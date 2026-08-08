@@ -11,6 +11,7 @@ The following points are the current user-confirmed requirements:
 - The selected product direction is a customer-ticket investigation and compensation-approval Agent.
 - Use `D:\java-agent-\research\agent-fullstack-project-topics.md` as prior discussion material.
 - Study relevant mature open-source projects and official documentation before making implementation decisions; do not invent designs without evidence.
+- Write project documentation and human-facing engineering artifacts in Chinese by default so they are easy for the user and agents to review together. Keep code identifiers and protocol fields in English where appropriate.
 
 ## Deliberately unresolved
 
