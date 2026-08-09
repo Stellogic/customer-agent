@@ -3,10 +3,10 @@ ARG GRADLE_OPTS
 WORKDIR /workspace
 COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
 COPY src ./src
-RUN gradle bootJar --no-daemon
+RUN --mount=type=cache,target=/home/gradle/.gradle gradle bootJar --no-daemon
 
 FROM build AS test
-RUN gradle test --no-daemon
+RUN --mount=type=cache,target=/home/gradle/.gradle gradle test --no-daemon
 
 FROM eclipse-temurin:25.0.3_9-jre-noble AS runtime
 RUN apt-get update \

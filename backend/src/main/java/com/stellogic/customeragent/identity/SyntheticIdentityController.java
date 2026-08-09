@@ -15,6 +15,7 @@ public final class SyntheticIdentityController {
     public List<SyntheticIdentity> identities() {
         return List.of(
                 new SyntheticIdentity("customer-demo", "CUSTOMER", "客户演示入口"),
+                new SyntheticIdentity("customer-other-demo", "CUSTOMER", "另一客户授权边界入口"),
                 new SyntheticIdentity("support-demo", "SUPPORT", "客服演示入口"),
                 new SyntheticIdentity("approver-demo", "APPROVER", "审批人演示入口"),
                 new SyntheticIdentity("agent-machine", "AGENT", "受限 Agent 机器身份"),
@@ -23,4 +24,3 @@ public final class SyntheticIdentityController {
 
     public record SyntheticIdentity(String id, String role, String label) {}
 }
-
