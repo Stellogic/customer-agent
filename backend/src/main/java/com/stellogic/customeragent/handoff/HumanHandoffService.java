@@ -6,4 +6,8 @@ interface HumanHandoffService {
     HumanHandoffResult request(RequestHumanHandoff command);
 
     HumanHandoffResult status(String customerId, UUID ticketId, String requestId);
+
+    AgentHumanHandoffResult requestAgentHumanHandoff(RequestAgentHumanHandoff command);
+
+    void auditAgentRejected(UUID ticketId, String reason);
 }

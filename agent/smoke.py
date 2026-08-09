@@ -206,7 +206,7 @@ def main() -> None:
         assert generation[4] == "COMPLETED"
         assert connection.execute(
             "select count(*) from investigation_fact where generation_id = %s", (generation[0],)
-        ).fetchone()[0] == 5
+        ).fetchone()[0] == 6
         assert connection.execute(
             "select count(*) from agent_command_request where generation_id = %s", (generation[0],)
         ).fetchone()[0] == 1
@@ -512,12 +512,12 @@ def main() -> None:
     assert sorted(reservation_results) == ["accepted", "compensation_reservation_capacity"]
 
     rejection_cases = {
-        "ORDER-DELAY-CANCELLED": "COMPENSATION_PROPOSAL_INELIGIBLE",
-        "ORDER-DELAY-UNPAID": "COMPENSATION_PROPOSAL_INELIGIBLE",
-        "ORDER-DELAY-REFUNDED": "COMPENSATION_PROPOSAL_INELIGIBLE",
-        "ORDER-DELAY-COMPENSATED": "COMPENSATION_PROPOSAL_INELIGIBLE",
-        "ORDER-DELAY-LOW-ALLOWANCE": "COMPENSATION_ALLOWANCE_INSUFFICIENT",
-        "ORDER-DELAY-RESERVED": "COMPENSATION_ALLOWANCE_INSUFFICIENT",
+        "ORDER-DELAY-CANCELLED": "UNSUPPORTED_SCENARIO",
+        "ORDER-DELAY-UNPAID": "UNSUPPORTED_SCENARIO",
+        "ORDER-DELAY-REFUNDED": "UNSUPPORTED_SCENARIO",
+        "ORDER-DELAY-COMPENSATED": "UNSUPPORTED_SCENARIO",
+        "ORDER-DELAY-LOW-ALLOWANCE": "FACT_CONFLICT",
+        "ORDER-DELAY-RESERVED": "FACT_CONFLICT",
     }
     rejected_ticket_ids = []
     with httpx.Client(timeout=20.0) as client:
@@ -537,8 +537,9 @@ def main() -> None:
             for _ in range(40):
                 with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
                     observed = connection.execute(
-                        "select exists(select 1 from audit_event where ticket_id = %s and event_type = %s)",
-                        (rejected_id, "AGENT_COMMAND_REJECTED_" + expected_reason),
+                        "select exists(select 1 from agent_human_handoff_request "
+                        "where ticket_id = %s and reason_code = %s)",
+                        (rejected_id, expected_reason),
                     ).fetchone()[0]
                     proposal_count = connection.execute(
                         "select count(*) from compensation_proposal_revision where ticket_id = %s",
@@ -870,6 +871,192 @@ def main() -> None:
             "select count(*) from public_message where ticket_id = %s",
             (uuid.UUID(handoff_ticket_id),),
         ).fetchone()[0] == len(handoff_public["messages"])
+
+    agent_handoff_ticket_id, _ = create_ambiguous_ticket("agent-human-handoff")
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        agent_handoff_generation_id = connection.execute(
+            "select id from agent_processing_generation where ticket_id = %s and status = 'ACTIVE'",
+            (uuid.UUID(agent_handoff_ticket_id),),
+        ).fetchone()[0]
+        agent_handoff_lifecycle = connection.execute(
+            "select lifecycle_state from support_ticket where id = %s",
+            (uuid.UUID(agent_handoff_ticket_id),),
+        ).fetchone()[0]
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into investigation_fact "
+            "(generation_id, fact_type, fact_value, evidence_reference, recorded_at) values "
+            "(%s, 'ORDER', 'ORDER-DELAY-AMBIGUOUS-A', 'order:ORDER-DELAY-AMBIGUOUS-A', now()), "
+            "(%s, 'LOGISTICS_DELAY_SECONDS', '288000', 'logistics:ORDER-DELAY-AMBIGUOUS-A', now())",
+            (agent_handoff_generation_id, agent_handoff_generation_id),
+        )
+    agent_handoff_request_id = f"{agent_handoff_generation_id}:human-handoff:FACT_CONFLICT"
+    agent_handoff_url = (
+        f"{spring_url}/internal/agent/tickets/{agent_handoff_ticket_id}/generations/"
+        f"{agent_handoff_generation_id}/human-handoff"
+    )
+    agent_handoff_headers = {
+        "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+        "X-Agent-Generation-Id": str(agent_handoff_generation_id),
+        "X-Agent-Operation": "REQUEST_HUMAN_HANDOFF",
+        "Idempotency-Key": agent_handoff_request_id,
+    }
+    agent_handoff_body = {
+        "reasonCode": "FACT_CONFLICT",
+        "summary": {
+            "conclusionCode": "INVESTIGATION_COULD_NOT_CONTINUE",
+            "facts": [
+                {
+                    "type": "ORDER",
+                    "value": "ORDER-DELAY-AMBIGUOUS-A",
+                    "evidenceReference": "order:ORDER-DELAY-AMBIGUOUS-A",
+                },
+                {
+                    "type": "LOGISTICS_DELAY_SECONDS",
+                    "value": "288000",
+                    "evidenceReference": "logistics:ORDER-DELAY-AMBIGUOUS-A",
+                },
+            ],
+        },
+    }
+    with httpx.Client(timeout=20.0) as client:
+        forged_summary = client.post(
+            agent_handoff_url,
+            headers={**agent_handoff_headers, "Idempotency-Key": f"forged-{uuid.uuid4()}"},
+            json={
+                **agent_handoff_body,
+                "summary": {
+                    "conclusionCode": "INVESTIGATION_COULD_NOT_CONTINUE",
+                    "facts": [{
+                        "type": "ORDER",
+                        "value": "raw payload fragment",
+                        "evidenceReference": "order:forged",
+                    }],
+                },
+            },
+        )
+        expect_status(forged_summary, 422)
+        agent_handoff = client.post(
+            agent_handoff_url, headers=agent_handoff_headers, json=agent_handoff_body
+        )
+        expect_status(agent_handoff, 202)
+        assert agent_handoff.json() == {
+            "requestId": agent_handoff_request_id,
+            "handlingMode": "HUMAN",
+            "reasonCode": "FACT_CONFLICT",
+            "replayed": False,
+        }
+        historical_replay = client.post(
+            agent_handoff_url, headers=agent_handoff_headers, json=agent_handoff_body
+        )
+        expect_status(historical_replay, 202)
+        assert historical_replay.json()["replayed"] is True
+        conflicting_replay = client.post(
+            agent_handoff_url,
+            headers=agent_handoff_headers,
+            json={**agent_handoff_body, "reasonCode": "UNSUPPORTED_SCENARIO"},
+        )
+        expect_status(conflicting_replay, 409)
+        stale_new_handoff = client.post(
+            agent_handoff_url,
+            headers={**agent_handoff_headers, "Idempotency-Key": f"late-agent-handoff-{uuid.uuid4()}"},
+            json=agent_handoff_body,
+        )
+        expect_status(stale_new_handoff, 403)
+        agent_handoff_public_response = client.get(
+            f"{spring_url}/api/customer/tickets/{agent_handoff_ticket_id}",
+            headers={"X-Synthetic-Customer-Id": "customer-demo"},
+        )
+        expect_status(agent_handoff_public_response, 200)
+        agent_handoff_public = agent_handoff_public_response.json()
+        assert agent_handoff_public["ticket"]["handlingMode"] == "HUMAN"
+        assert agent_handoff_public["ticket"]["lifecycleState"] == agent_handoff_lifecycle
+        assert agent_handoff_public["messages"][-1]["body"] == (
+            "为确保处理安全，此工单已转由客服继续调查。客服将在此工单中与您联系。"
+        )
+        agent_handoff_public_json = json.dumps(agent_handoff_public)
+        assert "FACT_CONFLICT" not in agent_handoff_public_json
+        assert "INVESTIGATION_COULD_NOT_CONTINUE" not in agent_handoff_public_json
+        agent_handoff_queue_response = client.get(
+            f"{spring_url}/api/support/queue",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(agent_handoff_queue_response, 200)
+        agent_handoff_queue_item = next(
+            item for item in agent_handoff_queue_response.json()
+            if item["ticketId"] == agent_handoff_ticket_id
+        )
+        assert agent_handoff_queue_item["reasonCodes"] == ["AGENT_HUMAN_HANDOFF"]
+        assert "summary" not in agent_handoff_queue_item
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select lifecycle_state, handling_mode, customer_human_preference, human_handoff_reason_code "
+            "from support_ticket where id = %s",
+            (uuid.UUID(agent_handoff_ticket_id),),
+        ).fetchone() == (agent_handoff_lifecycle, "HUMAN", False, "FACT_CONFLICT")
+        assert connection.execute(
+            "select status from agent_processing_generation where id = %s",
+            (agent_handoff_generation_id,),
+        ).fetchone()[0] == "HANDED_OFF"
+        stored_reason, stored_summary = connection.execute(
+            "select reason_code, investigation_summary from agent_human_handoff_request "
+            "where generation_id = %s and request_id = %s",
+            (agent_handoff_generation_id, agent_handoff_request_id),
+        ).fetchone()
+        assert stored_reason == "FACT_CONFLICT"
+        assert stored_summary == agent_handoff_body["summary"]
+        serialized_summary = json.dumps(stored_summary)
+        assert "payload" not in serialized_summary and "stack" not in serialized_summary
+
+    concurrent_agent_handoff_ticket_id, _ = create_ambiguous_ticket("concurrent-agent-handoff")
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        concurrent_agent_handoff_generation = connection.execute(
+            "select id from agent_processing_generation where ticket_id = %s and status = 'ACTIVE'",
+            (uuid.UUID(concurrent_agent_handoff_ticket_id),),
+        ).fetchone()[0]
+    concurrent_agent_handoff_url = (
+        f"{spring_url}/internal/agent/tickets/{concurrent_agent_handoff_ticket_id}/generations/"
+        f"{concurrent_agent_handoff_generation}/human-handoff"
+    )
+
+    def concurrent_agent_handoff(reason: str) -> int:
+        with httpx.Client(timeout=20.0) as concurrent_client:
+            response = concurrent_client.post(
+                concurrent_agent_handoff_url,
+                headers={
+                    "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                    "X-Agent-Generation-Id": str(concurrent_agent_handoff_generation),
+                    "X-Agent-Operation": "REQUEST_HUMAN_HANDOFF",
+                    "Idempotency-Key": f"{concurrent_agent_handoff_generation}:human-handoff:{reason}",
+                },
+                json={
+                    "reasonCode": reason,
+                    "summary": {
+                        "conclusionCode": "INVESTIGATION_COULD_NOT_CONTINUE",
+                        "facts": [],
+                    },
+                },
+            )
+            return response.status_code
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        concurrent_agent_handoff_statuses = list(executor.map(
+            concurrent_agent_handoff, ["FACT_CONFLICT", "UNSUPPORTED_SCENARIO"]
+        ))
+    assert sorted(concurrent_agent_handoff_statuses) == [202, 403]
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select count(*) from agent_human_handoff_request where ticket_id = %s",
+            (uuid.UUID(concurrent_agent_handoff_ticket_id),),
+        ).fetchone()[0] == 1
+        assert connection.execute(
+            "select count(*) from public_message where ticket_id = %s and body = %s",
+            (
+                uuid.UUID(concurrent_agent_handoff_ticket_id),
+                "为确保处理安全，此工单已转由客服继续调查。客服将在此工单中与您联系。",
+            ),
+        ).fetchone()[0] == 1
 
     resolved_handoff_request_id = f"resolved-handoff-{uuid.uuid4()}"
     with httpx.Client(timeout=20.0) as client:
@@ -1318,6 +1505,8 @@ def main() -> None:
         "concurrent_reservation_results": reservation_results,
         "concurrent_clarification_reply_statuses": concurrent_reply_statuses,
         "human_handoff_ticket_id": handoff_ticket_id,
+        "agent_handoff_ticket_id": agent_handoff_ticket_id,
+        "concurrent_agent_handoff_statuses": concurrent_agent_handoff_statuses,
         "handoff_reply_race_statuses": race_statuses,
         "clarification_resume_status": resume_status,
         "sla_fact_count": len(sla_facts),
