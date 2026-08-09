@@ -18,6 +18,7 @@ public final class SyntheticIdentityController {
                 new SyntheticIdentity("customer-other-demo", "CUSTOMER", "另一客户授权边界入口"),
                 new SyntheticIdentity("support-demo", "SUPPORT", "客服演示入口"),
                 new SyntheticIdentity("approver-demo", "APPROVER", "审批人演示入口"),
+                new SyntheticIdentity("approver-other-demo", "APPROVER", "另一审批人并发边界入口"),
                 new SyntheticIdentity("agent-machine", "AGENT", "受限 Agent 机器身份"),
                 new SyntheticIdentity("executor-machine", "COMPENSATION_EXECUTOR", "受限补偿执行器机器身份"));
     }

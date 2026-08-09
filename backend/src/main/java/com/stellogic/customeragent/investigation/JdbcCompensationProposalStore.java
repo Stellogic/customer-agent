@@ -67,13 +67,13 @@ class JdbcCompensationProposalStore {
                 "insert into compensation_proposal_revision "
                         + "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, "
                         + "delay_hours, delay_seconds, compensation_method, amount, reason_code, "
-                        + "evidence_references, policy_version, content_digest, status, created_at) "
+                        + "evidence_references, policy_version, content_digest, status, created_at, expires_at) "
                         + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'LOGISTICS_DELAY', "
-                        + "jsonb_build_array(?, ?), ?, ?, 'PENDING_APPROVAL', ?)",
+                        + "jsonb_build_array(?, ?), ?, ?, 'PENDING_APPROVAL', ?, ?)",
                 revisionId, proposalId, revisionNumber, content.ticketId(), content.orderReference(),
                 content.generationId(), content.delayHours(), content.delaySeconds(), content.method(),
                 content.amount(), content.evidenceReferences().get(0), content.evidenceReferences().get(1),
-                content.policyVersion(), contentDigest, databaseTime);
+                content.policyVersion(), contentDigest, databaseTime, Timestamp.from(now.plusSeconds(24 * 60 * 60)));
         jdbc.update(
                 "insert into approval_evidence_snapshot "
                         + "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "

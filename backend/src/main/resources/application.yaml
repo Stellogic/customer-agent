@@ -31,6 +31,9 @@ baseline:
     base-url: ${AGENT_SERVER_URL:http://localhost:2024}
     token: ${SPRING_TO_AGENT_TOKEN:local-spring-to-agent}
     submission-poll-delay: ${AGENT_SUBMISSION_POLL_DELAY:250}
+  approval:
+    default-lease-seconds: ${APPROVAL_DEFAULT_LEASE_SECONDS:900}
+    maximum-lease-seconds: ${APPROVAL_MAXIMUM_LEASE_SECONDS:900}
   identity:
     agent-token: ${AGENT_MACHINE_TOKEN:local-agent-machine}
     executor-token: ${EXECUTOR_MACHINE_TOKEN:local-executor-machine}
