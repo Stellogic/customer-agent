@@ -22,6 +22,7 @@ export function App() {
   const requestId = useRef(globalThis.crypto.randomUUID());
   const replyMessageId = useRef(globalThis.crypto.randomUUID());
   const resumeRequestId = useRef(globalThis.crypto.randomUUID());
+  const handoffRequestId = useRef(globalThis.crypto.randomUUID());
   const streamController = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -97,6 +98,38 @@ export function App() {
     }
   }
 
+  async function requestHumanHandoff() {
+    if (!snapshot || snapshot.ticket.handlingMode === "HUMAN") return;
+    setSubmitting(true);
+    setError("");
+    const ticketId = snapshot.ticket.id;
+    const requestId = handoffRequestId.current;
+    try {
+      const response = await fetch(`/api/customer/tickets/${ticketId}/human-handoff`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { ...customerHeaders, "Content-Type": "application/json", "Idempotency-Key": requestId },
+        body: JSON.stringify({ reasonCode: "CUSTOMER_REQUESTED" }),
+      });
+      if (!response.ok) throw new Error("human handoff failed");
+      await loadTicket(ticketId);
+      handoffRequestId.current = globalThis.crypto.randomUUID();
+    } catch {
+      const status = await fetch(`/api/customer/tickets/${ticketId}/human-handoff-requests/${requestId}`, {
+        headers: customerHeaders,
+        credentials: "same-origin",
+      }).catch(() => null);
+      if (status?.ok) {
+        await loadTicket(ticketId);
+        handoffRequestId.current = globalThis.crypto.randomUUID();
+      } else {
+        setError("转人工状态暂时未知；请保留本页重试，相同请求不会重复转人工。");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function consumeEvents(ticketId: string, cursor: string) {
     streamController.current?.abort();
     const controller = new AbortController();
@@ -141,6 +174,9 @@ export function App() {
       if (!current) return current;
       if (event.type === "PUBLIC_MESSAGE_APPENDED") {
         const message = JSON.parse(event.data) as Snapshot["messages"][number];
+        if (current.ticket.handlingMode === "HUMAN" && message.author === "AGENT") {
+          return { ...current, cursor: event.id };
+        }
         const duplicate = current.messages.some((existing) =>
           existing.author === message.author && existing.body === message.body && existing.sentAt === message.sentAt);
         return { ...current, cursor: event.id, messages: duplicate ? current.messages : [...current.messages, message] };
@@ -159,6 +195,18 @@ export function App() {
           cursor: event.id,
           ticket: { ...current.ticket, lifecycleState: transition.lifecycleState },
           clarification: transition.clarification === undefined ? current.clarification : transition.clarification,
+        };
+      }
+      if (event.type === "TICKET_HANDED_OFF") {
+        const transition = JSON.parse(event.data) as {
+          handlingMode: string;
+          clarification: null;
+        };
+        return {
+          ...current,
+          cursor: event.id,
+          ticket: { ...current.ticket, handlingMode: transition.handlingMode },
+          clarification: null,
         };
       }
       return current;
@@ -184,7 +232,7 @@ export function App() {
         <section className="ticket-card" aria-live="polite">
           <div className="ticket-heading">
             <div><p className="eyebrow">客服工单</p><h2>{snapshot.ticket.id}</h2></div>
-            <span className="status">{snapshot.ticket.lifecycleState === "INVESTIGATING" ? "调查中" : snapshot.ticket.lifecycleState === "WAITING_FOR_CUSTOMER" ? "等待你的回复" : snapshot.ticket.lifecycleState}</span>
+            <span className="status">{snapshot.ticket.handlingMode === "HUMAN" ? "人工处理中" : snapshot.ticket.lifecycleState === "INVESTIGATING" ? "调查中" : snapshot.ticket.lifecycleState === "WAITING_FOR_CUSTOMER" ? "等待你的回复" : snapshot.ticket.lifecycleState}</span>
           </div>
           <ol className="conversation">
             {snapshot.messages.map((message, index) => (
@@ -194,7 +242,7 @@ export function App() {
               </li>
             ))}
           </ol>
-          {snapshot.clarification && (
+          {snapshot.clarification && snapshot.ticket.handlingMode === "AGENT" && (
             <form className="clarification-form" onSubmit={submitClarification}>
               <label>{snapshot.clarification.question}
                 <input aria-label="订单确认码" value={clarificationAnswer}
@@ -202,6 +250,11 @@ export function App() {
               </label>
               <button disabled={submitting}>{submitting ? "正在恢复调查…" : "回复并继续调查"}</button>
             </form>
+          )}
+          {snapshot.ticket.handlingMode === "AGENT" && snapshot.ticket.lifecycleState !== "CLOSED" && (
+            <button type="button" className="handoff-button" disabled={submitting} onClick={requestHumanHandoff}>
+              {submitting ? "正在提交…" : "转人工处理"}
+            </button>
           )}
           <p className="recovery-note">刷新页面时，公开沟通会从 Spring 权威快照恢复。</p>
           {error && <p className="error" role="alert">{error}</p>}

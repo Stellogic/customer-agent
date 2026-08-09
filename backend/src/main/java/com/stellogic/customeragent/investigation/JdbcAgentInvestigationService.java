@@ -2,6 +2,7 @@ package com.stellogic.customeragent.investigation;
 
 import com.stellogic.customeragent.compensation.DelayCompensationPolicy;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
+import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import com.stellogic.customeragent.sla.SlaService;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -30,6 +31,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private final Clock clock;
     private final JdbcCompensationProposalStore proposalStore;
     private final SlaService slaService;
+    private final TicketAuthorityLock authorityLock;
     private final DelayCompensationPolicy policy = new DelayCompensationPolicy();
 
     @Autowired
@@ -38,17 +40,20 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             AgentAccessAudit accessAudit,
             Clock clock,
             JdbcCompensationProposalStore proposalStore,
-            SlaService slaService) {
+            SlaService slaService,
+            TicketAuthorityLock authorityLock) {
         this.jdbc = jdbc;
         this.accessAudit = accessAudit;
         this.clock = clock;
         this.proposalStore = proposalStore;
         this.slaService = slaService;
+        this.authorityLock = authorityLock;
     }
 
     @Override
     @Transactional
     public InvestigationFacts facts(UUID ticketId, UUID generationId) {
+        authorityLock.acquire(ticketId);
         List<String> ambiguous = jdbc.query(
                 "select t.order_reference from agent_processing_generation g "
                         + "join support_ticket t on t.id = g.ticket_id "
@@ -88,6 +93,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public ConclusionAcceptance submit(
             UUID ticketId, UUID generationId, String requestId, InvestigationConclusion conclusion) {
+        authorityLock.acquire(ticketId);
         validateShape(ticketId, conclusion);
         String parameterDigest = StableParameterDigest.sha256(
                 Boolean.toString(conclusion.compensationRequired()), conclusion.reasonCode().name(),
@@ -118,6 +124,11 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 accessAudit.rejected(ticketId, "REQUEST_ID_CONFLICT");
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         "command identity reused with different parameters");
+            }
+            if (!mayReplayCompletedCommand(ticketId, generationId)) {
+                accessAudit.rejected(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "generation is no longer authorized for command replay");
             }
             return record.asAcceptance();
         }
@@ -324,6 +335,14 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 "insert into investigation_fact (generation_id, fact_type, fact_value, evidence_reference, recorded_at) "
                         + "values (?, ?, ?, ?, ?) on conflict (generation_id, fact_type) do nothing",
                 generationId, type, value, evidence, Timestamp.from(now));
+    }
+
+    private boolean mayReplayCompletedCommand(UUID ticketId, UUID generationId) {
+        return !jdbc.query(
+                "select 1 from agent_processing_generation g join support_ticket t on t.id = g.ticket_id "
+                        + "where g.id = ? and g.ticket_id = ? and g.status in ('ACTIVE', 'COMPLETED') "
+                        + "and t.handling_mode = 'AGENT' and not t.customer_human_preference",
+                (rs, row) -> rs.getInt(1), generationId, ticketId).isEmpty();
     }
 
     private static String nullable(String value) {

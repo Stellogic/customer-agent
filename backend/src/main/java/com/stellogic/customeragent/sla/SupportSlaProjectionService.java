@@ -32,12 +32,14 @@ class SupportSlaProjectionService {
                         + "array_agg(f.objective order by f.objective) "
                         + "from shared_support_queue_entry q join support_ticket t on t.id = q.ticket_id "
                         + "join ticket_sla_fact f on f.ticket_id = q.ticket_id and f.fact_type = 'BREACH' "
+                        + "where q.reason_code = 'SLA_BREACH' "
                         + "group by q.ticket_id, t.lifecycle_state, t.handling_mode, q.reason_code, q.entered_at "
                         + "order by q.entered_at, q.ticket_id",
                 (rs, row) -> new SharedEscalationSummary(
                         rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4),
                         List.of((String[]) rs.getArray(6).getArray()), rs.getTimestamp(5).toInstant()));
     }
+
 }
 
 record SlaWarningNotification(UUID ticketId, String objective, Instant warnedAt) {}
