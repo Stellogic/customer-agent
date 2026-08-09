@@ -451,6 +451,10 @@ def main() -> None:
         assert approval_projection["reasonCode"] == "LOGISTICS_DELAY"
         assert approval_projection["delaySeconds"] == 288000
         assert approval_projection["leaseToken"] == lease_one["leaseToken"]
+        assert [event["eventType"] for event in approval_projection["responsibilityChain"]] == [
+            "COMPENSATION_PROPOSAL_REVISION_CREATED", "APPROVAL_LEASE_CLAIMED"
+        ]
+        assert approval_projection["responsibilityChain"][1]["leaseVersion"] == 1
         assert not any(field in approval_projection for field in (
             "ticket", "ticketId", "customerId", "description", "publicMessages", "internalNotes",
             "execution", "generationId", "threadId", "toolPayload",
@@ -620,9 +624,20 @@ def main() -> None:
         expect_status(release_at_proposal_expiry, 403)
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert connection.execute(
-            "select status from approval_lease where proposal_revision_id = %s",
+            "select p.status, l.status from compensation_proposal_revision p "
+            "join approval_lease l on l.proposal_revision_id = p.id where p.id = %s",
             (expired_revision_id,),
-        ).fetchone()[0] == "EXPIRED"
+        ).fetchone() == ("EXPIRED", "REVOKED")
+        expiry_audit = connection.execute(
+            "select event_type, occurred_at from audit_event where subject_id = %s "
+            "and event_type in ('COMPENSATION_PROPOSAL_REVISION_EXPIRED', 'APPROVAL_LEASE_REVOKED') "
+            "order by id",
+            (expired_revision_id,),
+        ).fetchall()
+        assert [(event_type, occurred_at.isoformat()) for event_type, occurred_at in expiry_audit] == [
+            ("COMPENSATION_PROPOSAL_REVISION_EXPIRED", "2026-08-09T14:00:00+00:00"),
+            ("APPROVAL_LEASE_REVOKED", "2026-08-09T14:00:00+00:00"),
+        ]
 
     duplicate_ticket = uuid.uuid4()
     duplicate_generation = uuid.uuid4()

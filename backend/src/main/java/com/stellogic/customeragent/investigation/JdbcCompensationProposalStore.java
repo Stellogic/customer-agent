@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.investigation;
 
 import com.stellogic.customeragent.reliability.StableParameterDigest;
+import com.stellogic.customeragent.approval.CompensationProposalExpiry;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -14,10 +15,12 @@ import org.springframework.stereotype.Repository;
 class JdbcCompensationProposalStore {
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final CompensationProposalExpiry expiry;
 
-    JdbcCompensationProposalStore(JdbcTemplate jdbc, Clock clock) {
+    JdbcCompensationProposalStore(JdbcTemplate jdbc, Clock clock, CompensationProposalExpiry expiry) {
         this.jdbc = jdbc;
         this.clock = clock;
+        this.expiry = expiry;
     }
 
     StoredProposal save(ProposalContent content) {
@@ -25,6 +28,8 @@ class JdbcCompensationProposalStore {
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
                 content.orderReference() + "\nLOGISTICS_DELAY");
+        Instant now = clock.instant();
+        expiry.expireDueForOrder(content.orderReference(), now);
         List<ActiveProposal> active = jdbc.query(
                 "select id, proposal_id, revision_number, ticket_id, content_digest, status "
                         + "from compensation_proposal_revision where order_reference = ? "
@@ -53,15 +58,25 @@ class JdbcCompensationProposalStore {
             revisionNumber = 1;
         } else {
             ActiveProposal previous = active.getFirst();
+            List<Long> revokedLeaseVersions = jdbc.query(
+                    "select lease_version from approval_lease where proposal_revision_id = ? "
+                            + "and status = 'ACTIVE' for update",
+                    (rs, row) -> rs.getLong(1), previous.id());
             jdbc.update(
                     "update compensation_proposal_revision set status = 'SUPERSEDED' where id = ?",
                     previous.id());
+            if (!revokedLeaseVersions.isEmpty()) {
+                jdbc.update(
+                        "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, subject_type, "
+                                + "subject_id, authorization_version) values (?, 'APPROVAL_LEASE_REVOKED', "
+                                + "'spring-system', ?, 'COMPENSATION_PROPOSAL_REVISION', ?, ?)",
+                        previous.ticketId(), Timestamp.from(now), previous.id(), revokedLeaseVersions.getFirst());
+            }
             proposalId = previous.proposalId();
             revisionNumber = previous.revisionNumber() + 1;
         }
 
         UUID revisionId = UUID.randomUUID();
-        Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         jdbc.update(
                 "insert into compensation_proposal_revision "

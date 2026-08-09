@@ -80,15 +80,6 @@ BEGIN
     IF OLD.status = 'PENDING_APPROVAL' AND NEW.status <> 'PENDING_APPROVAL' THEN
         UPDATE approval_lease SET status = 'REVOKED'
         WHERE proposal_revision_id = NEW.id AND status = 'ACTIVE';
-        IF FOUND THEN
-            INSERT INTO audit_event (
-                ticket_id, event_type, actor_id, occurred_at,
-                subject_type, subject_id, authorization_version
-            )
-            SELECT NEW.ticket_id, 'APPROVAL_LEASE_REVOKED', 'spring-system', current_timestamp,
-                   'COMPENSATION_PROPOSAL_REVISION', NEW.id, max(lease_version)
-            FROM approval_lease WHERE proposal_revision_id = NEW.id;
-        END IF;
     END IF;
     RETURN NEW;
 END;

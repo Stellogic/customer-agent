@@ -1,7 +1,7 @@
 package com.stellogic.customeragent.approval;
 
 import java.util.List;
-import java.util.Set;
+import com.stellogic.customeragent.identity.SyntheticApprovers;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +17,6 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/approver/compensation-proposals")
 public final class ApprovalController {
-    private static final Set<String> APPROVERS = Set.of("approver-demo", "approver-other-demo");
     private final ApprovalService service;
 
     ApprovalController(ApprovalService service) {
@@ -74,7 +73,7 @@ public final class ApprovalController {
     }
 
     private static String requireApprover(String approverId) {
-        if (approverId == null || !APPROVERS.contains(approverId.trim())) {
+        if (approverId == null || !SyntheticApprovers.contains(approverId.trim())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "approver identity required");
         }
         return approverId.trim();

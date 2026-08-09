@@ -24,6 +24,7 @@ class JdbcApprovalService implements ApprovalService {
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final ObjectMapper objectMapper;
+    private final CompensationProposalExpiry proposalExpiry;
     private final int defaultLeaseSeconds;
     private final int maximumLeaseSeconds;
     private final DelayCompensationPolicy policy = new DelayCompensationPolicy();
@@ -32,18 +33,23 @@ class JdbcApprovalService implements ApprovalService {
             JdbcTemplate jdbc,
             Clock clock,
             ObjectMapper objectMapper,
+            CompensationProposalExpiry proposalExpiry,
             @Value("${baseline.approval.default-lease-seconds:900}") int defaultLeaseSeconds,
             @Value("${baseline.approval.maximum-lease-seconds:900}") int maximumLeaseSeconds) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.objectMapper = objectMapper;
+        this.proposalExpiry = proposalExpiry;
         this.defaultLeaseSeconds = defaultLeaseSeconds;
         this.maximumLeaseSeconds = maximumLeaseSeconds;
     }
 
     @Override
+    @Transactional
     public List<ApprovalModels.QueueItem> queue() {
-        Timestamp now = Timestamp.from(clock.instant());
+        Instant serverNow = clock.instant();
+        proposalExpiry.expireDue(serverNow);
+        Timestamp now = Timestamp.from(serverNow);
         return jdbc.query(
                 "select p.id, p.compensation_method, p.amount, p.created_at, p.expires_at "
                         + "from compensation_proposal_revision p "
@@ -83,6 +89,7 @@ class JdbcApprovalService implements ApprovalService {
         }
 
         Instant now = clock.instant();
+        proposalExpiry.expireIfDue(command.revisionId(), now);
         Timestamp at = Timestamp.from(now);
         List<ProposalScope> proposals = jdbc.query(
                 "select ticket_id, status, expires_at from compensation_proposal_revision where id = ? for update",
@@ -132,9 +139,16 @@ class JdbcApprovalService implements ApprovalService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public ApprovalModels.ApprovalView view(ApprovalModels.ViewCommand command) {
         Instant now = clock.instant();
+        proposalExpiry.expireIfDue(command.revisionId(), now);
+        jdbc.update(
+                "update approval_lease set status = 'EXPIRED' where proposal_revision_id = ? "
+                        + "and approver_id = ? and lease_token = ? and lease_version = ? "
+                        + "and status = 'ACTIVE' and expires_at <= ?",
+                command.revisionId(), command.approverId(), command.leaseToken(),
+                command.leaseVersion(), Timestamp.from(now));
         List<ViewRow> rows = jdbc.query(
                 "select p.ticket_id, p.revision_number, p.content_digest, p.order_reference, p.reason_code, "
                         + "p.delay_hours, p.delay_seconds, p.compensation_method, p.amount, p.policy_version, "
@@ -145,7 +159,7 @@ class JdbcApprovalService implements ApprovalService {
                         + "join approval_evidence_snapshot s on s.proposal_revision_id = p.id "
                         + "where p.id = ? and p.status = 'PENDING_APPROVAL' and p.expires_at > ? "
                         + "and l.approver_id = ? and l.lease_token = ? and l.lease_version = ? "
-                        + "and l.status = 'ACTIVE' and l.expires_at > ?",
+                        + "and l.status = 'ACTIVE' and l.expires_at > ? for update of l, p",
                 (rs, row) -> new ViewRow(
                         rs.getObject(1, UUID.class), rs.getInt(2), rs.getString(3), rs.getString(4),
                         rs.getString(5), rs.getInt(6), rs.getLong(7), rs.getString(8), rs.getBigDecimal(9),
@@ -179,10 +193,11 @@ class JdbcApprovalService implements ApprovalService {
                         + "where subject_type = 'COMPENSATION_PROPOSAL_REVISION' and subject_id = ? and event_type in "
                         + "('COMPENSATION_PROPOSAL_REVISION_CREATED', 'COMPENSATION_PROPOSAL_REVISION_REUSED', "
                         + "'APPROVAL_LEASE_CLAIMED', 'APPROVAL_LEASE_RELEASED', 'APPROVAL_LEASE_REVOKED') "
+                        + "and (authorization_version is null or authorization_version <= ?) "
                         + "order by occurred_at, id",
                 (rs, index) -> new ApprovalModels.ResponsibilityEvent(
                         rs.getString(1), rs.getString(2), rs.getTimestamp(3).toInstant(),
-                        rs.getObject(4, Long.class)), command.revisionId());
+                        rs.getObject(4, Long.class)), command.revisionId(), command.leaseVersion());
         return new ApprovalModels.ApprovalView(
                 "APPROVAL_VIEW", command.revisionId(), row.revisionNumber(), row.contentDigest(),
                 row.orderReference(), row.reasonCode(), row.delayHours(), row.delaySeconds(), row.method(),
@@ -207,6 +222,7 @@ class JdbcApprovalService implements ApprovalService {
             return new ApprovalModels.ReleaseResult(existing.getFirst().revisionId(), true, true);
         }
         Instant now = clock.instant();
+        proposalExpiry.expireIfDue(command.revisionId(), now);
         Timestamp at = Timestamp.from(now);
         List<LeaseScope> leases = jdbc.query(
                 "select p.ticket_id, p.status, p.expires_at, l.status, l.expires_at from approval_lease l "
