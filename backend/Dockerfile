@@ -1,4 +1,5 @@
 FROM gradle:9.3.1-jdk25 AS build
+ARG GRADLE_OPTS
 WORKDIR /workspace
 COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
 COPY src ./src

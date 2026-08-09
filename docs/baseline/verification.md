@@ -7,9 +7,10 @@
 - 从空 Compose 数据卷启动 PostgreSQL 18.4。
 - 由 `spring_migrator` 和 `agent_migrator` 执行真实迁移；运行账号无 DDL 权限。
 - 运行 Spring API 测试、Agent 测试、React 类型检查与生产构建。
-- 通过 Spring 状态投影确认 PostgreSQL 与带认证的 Agent `/ok` 调用。
+- 通过 Spring 状态投影确认 PostgreSQL 与带认证的 Agent `/threads/search` 受限调用。
 - 创建真实 Agent Server thread/run，执行 LangGraph 节点，回调 Spring 的 Agent 专属能力并在 Agent 数据库产生 checkpoint。
 - 验证 Agent 与补偿执行器令牌不能互用，Spring 与 Agent 运行账号不能连接对方数据库。
+- 验证 Agent Server 进程环境中不存在补偿执行器令牌。
 - 扫描生产前端静态文件，拒绝 Agent 地址、本地令牌和数据库 URI。
 
 统一命令：

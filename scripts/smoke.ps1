@@ -11,9 +11,10 @@ if ($Reset) {
     docker compose down --volumes --remove-orphans
 }
 
-docker build --target test --tag customer-agent/backend-test:issue12 backend
+docker build --build-arg "GRADLE_OPTS=$($env:CUSTOMER_AGENT_GRADLE_OPTS)" --target test --tag customer-agent/backend-test:issue12 backend
 docker build --target test --tag customer-agent/agent-test:issue12 agent
 docker compose up --detach --build --force-recreate --wait
+docker compose exec -T agent-server sh -c 'test -z "${EXECUTOR_MACHINE_TOKEN+x}"'
 docker compose --profile smoke run --rm integration-smoke
 
 $status = Invoke-RestMethod -Uri 'http://127.0.0.1:4180/api/system/status'

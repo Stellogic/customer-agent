@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.client.RestClient;
 
@@ -20,10 +22,15 @@ class StatusConfiguration {
         RestClient agent = RestClient.builder()
                 .baseUrl(agentBaseUrl)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + agentToken)
+                .requestFactory(new SimpleClientHttpRequestFactory())
                 .build();
 
         AvailabilityProbe databaseProbe = () -> jdbc.queryForObject("select 1", Integer.class) == 1;
-        AvailabilityProbe agentProbe = () -> agent.get().uri("/ok").retrieve().toBodilessEntity().getStatusCode().is2xxSuccessful();
+        AvailabilityProbe agentProbe = () -> agent.post()
+                .uri("/threads/search")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{}")
+                .exchange((request, response) -> response.getStatusCode().is2xxSuccessful());
         return new SystemStatusService(databaseProbe, agentProbe);
     }
 }

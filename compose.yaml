@@ -22,7 +22,10 @@ services:
 
   spring-migrate:
     image: customer-agent/backend:issue12
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        GRADLE_OPTS: ${CUSTOMER_AGENT_GRADLE_OPTS:-}
     environment:
       SPRING_FLYWAY_ENABLED: "true"
       BASELINE_MIGRATE_ONLY: "true"
@@ -62,7 +65,8 @@ services:
     environment:
       AGENT_DATABASE_URI: postgresql://agent_runtime:local-agent-runtime@postgres:5432/agent_checkpoint
       SPRING_INTERNAL_URL: http://backend:8080
-      <<: *local-secrets
+      SPRING_TO_AGENT_TOKEN: ${SPRING_TO_AGENT_TOKEN:-local-spring-to-agent}
+      AGENT_MACHINE_TOKEN: ${AGENT_MACHINE_TOKEN:-local-agent-machine}
     depends_on:
       agent-migrate:
         condition: service_completed_successfully
@@ -75,7 +79,10 @@ services:
 
   backend:
     image: customer-agent/backend:issue12
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        GRADLE_OPTS: ${CUSTOMER_AGENT_GRADLE_OPTS:-}
     environment:
       SPRING_PROFILES_ACTIVE: local-demo
       SPRING_FLYWAY_ENABLED: "false"
