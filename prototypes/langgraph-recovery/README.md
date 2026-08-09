@@ -6,7 +6,7 @@
 
 这个原型验证：在 Spring Boot 持有 generation、可靠提交记录、业务授权和幂等真值，而 LangGraph/Agent Server 持有 thread、run 与 checkpoint 的边界下，提交响应丢失、进程重启、`interrupt/resume`、重复恢复、业务工具响应丢失、同幂等键重试，以及旧 generation 的迟到调用能否保持已接受的不变量。
 
-原型使用三个互不共享事务的 SQLite 文件来显式表示 Spring 业务库、Agent 运行时目录和 LangGraph checkpoint。SQLite 只为快速故障注入；它不替代最终 Spring Boot/PostgreSQL 或 Standalone Agent Server 验证。
+原型使用三个互不共享事务的 SQLite 文件来显式表示 Spring 业务库、Agent 运行时目录和 LangGraph checkpoint。SQLite 只为快速故障注入；它不替代最终 Spring Boot/PostgreSQL 专项验证。
 
 ## 一条命令运行
 
@@ -30,7 +30,7 @@ prototypes/langgraph-recovery/.venv/Scripts/python.exe prototypes/langgraph-reco
 
 - `matrix`：真实 LangGraph + SQLite checkpointer，跨多个 Python 子进程验证重启与重放；Spring/Agent Server 的 HTTP 边界用两个独立 SQLite 目录模拟。
 - `agent_app.py` + `langgraph.json`：供 `langgraph dev` 的真实 Agent Server API 二次验证。它需要 `requirements-agent-server.txt`，且是否需要 LangSmith API key 以当前官方 CLI 行为为准。
-- Standalone：本原型不会伪造 Standalone 的 PostgreSQL/Redis/许可证结果；部署要求和未实测项记录在 `CONCLUSION_DRAFT.md`。
+- 验证边界：本项目已决定使用 `langgraph dev` 完成本地开发与面试演示，不把 Standalone 许可证作为 MVP 前置条件；结论和不可外推项记录在 `CONCLUSION.md`。
 
 ## 目录
 
