@@ -1,10 +1,12 @@
 package com.stellogic.customeragent.investigation;
 
 import java.util.List;
+import java.util.UUID;
 
 record InvestigationFacts(
         String orderReference,
         int delayHours,
+        long delaySeconds,
         boolean paid,
         boolean cancelled,
         boolean fullyRefunded,
@@ -17,15 +19,29 @@ record InvestigationConclusion(
         boolean compensationRequired,
         DecisionReasonCode reasonCode,
         int delayHours,
+        long delaySeconds,
         String orderReference,
-        List<String> evidenceRefs) {}
+        List<String> evidenceRefs,
+        String suggestedMethod,
+        String suggestedAmount) {}
 
-record ConclusionAcceptance(boolean accepted, TicketLifecycleState lifecycleState) {}
+record ConclusionAcceptance(
+        boolean accepted,
+        TicketLifecycleState lifecycleState,
+        UUID proposalRevisionId,
+        Integer proposalRevision,
+        ProposalRevisionStatus proposalStatus) {}
 
 enum DecisionReasonCode {
-    DELAY_UNDER_24_HOURS
+    DELAY_UNDER_24_HOURS,
+    LOGISTICS_DELAY
 }
 
 enum TicketLifecycleState {
+    INVESTIGATING,
     RESOLVED
+}
+
+enum ProposalRevisionStatus {
+    PENDING_APPROVAL
 }

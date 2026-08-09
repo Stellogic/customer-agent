@@ -61,12 +61,23 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
 
 
 def fixed_fake_model(facts: dict) -> dict:
-    if facts["delayHours"] >= 24 or facts["pendingActionCount"] != 0:
-        raise ValueError("issue #14 fake model supports only the no-compensation policy tier")
+    if facts["delaySeconds"] >= 24 * 60 * 60:
+        return {
+            "compensationRequired": True,
+            "reasonCode": "LOGISTICS_DELAY",
+            "delayHours": facts["delayHours"],
+            "delaySeconds": facts["delaySeconds"],
+            "orderReference": facts["orderReference"],
+            "evidenceRefs": facts["evidenceRefs"],
+            # Intentionally wrong: Spring owns the authoritative method and amount.
+            "suggestedMethod": "COUPON",
+            "suggestedAmount": "999999.99",
+        }
     return {
         "compensationRequired": False,
         "reasonCode": "DELAY_UNDER_24_HOURS",
         "delayHours": facts["delayHours"],
+        "delaySeconds": facts["delaySeconds"],
         "orderReference": facts["orderReference"],
         "evidenceRefs": facts["evidenceRefs"],
     }
