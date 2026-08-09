@@ -787,6 +787,222 @@ def main() -> None:
         )
         expect_status(handed_off, 409)
 
+    fixed_now = "2026-08-09T14:00:00Z"
+    first_warning_headers = {
+        "X-Synthetic-Customer-Id": "customer-demo",
+        "Idempotency-Key": f"sla-first-warning-{uuid.uuid4()}",
+    }
+    with httpx.Client(timeout=20.0) as client:
+        first_warning_response = client.post(
+            f"{spring_url}/api/customer/tickets",
+            headers=first_warning_headers,
+            json={"orderReference": "ORDER-INTAKE-ONLY", "description": "首次响应边界验收"},
+        )
+        expect_status(first_warning_response, 201)
+        first_warning_ticket_id = uuid.UUID(first_warning_response.json()["ticketId"])
+
+    ticket_uuid = uuid.UUID(ticket_id)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into support_assignment (id, ticket_id, support_id, status, assigned_at) "
+            "values (%s, %s, 'support-demo', 'ACTIVE', %s)",
+            (uuid.uuid4(), ticket_uuid, fixed_now),
+        )
+        connection.execute(
+            "update support_ticket set created_at = %s::timestamptz - interval '15 minutes', "
+            "first_responded_at = %s, lifecycle_state = 'WAITING_FOR_CUSTOMER', "
+            "resolution_elapsed_seconds = 86399, resolution_running_since = null where id = %s",
+            (fixed_now, fixed_now, ticket_uuid),
+        )
+        connection.execute(
+            "update support_ticket set created_at = %s::timestamptz - interval '12 minutes', "
+            "first_responded_at = %s, lifecycle_state = 'WAITING_FOR_CUSTOMER', "
+            "resolution_elapsed_seconds = 69120, resolution_running_since = null where id = %s",
+            (fixed_now, fixed_now, first_warning_ticket_id),
+        )
+
+    for _ in range(40):
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            first_warning_facts = connection.execute(
+                "select fact_type from ticket_sla_fact where ticket_id = %s and objective = 'FIRST_RESPONSE'",
+                (first_warning_ticket_id,),
+            ).fetchall()
+            resolution_warning_facts = connection.execute(
+                "select fact_type from ticket_sla_fact where ticket_id = %s and objective = 'RESOLUTION'",
+                (first_warning_ticket_id,),
+            ).fetchall()
+            paused_resolution_breach = connection.execute(
+                "select count(*) from ticket_sla_fact where ticket_id = %s "
+                "and objective = 'RESOLUTION' and fact_type = 'BREACH'",
+                (ticket_uuid,),
+            ).fetchone()[0]
+        if first_warning_facts:
+            break
+        time.sleep(0.25)
+    assert first_warning_facts == [("WARNING",)]
+    assert resolution_warning_facts == [("WARNING",)]
+    assert paused_resolution_breach == 0
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "update support_ticket set lifecycle_state = 'WAITING_FOR_EXTERNAL', "
+            "resolution_running_since = %s::timestamptz - interval '1 second' where id = %s",
+            (fixed_now, ticket_uuid),
+        )
+
+    for _ in range(40):
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            sla_facts = connection.execute(
+                "select objective, fact_type from ticket_sla_fact where ticket_id = %s "
+                "order by objective, fact_type",
+                (ticket_uuid,),
+            ).fetchall()
+        if len(sla_facts) == 4:
+            break
+        time.sleep(0.25)
+    assert sla_facts == [
+        ("FIRST_RESPONSE", "BREACH"),
+        ("FIRST_RESPONSE", "WARNING"),
+        ("RESOLUTION", "BREACH"),
+        ("RESOLUTION", "WARNING"),
+    ]
+
+    with httpx.Client(timeout=20.0) as client:
+        notifications = client.get(
+            f"{spring_url}/api/support/sla/notifications",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(notifications, 200)
+        assert {item["objective"] for item in notifications.json() if item["ticketId"] == ticket_id} == {
+            "FIRST_RESPONSE", "RESOLUTION"
+        }
+        escalations = client.get(
+            f"{spring_url}/api/support/escalations",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(escalations, 200)
+        queue_item = next(item for item in escalations.json() if item["ticketId"] == ticket_id)
+        assert queue_item["lifecycleState"] == "WAITING_FOR_EXTERNAL"
+        assert queue_item["handlingMode"] == "AGENT"
+        assert queue_item["reasonCode"] == "SLA_BREACH"
+        assert set(queue_item["breachedObjectives"]) == {"FIRST_RESPONSE", "RESOLUTION"}
+        assert not any(field in queue_item for field in (
+            "customerId", "orderReference", "description", "messages", "investigationFacts"
+        ))
+        denied_queue = client.get(
+            f"{spring_url}/api/support/escalations",
+            headers={"X-Synthetic-Support-Id": "customer-demo"},
+        )
+        expect_status(denied_queue, 403)
+        unassigned_detail = client.get(
+            f"{spring_url}/api/support/tickets/{first_warning_ticket_id}",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(unassigned_detail, 404)
+
+    immediate_ticket_id, immediate_projection = create_ambiguous_ticket("sla-resume-boundary")
+    immediate_request_id = immediate_projection["clarification"]["id"]
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "update support_ticket set resolution_elapsed_seconds = 86400, "
+            "resolution_running_since = null where id = %s",
+            (uuid.UUID(immediate_ticket_id),),
+        )
+    with httpx.Client(timeout=20.0) as client:
+        immediate_reply = client.post(
+            f"{spring_url}/api/customer/tickets/{immediate_ticket_id}/clarifications/"
+            f"{immediate_request_id}/replies",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": f"sla-resume-message-{uuid.uuid4()}",
+                "X-Resume-Request-Id": str(uuid.uuid4()),
+            },
+            json={"answer": "A"},
+        )
+        expect_status(immediate_reply, 202)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select count(*) from ticket_sla_fact where ticket_id = %s "
+            "and objective = 'RESOLUTION' and fact_type = 'BREACH'",
+            (uuid.UUID(immediate_ticket_id),),
+        ).fetchone()[0] == 1
+
+    time.sleep(1.5)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select count(*) from ticket_sla_fact where ticket_id = %s", (ticket_uuid,)
+        ).fetchone()[0] == 4
+        assert connection.execute(
+            "select count(*) from audit_event where ticket_id = %s and event_type like 'SLA_%%'",
+            (ticket_uuid,),
+        ).fetchone()[0] == 4
+        assert connection.execute(
+            "select lifecycle_state, handling_mode, resolution_elapsed_seconds from support_ticket where id = %s",
+            (ticket_uuid,),
+        ).fetchone() == ("WAITING_FOR_EXTERNAL", "AGENT", 86399)
+
+    with httpx.Client(timeout=20.0) as client:
+        concurrent_state_response = client.post(
+            f"{spring_url}/api/customer/tickets",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": f"sla-concurrent-state-{uuid.uuid4()}",
+            },
+            json={"orderReference": "ORDER-INTAKE-ONLY", "description": "并发状态变化验收"},
+        )
+        expect_status(concurrent_state_response, 201)
+        concurrent_state_ticket_id = uuid.UUID(concurrent_state_response.json()["ticketId"])
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "select id from support_ticket where id = %s for update",
+            (concurrent_state_ticket_id,),
+        )
+        connection.execute(
+            "update support_ticket set lifecycle_state = 'WAITING_FOR_EXTERNAL', "
+            "resolution_elapsed_seconds = 86400, resolution_running_since = null where id = %s",
+            (concurrent_state_ticket_id,),
+        )
+        time.sleep(1.25)
+        connection.execute(
+            "update support_ticket set lifecycle_state = 'RESOLVED' where id = %s",
+            (concurrent_state_ticket_id,),
+        )
+    time.sleep(1.25)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select lifecycle_state, resolution_elapsed_seconds from support_ticket where id = %s",
+            (concurrent_state_ticket_id,),
+        ).fetchone() == ("RESOLVED", 86400)
+        assert connection.execute(
+            "select count(*) from ticket_sla_fact where ticket_id = %s and objective = 'RESOLUTION'",
+            (concurrent_state_ticket_id,),
+        ).fetchone()[0] == 2
+        connection.execute(
+            "update support_ticket set lifecycle_state = 'INVESTIGATING', "
+            "resolution_running_since = %s where id = %s",
+            (fixed_now, concurrent_state_ticket_id),
+        )
+    time.sleep(1.25)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select lifecycle_state, resolution_elapsed_seconds, resolution_running_since is not null "
+            "from support_ticket where id = %s",
+            (concurrent_state_ticket_id,),
+        ).fetchone() == ("INVESTIGATING", 86400, True)
+        assert connection.execute(
+            "select count(*) from ticket_sla_fact where ticket_id = %s and objective = 'RESOLUTION'",
+            (concurrent_state_ticket_id,),
+        ).fetchone()[0] == 2
+    try:
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            connection.execute(
+                "update support_ticket set resolution_elapsed_seconds = 0 where id = %s",
+                (concurrent_state_ticket_id,),
+            )
+        raise AssertionError("resolution elapsed time unexpectedly reset on reopen")
+    except psycopg.errors.CheckViolation as error:
+        assert error.diag.constraint_name == "resolution_elapsed_seconds_monotonic"
+
     with psycopg.connect(os.environ["AGENT_DATABASE_URI"]) as connection:
         assert connection.execute("select current_database(), current_user").fetchone() == (
             "agent_checkpoint",
@@ -817,6 +1033,8 @@ def main() -> None:
         "concurrent_reservation_results": reservation_results,
         "concurrent_clarification_reply_statuses": concurrent_reply_statuses,
         "clarification_resume_status": resume_status,
+        "sla_fact_count": len(sla_facts),
+        "sla_resume_immediate": True,
         "concurrent_replays": 7,
     }))
 

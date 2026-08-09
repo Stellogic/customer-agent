@@ -2,6 +2,7 @@ package com.stellogic.customeragent.investigation;
 
 import com.stellogic.customeragent.compensation.DelayCompensationPolicy;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
+import com.stellogic.customeragent.sla.SlaService;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -28,6 +29,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private final AgentAccessAudit accessAudit;
     private final Clock clock;
     private final JdbcCompensationProposalStore proposalStore;
+    private final SlaService slaService;
     private final DelayCompensationPolicy policy = new DelayCompensationPolicy();
 
     @Autowired
@@ -35,11 +37,13 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             JdbcTemplate jdbc,
             AgentAccessAudit accessAudit,
             Clock clock,
-            JdbcCompensationProposalStore proposalStore) {
+            JdbcCompensationProposalStore proposalStore,
+            SlaService slaService) {
         this.jdbc = jdbc;
         this.accessAudit = accessAudit;
         this.clock = clock;
         this.proposalStore = proposalStore;
+        this.slaService = slaService;
     }
 
     @Override
@@ -142,6 +146,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
 
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
+        slaService.evaluateTicket(ticketId, now);
         int ticketUpdated = jdbc.update(
                 "update support_ticket set lifecycle_state = 'RESOLVED', "
                         + "resolution_elapsed_seconds = resolution_elapsed_seconds + "
