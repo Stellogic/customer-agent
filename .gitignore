@@ -1,0 +1,9 @@
+.gradle/
+.npm-cache/
+**/build/
+**/node_modules/
+**/.venv/
+**/__pycache__/
+frontend/dist/
+.env
+.local/

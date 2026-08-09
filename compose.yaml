@@ -1,0 +1,148 @@
+name: customer-agent-baseline
+
+x-secrets: &local-secrets
+  SPRING_TO_AGENT_TOKEN: ${SPRING_TO_AGENT_TOKEN:-local-spring-to-agent}
+  AGENT_MACHINE_TOKEN: ${AGENT_MACHINE_TOKEN:-local-agent-machine}
+  EXECUTOR_MACHINE_TOKEN: ${EXECUTOR_MACHINE_TOKEN:-local-executor-machine}
+
+services:
+  postgres:
+    image: postgres:18.4-bookworm
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-local-postgres-superuser}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [data]
+
+  spring-migrate:
+    image: customer-agent/backend:issue12
+    build:
+      context: ./backend
+      args:
+        GRADLE_OPTS: ${CUSTOMER_AGENT_GRADLE_OPTS:-}
+    environment:
+      SPRING_FLYWAY_ENABLED: "true"
+      BASELINE_MIGRATE_ONLY: "true"
+      SPRING_DATABASE_URL: jdbc:postgresql://postgres:5432/customer_agent
+      SPRING_DATABASE_USER: spring_app
+      SPRING_DATABASE_PASSWORD: local-spring-app
+      SPRING_MIGRATION_DATABASE_URL: jdbc:postgresql://postgres:5432/customer_agent
+      SPRING_MIGRATION_DATABASE_USER: spring_migrator
+      SPRING_MIGRATION_DATABASE_PASSWORD: local-spring-migrator
+      AGENT_SERVER_URL: http://agent-server:2024
+      <<: *local-secrets
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks: [data, services]
+
+  agent-migrate:
+    image: customer-agent/agent:issue12
+    build:
+      context: ./agent
+      target: runtime
+    entrypoint: ["python", "-m", "baseline_agent.migrate"]
+    environment:
+      AGENT_MIGRATION_DATABASE_URI: postgresql://agent_migrator:local-agent-migrator@postgres:5432/agent_checkpoint
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks: [data]
+
+  agent-server:
+    image: customer-agent/agent:issue12
+    build:
+      context: ./agent
+      target: runtime
+    environment:
+      AGENT_DATABASE_URI: postgresql://agent_runtime:local-agent-runtime@postgres:5432/agent_checkpoint
+      SPRING_INTERNAL_URL: http://backend:8080
+      SPRING_TO_AGENT_TOKEN: ${SPRING_TO_AGENT_TOKEN:-local-spring-to-agent}
+      AGENT_MACHINE_TOKEN: ${AGENT_MACHINE_TOKEN:-local-agent-machine}
+    depends_on:
+      agent-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx,os; r=httpx.get('http://localhost:2024/ok',headers={'Authorization':'Bearer '+os.environ['SPRING_TO_AGENT_TOKEN']}); r.raise_for_status()"]
+      interval: 3s
+      timeout: 4s
+      retries: 30
+    networks: [data, services]
+
+  backend:
+    image: customer-agent/backend:issue12
+    build:
+      context: ./backend
+      args:
+        GRADLE_OPTS: ${CUSTOMER_AGENT_GRADLE_OPTS:-}
+    environment:
+      SPRING_PROFILES_ACTIVE: local-demo
+      SPRING_FLYWAY_ENABLED: "false"
+      SPRING_DATABASE_URL: jdbc:postgresql://postgres:5432/customer_agent
+      SPRING_DATABASE_USER: spring_app
+      SPRING_DATABASE_PASSWORD: local-spring-app
+      AGENT_SERVER_URL: http://agent-server:2024
+      <<: *local-secrets
+    depends_on:
+      spring-migrate:
+        condition: service_completed_successfully
+      agent-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health/readiness"]
+      interval: 3s
+      timeout: 4s
+      retries: 30
+    networks: [data, services, edge]
+
+  frontend:
+    image: customer-agent/frontend:issue12
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:4180:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/system/status"]
+      interval: 3s
+      timeout: 4s
+      retries: 30
+    networks: [edge]
+
+  integration-smoke:
+    image: customer-agent/agent:issue12
+    profiles: [smoke]
+    entrypoint: ["python", "/smoke/smoke.py"]
+    volumes:
+      - ./agent/smoke.py:/smoke/smoke.py:ro
+    environment:
+      AGENT_SERVER_URL: http://agent-server:2024
+      SPRING_INTERNAL_URL: http://backend:8080
+      SPRING_DATABASE_URI: postgresql://spring_app:local-spring-app@postgres:5432/customer_agent
+      AGENT_DATABASE_URI: postgresql://agent_runtime:local-agent-runtime@postgres:5432/agent_checkpoint
+      SPRING_CROSS_DATABASE_URI: postgresql://spring_app:local-spring-app@postgres:5432/agent_checkpoint
+      AGENT_CROSS_DATABASE_URI: postgresql://agent_runtime:local-agent-runtime@postgres:5432/customer_agent
+      <<: *local-secrets
+    depends_on:
+      frontend:
+        condition: service_healthy
+    networks: [data, services]
+
+volumes:
+  postgres-data:
+
+networks:
+  edge:
+  services:
+    internal: true
+  data:
+    internal: true

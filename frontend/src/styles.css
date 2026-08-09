@@ -1,0 +1,17 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #eef4ee;
+  background: #07130e;
+  font-synthesis: none;
+}
+
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+main { max-width: 760px; margin: 0 auto; padding: 12vh 24px; }
+.eyebrow { color: #76dba1; font-size: .75rem; font-weight: 800; letter-spacing: .16em; }
+h1 { max-width: 650px; margin: 16px 0; font-size: clamp(2.4rem, 7vw, 5.4rem); line-height: .98; letter-spacing: -.055em; }
+.lede { max-width: 590px; color: #9db1a5; font-size: 1.1rem; line-height: 1.65; }
+.status-card { display: flex; gap: 16px; align-items: flex-start; margin-top: 48px; padding: 22px; border: 1px solid #284235; border-radius: 16px; background: #0d1e15; }
+.status-card p { margin: 7px 0 0; color: #91a497; }
+.signal { flex: 0 0 auto; width: 11px; height: 11px; margin-top: 5px; border-radius: 50%; background: #789082; box-shadow: 0 0 0 5px #78908220; }
+.signal.up { background: #51e58d; box-shadow: 0 0 0 5px #51e58d20; }
+
