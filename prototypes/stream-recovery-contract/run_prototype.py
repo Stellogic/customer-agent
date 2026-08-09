@@ -38,9 +38,10 @@ def snapshot(
     elif view_type == "APPROVAL_VIEW":
         ticket = {
             "proposalRevisionRef": "proposal-rev-001",
+            "leaseRef": "lease-001",
             "leaseStatus": "ACTIVE",
             "decision": None,
-            "evidence": [],
+            "evidence": [{"evidenceRef": "approval-evidence-001"}],
         }
     else:
         ticket = {
@@ -110,6 +111,21 @@ def run_scenarios(verbose: bool = True) -> list[dict]:
     gap_state = reduce_event(once, event(5, "agent.phase", phase="POLICY_EVALUATION"))
     results.append(result("gap_requires_snapshot", gap_state["stream"]["needsSnapshot"] and "SEQUENCE_GAP" in gap_state["lastAction"], gap_state))
 
+    after_gap = reduce_event(
+        gap_state,
+        event(4, "agent.phase", phase="POLICY_EVALUATION"),
+    )
+    results.append(
+        result(
+            "reset_required_blocks_incrementals_until_snapshot",
+            after_gap["stream"]["lastSequence"] == once["stream"]["lastSequence"]
+            and after_gap["stream"]["connection"] == "RESET_REQUIRED"
+            and after_gap["stream"]["needsSnapshot"]
+            and after_gap["ticket"] == gap_state["ticket"],
+            after_gap,
+        )
+    )
+
     reconnect = mark_connected(apply_snapshot(gap_state, snapshot(sequence=4)))
     reconnect = reduce_event(reconnect, event(5, "agent.phase", phase="POLICY_EVALUATION"))
     results.append(result("replay_after_snapshot", reconnect["stream"]["lastSequence"] == 5 and reconnect["ticket"]["investigationPhase"] == "POLICY_EVALUATION", reconnect))
@@ -176,6 +192,75 @@ def run_scenarios(verbose: bool = True) -> list[dict]:
             and "currentGenerationId" not in customer_state["ticket"]
             and "evidence" not in customer_state["ticket"],
             customer_state,
+        )
+    )
+
+    approval_epoch = "proposal-rev-001.approval.v1"
+    approval_state = mark_connected(
+        apply_snapshot(
+            initial_state(),
+            snapshot(sequence=2, view_type="APPROVAL_VIEW", epoch=approval_epoch),
+        )
+    )
+    stale_approval = event(
+        3,
+        "spring.approval_lease",
+        view_type="APPROVAL_VIEW",
+        epoch=approval_epoch,
+        proposal_revision_ref="proposal-rev-old",
+        lease_ref="lease-001",
+        lease_status="ENDED",
+    )
+    approval_state = reduce_event(approval_state, stale_approval)
+    results.append(
+        result(
+            "approval_view_ignores_stale_proposal_event",
+            approval_state["ticket"]["proposalRevisionRef"] == "proposal-rev-001"
+            and approval_state["ticket"]["leaseRef"] == "lease-001"
+            and approval_state["ticket"]["leaseStatus"] == "ACTIVE",
+            approval_state,
+        )
+    )
+
+    stale_lease = event(
+        4,
+        "spring.approval_lease",
+        view_type="APPROVAL_VIEW",
+        epoch=approval_epoch,
+        proposal_revision_ref="proposal-rev-001",
+        lease_ref="lease-old",
+        lease_status="ENDED",
+    )
+    approval_state = reduce_event(approval_state, stale_lease)
+    results.append(
+        result(
+            "approval_view_ignores_stale_lease_event",
+            approval_state["ticket"]["proposalRevisionRef"] == "proposal-rev-001"
+            and approval_state["ticket"]["leaseRef"] == "lease-001"
+            and approval_state["ticket"]["leaseStatus"] == "ACTIVE",
+            approval_state,
+        )
+    )
+
+    decision = event(
+        5,
+        "spring.approval_decision",
+        view_type="APPROVAL_VIEW",
+        epoch=approval_epoch,
+        proposal_revision_ref="proposal-rev-001",
+        lease_ref="lease-001",
+        decision="APPROVED",
+    )
+    approval_state = reduce_event(approval_state, decision)
+    results.append(
+        result(
+            "approval_decision_ends_scoped_access",
+            approval_state["access"] == "FORBIDDEN"
+            and approval_state["stream"]["connection"] == "CLOSED"
+            and approval_state["stream"]["needsSnapshot"]
+            and approval_state["ticket"]["decision"] == "APPROVED"
+            and "evidence" not in approval_state["ticket"],
+            approval_state,
         )
     )
 

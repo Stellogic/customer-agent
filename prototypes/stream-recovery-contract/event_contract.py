@@ -40,8 +40,8 @@ EVENT_PAYLOAD_KEYS = {
     "proposal.created": {"proposalRevisionRef", "summary"},
     "ticket.result_changed": {"ticketState", "resultCode"},
     "investigation.failed": {"reasonCode", "retryable"},
-    "approval.lease_changed": {"proposalRevisionRef", "leaseStatus"},
-    "approval.decision_recorded": {"proposalRevisionRef", "decision"},
+    "approval.lease_changed": {"proposalRevisionRef", "leaseRef", "leaseStatus"},
+    "approval.decision_recorded": {"proposalRevisionRef", "leaseRef", "decision"},
 }
 
 GENERATION_SCOPED = {
@@ -176,15 +176,18 @@ def mark_reset_required(state: dict[str, Any], reason: str) -> dict[str, Any]:
 
 def reduce_event(state: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]:
     """Apply one sequenced product event or demand a fresh snapshot."""
+    stream = state["stream"]
+    if state["access"] != "AUTHORIZED":
+        return _diagnose(state, "IGNORED_WITHOUT_ACCESS")
+    if stream["needsSnapshot"]:
+        return _diagnose(state, "INCREMENTAL_IGNORED_UNTIL_SNAPSHOT")
+
     try:
         validate_product_event(event)
         cursor = Cursor.parse(event["id"])
     except (ContractViolation, KeyError, ValueError) as exc:
         return mark_reset_required(state, f"INVALID_EVENT:{exc}")
 
-    stream = state["stream"]
-    if state["access"] != "AUTHORIZED":
-        return _diagnose(state, "IGNORED_WITHOUT_ACCESS")
     if cursor.epoch != stream["epoch"]:
         return mark_reset_required(state, "EPOCH_MISMATCH")
     if event["viewType"] != stream["viewType"]:
@@ -203,6 +206,22 @@ def reduce_event(state: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]
         next_state = deepcopy(state)
         next_state["stream"]["lastSequence"] = cursor.sequence
         return _diagnose(next_state, f"STALE_GENERATION_IGNORED:{event['generationId']}")
+
+    if event_type.startswith("approval."):
+        current_proposal = state["ticket"].get("proposalRevisionRef")
+        current_lease = state["ticket"].get("leaseRef")
+        payload = event["payload"]
+        if (
+            payload["proposalRevisionRef"] != current_proposal
+            or payload["leaseRef"] != current_lease
+        ):
+            next_state = deepcopy(state)
+            next_state["stream"]["lastSequence"] = cursor.sequence
+            return _diagnose(
+                next_state,
+                "STALE_APPROVAL_SCOPE_IGNORED:"
+                f"{payload['proposalRevisionRef']}:{payload['leaseRef']}",
+            )
 
     next_state = deepcopy(state)
     next_state["stream"]["lastSequence"] = cursor.sequence
@@ -240,11 +259,13 @@ def reduce_event(state: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]
     elif event_type == "investigation.failed":
         ticket["failure"] = deepcopy(payload)
     elif event_type == "approval.lease_changed":
-        ticket["proposalRevisionRef"] = payload["proposalRevisionRef"]
         ticket["leaseStatus"] = payload["leaseStatus"]
+        if payload["leaseStatus"] in {"EXPIRED", "RELEASED", "ENDED"}:
+            return _close_approval_view(next_state, event_type, event["id"])
     elif event_type == "approval.decision_recorded":
-        ticket["proposalRevisionRef"] = payload["proposalRevisionRef"]
         ticket["decision"] = payload["decision"]
+        ticket["leaseStatus"] = "ENDED"
+        return _close_approval_view(next_state, event_type, event["id"])
 
     next_state["lastAction"] = f"EVENT_APPLIED:{event_type}@{event['id']}"
     return next_state
@@ -372,6 +393,7 @@ def project_raw_event(
             "approval.lease_changed",
             {
                 "proposalRevisionRef": raw.get("proposal_revision_ref"),
+                "leaseRef": raw.get("lease_ref"),
                 "leaseStatus": raw.get("lease_status"),
             },
             {"APPROVAL_VIEW"},
@@ -380,6 +402,7 @@ def project_raw_event(
             "approval.decision_recorded",
             {
                 "proposalRevisionRef": raw.get("proposal_revision_ref"),
+                "leaseRef": raw.get("lease_ref"),
                 "decision": raw.get("decision"),
             },
             {"APPROVAL_VIEW"},
@@ -433,6 +456,26 @@ def _validate_payload_values(payload: dict[str, Any]) -> None:
                 raise ContractViolation("retryable must be boolean")
         elif not isinstance(value, str) or not value:
             raise ContractViolation(f"payload value must be a non-empty string: {key}")
+
+
+def _close_approval_view(
+    state: dict[str, Any], event_type: str, event_id: str
+) -> dict[str, Any]:
+    """End proposal-scoped responsibility and discard no-longer-authorized detail."""
+    ticket = state["ticket"]
+    state["ticket"] = {
+        "proposalRevisionRef": ticket["proposalRevisionRef"],
+        "leaseRef": ticket["leaseRef"],
+        "leaseStatus": ticket["leaseStatus"],
+        "decision": ticket.get("decision"),
+    }
+    state["access"] = "FORBIDDEN"
+    state["stream"]["connection"] = "CLOSED"
+    state["stream"]["needsSnapshot"] = True
+    state["lastAction"] = f"APPROVAL_ACCESS_ENDED:{event_type}@{event_id}"
+    return state
+
+
 def _diagnose(state: dict[str, Any], message: str) -> dict[str, Any]:
     next_state = deepcopy(state)
     next_state["lastAction"] = message

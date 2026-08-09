@@ -57,8 +57,8 @@ Spring 订阅 Agent Server 原始流后，只把已识别的上游信号映射�
 | `proposal.created` | 不可变 `proposalRevisionRef`, 安全摘要 | 提示提案已形成；详情另查授权视图 |
 | `ticket.result_changed` | 工单状态, 结果码 | Spring 已确认的最终业务结果 |
 | `investigation.failed` | 受控原因码, 是否可重试 | 不暴露异常、trace 或模型输出 |
-| `approval.lease_changed` | 提案版本引用, 租约状态 | 仅审批视图 |
-| `approval.decision_recorded` | 提案版本引用, 审批结果 | 仅审批视图，决定后终止持续访问 |
+| `approval.lease_changed` | 提案版本引用, `leaseRef`, 租约状态 | 仅审批视图；旧提案或旧租约事件被忽略 |
+| `approval.decision_recorded` | 提案版本引用, `leaseRef`, 审批结果 | 仅审批视图，决定后终止持续访问并清除证据 |
 
 `reasoning`、token、debug、checkpoint、task、原始 messages、原始 tool call/result 等 LangGraph stream mode 不进入产品事件白名单。需要工具进度时，只接受 Agent 主动产生的、结构已约束的 custom 信号，再由 Spring 重新校验并投影。
 
