@@ -1,6 +1,6 @@
 # Customer Support Agent
 
-本仓库正在实现“客服工单调查与补偿审批 Agent”。当前代码是 Issue #12 的可复现本地全栈基线，只建立后续纵向切片共享的运行、迁移、合成身份和信任边界，不包含客服工单业务。
+本仓库正在实现“客服工单调查与补偿审批 Agent”。当前代码在 Issue #12 的可复现本地全栈基线上，实现了 Issue #13 的客户工单创建与公开受理切片；本票不会启动 Agent 调查。
 
 ## 本地启动
 
@@ -11,7 +11,7 @@ Copy-Item .env.example .env
 docker compose up --detach --build --wait
 ```
 
-打开 <http://127.0.0.1:4180>。浏览器只请求同源的 `/api/system/status`；Nginx 只把 `/api` 转发给 Spring Boot，Agent Server 和 PostgreSQL 均未发布主机端口。
+打开 <http://127.0.0.1:4180>。客户使用合成身份提交物流延迟问题，页面先读取完整 `CUSTOMER_PUBLIC` 权威快照，再从同一视图的 `epoch:sequence` 游标请求 SSE 增量。浏览器只请求同源的 Spring `/api`；Agent Server 和 PostgreSQL 均未发布主机端口。
 
 从空数据库重复验证全部基线：
 
@@ -49,6 +49,8 @@ docker compose down
 - Spring 业务运行账号与迁移账号分离；Agent runtime 与 checkpoint 迁移账号也分离。
 - Spring 业务库与 Agent checkpoint 库没有共享 ORM、跨库外键或跨服务事务。
 - `local-demo` profile 提供客户、客服、审批人、Agent、补偿执行器五个合成身份入口；正式 React 页面没有自由角色切换器。
+- 客户创建请求使用稳定 `Idempotency-Key`；相同参数重放返回既有工单，不同参数冲突。Spring 在同一事务中写入客服工单、两条公开消息、首次响应事实、审计事件和客户公开事件。
+- 客户工单读取按合成客户身份授权；他人访问返回与不存在相同的 `404`。客户投影与 SSE 只包含公开状态、处理模式和公开消息。
 - Spring→Agent、Agent→Spring 与补偿执行器探针使用三个不同的本地演示机器令牌；跨能力调用返回 `401/403`。
 - 所有账号、令牌和探针数据均为本地合成数据，不可用于生产。
 
