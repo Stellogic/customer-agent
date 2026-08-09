@@ -49,8 +49,8 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         UUID ticketId = UUID.randomUUID();
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
-        boolean startsNoCompensationInvestigation = !jdbc.query(
-                "select 1 from synthetic_order where order_reference = ? and customer_id = ? and delay_hours < 24",
+        boolean startsAgentInvestigation = !jdbc.query(
+                "select 1 from synthetic_order where order_reference = ? and customer_id = ?",
                 (rs, row) -> rs.getInt(1),
                 command.orderReference(), command.customerId()).isEmpty();
         jdbc.update(
@@ -69,7 +69,7 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         jdbc.update(
                 "insert into agent_processing_generation (id, ticket_id, generation_number, thread_id, status, created_at) values (?, ?, 1, ?, 'ACTIVE', ?)",
                 generationId, ticketId, threadId, databaseTime);
-        if (startsNoCompensationInvestigation) {
+        if (startsAgentInvestigation) {
             UUID submissionRequestId = UUID.randomUUID();
             jdbc.update(
                     "insert into agent_submission (submission_request_id, generation_id, thread_id, parameter_digest, status, next_attempt_at, created_at) values (?, ?, ?, ?, 'PENDING', current_timestamp, ?)",
