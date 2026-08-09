@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: customer-agent-backend
+  datasource:
+    url: ${SPRING_DATABASE_URL:jdbc:postgresql://localhost:5432/customer_agent}
+    username: ${SPRING_DATABASE_USER:spring_app}
+    password: ${SPRING_DATABASE_PASSWORD:local-spring-app}
+  flyway:
+    enabled: ${SPRING_FLYWAY_ENABLED:false}
+    url: ${SPRING_MIGRATION_DATABASE_URL:${spring.datasource.url}}
+    user: ${SPRING_MIGRATION_DATABASE_USER:spring_migrator}
+    password: ${SPRING_MIGRATION_DATABASE_PASSWORD:local-spring-migrator}
+  main:
+    web-application-type: ${SPRING_WEB_APPLICATION_TYPE:servlet}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+baseline:
+  migrate-only: ${BASELINE_MIGRATE_ONLY:false}
+  agent:
+    base-url: ${AGENT_SERVER_URL:http://localhost:2024}
+    token: ${SPRING_TO_AGENT_TOKEN:local-spring-to-agent}
+  identity:
+    agent-token: ${AGENT_MACHINE_TOKEN:local-agent-machine}
+    executor-token: ${EXECUTOR_MACHINE_TOKEN:local-executor-machine}
+
