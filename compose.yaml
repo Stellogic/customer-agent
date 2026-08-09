@@ -4,6 +4,7 @@ x-secrets: &local-secrets
   SPRING_TO_AGENT_TOKEN: ${SPRING_TO_AGENT_TOKEN:-local-spring-to-agent}
   AGENT_MACHINE_TOKEN: ${AGENT_MACHINE_TOKEN:-local-agent-machine}
   EXECUTOR_MACHINE_TOKEN: ${EXECUTOR_MACHINE_TOKEN:-local-executor-machine}
+  DEMO_FIXED_INSTANT: ${DEMO_FIXED_INSTANT:-2026-08-09T14:00:00Z}
 
 services:
   postgres:
@@ -21,7 +22,7 @@ services:
     networks: [data]
 
   spring-migrate:
-    image: customer-agent/backend:issue13
+    image: customer-agent/backend:issue14
     build:
       context: ./backend
       args:
@@ -44,7 +45,7 @@ services:
     networks: [data, services]
 
   agent-migrate:
-    image: customer-agent/agent:issue13
+    image: customer-agent/agent:issue14
     build:
       context: ./agent
       target: runtime
@@ -58,7 +59,7 @@ services:
     networks: [data]
 
   agent-server:
-    image: customer-agent/agent:issue13
+    image: customer-agent/agent:issue14
     build:
       context: ./agent
       target: runtime
@@ -78,7 +79,7 @@ services:
     networks: [data, services]
 
   backend:
-    image: customer-agent/backend:issue13
+    image: customer-agent/backend:issue14
     build:
       context: ./backend
       args:
@@ -104,7 +105,7 @@ services:
     networks: [data, services, edge]
 
   frontend:
-    image: customer-agent/frontend:issue13
+    image: customer-agent/frontend:issue14
     build: ./frontend
     depends_on:
       backend:
@@ -119,7 +120,7 @@ services:
     networks: [edge]
 
   integration-smoke:
-    image: customer-agent/agent:issue13
+    image: customer-agent/agent:issue14
     profiles: [smoke]
     entrypoint: ["python", "/smoke/smoke.py"]
     volumes:
@@ -138,7 +139,7 @@ services:
     networks: [data, services]
 
   frontend-acceptance:
-    image: customer-agent/frontend-test:issue13
+    image: customer-agent/frontend-test:issue14
     profiles: [smoke]
     entrypoint: ["npm", "test", "--", "src/App.integration.test.tsx"]
     environment:

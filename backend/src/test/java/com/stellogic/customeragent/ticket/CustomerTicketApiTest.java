@@ -39,6 +39,7 @@ class CustomerTicketApiTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.ticketId").value(TICKET_ID.toString()))
+                .andExpect(jsonPath("$.accepted").value(true))
                 .andExpect(jsonPath("$.replayed").value(false));
     }
 

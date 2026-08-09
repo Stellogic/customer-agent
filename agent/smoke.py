@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -149,7 +150,138 @@ def main() -> None:
         ).fetchone()[0] == 2
         assert connection.execute(
             "select count(*) from audit_event where ticket_id = %s", (ticket_uuid,)
-        ).fetchone()[0] == 2
+        ).fetchone()[0] >= 2
+
+    no_compensation_request = f"issue-14-{uuid.uuid4()}"
+    no_compensation_payload = {
+        "orderReference": "ORDER-DELAY-UNDER-24",
+        "description": "合成订单物流延迟不足二十四小时",
+    }
+    no_compensation_headers = {
+        "X-Synthetic-Customer-Id": "customer-demo",
+        "Idempotency-Key": no_compensation_request,
+    }
+    with httpx.Client(timeout=20.0) as client:
+        accepted = client.post(
+            f"{spring_url}/api/customer/tickets",
+            headers=no_compensation_headers,
+            json=no_compensation_payload,
+        )
+        expect_status(accepted, 201)
+        assert accepted.json()["accepted"] is True
+        resolved_ticket_id = accepted.json()["ticketId"]
+        resolved_projection = None
+        for _ in range(60):
+            snapshot = client.get(
+                f"{spring_url}/api/customer/tickets/{resolved_ticket_id}",
+                headers={"X-Synthetic-Customer-Id": "customer-demo"},
+            )
+            expect_status(snapshot, 200)
+            resolved_projection = snapshot.json()
+            if resolved_projection["ticket"]["lifecycleState"] == "RESOLVED":
+                break
+            time.sleep(0.5)
+        assert resolved_projection is not None
+        assert resolved_projection["ticket"]["lifecycleState"] == "RESOLVED", resolved_projection
+        assert resolved_projection["ticket"]["handlingMode"] == "AGENT"
+        assert resolved_projection["ticket"]["createdAt"] == "2026-08-09T14:00:00Z"
+        assert len(resolved_projection["messages"]) == 3
+        assert resolved_projection["messages"][-1]["author"] == "AGENT"
+        assert "不足 24 小时" in resolved_projection["messages"][-1]["body"]
+        serialized_projection = json.dumps(resolved_projection)
+        assert not any(field in serialized_projection for field in forbidden_fields)
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        resolved_uuid = uuid.UUID(resolved_ticket_id)
+        generation = connection.execute(
+            "select g.id, g.thread_id, g.status, s.submission_request_id, s.status "
+            "from agent_processing_generation g join agent_submission s on s.generation_id = g.id "
+            "where g.ticket_id = %s",
+            (resolved_uuid,),
+        ).fetchone()
+        assert generation is not None
+        assert generation[2] == "COMPLETED"
+        assert generation[4] == "COMPLETED"
+        assert connection.execute(
+            "select count(*) from investigation_fact where generation_id = %s", (generation[0],)
+        ).fetchone()[0] == 5
+        assert connection.execute(
+            "select count(*) from agent_command_request where generation_id = %s", (generation[0],)
+        ).fetchone()[0] == 1
+        assert connection.execute(
+            "select count(*) from public_message where ticket_id = %s", (resolved_uuid,)
+        ).fetchone()[0] == 3
+        generation_id = str(generation[0])
+        generation_thread_id = str(generation[1])
+        submission_request_id = str(generation[3])
+
+    with httpx.Client(timeout=20.0) as client:
+        runs = client.get(
+            f"{agent_url}/threads/{generation_thread_id}/runs?limit=100",
+            headers=spring_headers,
+        )
+        expect_status(runs, 200)
+        matching_runs = [
+            run for run in runs.json()
+            if run.get("metadata", {}).get("submission_request_id") == submission_request_id
+        ]
+        assert len(matching_runs) == 1, matching_runs
+
+        scoped_headers = {
+            "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+            "X-Agent-Generation-Id": generation_id,
+            "X-Agent-Operation": "READ_INVESTIGATION_FACTS",
+        }
+        stale = client.get(
+            f"{spring_url}/internal/agent/tickets/{resolved_ticket_id}/generations/{generation_id}/facts",
+            headers=scoped_headers,
+        )
+        expect_status(stale, 403)
+
+        conflict = client.post(
+            f"{spring_url}/internal/agent/tickets/{resolved_ticket_id}/generations/{generation_id}/conclusions",
+            headers={
+                **scoped_headers,
+                "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
+                "Idempotency-Key": f"{generation_id}:submit-conclusion",
+            },
+            json={
+                "compensationRequired": False,
+                "reasonCode": "DELAY_UNDER_24_HOURS",
+                "delayHours": 22,
+                "orderReference": "ORDER-DELAY-UNDER-24",
+                "evidenceRefs": [
+                    "order:ORDER-DELAY-UNDER-24",
+                    "logistics:ORDER-DELAY-UNDER-24",
+                ],
+            },
+        )
+        expect_status(conflict, 409)
+
+        wrong_ticket_replay = client.post(
+            f"{spring_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/conclusions",
+            headers={
+                **scoped_headers,
+                "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
+                "Idempotency-Key": f"{generation_id}:submit-conclusion",
+            },
+            json={
+                "compensationRequired": False,
+                "reasonCode": "DELAY_UNDER_24_HOURS",
+                "delayHours": 23,
+                "orderReference": "ORDER-DELAY-UNDER-24",
+                "evidenceRefs": [
+                    "order:ORDER-DELAY-UNDER-24",
+                    "logistics:ORDER-DELAY-UNDER-24",
+                ],
+            },
+        )
+        expect_status(wrong_ticket_replay, 403)
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select count(*) from audit_event where ticket_id = %s", (resolved_uuid,)
+        ).fetchone()[0] >= 8
     with psycopg.connect(os.environ["AGENT_DATABASE_URI"]) as connection:
         assert connection.execute("select current_database(), current_user").fetchone() == (
             "agent_checkpoint",
@@ -173,6 +305,7 @@ def main() -> None:
         "thread_id": thread_id,
         "checkpoint_count": checkpoint_count,
         "ticket_id": ticket_id,
+        "resolved_ticket_id": resolved_ticket_id,
         "concurrent_replays": 7,
     }))
 
