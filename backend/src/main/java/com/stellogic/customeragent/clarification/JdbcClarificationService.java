@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.clarification;
 
 import com.stellogic.customeragent.reliability.StableParameterDigest;
+import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import com.stellogic.customeragent.sla.SlaService;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -22,16 +23,20 @@ class JdbcClarificationService implements ClarificationService {
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final SlaService slaService;
+    private final TicketAuthorityLock authorityLock;
 
-    JdbcClarificationService(JdbcTemplate jdbc, Clock clock, SlaService slaService) {
+    JdbcClarificationService(
+            JdbcTemplate jdbc, Clock clock, SlaService slaService, TicketAuthorityLock authorityLock) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.slaService = slaService;
+        this.authorityLock = authorityLock;
     }
 
     @Override
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public ClarificationRequestResult create(CreateClarification command) {
+        authorityLock.acquire(command.ticketId());
         if (!"ORDER_AMBIGUOUS".equals(command.reasonCode())) {
             reject(command.ticketId(), HttpStatus.UNPROCESSABLE_ENTITY, "UNSUPPORTED_CLARIFICATION_REASON");
         }
@@ -43,7 +48,12 @@ class JdbcClarificationService implements ClarificationService {
                 (rs, row) -> new ClarificationRequestResult(
                         rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3)),
                 command.generationId(), command.requestId());
-        if (!existing.isEmpty()) return existing.getFirst();
+        if (!existing.isEmpty()) {
+            if (!hasCurrentAgentAuthority(command.ticketId(), command.generationId())) {
+                reject(command.ticketId(), HttpStatus.FORBIDDEN, "STALE_CLARIFICATION_GENERATION");
+            }
+            return existing.getFirst();
+        }
 
         List<Integer> scopes = jdbc.query(
                 "select 1 from agent_processing_generation g "
@@ -87,6 +97,7 @@ class JdbcClarificationService implements ClarificationService {
     @Override
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public ClarificationReplyResult reply(ReplyToClarification command) {
+        authorityLock.acquire(command.ticketId());
         String normalizedAnswer = command.answer().trim().toUpperCase(Locale.ROOT);
         String answerDigest = StableParameterDigest.sha256(normalizedAnswer);
         String parameterDigest = StableParameterDigest.sha256(
@@ -235,6 +246,14 @@ class JdbcClarificationService implements ClarificationService {
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, ?, ?, ?)",
                 ticketId, type, actor, at);
+    }
+
+    private boolean hasCurrentAgentAuthority(UUID ticketId, UUID generationId) {
+        return !jdbc.query(
+                "select 1 from agent_processing_generation g join support_ticket t on t.id = g.ticket_id "
+                        + "where g.id = ? and g.ticket_id = ? and g.status = 'ACTIVE' "
+                        + "and t.handling_mode = 'AGENT' and not t.customer_human_preference",
+                (rs, row) -> rs.getInt(1), generationId, ticketId).isEmpty();
     }
 
     private record ReplyScope(

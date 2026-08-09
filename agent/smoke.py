@@ -696,6 +696,267 @@ def main() -> None:
         concurrent_reply_statuses = list(executor.map(reply_concurrently, ["A", "B"]))
     assert sorted(concurrent_reply_statuses) == [202, 409]
 
+    handoff_ticket_id, handoff_projection = create_ambiguous_ticket("human-handoff")
+    handoff_clarification_id = handoff_projection["clarification"]["id"]
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        handoff_generation_id, handoff_clarification_request_key = connection.execute(
+            "select g.id, c.request_key from agent_processing_generation g "
+            "join customer_clarification_request c on c.generation_id = g.id "
+            "where g.ticket_id = %s and g.status = 'ACTIVE'",
+            (uuid.UUID(handoff_ticket_id),),
+        ).fetchone()
+        lifecycle_before_handoff = connection.execute(
+            "select lifecycle_state from support_ticket where id = %s",
+            (uuid.UUID(handoff_ticket_id),),
+        ).fetchone()[0]
+
+    handoff_request_id = f"handoff-{uuid.uuid4()}"
+    handoff_url = f"{spring_url}/api/customer/tickets/{handoff_ticket_id}/human-handoff"
+    handoff_headers = {
+        "X-Synthetic-Customer-Id": "customer-demo",
+        "Idempotency-Key": handoff_request_id,
+    }
+    with httpx.Client(timeout=20.0) as client:
+        handoff = client.post(
+            handoff_url,
+            headers=handoff_headers,
+            json={"reasonCode": "CUSTOMER_REQUESTED"},
+        )
+        expect_status(handoff, 202)
+        assert handoff.json() == {
+            "requestId": handoff_request_id,
+            "handlingMode": "HUMAN",
+            "replayed": False,
+        }
+        duplicate_handoff = client.post(
+            handoff_url,
+            headers=handoff_headers,
+            json={"reasonCode": "CUSTOMER_REQUESTED"},
+        )
+        expect_status(duplicate_handoff, 200)
+        assert duplicate_handoff.json()["replayed"] is True
+        conflicting_handoff = client.post(
+            handoff_url,
+            headers=handoff_headers,
+            json={"reasonCode": "DIFFERENT_REASON"},
+        )
+        expect_status(conflicting_handoff, 409)
+        handoff_status = client.get(
+            f"{spring_url}/api/customer/tickets/{handoff_ticket_id}/human-handoff-requests/{handoff_request_id}",
+            headers={"X-Synthetic-Customer-Id": "customer-demo"},
+        )
+        expect_status(handoff_status, 200)
+        restored_handoff = client.get(
+            f"{spring_url}/api/customer/tickets/{handoff_ticket_id}",
+            headers={"X-Synthetic-Customer-Id": "customer-demo"},
+        )
+        expect_status(restored_handoff, 200)
+        handoff_public = restored_handoff.json()
+        assert handoff_public["ticket"]["handlingMode"] == "HUMAN"
+        assert handoff_public["ticket"]["lifecycleState"] == lifecycle_before_handoff
+        assert handoff_public["clarification"] is None
+        assert handoff_public["messages"][-1]["body"] == (
+            "已按您的要求转由客服继续处理。客服将在此工单中与您联系。"
+        )
+        assert "CUSTOMER_REQUESTED" not in json.dumps(handoff_public)
+
+        stale_reply_after_handoff = client.post(
+            f"{spring_url}/api/customer/tickets/{handoff_ticket_id}/clarifications/"
+            f"{handoff_clarification_id}/replies",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": f"late-reply-{uuid.uuid4()}",
+                "X-Resume-Request-Id": str(uuid.uuid4()),
+            },
+            json={"answer": "A"},
+        )
+        expect_status(stale_reply_after_handoff, 409)
+        agent_capability_headers = {
+            "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+            "X-Agent-Generation-Id": str(handoff_generation_id),
+            "X-Agent-Operation": "READ_INVESTIGATION_FACTS",
+        }
+        late_facts = client.get(
+            f"{spring_url}/internal/agent/tickets/{handoff_ticket_id}/generations/"
+            f"{handoff_generation_id}/facts",
+            headers=agent_capability_headers,
+        )
+        expect_status(late_facts, 403)
+        late_clarification = client.post(
+            f"{spring_url}/internal/agent/tickets/{handoff_ticket_id}/generations/"
+            f"{handoff_generation_id}/clarifications",
+            headers={
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": str(handoff_generation_id),
+                "X-Agent-Operation": "CREATE_CUSTOMER_CLARIFICATION",
+                "Idempotency-Key": f"late-clarification-{uuid.uuid4()}",
+            },
+            json={"reasonCode": "ORDER_AMBIGUOUS"},
+        )
+        expect_status(late_clarification, 403)
+        replayed_clarification_after_handoff = client.post(
+            f"{spring_url}/internal/agent/tickets/{handoff_ticket_id}/generations/"
+            f"{handoff_generation_id}/clarifications",
+            headers={
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": str(handoff_generation_id),
+                "X-Agent-Operation": "CREATE_CUSTOMER_CLARIFICATION",
+                "Idempotency-Key": handoff_clarification_request_key,
+            },
+            json={"reasonCode": "ORDER_AMBIGUOUS"},
+        )
+        expect_status(replayed_clarification_after_handoff, 403)
+        late_conclusion = client.post(
+            f"{spring_url}/internal/agent/tickets/{handoff_ticket_id}/generations/"
+            f"{handoff_generation_id}/conclusions",
+            headers={
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": str(handoff_generation_id),
+                "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
+                "Idempotency-Key": f"late-conclusion-{uuid.uuid4()}",
+            },
+            json={
+                "compensationRequired": False,
+                "reasonCode": "DELAY_UNDER_24_HOURS",
+                "delayHours": 23,
+                "delaySeconds": 82800,
+                "orderReference": "ORDER-DELAY-AMBIGUOUS-A",
+                "evidenceRefs": [
+                    "order:ORDER-DELAY-AMBIGUOUS-A",
+                    "logistics:ORDER-DELAY-AMBIGUOUS-A",
+                ],
+            },
+        )
+        expect_status(late_conclusion, 403)
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        handoff_state = connection.execute(
+            "select lifecycle_state, handling_mode, customer_human_preference, human_handoff_reason_code "
+            "from support_ticket where id = %s",
+            (uuid.UUID(handoff_ticket_id),),
+        ).fetchone()
+        assert handoff_state == (lifecycle_before_handoff, "HUMAN", True, "CUSTOMER_REQUESTED")
+        assert connection.execute(
+            "select status from agent_processing_generation where id = %s",
+            (handoff_generation_id,),
+        ).fetchone()[0] == "HANDED_OFF"
+        assert connection.execute(
+            "select status from customer_clarification_request where id = %s",
+            (uuid.UUID(handoff_clarification_id),),
+        ).fetchone()[0] == "INVALIDATED"
+        assert connection.execute(
+            "select count(*) from customer_human_handoff_request where ticket_id = %s",
+            (uuid.UUID(handoff_ticket_id),),
+        ).fetchone()[0] == 1
+        handoff_summary = connection.execute(
+            "select investigation_summary from customer_human_handoff_request where ticket_id = %s",
+            (uuid.UUID(handoff_ticket_id),),
+        ).fetchone()[0]
+        assert handoff_summary["generationId"] == str(handoff_generation_id)
+        assert isinstance(handoff_summary["facts"], list)
+        assert connection.execute(
+            "select count(*) from audit_event where ticket_id = %s and event_type in ("
+            "'CUSTOMER_HUMAN_HANDOFF_REQUEST_RECORDED', 'CUSTOMER_HUMAN_PREFERENCE_RECORDED', "
+            "'AGENT_GENERATION_HANDED_OFF', 'SHARED_SUPPORT_QUEUE_ENTERED')",
+            (uuid.UUID(handoff_ticket_id),),
+        ).fetchone()[0] == 4
+        assert connection.execute(
+            "select count(*) from audit_event where ticket_id = %s and ("
+            "event_type = 'AGENT_COMMAND_REJECTED_STALE_OR_OUT_OF_SCOPE_GENERATION' or "
+            "event_type = 'CLARIFICATION_REJECTED_STALE_CLARIFICATION_GENERATION')",
+            (uuid.UUID(handoff_ticket_id),),
+        ).fetchone()[0] >= 4
+        assert connection.execute(
+            "select count(*) from public_message where ticket_id = %s",
+            (uuid.UUID(handoff_ticket_id),),
+        ).fetchone()[0] == len(handoff_public["messages"])
+
+    resolved_handoff_request_id = f"resolved-handoff-{uuid.uuid4()}"
+    with httpx.Client(timeout=20.0) as client:
+        resolved_handoff = client.post(
+            f"{spring_url}/api/customer/tickets/{resolved_ticket_id}/human-handoff",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": resolved_handoff_request_id,
+            },
+            json={"reasonCode": "CUSTOMER_REQUESTED"},
+        )
+        expect_status(resolved_handoff, 202)
+        replayed_conclusion_after_handoff = client.post(
+            f"{spring_url}/internal/agent/tickets/{resolved_ticket_id}/generations/{generation_id}/conclusions",
+            headers={
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": generation_id,
+                "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
+                "Idempotency-Key": f"{generation_id}:submit-conclusion",
+            },
+            json={
+                "compensationRequired": False,
+                "reasonCode": "DELAY_UNDER_24_HOURS",
+                "delayHours": 23,
+                "delaySeconds": 82800,
+                "orderReference": "ORDER-DELAY-UNDER-24",
+                "evidenceRefs": [
+                    "order:ORDER-DELAY-UNDER-24",
+                    "logistics:ORDER-DELAY-UNDER-24",
+                ],
+            },
+        )
+        expect_status(replayed_conclusion_after_handoff, 403)
+
+    race_ticket_id, race_projection = create_ambiguous_ticket("handoff-reply-race")
+    race_clarification_id = race_projection["clarification"]["id"]
+    race_handoff_id = f"race-handoff-{uuid.uuid4()}"
+    race_barrier = threading.Barrier(2)
+
+    def request_handoff_during_reply() -> int:
+        race_barrier.wait()
+        with httpx.Client(timeout=20.0) as client:
+            response = client.post(
+                f"{spring_url}/api/customer/tickets/{race_ticket_id}/human-handoff",
+                headers={
+                    "X-Synthetic-Customer-Id": "customer-demo",
+                    "Idempotency-Key": race_handoff_id,
+                },
+                json={"reasonCode": "CUSTOMER_REQUESTED"},
+            )
+            return response.status_code
+
+    def reply_during_handoff() -> int:
+        race_barrier.wait()
+        with httpx.Client(timeout=20.0) as client:
+            response = client.post(
+                f"{spring_url}/api/customer/tickets/{race_ticket_id}/clarifications/"
+                f"{race_clarification_id}/replies",
+                headers={
+                    "X-Synthetic-Customer-Id": "customer-demo",
+                    "Idempotency-Key": f"race-reply-{uuid.uuid4()}",
+                    "X-Resume-Request-Id": str(uuid.uuid4()),
+                },
+                json={"answer": "A"},
+            )
+            return response.status_code
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        handoff_future = executor.submit(request_handoff_during_reply)
+        reply_future = executor.submit(reply_during_handoff)
+        race_statuses = (handoff_future.result(), reply_future.result())
+    assert race_statuses[0] == 202
+    assert race_statuses[1] in {202, 409}
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select handling_mode, customer_human_preference from support_ticket where id = %s",
+            (uuid.UUID(race_ticket_id),),
+        ).fetchone() == ("HUMAN", True)
+        assert connection.execute(
+            "select count(*) from agent_processing_generation where ticket_id = %s and status = 'ACTIVE'",
+            (uuid.UUID(race_ticket_id),),
+        ).fetchone()[0] == 0
+        assert connection.execute(
+            "select count(*) from customer_clarification_request where id = %s and status = 'OPEN'",
+            (uuid.UUID(race_clarification_id),),
+        ).fetchone()[0] == 0
+
     superseded_ticket_id, superseded_projection = create_ambiguous_ticket("superseded")
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         connection.execute(
@@ -889,6 +1150,30 @@ def main() -> None:
         assert not any(field in queue_item for field in (
             "customerId", "orderReference", "description", "messages", "investigationFacts"
         ))
+        sla_handoff_request_id = f"sla-handoff-{uuid.uuid4()}"
+        sla_handoff = client.post(
+            f"{spring_url}/api/customer/tickets/{ticket_id}/human-handoff",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": sla_handoff_request_id,
+            },
+            json={"reasonCode": "CUSTOMER_REQUESTED"},
+        )
+        expect_status(sla_handoff, 202)
+        shared_queue = client.get(
+            f"{spring_url}/api/support/queue",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(shared_queue, 200)
+        combined_queue_item = next(item for item in shared_queue.json() if item["ticketId"] == ticket_id)
+        assert set(combined_queue_item["reasonCodes"]) == {"SLA_BREACH", "CUSTOMER_REQUESTED_HANDOFF"}
+        assert combined_queue_item["handlingMode"] == "HUMAN"
+        escalations_after_handoff = client.get(
+            f"{spring_url}/api/support/escalations",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(escalations_after_handoff, 200)
+        assert sum(item["ticketId"] == ticket_id for item in escalations_after_handoff.json()) == 1
         denied_queue = client.get(
             f"{spring_url}/api/support/escalations",
             headers={"X-Synthetic-Support-Id": "customer-demo"},
@@ -939,7 +1224,7 @@ def main() -> None:
         assert connection.execute(
             "select lifecycle_state, handling_mode, resolution_elapsed_seconds from support_ticket where id = %s",
             (ticket_uuid,),
-        ).fetchone() == ("WAITING_FOR_EXTERNAL", "AGENT", 86399)
+        ).fetchone() == ("WAITING_FOR_EXTERNAL", "HUMAN", 86399)
 
     with httpx.Client(timeout=20.0) as client:
         concurrent_state_response = client.post(
@@ -1032,6 +1317,8 @@ def main() -> None:
         "rejected_proposal_count": len(rejected_ticket_ids),
         "concurrent_reservation_results": reservation_results,
         "concurrent_clarification_reply_statuses": concurrent_reply_statuses,
+        "human_handoff_ticket_id": handoff_ticket_id,
+        "handoff_reply_race_statuses": race_statuses,
         "clarification_resume_status": resume_status,
         "sla_fact_count": len(sla_facts),
         "sla_resume_immediate": True,
