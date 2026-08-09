@@ -2,6 +2,18 @@ ALTER TABLE compensation_proposal_revision ADD COLUMN expires_at timestamptz;
 UPDATE compensation_proposal_revision SET expires_at = created_at + interval '24 hours';
 ALTER TABLE compensation_proposal_revision ALTER COLUMN expires_at SET NOT NULL;
 
+ALTER TABLE audit_event
+    ADD COLUMN subject_type text,
+    ADD COLUMN subject_id uuid,
+    ADD COLUMN authorization_version bigint,
+    ADD CONSTRAINT audit_event_subject_complete CHECK (
+        (subject_type IS NULL AND subject_id IS NULL)
+        OR (subject_type IS NOT NULL AND subject_id IS NOT NULL)
+    ),
+    ADD CONSTRAINT audit_event_authorization_version_positive CHECK (
+        authorization_version IS NULL OR authorization_version > 0
+    );
+
 CREATE OR REPLACE FUNCTION reject_proposal_content_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF ROW(NEW.proposal_id, NEW.revision_number, NEW.ticket_id, NEW.order_reference,
@@ -69,8 +81,13 @@ BEGIN
         UPDATE approval_lease SET status = 'REVOKED'
         WHERE proposal_revision_id = NEW.id AND status = 'ACTIVE';
         IF FOUND THEN
-            INSERT INTO audit_event (ticket_id, event_type, actor_id, occurred_at)
-            VALUES (NEW.ticket_id, 'APPROVAL_LEASE_REVOKED', 'spring-system', current_timestamp);
+            INSERT INTO audit_event (
+                ticket_id, event_type, actor_id, occurred_at,
+                subject_type, subject_id, authorization_version
+            )
+            SELECT NEW.ticket_id, 'APPROVAL_LEASE_REVOKED', 'spring-system', current_timestamp,
+                   'COMPENSATION_PROPOSAL_REVISION', NEW.id, max(lease_version)
+            FROM approval_lease WHERE proposal_revision_id = NEW.id;
         END IF;
     END IF;
     RETURN NEW;

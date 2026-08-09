@@ -66,7 +66,9 @@ class ApprovalControllerTest {
                         "NO_EXISTING_COMPENSATION", "ALLOWANCE_SUFFICIENT"),
                 List.of("order:ORDER-DELAY-001", "logistics:ORDER-DELAY-001"),
                 Map.of("delaySeconds", 288000, "paidAmount", "268.00"),
-                List.of("COMPENSATION_PROPOSAL_REVISION_CREATED"), LEASE_TOKEN, 1,
+                List.of(new ApprovalModels.ResponsibilityEvent(
+                        "COMPENSATION_PROPOSAL_REVISION_CREATED", "spring-system",
+                        Instant.parse("2026-08-09T14:00:00Z"), null)), LEASE_TOKEN, 1,
                 Instant.parse("2026-08-09T14:15:00Z"), Instant.parse("2026-08-09T14:00:00Z"),
                 Instant.parse("2026-08-10T14:00:00Z")));
 

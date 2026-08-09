@@ -44,12 +44,14 @@ final class ApprovalModels {
             List<String> eligibilityChecks,
             List<String> evidenceReferences,
             Map<String, Object> evidenceSnapshot,
-            List<String> responsibilityChain,
+            List<ResponsibilityEvent> responsibilityChain,
             UUID leaseToken,
             long leaseVersion,
             Instant leaseExpiresAt,
             Instant submittedAt,
             Instant proposalExpiresAt) {}
+
+    record ResponsibilityEvent(String eventType, String actorId, Instant occurredAt, Long leaseVersion) {}
 
     record ReleaseCommand(
             String approverId, UUID revisionId, UUID leaseToken, long leaseVersion, String requestId) {}

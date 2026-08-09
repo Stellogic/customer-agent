@@ -216,14 +216,14 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         completeGeneration(generationId, databaseTime);
         appendPublicMessage(ticketId, PUBLIC_WAITING_APPROVAL, now, databaseTime, false);
         jdbc.update(
-                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values "
-                        + "(?, ?, 'spring-system', ?), "
-                        + "(?, 'AGENT_GENERATION_COMPLETED', 'spring-system', ?)",
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, subject_type, subject_id) values "
+                        + "(?, ?, 'spring-system', ?, 'COMPENSATION_PROPOSAL_REVISION', ?), "
+                        + "(?, 'AGENT_GENERATION_COMPLETED', 'spring-system', ?, null, null)",
                 ticketId,
                 proposal.created()
                         ? "COMPENSATION_PROPOSAL_REVISION_CREATED"
                         : "COMPENSATION_PROPOSAL_REVISION_REUSED",
-                databaseTime, ticketId, databaseTime);
+                databaseTime, proposal.revisionId(), ticketId, databaseTime);
         jdbc.update(
                 "insert into agent_command_request (generation_id, request_id, operation, parameter_digest, response_payload, created_at) "
                         + "values (?, ?, 'SUBMIT_INVESTIGATION_CONCLUSION', ?, "

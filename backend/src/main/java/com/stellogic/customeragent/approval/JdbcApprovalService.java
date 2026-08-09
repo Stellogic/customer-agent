@@ -126,7 +126,8 @@ class JdbcApprovalService implements ApprovalService {
                         + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 command.approverId(), command.requestId(), digest, command.revisionId(), leaseId,
                 token, version, Timestamp.from(expiresAt), at);
-        audit(proposal.ticketId(), "APPROVAL_LEASE_CLAIMED", command.approverId(), at);
+        audit(proposal.ticketId(), command.revisionId(), version,
+                "APPROVAL_LEASE_CLAIMED", command.approverId(), at);
         return new ApprovalModels.LeaseResult(command.revisionId(), token, version, expiresAt, false);
     }
 
@@ -160,7 +161,8 @@ class JdbcApprovalService implements ApprovalService {
         ViewRow row = rows.getFirst();
         DelayCompensationPolicy.Decision authoritative =
                 policy.evaluate(Duration.ofSeconds(row.delaySeconds()), row.paidAmount());
-        if (!authoritative.eligible()
+        if (!DelayCompensationPolicy.VERSION.equals(row.policyVersion())
+                || !authoritative.eligible()
                 || !authoritative.method().name().equals(row.method())
                 || authoritative.amount().compareTo(row.amount()) != 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "proposal no longer matches authoritative policy");
@@ -172,11 +174,15 @@ class JdbcApprovalService implements ApprovalService {
         snapshot.put("availableCompensationAmount", row.availableAmount().toPlainString());
         snapshot.put("activeReservationAmount", row.reservedAmount().toPlainString());
         List<String> checks = eligibilityChecks(row, authoritative.amount());
-        List<String> responsibility = jdbc.query(
-                "select event_type from audit_event where ticket_id = ? and event_type in "
+        List<ApprovalModels.ResponsibilityEvent> responsibility = jdbc.query(
+                "select event_type, actor_id, occurred_at, authorization_version from audit_event "
+                        + "where subject_type = 'COMPENSATION_PROPOSAL_REVISION' and subject_id = ? and event_type in "
                         + "('COMPENSATION_PROPOSAL_REVISION_CREATED', 'COMPENSATION_PROPOSAL_REVISION_REUSED', "
-                        + "'APPROVAL_LEASE_CLAIMED') order by occurred_at, id",
-                (rs, index) -> rs.getString(1), row.ticketId());
+                        + "'APPROVAL_LEASE_CLAIMED', 'APPROVAL_LEASE_RELEASED', 'APPROVAL_LEASE_REVOKED') "
+                        + "order by occurred_at, id",
+                (rs, index) -> new ApprovalModels.ResponsibilityEvent(
+                        rs.getString(1), rs.getString(2), rs.getTimestamp(3).toInstant(),
+                        rs.getObject(4, Long.class)), command.revisionId());
         return new ApprovalModels.ApprovalView(
                 "APPROVAL_VIEW", command.revisionId(), row.revisionNumber(), row.contentDigest(),
                 row.orderReference(), row.reasonCode(), row.delayHours(), row.delaySeconds(), row.method(),
@@ -186,7 +192,7 @@ class JdbcApprovalService implements ApprovalService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public ApprovalModels.ReleaseResult release(ApprovalModels.ReleaseCommand command) {
         String digest = StableParameterDigest.sha256(
                 command.revisionId().toString(), command.leaseToken().toString(), Long.toString(command.leaseVersion()));
@@ -203,16 +209,19 @@ class JdbcApprovalService implements ApprovalService {
         Instant now = clock.instant();
         Timestamp at = Timestamp.from(now);
         List<LeaseScope> leases = jdbc.query(
-                "select p.ticket_id, l.status, l.expires_at from approval_lease l "
+                "select p.ticket_id, p.status, p.expires_at, l.status, l.expires_at from approval_lease l "
                         + "join compensation_proposal_revision p on p.id = l.proposal_revision_id "
                         + "where l.proposal_revision_id = ? and l.approver_id = ? and l.lease_token = ? "
                         + "and l.lease_version = ? for update of l, p",
                 (rs, row) -> new LeaseScope(
-                        rs.getObject(1, UUID.class), rs.getString(2), rs.getTimestamp(3).toInstant()),
+                        rs.getObject(1, UUID.class), rs.getString(2), rs.getTimestamp(3).toInstant(),
+                        rs.getString(4), rs.getTimestamp(5).toInstant()),
                 command.revisionId(), command.approverId(), command.leaseToken(), command.leaseVersion());
-        if (leases.isEmpty() || !"ACTIVE".equals(leases.getFirst().status())
-                || !leases.getFirst().expiresAt().isAfter(now)) {
-            if (!leases.isEmpty() && "ACTIVE".equals(leases.getFirst().status())) {
+        if (leases.isEmpty() || !"PENDING_APPROVAL".equals(leases.getFirst().proposalStatus())
+                || !leases.getFirst().proposalExpiresAt().isAfter(now)
+                || !"ACTIVE".equals(leases.getFirst().leaseStatus())
+                || !leases.getFirst().leaseExpiresAt().isAfter(now)) {
+            if (!leases.isEmpty() && "ACTIVE".equals(leases.getFirst().leaseStatus())) {
                 jdbc.update("update approval_lease set status = 'EXPIRED' where proposal_revision_id = ? "
                                 + "and lease_version = ? and status = 'ACTIVE'",
                         command.revisionId(), command.leaseVersion());
@@ -229,7 +238,8 @@ class JdbcApprovalService implements ApprovalService {
                         + "proposal_revision_id, lease_token, lease_version, created_at) values (?, ?, ?, ?, ?, ?, ?)",
                 command.approverId(), command.requestId(), digest, command.revisionId(), command.leaseToken(),
                 command.leaseVersion(), at);
-        audit(lease.ticketId(), "APPROVAL_LEASE_RELEASED", command.approverId(), at);
+        audit(lease.ticketId(), command.revisionId(), command.leaseVersion(),
+                "APPROVAL_LEASE_RELEASED", command.approverId(), at);
         return new ApprovalModels.ReleaseResult(command.revisionId(), true, false);
     }
 
@@ -238,10 +248,14 @@ class JdbcApprovalService implements ApprovalService {
                 approverId + "\n" + operation + "\n" + requestId);
     }
 
-    private void audit(UUID ticketId, String eventType, String actorId, Timestamp at) {
+    private void audit(
+            UUID ticketId, UUID revisionId, long leaseVersion,
+            String eventType, String actorId, Timestamp at) {
         jdbc.update(
-                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, ?, ?, ?)",
-                ticketId, eventType, actorId, at);
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, "
+                        + "subject_type, subject_id, authorization_version) "
+                        + "values (?, ?, ?, ?, 'COMPENSATION_PROPOSAL_REVISION', ?, ?)",
+                ticketId, eventType, actorId, at, revisionId, leaseVersion);
     }
 
     private List<String> parseEvidence(String json) {
@@ -276,7 +290,9 @@ class JdbcApprovalService implements ApprovalService {
     private record ClaimReplay(String parameterDigest, UUID revisionId, UUID token, long version, Instant expiresAt) {}
     private record ReleaseReplay(String parameterDigest, UUID revisionId) {}
     private record ProposalScope(UUID ticketId, String status, Instant expiresAt) {}
-    private record LeaseScope(UUID ticketId, String status, Instant expiresAt) {}
+    private record LeaseScope(
+            UUID ticketId, String proposalStatus, Instant proposalExpiresAt,
+            String leaseStatus, Instant leaseExpiresAt) {}
     private record ViewRow(
             UUID ticketId, int revisionNumber, String contentDigest, String orderReference, String reasonCode,
             int delayHours, long delaySeconds, String method, BigDecimal amount, String policyVersion,
