@@ -58,7 +58,7 @@ final class AgentHumanHandoffController {
                 : new byte[0];
         boolean allowed = MessageDigest.isEqual(actual, agentToken)
                 && generationId.equals(scopedGenerationId)
-                && "REQUEST_SAFE_HANDOFF".equals(operation);
+                && "REQUEST_HUMAN_HANDOFF".equals(operation);
         if (!allowed) {
             service.auditAgentRejected(ticketId, "CAPABILITY_SCOPE_REJECTED");
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "agent capability is outside the current scope");

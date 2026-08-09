@@ -28,7 +28,7 @@ class AgentHumanHandoffControllerTest {
                         TICKET_ID, GENERATION_ID)
                         .header("Authorization", "Bearer agent-token")
                         .header("X-Agent-Generation-Id", GENERATION_ID)
-                        .header("X-Agent-Operation", "REQUEST_SAFE_HANDOFF")
+                        .header("X-Agent-Operation", "REQUEST_HUMAN_HANDOFF")
                         .header("Idempotency-Key", "handoff-19")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -49,7 +49,7 @@ class AgentHumanHandoffControllerTest {
                         TICKET_ID, GENERATION_ID)
                         .header("Authorization", "Bearer agent-token")
                         .header("X-Agent-Generation-Id", GENERATION_ID)
-                        .header("X-Agent-Operation", "REQUEST_SAFE_HANDOFF")
+                        .header("X-Agent-Operation", "REQUEST_HUMAN_HANDOFF")
                         .header("Idempotency-Key", "handoff-19")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reasonCode\":\"MODEL_SAID_SO\",\"summary\":{\"conclusionCode\":\"X\",\"facts\":[]}}"))

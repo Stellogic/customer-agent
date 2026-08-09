@@ -1,4 +1,5 @@
 import os
+from collections.abc import Awaitable, Callable
 from typing import TypedDict
 
 import httpx
@@ -50,30 +51,21 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
         "X-Agent-Generation-Id": generation_id,
     }
     async with httpx.AsyncClient(timeout=5.0) as client:
-        facts = None
-        for _ in range(_tool_attempt_budget()):
-            try:
-                facts_response = await client.get(
+        facts_response = await _request_with_retries(
+            lambda: client.get(
                     f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/facts",
                     headers={**scope_headers, "X-Agent-Operation": "READ_INVESTIGATION_FACTS"},
-                )
-                facts_response.raise_for_status()
-                facts = facts_response.json()
-                break
-            except (httpx.TransportError, httpx.TimeoutException):
-                continue
-            except httpx.HTTPStatusError as error:
-                if error.response.status_code >= 500:
-                    continue
-                raise
-            except ValueError:
-                facts = "INVALID_JSON_RESPONSE"
-                break
-        if facts is None:
+            )
+        )
+        if facts_response is None:
             return await _human_handoff(
                 client, base_url, ticket_id, generation_id, scope_headers,
                 "TOOL_RETRY_EXHAUSTED", [],
             )
+        try:
+            facts = facts_response.json()
+        except ValueError:
+            facts = "INVALID_JSON_RESPONSE"
         unsafe_reason = _unsafe_facts_reason(facts)
         if unsafe_reason is not None:
             return await _human_handoff(
@@ -83,10 +75,9 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
         if facts.get("matchStatus") == "AMBIGUOUS":
             return {"facts": facts, "model_mode": "fixed-fake-model-v1"}
         conclusion = fixed_fake_model(facts)
-        conclusion_response = None
-        for _ in range(_tool_attempt_budget()):
-            try:
-                candidate = await client.post(
+        try:
+            conclusion_response = await _request_with_retries(
+                lambda: client.post(
                     f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/conclusions",
                     headers={
                         **scope_headers,
@@ -95,20 +86,14 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                     },
                     json=conclusion,
                 )
-                candidate.raise_for_status()
-                conclusion_response = candidate
-                break
-            except (httpx.TransportError, httpx.TimeoutException):
-                continue
-            except httpx.HTTPStatusError as error:
-                if error.response.status_code >= 500:
-                    continue
-                if error.response.status_code == 422:
-                    return await _human_handoff(
-                        client, base_url, ticket_id, generation_id, scope_headers,
-                        "FACT_CONFLICT", _controlled_summary_facts(facts),
-                    )
-                raise
+            )
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code == 422:
+                return await _human_handoff(
+                    client, base_url, ticket_id, generation_id, scope_headers,
+                    "FACT_CONFLICT", _controlled_summary_facts(facts),
+                )
+            raise
         if conclusion_response is None:
             return await _human_handoff(
                 client, base_url, ticket_id, generation_id, scope_headers,
@@ -123,6 +108,23 @@ def _tool_attempt_budget() -> int:
     except ValueError:
         return 3
     return min(max(configured, 1), 5)
+
+
+async def _request_with_retries(
+    request: Callable[[], Awaitable[httpx.Response]],
+) -> httpx.Response | None:
+    for _ in range(_tool_attempt_budget()):
+        try:
+            response = await request()
+            response.raise_for_status()
+            return response
+        except (httpx.TransportError, httpx.TimeoutException):
+            continue
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code >= 500:
+                continue
+            raise
+    return None
 
 
 def _unsafe_facts_reason(facts: object) -> str | None:
@@ -220,7 +222,7 @@ async def _human_handoff(
         f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/human-handoff",
         headers={
             **scope_headers,
-            "X-Agent-Operation": "REQUEST_SAFE_HANDOFF",
+            "X-Agent-Operation": "REQUEST_HUMAN_HANDOFF",
             "Idempotency-Key": f"{generation_id}:human-handoff:{reason_code}",
         },
         json={

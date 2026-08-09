@@ -1,3 +1,4 @@
+-- Agent 发起转人工与客户主动转人工共享工单处理模式和队列不变量。
 ALTER TABLE support_ticket DROP CONSTRAINT support_ticket_handoff_reason_check;
 ALTER TABLE support_ticket ADD CONSTRAINT support_ticket_handoff_reason_check
     CHECK (human_handoff_reason_code IS NULL OR human_handoff_reason_code IN (

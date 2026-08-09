@@ -73,7 +73,7 @@ async def test_unsafe_investigation_uses_controlled_handoff_without_leaking_raw_
     assert len(posts) == 1
     url, body, headers = posts[0]
     assert url.endswith("/human-handoff")
-    assert headers["X-Agent-Operation"] == "REQUEST_SAFE_HANDOFF"
+    assert headers["X-Agent-Operation"] == "REQUEST_HUMAN_HANDOFF"
     assert headers["Idempotency-Key"] == f"generation-19:human-handoff:{expected_reason}"
     serialized = repr(body)
     assert "raw" not in serialized

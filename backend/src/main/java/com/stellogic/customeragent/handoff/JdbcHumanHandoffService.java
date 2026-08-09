@@ -22,8 +22,8 @@ class JdbcHumanHandoffService implements HumanHandoffService {
     private static final String CUSTOMER_PUBLIC_EPOCH = "customer-public-v1";
     private static final String CUSTOMER_REQUESTED_REASON = "CUSTOMER_REQUESTED";
     private static final String CUSTOMER_PUBLIC_MESSAGE = "已按您的要求转由客服继续处理。客服将在此工单中与您联系。";
-    private static final String SAFETY_PUBLIC_MESSAGE = "为确保处理安全，此工单已转由客服继续调查。客服将在此工单中与您联系。";
-    private static final String SAFETY_CONCLUSION = "INVESTIGATION_COULD_NOT_CONTINUE";
+    private static final String AGENT_HANDOFF_PUBLIC_MESSAGE = "为确保处理安全，此工单已转由客服继续调查。客服将在此工单中与您联系。";
+    private static final String INCOMPLETE_INVESTIGATION_CONCLUSION = "INVESTIGATION_COULD_NOT_CONTINUE";
     private static final Set<String> SUMMARY_FACT_TYPES = Set.of(
             "ORDER", "LOGISTICS_DELAY_SECONDS", "PAYMENT", "POLICY", "PENDING_ACTION_COUNT");
     private final JdbcTemplate jdbc;
@@ -90,18 +90,18 @@ class JdbcHumanHandoffService implements HumanHandoffService {
     @Override
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public AgentHumanHandoffResult requestAgentHumanHandoff(RequestAgentHumanHandoff command) {
-        validateSafetyCommand(command);
+        validateAgentHandoffCommand(command);
         String summaryJson = serializeSummary(command.summary());
-        String digest = safetyDigest(command);
+        String digest = agentHandoffDigest(command);
         acquireRequestIdentity(command.ticketId(), command.requestId());
-        List<SafetyRequestRecord> existing = jdbc.query(
+        List<AgentHandoffRequestRecord> existing = jdbc.query(
                 "select parameter_digest, ticket_id, reason_code from agent_human_handoff_request "
                         + "where generation_id = ? and request_id = ?",
-                (rs, row) -> new SafetyRequestRecord(
+                (rs, row) -> new AgentHandoffRequestRecord(
                         rs.getString(1), rs.getObject(2, UUID.class), rs.getString(3)),
                 command.generationId(), command.requestId());
         if (!existing.isEmpty()) {
-            SafetyRequestRecord record = existing.getFirst();
+            AgentHandoffRequestRecord record = existing.getFirst();
             if (!record.ticketId().equals(command.ticketId())) {
                 rejectAgent(command.ticketId(), AgentHandoffRejection.OUT_OF_SCOPE_HANDOFF_REPLAY);
             }
@@ -127,7 +127,7 @@ class JdbcHumanHandoffService implements HumanHandoffService {
 
         HandoffTransition transition = transitionToHuman(
                 command.ticketId(), command.reasonCode().name(), "AGENT_HUMAN_HANDOFF",
-                SAFETY_PUBLIC_MESSAGE, false, "agent-machine");
+                AGENT_HANDOFF_PUBLIC_MESSAGE, false, "agent-machine");
         if (!command.generationId().equals(transition.generationId())) {
             rejectAgent(command.ticketId(), AgentHandoffRejection.STALE_OR_OUT_OF_SCOPE_GENERATION);
         }
@@ -137,7 +137,7 @@ class JdbcHumanHandoffService implements HumanHandoffService {
                         + "values (?, ?, ?, ?, ?, ?::jsonb, ?)",
                 command.generationId(), command.ticketId(), command.requestId(), digest,
                 command.reasonCode().name(), summaryJson, transition.at());
-        audit(command.ticketId(), "AGENT_SAFE_HANDOFF_REQUEST_RECORDED", "agent-machine", transition.at());
+        audit(command.ticketId(), "AGENT_HUMAN_HANDOFF_REQUEST_RECORDED", "agent-machine", transition.at());
         return new AgentHumanHandoffResult(
                 command.requestId(), "HUMAN", command.reasonCode().name(), false);
     }
@@ -200,9 +200,9 @@ class JdbcHumanHandoffService implements HumanHandoffService {
         return new HandoffTransition(generationId, at, publicTransitionRequired);
     }
 
-    private void validateSafetyCommand(RequestAgentHumanHandoff command) {
+    private void validateAgentHandoffCommand(RequestAgentHumanHandoff command) {
         if (command.reasonCode() == null || command.summary() == null
-                || !SAFETY_CONCLUSION.equals(command.summary().conclusionCode())
+                || !INCOMPLETE_INVESTIGATION_CONCLUSION.equals(command.summary().conclusionCode())
                 || command.summary().facts() == null || command.summary().facts().size() > 20) {
             rejectAgent(command.ticketId(), AgentHandoffRejection.INVALID_HANDOFF_SUMMARY);
         }
@@ -243,7 +243,7 @@ class JdbcHumanHandoffService implements HumanHandoffService {
         }
     }
 
-    private static String safetyDigest(RequestAgentHumanHandoff command) {
+    private static String agentHandoffDigest(RequestAgentHumanHandoff command) {
         String[] values = new String[2 + command.summary().facts().size() * 3];
         values[0] = command.reasonCode().name();
         values[1] = command.summary().conclusionCode();
@@ -308,7 +308,7 @@ class JdbcHumanHandoffService implements HumanHandoffService {
     }
 
     private record RequestRecord(String parameterDigest, String customerId) {}
-    private record SafetyRequestRecord(String parameterDigest, UUID ticketId, String reasonCode) {}
+    private record AgentHandoffRequestRecord(String parameterDigest, UUID ticketId, String reasonCode) {}
     private record TicketScope(String lifecycleState, String handlingMode, boolean customerHumanPreference) {}
     private record HandoffTransition(UUID generationId, Timestamp at, boolean publicTransitionRequired) {}
 

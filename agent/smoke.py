@@ -898,7 +898,7 @@ def main() -> None:
     safe_headers = {
         "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
         "X-Agent-Generation-Id": str(safe_generation_id),
-        "X-Agent-Operation": "REQUEST_SAFE_HANDOFF",
+        "X-Agent-Operation": "REQUEST_HUMAN_HANDOFF",
         "Idempotency-Key": safe_request_id,
     }
     safe_body = {
@@ -1022,7 +1022,7 @@ def main() -> None:
                 headers={
                     "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
                     "X-Agent-Generation-Id": str(concurrent_safe_generation),
-                    "X-Agent-Operation": "REQUEST_SAFE_HANDOFF",
+                    "X-Agent-Operation": "REQUEST_HUMAN_HANDOFF",
                     "Idempotency-Key": f"{concurrent_safe_generation}:human-handoff:{reason}",
                 },
                 json={

@@ -81,8 +81,8 @@ React 实时验收通过，生产构建扫描未发现 Agent 地址、本地机�
 
 验证日期：2026-08-10（Asia/Shanghai）。从空 Compose 合成数据卷执行 V1→V8，Flyway 历史为 `1:true` 至 `8:true`；完整后端测试、Agent 测试、React 生产构建、真实 PostgreSQL/LangGraph/Spring smoke、React 实时验收与前端敏感串扫描全部通过。最终 smoke 包含 69 条 checkpoint，并继续覆盖 #16 澄清恢复、#17 SLA 与共享队列、#18 客户主动转人工，以及补偿提案和额度预占不变量。
 
-固定 Agent 用例确定性覆盖 `TOOL_RETRY_EXHAUSTED`、`FACT_CONFLICT`、`INVALID_TOOL_RESPONSE`、`REQUIRED_FACT_MISSING`、`UNSUPPORTED_SCENARIO` 五个封闭理由码。暂时性事实工具错误按配置预算立即重试，不依赖真实等待；预算耗尽后只发送受控理由码与结构化摘要，不携带异常、stack、prompt、自由形式推理或原始 payload。原先会到达 Spring 确定性拒绝的不支持订单现在在提案产生前安全转人工；剩余额度冲突仍由 Spring 拒绝结论，再映射为安全转人工，所有用例保持零提案副作用。
+固定 Agent 用例确定性覆盖 `TOOL_RETRY_EXHAUSTED`、`FACT_CONFLICT`、`INVALID_TOOL_RESPONSE`、`REQUIRED_FACT_MISSING`、`UNSUPPORTED_SCENARIO` 五个封闭理由码。暂时性事实工具错误按配置预算立即重试，不依赖真实等待；预算耗尽后只发送受控理由码与结构化摘要，不携带异常、stack、prompt、自由形式推理或原始 payload。原先会到达 Spring 确定性拒绝的不支持订单现在在提案产生前转人工；剩余额度冲突仍由 Spring 拒绝结论，再映射为转人工，所有用例保持零提案副作用。
 
-安全转人工复用 #18 的同一 `HumanHandoffService` 事务：保留生命周期、切换 `HUMAN`、撤销当前 generation、失效澄清、发布固定公开说明、写入共享队列和审计。客户人工偏好保持 `false`，不会把系统安全转人工伪造成客户请求。相同 generation/request/参数在转人工后仍可历史重放；不同参数复用返回 `409`，新请求和旧 generation 工具调用返回 `403`。两个不同安全理由并发触发观察到 `[202, 403]`，数据库只有一条请求、一个固定公开消息和一个 `AGENT_HUMAN_HANDOFF` 队列原因。
+调查异常转人工复用 #18 的同一 `HumanHandoffService` 事务：保留生命周期、切换 `HUMAN`、撤销当前 generation、失效澄清、发布固定公开说明、写入共享队列和审计。客户人工偏好保持 `false`，不会把 Agent 发起的转人工伪造成客户请求。相同 generation/request/参数在转人工后仍可历史重放；不同参数复用返回 `409`，新请求和旧 generation 工具调用返回 `403`。两个不同异常理由并发触发观察到 `[202, 403]`，数据库只有一条请求、一个固定公开消息和一个 `AGENT_HUMAN_HANDOFF` 队列原因。
 
-持久化摘要仅包含 `conclusionCode` 与受控的事实 `type`、`value`、`evidenceReference`，并且每项事实必须精确匹配当前 generation 在 Spring 中已经记录的调查事实；伪造值或仅伪造合法引用前缀会返回 `422`，不会改变工单或发布消息。客户投影不含内部理由码或摘要，共享队列只呈现聚合理由，不提供完整摘要读取入口。集成验收还发现安全转人工最初错误限制为 `INVESTIGATING`；修复后当前有效 generation 在 `WAITING_FOR_CUSTOMER` 等未关闭生命周期也可转人工，同时保持原生命周期。宿主 Docker 代理仍不可达，本轮运行镜像由本地 #18 固定运行时层与本轮已通过测试的 JAR、Agent 源码和前端产物离线组装，不把该结果表述为外部镜像仓库可用性验证。
+持久化摘要仅包含 `conclusionCode` 与受控的事实 `type`、`value`、`evidenceReference`，并且每项事实必须精确匹配当前 generation 在 Spring 中已经记录的调查事实；伪造值或仅伪造合法引用前缀会返回 `422`，不会改变工单或发布消息。客户投影不含内部理由码或摘要，共享队列只呈现聚合理由，不提供完整摘要读取入口。集成验收还发现 Agent 发起转人工最初错误限制为 `INVESTIGATING`；修复后当前有效 generation 在 `WAITING_FOR_CUSTOMER` 等未关闭生命周期也可转人工，同时保持原生命周期。宿主 Docker 代理仍不可达，本轮运行镜像由本地 #18 固定运行时层与本轮已通过测试的 JAR、Agent 源码和前端产物离线组装，不把该结果表述为外部镜像仓库可用性验证。
