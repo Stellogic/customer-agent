@@ -1,0 +1,8 @@
+{
+  "$schema": "https://langgra.ph/schema.json",
+  "dependencies": ["."],
+  "graphs": {
+    "recovery_prototype": "./agent_app.py:graph"
+  },
+  "env": ".env.example"
+}

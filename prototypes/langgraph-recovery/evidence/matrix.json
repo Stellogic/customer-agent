@@ -1,0 +1,288 @@
+{
+  "generated_at": "2026-08-09T08:53:38.464504+00:00",
+  "python": "3.12.13 (main, Mar  3 2026, 15:01:35) [MSC v.1944 64 bit (AMD64)]",
+  "packages": {
+    "langgraph": "1.2.10",
+    "langgraph-checkpoint": "4.2.0",
+    "langgraph-checkpoint-sqlite": "3.1.0",
+    "langgraph-sdk": "0.4.2"
+  },
+  "process_ids": [
+    34576,
+    13172,
+    10348,
+    31412
+  ],
+  "results": [
+    {
+      "scenario": "可靠提交响应丢失后对账",
+      "passed": true,
+      "evidence": {
+        "process_id": 34576,
+        "pending_before_reconcile": "PENDING",
+        "confirmed_after_reconcile": "CONFIRMED",
+        "thread_count": 1,
+        "interrupt_count": 1,
+        "next_nodes": [
+          "wait_for_confirmation"
+        ]
+      }
+    },
+    {
+      "scenario": "一个 generation 一个 thread 且允许多个 run",
+      "passed": true,
+      "evidence": {
+        "threads": [
+          {
+            "thread_id": "90c079e4-3c8f-5b7e-8fec-b2f54439be59",
+            "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e"
+          }
+        ],
+        "runs": [
+          {
+            "run_id": "9da26d3f-73e2-520b-a70b-5c28580830c6",
+            "thread_id": "90c079e4-3c8f-5b7e-8fec-b2f54439be59",
+            "kind": "initial",
+            "request_id": null
+          },
+          {
+            "run_id": "ad8ba7a2-6dbc-5457-80a7-a90b78701265",
+            "thread_id": "90c079e4-3c8f-5b7e-8fec-b2f54439be59",
+            "kind": "resume",
+            "request_id": "resume-request-001"
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "interrupt 后跨进程 resume",
+      "passed": true,
+      "evidence": {
+        "bootstrap": {
+          "process_id": 34576,
+          "pending_before_reconcile": "PENDING",
+          "confirmed_after_reconcile": "CONFIRMED",
+          "thread_count": 1,
+          "interrupt_count": 1,
+          "next_nodes": [
+            "wait_for_confirmation"
+          ]
+        },
+        "recovery": {
+          "process_id": 10348,
+          "duplicate_resume_returned_same_run": true,
+          "duplicate_run_id": "29b3f999-336a-50a8-bb8f-64b2ea87ddd2",
+          "agent_duplicate_created_new_run": false,
+          "agent_run_id": "ad8ba7a2-6dbc-5457-80a7-a90b78701265",
+          "effect_count_after_recovery": 1,
+          "effect_replayed": true,
+          "graph_completed": true,
+          "proposal": {
+            "proposal_revision": "proposal-95c675e6-r1",
+            "status": "PROPOSED"
+          },
+          "steps": [
+            "investigation_facts_loaded",
+            "interrupt_resumed",
+            "proposal_persisted"
+          ]
+        }
+      }
+    },
+    {
+      "scenario": "重复恢复请求幂等",
+      "passed": true,
+      "evidence": {
+        "process_id": 10348,
+        "duplicate_resume_returned_same_run": true,
+        "duplicate_run_id": "29b3f999-336a-50a8-bb8f-64b2ea87ddd2",
+        "agent_duplicate_created_new_run": false,
+        "agent_run_id": "ad8ba7a2-6dbc-5457-80a7-a90b78701265",
+        "effect_count_after_recovery": 1,
+        "effect_replayed": true,
+        "graph_completed": true,
+        "proposal": {
+          "proposal_revision": "proposal-95c675e6-r1",
+          "status": "PROPOSED"
+        },
+        "steps": [
+          "investigation_facts_loaded",
+          "interrupt_resumed",
+          "proposal_persisted"
+        ]
+      }
+    },
+    {
+      "scenario": "工具响应丢失与同幂等键重试",
+      "passed": true,
+      "evidence": {
+        "loss": {
+          "process_id": 13172,
+          "spring_resume_run_id": "29b3f999-336a-50a8-bb8f-64b2ea87ddd2",
+          "spring_resume_accepted": true,
+          "agent_run_id": "ad8ba7a2-6dbc-5457-80a7-a90b78701265",
+          "agent_run_created": true,
+          "response_lost_after_commit": true,
+          "effect_count_after_loss": 1
+        },
+        "recovery": {
+          "process_id": 10348,
+          "duplicate_resume_returned_same_run": true,
+          "duplicate_run_id": "29b3f999-336a-50a8-bb8f-64b2ea87ddd2",
+          "agent_duplicate_created_new_run": false,
+          "agent_run_id": "ad8ba7a2-6dbc-5457-80a7-a90b78701265",
+          "effect_count_after_recovery": 1,
+          "effect_replayed": true,
+          "graph_completed": true,
+          "proposal": {
+            "proposal_revision": "proposal-95c675e6-r1",
+            "status": "PROPOSED"
+          },
+          "steps": [
+            "investigation_facts_loaded",
+            "interrupt_resumed",
+            "proposal_persisted"
+          ]
+        }
+      }
+    },
+    {
+      "scenario": "旧 generation 迟到调用拒绝",
+      "passed": true,
+      "evidence": {
+        "process_id": 31412,
+        "replacement_generation_id": "db18e903-43bc-5706-90b2-12a2a1a1f50f",
+        "old_generation_rejected": true,
+        "late_effect_created": false,
+        "stale_audit_count": 1
+      }
+    }
+  ],
+  "spring_snapshot": {
+    "tickets": [
+      {
+        "ticket_id": "TICKET-DEMO-001",
+        "current_generation_id": "db18e903-43bc-5706-90b2-12a2a1a1f50f",
+        "generation_seq": 2
+      }
+    ],
+    "generations": [
+      {
+        "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e",
+        "ticket_id": "TICKET-DEMO-001",
+        "generation_seq": 1,
+        "status": "ACTIVE",
+        "thread_id": "90c079e4-3c8f-5b7e-8fec-b2f54439be59"
+      },
+      {
+        "generation_id": "db18e903-43bc-5706-90b2-12a2a1a1f50f",
+        "ticket_id": "TICKET-DEMO-001",
+        "generation_seq": 2,
+        "status": "PENDING_SUBMISSION",
+        "thread_id": null
+      }
+    ],
+    "submission_outbox": [
+      {
+        "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e",
+        "requested_thread_id": "90c079e4-3c8f-5b7e-8fec-b2f54439be59",
+        "status": "CONFIRMED",
+        "attempts": 1
+      },
+      {
+        "generation_id": "db18e903-43bc-5706-90b2-12a2a1a1f50f",
+        "requested_thread_id": "7799ff8c-ac68-5242-8f6f-017ebe76e5f5",
+        "status": "PENDING",
+        "attempts": 0
+      }
+    ],
+    "resume_requests": [
+      {
+        "request_id": "resume-request-001",
+        "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e",
+        "answer_hash": "15776b37260a5897bb8aa57ee5df951203984ccc24a5bd9cb44d4521dc0ca203",
+        "run_id": "29b3f999-336a-50a8-bb8f-64b2ea87ddd2"
+      }
+    ],
+    "effects": [
+      {
+        "idempotency_key": "investigation-result:95c675e6-45f6-555f-8477-6023fbb7ae0e",
+        "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e",
+        "payload_hash": "ebfe57f57d93442248c4f076d9f5ac3279c640fef9d038901d9965f781dd25e2",
+        "result_json": "{\"proposal_revision\": \"proposal-95c675e6-r1\", \"status\": \"PROPOSED\"}"
+      }
+    ],
+    "faults": [
+      {
+        "name": "tool_response_loss",
+        "remaining": 0
+      }
+    ],
+    "audit": [
+      {
+        "seq": 1,
+        "event_type": "GENERATION_CREATED",
+        "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e",
+        "details_json": "{\"thread_id\": \"90c079e4-3c8f-5b7e-8fec-b2f54439be59\"}"
+      },
+      {
+        "seq": 2,
+        "event_type": "THREAD_CONFIRMED",
+        "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e",
+        "details_json": "{\"thread_id\": \"90c079e4-3c8f-5b7e-8fec-b2f54439be59\"}"
+      },
+      {
+        "seq": 3,
+        "event_type": "RESUME_ACCEPTED",
+        "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e",
+        "details_json": "{\"request_id\": \"resume-request-001\", \"run_id\": \"29b3f999-336a-50a8-bb8f-64b2ea87ddd2\"}"
+      },
+      {
+        "seq": 4,
+        "event_type": "EFFECT_COMMITTED",
+        "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e",
+        "details_json": "{\"idempotency_key\": \"investigation-result:95c675e6-45f6-555f-8477-6023fbb7ae0e\"}"
+      },
+      {
+        "seq": 5,
+        "event_type": "EFFECT_REPLAYED",
+        "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e",
+        "details_json": "{\"idempotency_key\": \"investigation-result:95c675e6-45f6-555f-8477-6023fbb7ae0e\"}"
+      },
+      {
+        "seq": 6,
+        "event_type": "GENERATION_CREATED",
+        "generation_id": "db18e903-43bc-5706-90b2-12a2a1a1f50f",
+        "details_json": "{\"thread_id\": \"7799ff8c-ac68-5242-8f6f-017ebe76e5f5\"}"
+      },
+      {
+        "seq": 7,
+        "event_type": "STALE_RESULT_REJECTED",
+        "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e",
+        "details_json": "{\"idempotency_key\": \"late-old-generation-effect\", \"ticket_id\": \"TICKET-DEMO-001\"}"
+      }
+    ]
+  },
+  "agent_snapshot": {
+    "threads": [
+      {
+        "thread_id": "90c079e4-3c8f-5b7e-8fec-b2f54439be59",
+        "generation_id": "95c675e6-45f6-555f-8477-6023fbb7ae0e"
+      }
+    ],
+    "runs": [
+      {
+        "run_id": "9da26d3f-73e2-520b-a70b-5c28580830c6",
+        "thread_id": "90c079e4-3c8f-5b7e-8fec-b2f54439be59",
+        "kind": "initial",
+        "request_id": null
+      },
+      {
+        "run_id": "ad8ba7a2-6dbc-5457-80a7-a90b78701265",
+        "thread_id": "90c079e4-3c8f-5b7e-8fec-b2f54439be59",
+        "kind": "resume",
+        "request_id": "resume-request-001"
+      }
+    ]
+  }
+}

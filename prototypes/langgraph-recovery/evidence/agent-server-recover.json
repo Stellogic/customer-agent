@@ -1,0 +1,26 @@
+{
+  "client_process_id": 36140,
+  "output": {
+    "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+    "ticket_id": "TICKET-SERVER-004",
+    "steps": [
+      "investigation_facts_loaded",
+      "interrupt_resumed",
+      "proposal_persisted"
+    ],
+    "confirmation": "yes",
+    "proposal": {
+      "proposal_revision": "proposal-1e41637d-r1",
+      "status": "PROPOSED"
+    }
+  },
+  "effect_count_after_recovery": 1,
+  "effect_replayed": true,
+  "state_next": [],
+  "run_count": 3,
+  "run_statuses": [
+    "success",
+    "error",
+    "success"
+  ]
+}

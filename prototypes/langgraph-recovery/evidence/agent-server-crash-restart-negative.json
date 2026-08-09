@@ -1,0 +1,25 @@
+{
+  "scenario": "langgraph dev 在 interrupt 后强制终止并重启",
+  "server_before_process_id": 32448,
+  "bootstrap_client_process_id": 17520,
+  "server_after_restart_observation": {
+    "thread_and_run_metadata_present": true,
+    "run_count_after_resume_attempt": 2,
+    "checkpoint_resumed_at_expected_node": false,
+    "observed_next_node": "__start__",
+    "observed_error": "TypeError: 'NoneType' object is not iterable",
+    "spring_effect_count": 0
+  },
+  "verdict": "NEGATIVE: langgraph dev 0.4.31 / langgraph-api 0.12.1 的本地 in-memory runtime 不能作为强制终止后的 durable checkpoint 证据。需要 Standalone + PostgreSQL 复测。",
+  "log_excerpt": {
+    "runtime": "Starting In-Memory runtime with langgraph-api=0.12.1 and in-memory runtime=0.32.1",
+    "resume_failure": "TypeError: 'NoneType' object is not iterable; During task with name '__start__'"
+  },
+  "environment": {
+    "python": "3.12.13",
+    "langgraph": "1.2.10",
+    "langgraph_cli": "0.4.31",
+    "langgraph_api": "0.12.1",
+    "langgraph_runtime_inmem": "0.32.1"
+  }
+}

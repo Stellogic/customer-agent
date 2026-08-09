@@ -1,0 +1,12 @@
+{
+  "client_process_id": 31392,
+  "replacement_generation_id": "1111314a-8589-5e73-9f66-c523d49b7209",
+  "old_generation_interrupt_seen": true,
+  "server_error": {
+    "error": "StaleGenerationRejected",
+    "message": "1e41637d-53f0-59e0-8c9d-20eef10969fc"
+  },
+  "stale_audit_count": 1,
+  "effect_count_unchanged": true,
+  "run_count": 5
+}
