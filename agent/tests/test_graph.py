@@ -1,6 +1,126 @@
 import pytest
+import httpx
 
 from baseline_agent.graph import await_clarification, fixed_fake_model, request_clarification, investigate_ticket, probe_spring
+
+
+@pytest.mark.parametrize(
+    ("facts_payload", "expected_reason"),
+    [
+        ({
+            "orderReference": "ORDER-1", "delayHours": 2, "delaySeconds": 1,
+            "paid": True, "cancelled": False, "fullyRefunded": False,
+            "existingCompensation": False, "pendingActionCount": 0,
+            "policyVersion": "delay-policy-v1", "evidenceRefs": ["order:ORDER-1", "logistics:ORDER-1"],
+        }, "FACT_CONFLICT"),
+        ({"orderReference": ["raw", "payload"], "delayHours": "bad"}, "INVALID_TOOL_RESPONSE"),
+        ({"orderReference": "ORDER-1", "delayHours": 2}, "REQUIRED_FACT_MISSING"),
+        ({
+            "orderReference": "ORDER-1", "delayHours": 2, "delaySeconds": 7200,
+            "paid": False, "cancelled": False, "fullyRefunded": False,
+            "existingCompensation": False, "pendingActionCount": 0,
+            "policyVersion": "delay-policy-v1", "evidenceRefs": ["order:ORDER-1", "logistics:ORDER-1"],
+        }, "UNSUPPORTED_SCENARIO"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_unsafe_investigation_uses_controlled_handoff_without_leaking_raw_payload(
+    monkeypatch: pytest.MonkeyPatch, facts_payload: dict, expected_reason: str,
+) -> None:
+    posts: list[tuple[str, dict, dict[str, str]]] = []
+
+    class Response:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+            self.status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, *_: object, **__: object) -> Response:
+            return Response(facts_payload)
+
+        async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
+            posts.append((url, json, headers))
+            return Response({"handlingMode": "HUMAN", "reasonCode": expected_reason})
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+
+    result = await investigate_ticket({
+        "requested_by": "spring", "ticket_id": "ticket-19", "generation_id": "generation-19",
+    })
+
+    assert result["handoff"]["reasonCode"] == expected_reason
+    assert len(posts) == 1
+    url, body, headers = posts[0]
+    assert url.endswith("/safe-handoff")
+    assert headers["X-Agent-Operation"] == "REQUEST_SAFE_HANDOFF"
+    assert headers["Idempotency-Key"] == f"generation-19:safe-handoff:{expected_reason}"
+    serialized = repr(body)
+    assert "raw" not in serialized
+    assert "payload" not in serialized
+    assert set(body) == {"reasonCode", "summary"}
+
+
+@pytest.mark.asyncio
+async def test_transient_fact_tool_errors_retry_to_budget_then_handoff_without_waiting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts = 0
+    posts: list[dict] = []
+
+    class Response:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"handlingMode": "HUMAN", "reasonCode": "TOOL_RETRY_EXHAUSTED"}
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, *_: object, **__: object) -> Response:
+            nonlocal attempts
+            attempts += 1
+            raise httpx.ConnectError("secret upstream stack and payload")
+
+        async def post(self, _url: str, *, headers: dict[str, str], json: dict) -> Response:
+            posts.append(json)
+            return Response()
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    monkeypatch.setenv("AGENT_TOOL_MAX_ATTEMPTS", "3")
+
+    result = await investigate_ticket({
+        "requested_by": "spring", "ticket_id": "ticket-19", "generation_id": "generation-19",
+    })
+
+    assert attempts == 3
+    assert result["handoff"]["reasonCode"] == "TOOL_RETRY_EXHAUSTED"
+    assert posts == [{
+        "reasonCode": "TOOL_RETRY_EXHAUSTED",
+        "summary": {"conclusionCode": "INVESTIGATION_COULD_NOT_CONTINUE", "facts": []},
+    }]
 
 
 @pytest.mark.asyncio
