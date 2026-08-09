@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.clarification;
 
 import com.stellogic.customeragent.reliability.StableParameterDigest;
+import com.stellogic.customeragent.sla.SlaService;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -20,10 +21,12 @@ class JdbcClarificationService implements ClarificationService {
     private static final String PUBLIC_QUESTION = "为确认需要调查的订单，请回复订单确认码（A 或 B）。";
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final SlaService slaService;
 
-    JdbcClarificationService(JdbcTemplate jdbc, Clock clock) {
+    JdbcClarificationService(JdbcTemplate jdbc, Clock clock, SlaService slaService) {
         this.jdbc = jdbc;
         this.clock = clock;
+        this.slaService = slaService;
     }
 
     @Override
@@ -73,6 +76,7 @@ class JdbcClarificationService implements ClarificationService {
                         + "case when resolution_running_since is null then 0 else greatest(0, extract(epoch from (?::timestamptz - resolution_running_since))::bigint) end, "
                         + "resolution_running_since = null where id = ?",
                 at, command.ticketId());
+        slaService.evaluateTicket(command.ticketId(), now);
         appendPublicMessage(
                 command.ticketId(), "AGENT", PUBLIC_QUESTION, now,
                 "CUSTOMER_CLARIFICATION_REQUESTED", requestId);
@@ -158,6 +162,7 @@ class JdbcClarificationService implements ClarificationService {
                 "update support_ticket set order_reference = ?, lifecycle_state = 'INVESTIGATING', "
                         + "resolution_running_since = ? where id = ?",
                 resolvedOrder, at, command.ticketId());
+        slaService.evaluateTicket(command.ticketId(), now);
         jdbc.update(
                 "insert into agent_resume_request "
                         + "(resume_request_id, customer_message_id, clarification_request_id, generation_id, thread_id, "

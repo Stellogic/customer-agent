@@ -56,3 +56,11 @@ pwsh -File scripts/smoke.ps1 -Reset
 另以隔离临时数据库先迁移到 V4，写入 `INVESTIGATING` 与 `RESOLVED` 两条合成旧工单，再单独执行 V5。升级后两条记录均保留：调查中工单的 `resolution_running_since` 回填为原 `created_at`，已解决工单保持空值；`resolution_elapsed_seconds=0`、`customer_human_preference=false`，既有提案表和新增澄清/恢复表同时存在。临时数据库在回读后已删除。
 
 React 实时验收通过，生产构建扫描未发现 Agent 地址、本地机器令牌或 PostgreSQL URI。验证期间宿主 Docker 代理端口不可用，无法重新拉取 Nginx/Temurin 运行时基础镜像；因此集成栈使用本轮已通过测试的本地缓存镜像启动，业务数据库、Spring、Agent Server、LangGraph 和浏览器 API 边界均为真实进程，不把该结果表述为镜像仓库可用性验证。
+
+## Issue #17 增量验证
+
+验证日期：2026-08-10（Asia/Shanghai）。从空 Compose 合成数据卷运行 V1→V6 后，Flyway 历史为 `1:true` 至 `6:true`；后端完整测试、Agent 测试、React 单测/生产构建、真实 PostgreSQL/LangGraph smoke 与 React 实时验收均通过。smoke 结果包含 79 条 checkpoint，并保留 Issue #16 的同 generation/thread 恢复、并发澄清回复 `[202, 409]` 和稳定恢复查询。
+
+可控时钟验收把首次响应精确放在 12 分钟和 15 分钟边界，并把解决累计时长放在 69120 秒、86399 秒和 86400 秒边界。结果证明：首次响应在 `WAITING_FOR_CUSTOMER` 仍形成预警/违约；解决时钟在 `WAITING_FOR_CUSTOMER` 的 86399 秒保持不变，在 `WAITING_FOR_EXTERNAL` 继续到 86400 秒；澄清恢复请求返回前已原子形成解决预警、违约及审计；重复调度后同一工单仍只有 4 个 SLA 事实和 4 个对应审计事件。并发验收让调度器等待工单行锁、在同一事务中把已耗 86400 秒的工单转为 `RESOLVED`，提交后仍补齐不可撤销的解决预警/违约；随后重开到 `INVESTIGATING` 保留 86400 秒，数据库约束拒绝把累计值降为 0。预警只投影给当时的 `support-demo` 当前分配，违约队列仅包含工单标识、生命周期、处理模式、原因、违约目标和进入时间，未暴露客户、订单、描述、消息或调查事实；队列未改变 `WAITING_FOR_EXTERNAL` / `AGENT`。
+
+另以隔离临时数据库先迁移到 V5，写入一条 `WAITING_FOR_CUSTOMER` 旧工单，再单独执行 V6。升级后工单仍为 `WAITING_FOR_CUSTOMER`，`resolution_elapsed_seconds=1234`、`resolution_running_since=null`、首次响应事实仍存在，V1→V6 历史完整且新增 SLA/通知/共享队列表均存在。临时数据库在回读后已删除。首次完整 Compose 启动仍遇到宿主 Docker 代理 `127.0.0.1:7897` 不可达；本轮随后以已通过测试的本地镜像离线组装运行时完成上述真实进程验收，不把该结果表述为外部镜像仓库可用性验证。

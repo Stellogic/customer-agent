@@ -11,14 +11,14 @@ if ($Reset) {
     docker compose down --volumes --remove-orphans
 }
 
-docker build --build-arg "GRADLE_OPTS=$($env:CUSTOMER_AGENT_GRADLE_OPTS)" --target test --tag customer-agent/backend-test:issue16 backend
-docker build --target test --tag customer-agent/agent-test:issue16 agent
-docker build --target test --tag customer-agent/frontend-test:issue16 frontend
+docker build --build-arg "GRADLE_OPTS=$($env:CUSTOMER_AGENT_GRADLE_OPTS)" --target test --tag customer-agent/backend-test:issue17 backend
+docker build --target test --tag customer-agent/agent-test:issue17 agent
+docker build --target test --tag customer-agent/frontend-test:issue17 frontend
 docker compose up --detach --build --force-recreate --wait
 docker compose exec -T agent-server sh -c 'test -z "${EXECUTOR_MACHINE_TOKEN+x}"'
 
 $migrationHistory = docker compose exec -T postgres psql -U postgres -d customer_agent -Atc "select version || ':' || success from flyway_schema_history order by installed_rank"
-if (($migrationHistory -join ',') -ne '1:true,2:true,3:true,4:true,5:true') {
+if (($migrationHistory -join ',') -ne '1:true,2:true,3:true,4:true,5:true,6:true') {
     throw "Spring Flyway 迁移历史不完整: $($migrationHistory -join ',')"
 }
 
@@ -30,12 +30,12 @@ if ($status.status -ne 'UP') {
     throw "Spring 状态投影不是 UP: $($status | ConvertTo-Json -Compress)"
 }
 
-docker run --rm --entrypoint sh customer-agent/frontend:issue16 -c "if grep -R -E 'agent-server|agent:2024|local-(spring|agent|executor|postgres)|postgresql://' /usr/share/nginx/html; then exit 1; fi"
+docker run --rm --entrypoint sh customer-agent/frontend:issue17 -c "if grep -R -E 'agent-server|agent:2024|local-(spring|agent|executor|postgres)|postgresql://' /usr/share/nginx/html; then exit 1; fi"
 
 $versions = [ordered]@{
     node = (docker run --rm node:24.19.0-bookworm-slim node --version 2>$null)
-    java = (docker run --rm --entrypoint sh customer-agent/backend:issue16 -c 'java -version 2>&1 | head -n 1')
-    python = (docker run --rm --entrypoint python customer-agent/agent:issue16 --version 2>&1)
+    java = (docker run --rm --entrypoint sh customer-agent/backend:issue17 -c 'java -version 2>&1 | head -n 1')
+    python = (docker run --rm --entrypoint python customer-agent/agent:issue17 --version 2>&1)
     postgres = (docker compose exec -T postgres postgres --version)
 }
 
