@@ -17,5 +17,6 @@ python prototypes/stream-recovery-contract/run_prototype.py --all
 | `epoch_change_requires_snapshot` | 不同 epoch 不能混合应用 |
 | `unknown_raw_event_is_dropped` | 未列入映射的 LangGraph/Agent 原始事件默认丢弃 |
 | `malformed_product_event_requires_snapshot` | 含额外或敏感字段的产品事件不被部分应用，客户端转而获取权威快照 |
+| `role_scoped_stream_avoids_filtered_gaps` | 客户公开流过滤内部调查事件后仍使用自身连续序号，不因看不见的事件产生伪缺口 |
 
 本矩阵是纯状态模型验证，不代表 Spring、浏览器或代理链路的运行结果。

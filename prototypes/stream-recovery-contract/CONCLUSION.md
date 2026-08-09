@@ -8,15 +8,17 @@ React 只消费 Spring 提供的**权威快照**和**白名单产品事件**。S
 
 Spring 订阅 Agent Server 原始流后，只把已识别的上游信号映射为封闭的产品事件类型。未知类型默认丢弃并记内部 observability；不能透传或使用“任意 JSON”兜底。Spring 自己产生的提案、审批、执行和最终工单结果同样进入产品事件日志，但其业务表仍是权威。
 
+产品事件按授权投影视图分流：`CUSTOMER_PUBLIC`、`SUPPORT_WORKBENCH` 和以当前提案版本/审批租约为范围的 `APPROVAL_VIEW` 各有独立的 epoch、序号和白名单。底层业务事实只保存一份；视图流是授权投影，不是新的业务真值。这样客户看不到客服内部事件时，不会因为全局序号被过滤而产生伪缺口。
+
 ## 2. 浏览器契约
 
 ### 权威快照
 
-`GET /api/tickets/{ticketId}/workbench` 在每次请求时校验当前权限，返回角色范围内的完整页面投影以及 `cursor = epoch:sequence`。审批人使用独立、以提案版本和审批租约为范围的审批投影；不能复用客服工作台事件流取得完整工单。
+`GET /api/tickets/{ticketId}/workbench` 在每次请求时校验当前权限，返回客服角色范围内的完整页面投影以及 `cursor = epoch:sequence`。客户公开投影与审批投影使用独立端点、独立数据形状和独立视图流；客户快照不含 generation、调查事实、工具进度或提案草稿，审批快照只含当前提案版本的审批证据与租约状态。审批投影以提案版本和审批租约为范围，不能复用客服工作台事件流取得完整工单。
 
 ### SSE 增量流
 
-`GET /api/tickets/{ticketId}/events?after={cursor}` 使用同源 HttpOnly 会话认证。Spring 在建立连接、重放每个事件、投递实时事件时都按当前主体与资源关系复核权限；权限或租约失效即停止投递并关闭连接。实现可用授权变更通知加周期性复核缩短撤销窗口，不能只在连接建立时鉴权一次。
+每种投影视图使用对应的 SSE 端点和同源 HttpOnly 会话认证。Spring 在建立连接、重放每个事件、投递实时事件时都按当前主体与资源关系复核权限；权限或租约失效即停止投递并关闭连接。实现可用授权变更通知加周期性复核缩短撤销窗口，不能只在连接建立时鉴权一次。
 
 首次连接使用快照返回的 `after` 游标；自动重连由浏览器按 SSE 标准携带 `Last-Event-ID`。游标不是授权凭据。SSE 心跳使用 comment，不占产品序号。
 
@@ -25,24 +27,27 @@ Spring 订阅 Agent Server 原始流后，只把已识别的上游信号映射�
 ```json
 {
   "schemaVersion": 1,
-  "id": "ticket-demo-001.v1:42",
+  "id": "ticket-demo-001.support.v1:42",
   "type": "investigation.phase_changed",
   "ticketId": "ticket-demo-001",
+  "viewType": "SUPPORT_WORKBENCH",
   "generationId": "gen-002",
   "occurredAt": "2026-08-09T10:00:00Z",
   "payload": { "phase": "POLICY_EVALUATION" }
 }
 ```
 
-- `id` 同时作为 SSE `id`；`epoch` 标识一次兼容的事件流历史，`sequence` 在单工单产品事件流内严格递增。
+- `id` 同时作为 SSE `id`；`epoch` 标识一次兼容的授权投影视图流历史，`sequence` 在该视图流内严格递增。不同视图不得共享游标。
 - 页面只按 `sequence` 应用事件，不按 `occurredAt` 排序；时间只用于展示。
-- `generationId` 是业务代次关联，不是权限凭据。除 generation 生命周期事件外，调查事件只在其代次仍为当前代次时生效。
+- `generationId` 只在客服工作台调查事件中作为业务代次关联，不是权限凭据；客户公开流和审批流不暴露它。除 generation 生命周期事件外，客服调查事件只在其代次仍为当前代次时生效。
 - payload 必须按事件类型封闭校验字段，未知字段拒绝进入产品事件日志。
 
 ## 3. 事件白名单
 
 | 产品事件 | 最小公开字段 | 用途 |
 |---|---|---|
+| `public.progress_changed` | 固定公开状态码 | 客户公开进度，不包含内部调查事实 |
+| `customer.message_published` | 固定消息模板码 | 通知客户等待审批、转人工或最终结果 |
 | `generation.activated` | `generationId` | 表达当前有权 Agent 代次 |
 | `generation.revoked` | `generationId`, `reasonCode` | 终止旧代次的页面影响 |
 | `investigation.phase_changed` | 受控 `phase` | 调查阶段 |
@@ -52,6 +57,8 @@ Spring 订阅 Agent Server 原始流后，只把已识别的上游信号映射�
 | `proposal.created` | 不可变 `proposalRevisionRef`, 安全摘要 | 提示提案已形成；详情另查授权视图 |
 | `ticket.result_changed` | 工单状态, 结果码 | Spring 已确认的最终业务结果 |
 | `investigation.failed` | 受控原因码, 是否可重试 | 不暴露异常、trace 或模型输出 |
+| `approval.lease_changed` | 提案版本引用, 租约状态 | 仅审批视图 |
+| `approval.decision_recorded` | 提案版本引用, 审批结果 | 仅审批视图，决定后终止持续访问 |
 
 `reasoning`、token、debug、checkpoint、task、原始 messages、原始 tool call/result 等 LangGraph stream mode 不进入产品事件白名单。需要工具进度时，只接受 Agent 主动产生的、结构已约束的 custom 信号，再由 Spring 重新校验并投影。
 
@@ -68,7 +75,7 @@ Spring 订阅 Agent Server 原始流后，只把已识别的上游信号映射�
 
 ## 5. 原型结论和限制
 
-确定性场景覆盖：白名单投影、重复事件、序号缺口、快照后重放、新旧 generation 交替、权限撤销、epoch 变化和未知原始事件。原型证明状态模型内部一致，不证明 Spring MVC/WebFlux 实现、数据库并发、浏览器真实自动重连、代理缓冲或端到端授权已运行验证。
+确定性场景覆盖：白名单投影、重复事件、序号缺口、快照后重放、新旧 generation 交替、权限撤销、epoch 变化、未知原始事件、非法敏感字段，以及客户公开流过滤内部事件后仍保持连续游标。原型证明状态模型内部一致，不证明 Spring MVC/WebFlux 实现、数据库并发、浏览器真实自动重连、代理缓冲或端到端授权已运行验证。
 
 进入规格后至少需要三类真实验证：Spring 产品事件日志的并发序号与快照/订阅无缝切换；浏览器断线与 `Last-Event-ID` 重连；审批租约或客服访问撤销后既有 SSE 连接在限定时间内停止投递。
 

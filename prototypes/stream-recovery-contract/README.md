@@ -26,5 +26,6 @@ python prototypes/stream-recovery-contract/run_prototype.py
 3. 新 generation 生效后，旧 generation 的迟到事件不会改变当前页面。
 4. 断线后能从最后游标重放；游标不可用时回到权威快照，而不是猜测状态。
 5. 权限撤销后停止投递；重新查询快照返回拒绝，旧连接不能继续泄露数据。
+6. 客户、客服和审批视图各自编号，过滤不可见事件不会制造伪序号缺口。
 
 详细决策草案见 [CONCLUSION.md](CONCLUSION.md)。

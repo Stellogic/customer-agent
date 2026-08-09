@@ -24,6 +24,8 @@ FORBIDDEN_KEYS = {
 }
 
 EVENT_PAYLOAD_KEYS = {
+    "public.progress_changed": {"statusCode"},
+    "customer.message_published": {"messageCode"},
     "generation.activated": {"generationId"},
     "generation.revoked": {"generationId", "reasonCode"},
     "investigation.phase_changed": {"phase"},
@@ -38,6 +40,8 @@ EVENT_PAYLOAD_KEYS = {
     "proposal.created": {"proposalRevisionRef", "summary"},
     "ticket.result_changed": {"ticketState", "resultCode"},
     "investigation.failed": {"reasonCode", "retryable"},
+    "approval.lease_changed": {"proposalRevisionRef", "leaseStatus"},
+    "approval.decision_recorded": {"proposalRevisionRef", "decision"},
 }
 
 GENERATION_SCOPED = {
@@ -50,6 +54,7 @@ GENERATION_SCOPED = {
 }
 
 ENUMS = {
+    "viewType": {"CUSTOMER_PUBLIC", "SUPPORT_WORKBENCH", "APPROVAL_VIEW"},
     "phase": {
         "ORDER_LOOKUP",
         "LOGISTICS_LOOKUP",
@@ -76,6 +81,8 @@ ENUMS = {
         "RESOLVED",
         "CLOSED",
     },
+    "leaseStatus": {"AVAILABLE", "ACTIVE", "EXPIRED", "RELEASED", "ENDED"},
+    "decision": {"APPROVED", "REJECTED"},
 }
 
 
@@ -102,6 +109,7 @@ def initial_state() -> dict[str, Any]:
         "stream": {
             "epoch": None,
             "lastSequence": 0,
+            "viewType": None,
             "connection": "DISCONNECTED",
             "needsSnapshot": True,
         },
@@ -129,6 +137,7 @@ def apply_snapshot(state: dict[str, Any], snapshot: dict[str, Any]) -> dict[str,
     next_state["stream"] = {
         "epoch": cursor.epoch,
         "lastSequence": cursor.sequence,
+        "viewType": snapshot["viewType"],
         "connection": "CONNECTING",
         "needsSnapshot": False,
     }
@@ -178,6 +187,8 @@ def reduce_event(state: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]
         return _diagnose(state, "IGNORED_WITHOUT_ACCESS")
     if cursor.epoch != stream["epoch"]:
         return mark_reset_required(state, "EPOCH_MISMATCH")
+    if event["viewType"] != stream["viewType"]:
+        return mark_reset_required(state, "VIEW_MISMATCH")
     if cursor.sequence <= stream["lastSequence"]:
         return _diagnose(state, f"DUPLICATE_IGNORED:{event['id']}")
     if cursor.sequence != stream["lastSequence"] + 1:
@@ -187,7 +198,7 @@ def reduce_event(state: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]
         )
 
     event_type = event["type"]
-    current_generation = state["ticket"]["currentGenerationId"]
+    current_generation = state["ticket"].get("currentGenerationId")
     if event_type in GENERATION_SCOPED and event["generationId"] != current_generation:
         next_state = deepcopy(state)
         next_state["stream"]["lastSequence"] = cursor.sequence
@@ -198,7 +209,11 @@ def reduce_event(state: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]
     payload = event["payload"]
     ticket = next_state["ticket"]
 
-    if event_type == "generation.activated":
+    if event_type == "public.progress_changed":
+        ticket["publicProgress"] = payload["statusCode"]
+    elif event_type == "customer.message_published":
+        ticket["lastMessageCode"] = payload["messageCode"]
+    elif event_type == "generation.activated":
         ticket["currentGenerationId"] = payload["generationId"]
         ticket["investigationPhase"] = None
         ticket["pendingInput"] = None
@@ -224,6 +239,12 @@ def reduce_event(state: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]
         ticket["resultCode"] = payload["resultCode"]
     elif event_type == "investigation.failed":
         ticket["failure"] = deepcopy(payload)
+    elif event_type == "approval.lease_changed":
+        ticket["proposalRevisionRef"] = payload["proposalRevisionRef"]
+        ticket["leaseStatus"] = payload["leaseStatus"]
+    elif event_type == "approval.decision_recorded":
+        ticket["proposalRevisionRef"] = payload["proposalRevisionRef"]
+        ticket["decision"] = payload["decision"]
 
     next_state["lastAction"] = f"EVENT_APPLIED:{event_type}@{event['id']}"
     return next_state
@@ -235,6 +256,7 @@ def validate_product_event(event: dict[str, Any]) -> None:
         "id",
         "type",
         "ticketId",
+        "viewType",
         "generationId",
         "occurredAt",
         "payload",
@@ -254,6 +276,8 @@ def validate_product_event(event: dict[str, Any]) -> None:
         raise ContractViolation("id must be a non-empty string")
     if not isinstance(event["ticketId"], str) or not event["ticketId"]:
         raise ContractViolation("ticketId must be a non-empty string")
+    if event["viewType"] not in ENUMS["viewType"]:
+        raise ContractViolation(f"unsupported viewType: {event['viewType']}")
     if event["type"] in GENERATION_SCOPED and not event["generationId"]:
         raise ContractViolation("generation-scoped event requires generationId")
     if event["type"].startswith("generation."):
@@ -263,22 +287,37 @@ def validate_product_event(event: dict[str, Any]) -> None:
     _reject_forbidden_keys(event)
 
 
-def project_raw_event(raw: dict[str, Any], cursor: Cursor) -> dict[str, Any] | None:
+def project_raw_event(
+    raw: dict[str, Any], cursor: Cursor, view_type: str = "SUPPORT_WORKBENCH"
+) -> dict[str, Any] | None:
     """Spring-side allowlist projection. Unknown or stale raw events yield no product event."""
     kind = raw.get("kind")
     generation_id = raw.get("generation_id")
-    mapping: dict[str, tuple[str, dict[str, Any]]] = {
+    mapping: dict[str, tuple[str, dict[str, Any], set[str]]] = {
+        "spring.public_progress": (
+            "public.progress_changed",
+            {"statusCode": raw.get("status_code")},
+            {"CUSTOMER_PUBLIC"},
+        ),
+        "spring.customer_message": (
+            "customer.message_published",
+            {"messageCode": raw.get("message_code")},
+            {"CUSTOMER_PUBLIC"},
+        ),
         "spring.generation_activated": (
             "generation.activated",
             {"generationId": generation_id},
+            {"SUPPORT_WORKBENCH"},
         ),
         "spring.generation_revoked": (
             "generation.revoked",
             {"generationId": generation_id, "reasonCode": raw.get("reason_code")},
+            {"SUPPORT_WORKBENCH"},
         ),
         "agent.phase": (
             "investigation.phase_changed",
             {"phase": raw.get("phase")},
+            {"SUPPORT_WORKBENCH"},
         ),
         "agent.evidence": (
             "evidence.added",
@@ -287,6 +326,7 @@ def project_raw_event(raw: dict[str, Any], cursor: Cursor) -> dict[str, Any] | N
                 "category": raw.get("category"),
                 "summary": raw.get("safe_summary"),
             },
+            {"SUPPORT_WORKBENCH"},
         ),
         "agent.tool": (
             "tool.progress_changed",
@@ -295,6 +335,7 @@ def project_raw_event(raw: dict[str, Any], cursor: Cursor) -> dict[str, Any] | N
                 "category": raw.get("category"),
                 "status": raw.get("status"),
             },
+            {"SUPPORT_WORKBENCH"},
         ),
         "agent.interrupt": (
             "investigation.input_required",
@@ -304,6 +345,7 @@ def project_raw_event(raw: dict[str, Any], cursor: Cursor) -> dict[str, Any] | N
                 "promptKey": raw.get("prompt_key"),
                 "allowedActions": raw.get("allowed_actions"),
             },
+            {"SUPPORT_WORKBENCH"},
         ),
         "spring.proposal": (
             "proposal.created",
@@ -311,6 +353,7 @@ def project_raw_event(raw: dict[str, Any], cursor: Cursor) -> dict[str, Any] | N
                 "proposalRevisionRef": raw.get("proposal_revision_ref"),
                 "summary": raw.get("safe_summary"),
             },
+            {"SUPPORT_WORKBENCH"},
         ),
         "spring.result": (
             "ticket.result_changed",
@@ -318,21 +361,43 @@ def project_raw_event(raw: dict[str, Any], cursor: Cursor) -> dict[str, Any] | N
                 "ticketState": raw.get("ticket_state"),
                 "resultCode": raw.get("result_code"),
             },
+            {"CUSTOMER_PUBLIC", "SUPPORT_WORKBENCH"},
         ),
         "agent.failed": (
             "investigation.failed",
             {"reasonCode": raw.get("reason_code"), "retryable": raw.get("retryable")},
+            {"SUPPORT_WORKBENCH"},
+        ),
+        "spring.approval_lease": (
+            "approval.lease_changed",
+            {
+                "proposalRevisionRef": raw.get("proposal_revision_ref"),
+                "leaseStatus": raw.get("lease_status"),
+            },
+            {"APPROVAL_VIEW"},
+        ),
+        "spring.approval_decision": (
+            "approval.decision_recorded",
+            {
+                "proposalRevisionRef": raw.get("proposal_revision_ref"),
+                "decision": raw.get("decision"),
+            },
+            {"APPROVAL_VIEW"},
         ),
     }
     if kind not in mapping:
         return None
-    event_type, payload = mapping[kind]
+    event_type, payload, allowed_views = mapping[kind]
+    if view_type not in allowed_views:
+        return None
+    exposed_generation_id = generation_id if view_type == "SUPPORT_WORKBENCH" else None
     event = {
         "schemaVersion": SCHEMA_VERSION,
         "id": str(cursor),
         "type": event_type,
         "ticketId": raw["ticket_id"],
-        "generationId": generation_id,
+        "viewType": view_type,
+        "generationId": exposed_generation_id,
         "occurredAt": raw["occurred_at"],
         "payload": payload,
     }

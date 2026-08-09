@@ -19,13 +19,31 @@ from event_contract import (
 
 
 TICKET_ID = "ticket-demo-001"
-EPOCH = "ticket-demo-001.v1"
+EPOCH = "ticket-demo-001.support.v1"
 
 
-def snapshot(sequence: int = 2, generation_id: str = "gen-001") -> dict:
-    return {
-        "cursor": f"{EPOCH}:{sequence}",
-        "ticket": {
+def snapshot(
+    sequence: int = 2,
+    generation_id: str = "gen-001",
+    view_type: str = "SUPPORT_WORKBENCH",
+    epoch: str = EPOCH,
+) -> dict:
+    if view_type == "CUSTOMER_PUBLIC":
+        ticket = {
+            "ticketState": "INVESTIGATING",
+            "publicProgress": "INVESTIGATION_STARTED",
+            "lastMessageCode": "TICKET_RECEIVED",
+            "resultCode": None,
+        }
+    elif view_type == "APPROVAL_VIEW":
+        ticket = {
+            "proposalRevisionRef": "proposal-rev-001",
+            "leaseStatus": "ACTIVE",
+            "decision": None,
+            "evidence": [],
+        }
+    else:
+        ticket = {
             "ticketState": "INVESTIGATING",
             "currentGenerationId": generation_id,
             "investigationPhase": "ORDER_LOOKUP",
@@ -35,7 +53,11 @@ def snapshot(sequence: int = 2, generation_id: str = "gen-001") -> dict:
             "proposalRevisionRef": None,
             "resultCode": None,
             "failure": None,
-        },
+        }
+    return {
+        "cursor": f"{epoch}:{sequence}",
+        "viewType": view_type,
+        "ticket": ticket,
     }
 
 
@@ -56,8 +78,17 @@ def raw(kind: str, generation_id: str = "gen-001", **fields) -> dict:
     return value
 
 
-def event(sequence: int, kind: str, generation_id: str = "gen-001", **fields) -> dict:
-    projected = project_raw_event(raw(kind, generation_id, **fields), Cursor(EPOCH, sequence))
+def event(
+    sequence: int,
+    kind: str,
+    generation_id: str = "gen-001",
+    view_type: str = "SUPPORT_WORKBENCH",
+    epoch: str = EPOCH,
+    **fields,
+) -> dict:
+    projected = project_raw_event(
+        raw(kind, generation_id, **fields), Cursor(epoch, sequence), view_type
+    )
     assert projected is not None
     return projected
 
@@ -105,6 +136,48 @@ def run_scenarios(verbose: bool = True) -> list[dict]:
     malformed["payload"]["prompt"] = "must not pass"
     malformed_state = reduce_event(malformed_state, malformed)
     results.append(result("malformed_product_event_requires_snapshot", malformed_state["stream"]["needsSnapshot"] and "INVALID_EVENT" in malformed_state["lastAction"], malformed_state))
+
+    customer_epoch = "ticket-demo-001.customer.v1"
+    customer_state = mark_connected(
+        apply_snapshot(
+            initial_state(),
+            snapshot(
+                sequence=2,
+                view_type="CUSTOMER_PUBLIC",
+                epoch=customer_epoch,
+            ),
+        )
+    )
+    filtered = project_raw_event(
+        raw(
+            "agent.evidence",
+            evidence_ref="ev-private",
+            category="LOGISTICS",
+            safe_summary="客服可见、客户不可见",
+        ),
+        Cursor(customer_epoch, 3),
+        "CUSTOMER_PUBLIC",
+    )
+    public_event = event(
+        3,
+        "spring.public_progress",
+        view_type="CUSTOMER_PUBLIC",
+        epoch=customer_epoch,
+        status_code="INVESTIGATION_IN_PROGRESS",
+    )
+    customer_state = reduce_event(customer_state, public_event)
+    results.append(
+        result(
+            "role_scoped_stream_avoids_filtered_gaps",
+            filtered is None
+            and customer_state["stream"]["lastSequence"] == 3
+            and not customer_state["stream"]["needsSnapshot"]
+            and public_event["generationId"] is None
+            and "currentGenerationId" not in customer_state["ticket"]
+            and "evidence" not in customer_state["ticket"],
+            customer_state,
+        )
+    )
 
     if verbose:
         for item in results:
