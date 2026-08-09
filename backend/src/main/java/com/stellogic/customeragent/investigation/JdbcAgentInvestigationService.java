@@ -45,6 +45,25 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     @Override
     @Transactional
     public InvestigationFacts facts(UUID ticketId, UUID generationId) {
+        List<String> ambiguous = jdbc.query(
+                "select t.order_reference from agent_processing_generation g "
+                        + "join support_ticket t on t.id = g.ticket_id "
+                        + "where g.id = ? and g.ticket_id = ? and g.status = 'ACTIVE' "
+                        + "and t.handling_mode = 'AGENT' and t.lifecycle_state = 'INVESTIGATING' "
+                        + "and not t.customer_human_preference "
+                        + "and (select count(*) from synthetic_order_alias a "
+                        + "where a.alias = t.order_reference and a.customer_id = t.customer_id) > 1 "
+                        + "for update of g, t",
+                (rs, row) -> rs.getString(1), generationId, ticketId);
+        if (!ambiguous.isEmpty()) {
+            Instant now = clock.instant();
+            jdbc.update(
+                    "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                            + "values (?, 'AGENT_ORDER_AMBIGUITY_READ', 'agent-machine', ?)",
+                    ticketId, Timestamp.from(now));
+            return new InvestigationFacts(
+                    "AMBIGUOUS", ambiguous.getFirst(), null, null, null, null, null, null, null, null, List.of());
+        }
         ScopedOrder order = currentOrder(ticketId, generationId);
         Instant now = clock.instant();
         recordFact(generationId, "ORDER", order.orderReference(), "order:" + order.orderReference(), now);
@@ -124,8 +143,12 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         int ticketUpdated = jdbc.update(
-                "update support_ticket set lifecycle_state = 'RESOLVED' where id = ? and lifecycle_state = 'INVESTIGATING' and handling_mode = 'AGENT'",
-                ticketId);
+                "update support_ticket set lifecycle_state = 'RESOLVED', "
+                        + "resolution_elapsed_seconds = resolution_elapsed_seconds + "
+                        + "case when resolution_running_since is null then 0 else greatest(0, extract(epoch from (?::timestamptz - resolution_running_since))::bigint) end, "
+                        + "resolution_running_since = null "
+                        + "where id = ? and lifecycle_state = 'INVESTIGATING' and handling_mode = 'AGENT'",
+                databaseTime, ticketId);
         if (ticketUpdated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
         completeGeneration(generationId, databaseTime);
         appendPublicMessage(ticketId, PUBLIC_NO_COMPENSATION_CONCLUSION, now, databaseTime, true);
@@ -224,6 +247,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 at, generationId);
         if (updated != 1) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "generation is no longer active");
         jdbc.update("update agent_submission set status = 'COMPLETED' where generation_id = ?", generationId);
+        jdbc.update("update agent_resume_request set status = 'COMPLETED' where generation_id = ?", generationId);
     }
 
     private void appendPublicMessage(
@@ -320,7 +344,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             int pendingActionCount, BigDecimal activeReservationAmount) {
         InvestigationFacts asFacts() {
             return new InvestigationFacts(
-                    orderReference, delayHours, delaySeconds, paid, cancelled, fullyRefunded, existingCompensation,
+                    "UNIQUE", orderReference, delayHours, delaySeconds, paid, cancelled, fullyRefunded, existingCompensation,
                     pendingActionCount, policyVersion, evidenceRefs());
         }
 

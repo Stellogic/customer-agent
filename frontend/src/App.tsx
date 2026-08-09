@@ -5,6 +5,7 @@ type Snapshot = {
   cursor: string;
   ticket: { id: string; lifecycleState: string; handlingMode: string; firstRespondedAt: string };
   messages: Array<{ author: string; body: string; sentAt: string }>;
+  clarification: { id: string; promptCode: string; question: string } | null;
 };
 
 type PublicEvent = { id: string; type: string; data: string };
@@ -16,8 +17,11 @@ export function App() {
   const [description, setDescription] = useState("");
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [clarificationAnswer, setClarificationAnswer] = useState("");
   const [error, setError] = useState("");
   const requestId = useRef(globalThis.crypto.randomUUID());
+  const replyMessageId = useRef(globalThis.crypto.randomUUID());
+  const resumeRequestId = useRef(globalThis.crypto.randomUUID());
   const streamController = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -54,6 +58,43 @@ export function App() {
     setSnapshot(authoritative);
     globalThis.history.replaceState(null, "", `?ticket=${ticketId}`);
     void consumeEvents(ticketId, authoritative.cursor);
+  }
+
+  async function submitClarification(event: FormEvent) {
+    event.preventDefault();
+    if (!snapshot?.clarification) return;
+    setSubmitting(true);
+    setError("");
+    const ticketId = snapshot.ticket.id;
+    const clarificationId = snapshot.clarification.id;
+    const headers = {
+      ...customerHeaders,
+      "Content-Type": "application/json",
+      "Idempotency-Key": replyMessageId.current,
+      "X-Resume-Request-Id": resumeRequestId.current,
+    };
+    try {
+      const response = await fetch(`/api/customer/tickets/${ticketId}/clarifications/${clarificationId}/replies`, {
+        method: "POST", credentials: "same-origin", headers,
+        body: JSON.stringify({ answer: clarificationAnswer }),
+      });
+      if (!response.ok) throw new Error("clarification reply failed");
+      await loadTicket(ticketId);
+      replyMessageId.current = globalThis.crypto.randomUUID();
+      resumeRequestId.current = globalThis.crypto.randomUUID();
+      setClarificationAnswer("");
+    } catch {
+      const status = await fetch(`/api/customer/tickets/${ticketId}/clarification-resumes/${resumeRequestId.current}`, {
+        headers: customerHeaders, credentials: "same-origin",
+      }).catch(() => null);
+      if (status?.ok) {
+        await loadTicket(ticketId);
+      } else {
+        setError("回复状态暂时未知；请保留本页重试，稳定恢复身份不会启动第二次调查。");
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function consumeEvents(ticketId: string, cursor: string) {
@@ -108,6 +149,18 @@ export function App() {
         const accepted = JSON.parse(event.data) as { lifecycleState: string; handlingMode: string };
         return { ...current, cursor: event.id, ticket: { ...current.ticket, ...accepted } };
       }
+      if (event.type === "CUSTOMER_CLARIFICATION_REQUESTED" || event.type === "TICKET_INVESTIGATION_RESUMED") {
+        const transition = JSON.parse(event.data) as {
+          lifecycleState: string;
+          clarification?: Snapshot["clarification"];
+        };
+        return {
+          ...current,
+          cursor: event.id,
+          ticket: { ...current.ticket, lifecycleState: transition.lifecycleState },
+          clarification: transition.clarification === undefined ? current.clarification : transition.clarification,
+        };
+      }
       return current;
     });
   }
@@ -117,7 +170,7 @@ export function App() {
       <header>
         <p className="eyebrow">STELLOGIC 帮助中心</p>
         <h1>物流遇到问题？<br />我们从这里开始处理。</h1>
-        <p className="lede">提交后，你会得到一张可查询的客服工单。当前票只确认受理，不会启动 Agent 调查。</p>
+        <p className="lede">提交后，你会得到一张可查询的客服工单。调查异步继续；订单无法唯一确认时，我们会在同一工单中向你提问。</p>
       </header>
 
       {!snapshot ? (
@@ -131,7 +184,7 @@ export function App() {
         <section className="ticket-card" aria-live="polite">
           <div className="ticket-heading">
             <div><p className="eyebrow">客服工单</p><h2>{snapshot.ticket.id}</h2></div>
-            <span className="status">{snapshot.ticket.lifecycleState === "INVESTIGATING" ? "调查中" : snapshot.ticket.lifecycleState}</span>
+            <span className="status">{snapshot.ticket.lifecycleState === "INVESTIGATING" ? "调查中" : snapshot.ticket.lifecycleState === "WAITING_FOR_CUSTOMER" ? "等待你的回复" : snapshot.ticket.lifecycleState}</span>
           </div>
           <ol className="conversation">
             {snapshot.messages.map((message, index) => (
@@ -141,6 +194,15 @@ export function App() {
               </li>
             ))}
           </ol>
+          {snapshot.clarification && (
+            <form className="clarification-form" onSubmit={submitClarification}>
+              <label>{snapshot.clarification.question}
+                <input aria-label="订单确认码" value={clarificationAnswer}
+                  onChange={(event) => setClarificationAnswer(event.target.value)} required />
+              </label>
+              <button disabled={submitting}>{submitting ? "正在恢复调查…" : "回复并继续调查"}</button>
+            </form>
+          )}
           <p className="recovery-note">刷新页面时，公开沟通会从 Spring 权威快照恢复。</p>
           {error && <p className="error" role="alert">{error}</p>}
         </section>

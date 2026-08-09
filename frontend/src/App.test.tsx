@@ -1,9 +1,13 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 describe("客户帮助中心", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    globalThis.history.replaceState(null, "", "/");
+  });
 
   it("提交后读取 CUSTOMER_PUBLIC 权威快照并显示受理结果", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
@@ -18,7 +22,8 @@ describe("客户帮助中心", () => {
         ],
       }), { status: 200 }))
       .mockResolvedValueOnce(new Response(
-        'id:customer-public-v1:3\nevent:PUBLIC_MESSAGE_APPENDED\ndata:{"author":"SUPPORT","body":"正在核对物流轨迹","sentAt":"2026-08-09T00:01:00Z"}\n\n',
+        'id:customer-public-v1:3\nevent:PUBLIC_MESSAGE_APPENDED\ndata:{"author":"SUPPORT","body":"正在核对物流轨迹","sentAt":"2026-08-09T00:01:00Z"}\n\n' +
+        'id:customer-public-v1:4\nevent:CUSTOMER_CLARIFICATION_REQUESTED\ndata:{"lifecycleState":"WAITING_FOR_CUSTOMER","clarification":{"id":"clarification-16","promptCode":"ORDER_CONFIRMATION_CODE","question":"请回复订单确认码（A 或 B）。"}}\n\n',
         { status: 200, headers: { "Content-Type": "text/event-stream" } },
       ));
 
@@ -29,9 +34,63 @@ describe("客户帮助中心", () => {
 
     expect(await screen.findByText("您的问题已受理")).toBeInTheDocument();
     expect(await screen.findByText("正在核对物流轨迹")).toBeInTheDocument();
-    expect(screen.getByText("调查中")).toBeInTheDocument();
+    expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
+    expect(screen.getByLabelText("订单确认码")).toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(fetchMock.mock.calls[1][0]).toBe("/api/customer/tickets/ticket-13");
     expect(fetchMock.mock.calls[2][0]).toBe("/api/customer/tickets/ticket-13/events");
+  });
+
+  it("澄清恢复响应丢失时按稳定 resumeRequestId 查询而不创建第二次恢复", async () => {
+    const ticketId = "16000000-0000-0000-0000-000000000001";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    let snapshotReads = 0;
+    let replyPosts = 0;
+    let statusQueries = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/tickets/${ticketId}`)) {
+        snapshotReads += 1;
+        const waiting = snapshotReads === 1;
+        return new Response(JSON.stringify({
+          view: "CUSTOMER_PUBLIC",
+          cursor: waiting ? "customer-public-v1:4" : "customer-public-v1:6",
+          ticket: {
+            id: ticketId,
+            lifecycleState: waiting ? "WAITING_FOR_CUSTOMER" : "INVESTIGATING",
+            handlingMode: "AGENT",
+            firstRespondedAt: "2026-08-09T00:00:00Z",
+          },
+          messages: [],
+          clarification: waiting ? {
+            id: "16000000-0000-0000-0000-000000000002",
+            promptCode: "ORDER_CONFIRMATION_CODE",
+            question: "为确认需要调查的订单，请回复订单确认码（A 或 B）。",
+          } : null,
+        }), { status: 200 });
+      }
+      if (url.includes("/clarifications/") && init?.method === "POST") {
+        replyPosts += 1;
+        throw new TypeError("response lost after commit");
+      }
+      if (url.includes("/clarification-resumes/")) {
+        statusQueries += 1;
+        return new Response(JSON.stringify({ status: "PENDING", replayed: true }), { status: 200 });
+      }
+      if (url.endsWith("/events")) {
+        return new Response("", { status: 200, headers: { "Content-Type": "text/event-stream" } });
+      }
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+    expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "A" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+
+    expect(await screen.findByText("调查中")).toBeInTheDocument();
+    expect(replyPosts).toBe(1);
+    expect(statusQueries).toBe(1);
+    expect(snapshotReads).toBe(2);
   });
 });
