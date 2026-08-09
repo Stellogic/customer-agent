@@ -70,7 +70,8 @@ class CustomerTicketApiTest {
                 2,
                 List.of(
                         new PublicMessage("CUSTOMER", "物流已经延迟多日", Instant.parse("2026-08-09T00:00:00Z")),
-                        new PublicMessage("SUPPORT", "已受理", Instant.parse("2026-08-09T00:00:00Z"))));
+                        new PublicMessage("SUPPORT", "已受理", Instant.parse("2026-08-09T00:00:00Z"))),
+                null);
         when(service.snapshot("customer-demo", TICKET_ID)).thenReturn(snapshot);
         when(service.snapshot("customer-other-demo", TICKET_ID)).thenThrow(new TicketNotFoundException());
 

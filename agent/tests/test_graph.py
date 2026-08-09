@@ -1,6 +1,6 @@
 import pytest
 
-from baseline_agent.graph import fixed_fake_model, investigate_ticket, probe_spring
+from baseline_agent.graph import await_clarification, fixed_fake_model, request_clarification, investigate_ticket, probe_spring
 
 
 @pytest.mark.asyncio
@@ -102,3 +102,67 @@ def test_agent_submits_a_structured_but_non_authoritative_compensation_suggestio
         "suggestedMethod": "COUPON",
         "suggestedAmount": "999999.99",
     }
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_order_creates_a_controlled_request_before_interrupt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict]] = []
+
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "clarificationRequestId": "clarification-16",
+                "promptCode": "ORDER_CONFIRMATION_CODE",
+                "question": "请回复订单确认码（A 或 B），以便继续调查。",
+            }
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
+            calls.append((url, json))
+            assert headers["X-Agent-Operation"] == "CREATE_CUSTOMER_CLARIFICATION"
+            return Response()
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+
+    result = await request_clarification({
+        "requested_by": "spring",
+        "ticket_id": "ticket-16",
+        "generation_id": "generation-16",
+        "facts": {"matchStatus": "AMBIGUOUS"},
+    })
+
+    assert result["clarification"]["clarificationRequestId"] == "clarification-16"
+    assert calls[0][1] == {"reasonCode": "ORDER_AMBIGUOUS"}
+
+
+def test_clarification_interrupt_contains_only_public_controlled_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: list[dict] = []
+    monkeypatch.setattr("baseline_agent.graph.interrupt", lambda value: captured.append(value) or {"answerDigest": "digest"})
+
+    result = await_clarification({
+        "clarification": {
+            "clarificationRequestId": "clarification-16",
+            "promptCode": "ORDER_CONFIRMATION_CODE",
+            "question": "请回复订单确认码（A 或 B），以便继续调查。",
+        }
+    })
+
+    assert captured == [{
+        "clarificationRequestId": "clarification-16",
+        "promptCode": "ORDER_CONFIRMATION_CODE",
+        "question": "请回复订单确认码（A 或 B），以便继续调查。",
+    }]
+    assert result == {"clarification_answer": {"answerDigest": "digest"}}

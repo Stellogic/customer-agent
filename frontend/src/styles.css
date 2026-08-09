@@ -35,6 +35,7 @@ h2 { max-width: 290px; margin: 7px 0 0; overflow-wrap: anywhere; font-size: 1rem
 .conversation li span { color: #718078; font-size: .72rem; font-weight: 800; }
 .conversation li p { margin: 5px 0 0; border-radius: 14px; background: #e7eee8; padding: 12px 14px; line-height: 1.55; }
 .conversation li.customer p { background: var(--forest); color: #fff; }
+.clarification-form { display: grid; gap: 14px; margin: 18px 0; border-top: 1px solid #d9ddd6; padding-top: 18px; }
 .recovery-note { margin: 0; color: #6a776f; font-size: .78rem; line-height: 1.5; }
 .error { color: #a0342c; font-size: .85rem; }
 @media (max-width: 760px) { .help-center { grid-template-columns: 1fr; padding-top: 7vh; } h1 { font-size: clamp(2.6rem, 13vw, 4.4rem); } }

@@ -10,6 +10,8 @@ record TicketCreationResult(UUID ticketId, boolean replayed) {}
 
 record PublicMessage(String author, String body, Instant sentAt) {}
 
+record CurrentClarification(UUID id, String promptCode, String question) {}
+
 record CustomerPublicSnapshot(
         UUID ticketId,
         String lifecycleState,
@@ -18,7 +20,8 @@ record CustomerPublicSnapshot(
         Instant firstRespondedAt,
         String epoch,
         long sequence,
-        List<PublicMessage> messages) {}
+        List<PublicMessage> messages,
+        CurrentClarification clarification) {}
 
 record CustomerPublicEvent(String epoch, long sequence, String type, String jsonPayload) {
     String cursor() {

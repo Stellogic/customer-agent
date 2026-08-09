@@ -5,7 +5,6 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 
 import httpx
@@ -550,6 +549,244 @@ def main() -> None:
                 time.sleep(0.25)
             assert observed and proposal_count == 0, (order_reference, expected_reason)
 
+    def create_ambiguous_ticket(label: str) -> tuple[str, dict]:
+        with httpx.Client(timeout=20.0) as client:
+            response = client.post(
+                f"{spring_url}/api/customer/tickets",
+                headers={
+                    "X-Synthetic-Customer-Id": "customer-demo",
+                    "Idempotency-Key": f"clarification-{label}-{uuid.uuid4()}",
+                },
+                json={"orderReference": "ORDER-DELAY-AMBIGUOUS", "description": f"需要确认订单 {label}"},
+            )
+            expect_status(response, 201)
+            created_id = response.json()["ticketId"]
+            for _ in range(80):
+                projection_response = client.get(
+                    f"{spring_url}/api/customer/tickets/{created_id}",
+                    headers={"X-Synthetic-Customer-Id": "customer-demo"},
+                )
+                expect_status(projection_response, 200)
+                projection = projection_response.json()
+                if projection["ticket"]["lifecycleState"] == "WAITING_FOR_CUSTOMER" and projection["clarification"]:
+                    return created_id, projection
+                time.sleep(0.25)
+        raise AssertionError("clarification request was not published")
+
+    clarification_ticket_id, clarification_projection = create_ambiguous_ticket("primary")
+    clarification_request_id = clarification_projection["clarification"]["id"]
+    assert clarification_projection["clarification"]["promptCode"] == "ORDER_CONFIRMATION_CODE"
+    serialized_clarification = json.dumps(clarification_projection)
+    assert not any(field in serialized_clarification for field in forbidden_fields)
+    resume_request_id = str(uuid.uuid4())
+    reply_message_id = f"message-{uuid.uuid4()}"
+    reply_url = (
+        f"{spring_url}/api/customer/tickets/{clarification_ticket_id}/clarifications/"
+        f"{clarification_request_id}/replies"
+    )
+    with httpx.Client(timeout=20.0) as client:
+        invalid = client.post(
+            reply_url,
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": f"invalid-{uuid.uuid4()}",
+                "X-Resume-Request-Id": str(uuid.uuid4()),
+            },
+            json={"answer": "unrelated input"},
+        )
+        expect_status(invalid, 422)
+        accepted_reply = client.post(
+            reply_url,
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": reply_message_id,
+                "X-Resume-Request-Id": resume_request_id,
+            },
+            json={"answer": "A"},
+        )
+        expect_status(accepted_reply, 202)
+        duplicate_reply = client.post(
+            reply_url,
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": reply_message_id,
+                "X-Resume-Request-Id": resume_request_id,
+            },
+            json={"answer": "A"},
+        )
+        expect_status(duplicate_reply, 200)
+        assert duplicate_reply.json()["replayed"] is True
+        conflicting_reuse = client.post(
+            reply_url,
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": reply_message_id,
+                "X-Resume-Request-Id": resume_request_id,
+            },
+            json={"answer": "B"},
+        )
+        expect_status(conflicting_reuse, 409)
+        stale_reply = client.post(
+            reply_url,
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": f"stale-{uuid.uuid4()}",
+                "X-Resume-Request-Id": str(uuid.uuid4()),
+            },
+            json={"answer": "A"},
+        )
+        expect_status(stale_reply, 409)
+
+        resume_status = None
+        for _ in range(80):
+            queried = client.get(
+                f"{spring_url}/api/customer/tickets/{clarification_ticket_id}/clarification-resumes/{resume_request_id}",
+                headers={"X-Synthetic-Customer-Id": "customer-demo"},
+            )
+            expect_status(queried, 200)
+            resume_status = queried.json()["status"]
+            if resume_status in {"SUBMITTED", "COMPLETED"}:
+                break
+            time.sleep(0.25)
+        assert resume_status in {"SUBMITTED", "COMPLETED"}
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        clarification_generation = connection.execute(
+            "select g.id, g.thread_id, t.resolution_elapsed_seconds, t.resolution_running_since "
+            "from agent_processing_generation g join support_ticket t on t.id = g.ticket_id "
+            "where g.ticket_id = %s",
+            (uuid.UUID(clarification_ticket_id),),
+        ).fetchone()
+        assert clarification_generation is not None
+        assert clarification_generation[2] >= 0 and clarification_generation[3] is not None
+        assert connection.execute(
+            "select count(*) from agent_resume_request where generation_id = %s",
+            (clarification_generation[0],),
+        ).fetchone()[0] == 1
+
+    with httpx.Client(timeout=20.0) as client:
+        runs = client.get(
+            f"{agent_url}/threads/{clarification_generation[1]}/runs?limit=100",
+            headers=spring_headers,
+        )
+        expect_status(runs, 200)
+        run_metadata = [run.get("metadata", {}) for run in runs.json()]
+        assert sum("submission_request_id" in metadata for metadata in run_metadata) == 1
+        assert sum(metadata.get("resume_request_id") == resume_request_id for metadata in run_metadata) == 1
+
+    concurrent_ticket_id, concurrent_projection = create_ambiguous_ticket("concurrent")
+    concurrent_request_id = concurrent_projection["clarification"]["id"]
+    reply_barrier = threading.Barrier(2)
+
+    def reply_concurrently(answer: str) -> int:
+        reply_barrier.wait()
+        with httpx.Client(timeout=20.0) as client:
+            response = client.post(
+                f"{spring_url}/api/customer/tickets/{concurrent_ticket_id}/clarifications/{concurrent_request_id}/replies",
+                headers={
+                    "X-Synthetic-Customer-Id": "customer-demo",
+                    "Idempotency-Key": f"concurrent-message-{uuid.uuid4()}",
+                    "X-Resume-Request-Id": str(uuid.uuid4()),
+                },
+                json={"answer": answer},
+            )
+            return response.status_code
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        concurrent_reply_statuses = list(executor.map(reply_concurrently, ["A", "B"]))
+    assert sorted(concurrent_reply_statuses) == [202, 409]
+
+    superseded_ticket_id, superseded_projection = create_ambiguous_ticket("superseded")
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "update agent_processing_generation set status = 'SUPERSEDED' where ticket_id = %s and status = 'ACTIVE'",
+            (uuid.UUID(superseded_ticket_id),),
+        )
+    with httpx.Client(timeout=20.0) as client:
+        superseded = client.post(
+            f"{spring_url}/api/customer/tickets/{superseded_ticket_id}/clarifications/"
+            f"{superseded_projection['clarification']['id']}/replies",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": f"superseded-{uuid.uuid4()}",
+                "X-Resume-Request-Id": str(uuid.uuid4()),
+            },
+            json={"answer": "A"},
+        )
+        expect_status(superseded, 409)
+    replacement_generation_id = uuid.uuid4()
+    replacement_thread_id = uuid.uuid4()
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select status from customer_clarification_request where id = %s",
+            (uuid.UUID(superseded_projection["clarification"]["id"]),),
+        ).fetchone()[0] == "INVALIDATED"
+        connection.execute(
+            "update support_ticket set lifecycle_state = 'INVESTIGATING' where id = %s",
+            (uuid.UUID(superseded_ticket_id),),
+        )
+        connection.execute(
+            "insert into agent_processing_generation "
+            "(id, ticket_id, generation_number, thread_id, status, created_at) "
+            "values (%s, %s, 2, %s, 'ACTIVE', now())",
+            (replacement_generation_id, uuid.UUID(superseded_ticket_id), replacement_thread_id),
+        )
+    with httpx.Client(timeout=20.0) as client:
+        replacement_request = client.post(
+            f"{spring_url}/internal/agent/tickets/{superseded_ticket_id}/generations/"
+            f"{replacement_generation_id}/clarifications",
+            headers={
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": str(replacement_generation_id),
+                "X-Agent-Operation": "CREATE_CUSTOMER_CLARIFICATION",
+                "Idempotency-Key": f"{replacement_generation_id}:order-disambiguation",
+            },
+            json={"reasonCode": "ORDER_AMBIGUOUS"},
+        )
+        expect_status(replacement_request, 200)
+        assert replacement_request.json()["clarificationRequestId"] != superseded_projection["clarification"]["id"]
+
+    human_ticket_id, human_projection = create_ambiguous_ticket("human-preference")
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "update support_ticket set customer_human_preference = true where id = %s",
+            (uuid.UUID(human_ticket_id),),
+        )
+        assert connection.execute(
+            "select status from customer_clarification_request where id = %s",
+            (uuid.UUID(human_projection["clarification"]["id"]),),
+        ).fetchone()[0] == "INVALIDATED"
+    with httpx.Client(timeout=20.0) as client:
+        human_preference = client.post(
+            f"{spring_url}/api/customer/tickets/{human_ticket_id}/clarifications/"
+            f"{human_projection['clarification']['id']}/replies",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": f"human-pref-{uuid.uuid4()}",
+                "X-Resume-Request-Id": str(uuid.uuid4()),
+            },
+            json={"answer": "A"},
+        )
+        expect_status(human_preference, 409)
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "update support_ticket set customer_human_preference = false, handling_mode = 'HUMAN' where id = %s",
+            (uuid.UUID(human_ticket_id),),
+        )
+    with httpx.Client(timeout=20.0) as client:
+        handed_off = client.post(
+            f"{spring_url}/api/customer/tickets/{human_ticket_id}/clarifications/"
+            f"{human_projection['clarification']['id']}/replies",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": f"human-mode-{uuid.uuid4()}",
+                "X-Resume-Request-Id": str(uuid.uuid4()),
+            },
+            json={"answer": "A"},
+        )
+        expect_status(handed_off, 409)
+
     with psycopg.connect(os.environ["AGENT_DATABASE_URI"]) as connection:
         assert connection.execute("select current_database(), current_user").fetchone() == (
             "agent_checkpoint",
@@ -578,6 +815,8 @@ def main() -> None:
         "proposal_revision_count": 2,
         "rejected_proposal_count": len(rejected_ticket_ids),
         "concurrent_reservation_results": reservation_results,
+        "concurrent_clarification_reply_statuses": concurrent_reply_statuses,
+        "clarification_resume_status": resume_status,
         "concurrent_replays": 7,
     }))
 

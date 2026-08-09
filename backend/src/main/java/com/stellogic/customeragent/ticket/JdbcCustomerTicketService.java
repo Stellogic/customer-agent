@@ -50,15 +50,19 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         boolean startsAgentInvestigation = !jdbc.query(
-                "select 1 from synthetic_order where order_reference = ? and customer_id = ?",
+                "select 1 from synthetic_order where order_reference = ? and customer_id = ? "
+                        + "union all select 1 from synthetic_order_alias where alias = ? and customer_id = ? limit 1",
                 (rs, row) -> rs.getInt(1),
-                command.orderReference(), command.customerId()).isEmpty();
+                command.orderReference(), command.customerId(), command.orderReference(), command.customerId()).isEmpty();
         jdbc.update(
-                "insert into support_ticket (id, customer_id, order_reference, description, lifecycle_state, handling_mode, created_at, first_responded_at) values (?, ?, ?, ?, 'INVESTIGATING', 'AGENT', ?, ?)",
+                "insert into support_ticket (id, customer_id, order_reference, description, lifecycle_state, handling_mode, "
+                        + "created_at, first_responded_at, resolution_running_since) "
+                        + "values (?, ?, ?, ?, 'INVESTIGATING', 'AGENT', ?, ?, ?)",
                 ticketId,
                 command.customerId(),
                 command.orderReference(),
                 command.description(),
+                databaseTime,
                 databaseTime,
                 databaseTime);
         jdbc.update(
@@ -110,7 +114,8 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                         rs.getTimestamp(5).toInstant(),
                         EPOCH,
                         rs.getLong(6),
-                        List.of()),
+                        List.of(),
+                        null),
                 EPOCH, ticketId, customerId);
         if (snapshots.isEmpty()) throw new TicketNotFoundException();
         List<PublicMessage> messages = jdbc.query(
@@ -118,9 +123,16 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 JdbcCustomerTicketService::mapMessage,
                 ticketId);
         CustomerPublicSnapshot ticket = snapshots.getFirst();
+        List<CurrentClarification> clarifications = jdbc.query(
+                "select id, prompt_code, public_question from customer_clarification_request "
+                        + "where ticket_id = ? and status = 'OPEN'",
+                (rs, row) -> new CurrentClarification(
+                        rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3)),
+                ticketId);
         return new CustomerPublicSnapshot(
                 ticket.ticketId(), ticket.lifecycleState(), ticket.handlingMode(), ticket.createdAt(),
-                ticket.firstRespondedAt(), ticket.epoch(), ticket.sequence(), messages);
+                ticket.firstRespondedAt(), ticket.epoch(), ticket.sequence(), messages,
+                clarifications.isEmpty() ? null : clarifications.getFirst());
     }
 
     @Override

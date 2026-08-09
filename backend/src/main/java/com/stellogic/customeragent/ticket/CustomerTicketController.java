@@ -125,7 +125,9 @@ public final class CustomerTicketController {
 
     record CreateTicketResponse(UUID ticketId, boolean accepted, boolean replayed) {}
 
-    record SnapshotResponse(String view, String cursor, Ticket ticket, List<PublicMessage> messages) {
+    record SnapshotResponse(
+            String view, String cursor, Ticket ticket, List<PublicMessage> messages,
+            CurrentClarification clarification) {
         static SnapshotResponse from(CustomerPublicSnapshot snapshot) {
             return new SnapshotResponse(
                     "CUSTOMER_PUBLIC",
@@ -136,7 +138,8 @@ public final class CustomerTicketController {
                             snapshot.handlingMode(),
                             snapshot.createdAt(),
                             snapshot.firstRespondedAt()),
-                    snapshot.messages());
+                    snapshot.messages(),
+                    snapshot.clarification());
         }
     }
 

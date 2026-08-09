@@ -4,14 +4,15 @@ import java.util.List;
 import java.util.UUID;
 
 record InvestigationFacts(
+        String matchStatus,
         String orderReference,
-        int delayHours,
-        long delaySeconds,
-        boolean paid,
-        boolean cancelled,
-        boolean fullyRefunded,
-        boolean existingCompensation,
-        int pendingActionCount,
+        Integer delayHours,
+        Long delaySeconds,
+        Boolean paid,
+        Boolean cancelled,
+        Boolean fullyRefunded,
+        Boolean existingCompensation,
+        Integer pendingActionCount,
         String policyVersion,
         List<String> evidenceRefs) {}
 
