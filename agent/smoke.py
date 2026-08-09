@@ -206,7 +206,7 @@ def main() -> None:
         assert generation[4] == "COMPLETED"
         assert connection.execute(
             "select count(*) from investigation_fact where generation_id = %s", (generation[0],)
-        ).fetchone()[0] == 5
+        ).fetchone()[0] == 6
         assert connection.execute(
             "select count(*) from agent_command_request where generation_id = %s", (generation[0],)
         ).fetchone()[0] == 1
@@ -537,7 +537,7 @@ def main() -> None:
             for _ in range(40):
                 with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
                     observed = connection.execute(
-                        "select exists(select 1 from agent_safety_handoff_request "
+                        "select exists(select 1 from agent_human_handoff_request "
                         "where ticket_id = %s and reason_code = %s)",
                         (rejected_id, expected_reason),
                     ).fetchone()[0]
@@ -882,10 +882,18 @@ def main() -> None:
             "select lifecycle_state from support_ticket where id = %s",
             (uuid.UUID(safe_ticket_id),),
         ).fetchone()[0]
-    safe_request_id = f"{safe_generation_id}:safe-handoff:FACT_CONFLICT"
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into investigation_fact "
+            "(generation_id, fact_type, fact_value, evidence_reference, recorded_at) values "
+            "(%s, 'ORDER', 'ORDER-DELAY-AMBIGUOUS-A', 'order:ORDER-DELAY-AMBIGUOUS-A', now()), "
+            "(%s, 'LOGISTICS_DELAY_SECONDS', '288000', 'logistics:ORDER-DELAY-AMBIGUOUS-A', now())",
+            (safe_generation_id, safe_generation_id),
+        )
+    safe_request_id = f"{safe_generation_id}:human-handoff:FACT_CONFLICT"
     safe_url = (
         f"{spring_url}/internal/agent/tickets/{safe_ticket_id}/generations/"
-        f"{safe_generation_id}/safe-handoff"
+        f"{safe_generation_id}/human-handoff"
     )
     safe_headers = {
         "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
@@ -912,6 +920,22 @@ def main() -> None:
         },
     }
     with httpx.Client(timeout=20.0) as client:
+        forged_summary = client.post(
+            safe_url,
+            headers={**safe_headers, "Idempotency-Key": f"forged-{uuid.uuid4()}"},
+            json={
+                **safe_body,
+                "summary": {
+                    "conclusionCode": "INVESTIGATION_COULD_NOT_CONTINUE",
+                    "facts": [{
+                        "type": "ORDER",
+                        "value": "raw payload fragment",
+                        "evidenceReference": "order:forged",
+                    }],
+                },
+            },
+        )
+        expect_status(forged_summary, 422)
         safe_handoff = client.post(safe_url, headers=safe_headers, json=safe_body)
         expect_status(safe_handoff, 202)
         assert safe_handoff.json() == {
@@ -957,7 +981,7 @@ def main() -> None:
         safe_queue_item = next(
             item for item in safe_queue_response.json() if item["ticketId"] == safe_ticket_id
         )
-        assert safe_queue_item["reasonCodes"] == ["SAFE_INVESTIGATION_HANDOFF"]
+        assert safe_queue_item["reasonCodes"] == ["AGENT_HUMAN_HANDOFF"]
         assert "summary" not in safe_queue_item
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -971,7 +995,7 @@ def main() -> None:
             (safe_generation_id,),
         ).fetchone()[0] == "HANDED_OFF"
         stored_reason, stored_summary = connection.execute(
-            "select reason_code, investigation_summary from agent_safety_handoff_request "
+            "select reason_code, investigation_summary from agent_human_handoff_request "
             "where generation_id = %s and request_id = %s",
             (safe_generation_id, safe_request_id),
         ).fetchone()
@@ -988,7 +1012,7 @@ def main() -> None:
         ).fetchone()[0]
     concurrent_safe_url = (
         f"{spring_url}/internal/agent/tickets/{concurrent_safe_ticket_id}/generations/"
-        f"{concurrent_safe_generation}/safe-handoff"
+        f"{concurrent_safe_generation}/human-handoff"
     )
 
     def concurrent_safe_handoff(reason: str) -> int:
@@ -999,9 +1023,15 @@ def main() -> None:
                     "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
                     "X-Agent-Generation-Id": str(concurrent_safe_generation),
                     "X-Agent-Operation": "REQUEST_SAFE_HANDOFF",
-                    "Idempotency-Key": f"{concurrent_safe_generation}:safe-handoff:{reason}",
+                    "Idempotency-Key": f"{concurrent_safe_generation}:human-handoff:{reason}",
                 },
-                json={**safe_body, "reasonCode": reason},
+                json={
+                    "reasonCode": reason,
+                    "summary": {
+                        "conclusionCode": "INVESTIGATION_COULD_NOT_CONTINUE",
+                        "facts": [],
+                    },
+                },
             )
             return response.status_code
 
@@ -1012,7 +1042,7 @@ def main() -> None:
     assert sorted(concurrent_safe_statuses) == [202, 403]
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert connection.execute(
-            "select count(*) from agent_safety_handoff_request where ticket_id = %s",
+            "select count(*) from agent_human_handoff_request where ticket_id = %s",
             (uuid.UUID(concurrent_safe_ticket_id),),
         ).fetchone()[0] == 1
         assert connection.execute(

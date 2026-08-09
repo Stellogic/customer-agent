@@ -7,11 +7,11 @@ record RequestHumanHandoff(String customerId, UUID ticketId, String requestId, S
 
 record HumanHandoffResult(String requestId, String handlingMode, boolean replayed) {}
 
-record AgentSafetyHandoffFact(String type, String value, String evidenceReference) {}
+record AgentHumanHandoffFact(String type, String value, String evidenceReference) {}
 
-record AgentSafetyHandoffSummary(String conclusionCode, List<AgentSafetyHandoffFact> facts) {}
+record AgentHumanHandoffSummary(String conclusionCode, List<AgentHumanHandoffFact> facts) {}
 
-enum AgentSafetyHandoffReason {
+enum AgentHumanHandoffReason {
     TOOL_RETRY_EXHAUSTED,
     FACT_CONFLICT,
     INVALID_TOOL_RESPONSE,
@@ -19,11 +19,11 @@ enum AgentSafetyHandoffReason {
     UNSUPPORTED_SCENARIO
 }
 
-record RequestAgentSafetyHandoff(
+record RequestAgentHumanHandoff(
         UUID ticketId,
         UUID generationId,
         String requestId,
-        AgentSafetyHandoffReason reasonCode,
-        AgentSafetyHandoffSummary summary) {}
+        AgentHumanHandoffReason reasonCode,
+        AgentHumanHandoffSummary summary) {}
 
-record AgentSafetyHandoffResult(String requestId, String handlingMode, String reasonCode, boolean replayed) {}
+record AgentHumanHandoffResult(String requestId, String handlingMode, String reasonCode, boolean replayed) {}

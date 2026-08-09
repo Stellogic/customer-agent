@@ -5,7 +5,7 @@ ALTER TABLE support_ticket ADD CONSTRAINT support_ticket_handoff_reason_check
         'INVALID_TOOL_RESPONSE', 'REQUIRED_FACT_MISSING', 'UNSUPPORTED_SCENARIO'
     ));
 
-CREATE TABLE agent_safety_handoff_request (
+CREATE TABLE agent_human_handoff_request (
     generation_id uuid NOT NULL REFERENCES agent_processing_generation(id),
     ticket_id uuid NOT NULL REFERENCES support_ticket(id),
     request_id text NOT NULL,
@@ -21,6 +21,6 @@ CREATE TABLE agent_safety_handoff_request (
 
 ALTER TABLE shared_support_queue_entry DROP CONSTRAINT shared_support_queue_entry_reason_code_check;
 ALTER TABLE shared_support_queue_entry ADD CONSTRAINT shared_support_queue_entry_reason_code_check
-    CHECK (reason_code IN ('SLA_BREACH', 'CUSTOMER_REQUESTED_HANDOFF', 'SAFE_INVESTIGATION_HANDOFF'));
+    CHECK (reason_code IN ('SLA_BREACH', 'CUSTOMER_REQUESTED_HANDOFF', 'AGENT_HUMAN_HANDOFF'));
 
-GRANT SELECT, INSERT ON agent_safety_handoff_request TO spring_app;
+GRANT SELECT, INSERT ON agent_human_handoff_request TO spring_app;

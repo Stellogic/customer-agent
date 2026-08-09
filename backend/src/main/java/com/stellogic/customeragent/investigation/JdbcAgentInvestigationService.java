@@ -78,6 +78,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         recordFact(generationId, "ORDER", order.orderReference(), "order:" + order.orderReference(), now);
         recordFact(generationId, "LOGISTICS_DELAY_HOURS", Integer.toString(order.delayHours()),
                 "logistics:" + order.orderReference(), now);
+        recordFact(generationId, "LOGISTICS_DELAY_SECONDS", Long.toString(order.delaySeconds()),
+                "logistics:" + order.orderReference(), now);
         recordFact(generationId, "PAYMENT", order.paid() ? "PAID" : "UNPAID",
                 "payment:" + order.orderReference(), now);
         recordFact(generationId, "POLICY", order.policyVersion(), "policy:" + order.policyVersion(), now);

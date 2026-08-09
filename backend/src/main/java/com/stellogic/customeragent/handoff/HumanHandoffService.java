@@ -7,7 +7,7 @@ interface HumanHandoffService {
 
     HumanHandoffResult status(String customerId, UUID ticketId, String requestId);
 
-    AgentSafetyHandoffResult requestAgentSafetyHandoff(RequestAgentSafetyHandoff command);
+    AgentHumanHandoffResult requestAgentHumanHandoff(RequestAgentHumanHandoff command);
 
     void auditAgentRejected(UUID ticketId, String reason);
 }
