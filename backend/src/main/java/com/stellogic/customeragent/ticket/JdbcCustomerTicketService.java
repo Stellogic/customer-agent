@@ -1,15 +1,11 @@
 package com.stellogic.customeragent.ticket;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.ByteBuffer;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import com.stellogic.customeragent.reliability.StableParameterDigest;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,11 +22,7 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
     private final Clock clock;
 
     @Autowired
-    public JdbcCustomerTicketService(JdbcTemplate jdbc) {
-        this(jdbc, Clock.systemUTC());
-    }
-
-    JdbcCustomerTicketService(JdbcTemplate jdbc, Clock clock) {
+    public JdbcCustomerTicketService(JdbcTemplate jdbc, Clock clock) {
         this.jdbc = jdbc;
         this.clock = clock;
     }
@@ -38,7 +30,7 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
     @Override
     @Transactional
     public TicketCreationResult create(CreateCustomerTicket command) {
-        String digest = digest(command.orderReference(), command.description());
+        String digest = StableParameterDigest.sha256(command.orderReference(), command.description());
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 (ResultSetExtractor<Void>) resultSet -> null,
@@ -57,6 +49,10 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         UUID ticketId = UUID.randomUUID();
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
+        boolean startsNoCompensationInvestigation = !jdbc.query(
+                "select 1 from synthetic_order where order_reference = ? and customer_id = ? and delay_hours < 24",
+                (rs, row) -> rs.getInt(1),
+                command.orderReference(), command.customerId()).isEmpty();
         jdbc.update(
                 "insert into support_ticket (id, customer_id, order_reference, description, lifecycle_state, handling_mode, created_at, first_responded_at) values (?, ?, ?, ?, 'INVESTIGATING', 'AGENT', ?, ?)",
                 ticketId,
@@ -68,6 +64,22 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         jdbc.update(
                 "insert into customer_ticket_request (customer_id, request_id, parameter_digest, ticket_id) values (?, ?, ?, ?)",
                 command.customerId(), command.requestId(), digest, ticketId);
+        UUID generationId = UUID.randomUUID();
+        UUID threadId = UUID.randomUUID();
+        jdbc.update(
+                "insert into agent_processing_generation (id, ticket_id, generation_number, thread_id, status, created_at) values (?, ?, 1, ?, 'ACTIVE', ?)",
+                generationId, ticketId, threadId, databaseTime);
+        if (startsNoCompensationInvestigation) {
+            UUID submissionRequestId = UUID.randomUUID();
+            jdbc.update(
+                    "insert into agent_submission (submission_request_id, generation_id, thread_id, parameter_digest, status, next_attempt_at, created_at) values (?, ?, ?, ?, 'PENDING', current_timestamp, ?)",
+                    submissionRequestId,
+                    generationId,
+                    threadId,
+                    StableParameterDigest.sha256(
+                            ticketId.toString(), generationId.toString(), threadId.toString(), submissionRequestId.toString()),
+                    databaseTime);
+        }
         jdbc.update(
                 "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) values (?, ?, 1, 'CUSTOMER', ?, ?), (?, ?, 2, 'SUPPORT', ?, ?)",
                 UUID.randomUUID(), ticketId, command.description(), databaseTime,
@@ -75,6 +87,9 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, 'TICKET_CREATED', ?, ?), (?, 'FIRST_RESPONSE_RECORDED', 'spring-system', ?)",
                 ticketId, command.customerId(), databaseTime, ticketId, databaseTime);
+        jdbc.update(
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, 'AGENT_GENERATION_CREATED', 'spring-system', ?)",
+                ticketId, databaseTime);
         jdbc.update(
                 "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) values (?, ?, 1, 'TICKET_ACCEPTED', jsonb_build_object('ticketId', ?::text, 'lifecycleState', 'INVESTIGATING', 'handlingMode', 'AGENT'), ?), (?, ?, 2, 'PUBLIC_MESSAGE_APPENDED', jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?)",
                 ticketId, EPOCH, ticketId.toString(), databaseTime,
@@ -132,20 +147,6 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
 
     private static PublicMessage mapMessage(ResultSet rs, int row) throws SQLException {
         return new PublicMessage(rs.getString(1), rs.getString(2), rs.getTimestamp(3).toInstant());
-    }
-
-    private static String digest(String... values) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            for (String value : values) {
-                byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-                digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
-                digest.update(bytes);
-            }
-            return HexFormat.of().formatHex(digest.digest());
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException(exception);
-        }
     }
 
     private record RequestRecord(String digest, UUID ticketId) {}

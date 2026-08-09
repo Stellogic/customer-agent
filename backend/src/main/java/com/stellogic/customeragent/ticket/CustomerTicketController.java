@@ -40,7 +40,7 @@ public final class CustomerTicketController {
         var result = service.create(new CreateCustomerTicket(
                 customerId.trim(), requestId.trim(), request.orderReference().trim(), request.description().trim()));
         return ResponseEntity.status(result.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
-                .body(new CreateTicketResponse(result.ticketId(), result.replayed()));
+                .body(new CreateTicketResponse(result.ticketId(), true, result.replayed()));
     }
 
     @GetMapping("/{ticketId}")
@@ -123,7 +123,7 @@ public final class CustomerTicketController {
 
     record CreateTicketRequest(String orderReference, String description) {}
 
-    record CreateTicketResponse(UUID ticketId, boolean replayed) {}
+    record CreateTicketResponse(UUID ticketId, boolean accepted, boolean replayed) {}
 
     record SnapshotResponse(String view, String cursor, Ticket ticket, List<PublicMessage> messages) {
         static SnapshotResponse from(CustomerPublicSnapshot snapshot) {

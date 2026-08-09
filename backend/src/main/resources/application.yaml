@@ -22,11 +22,13 @@ management:
       probes:
         enabled: true
 baseline:
+  clock:
+    fixed-instant: ${DEMO_FIXED_INSTANT:}
   migrate-only: ${BASELINE_MIGRATE_ONLY:false}
   agent:
     base-url: ${AGENT_SERVER_URL:http://localhost:2024}
     token: ${SPRING_TO_AGENT_TOKEN:local-spring-to-agent}
+    submission-poll-delay: ${AGENT_SUBMISSION_POLL_DELAY:250}
   identity:
     agent-token: ${AGENT_MACHINE_TOKEN:local-agent-machine}
     executor-token: ${EXECUTOR_MACHINE_TOKEN:local-executor-machine}
-

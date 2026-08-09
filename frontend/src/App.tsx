@@ -136,7 +136,7 @@ export function App() {
           <ol className="conversation">
             {snapshot.messages.map((message, index) => (
               <li key={`${message.sentAt}-${index}`} className={message.author.toLowerCase()}>
-                <span>{message.author === "CUSTOMER" ? "你" : "客服"}</span>
+                <span>{message.author === "CUSTOMER" ? "你" : message.author === "AGENT" ? "智能客服" : "客服"}</span>
                 <p>{message.body}</p>
               </li>
             ))}
