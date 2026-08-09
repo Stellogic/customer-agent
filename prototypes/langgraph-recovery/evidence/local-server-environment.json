@@ -1,0 +1,22 @@
+{
+  "health_response": {"ok": true},
+  "startup_observations": {
+    "runtime": "In-Memory",
+    "auth": "noop",
+    "license_metadata_loop": "No license key or control plane API key set, skipping metadata loop",
+    "workers": 1,
+    "host": "127.0.0.1",
+    "port": 2024
+  },
+  "windows_startup_compatibility": {
+    "without_pythonutf8": "UnicodeDecodeError: gbk codec could not decode OpenAPI text",
+    "with_pythonutf8": "server started and /ok returned true"
+  },
+  "versions": {
+    "python": "3.12.13",
+    "langgraph": "1.2.10",
+    "langgraph_cli": "0.4.31",
+    "langgraph_api": "0.12.1",
+    "langgraph_runtime_inmem": "0.32.1"
+  }
+}

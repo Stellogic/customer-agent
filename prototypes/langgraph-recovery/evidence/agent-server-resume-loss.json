@@ -1,0 +1,19 @@
+{
+  "client_process_id": 25092,
+  "error": null,
+  "output": {
+    "__error__": {
+      "error": "SimulatedResponseLoss",
+      "message": "Spring committed the effect; Agent did not receive the response"
+    }
+  },
+  "effect_count_after_loss": 1,
+  "state_next": [
+    "persist_proposal"
+  ],
+  "run_count": 2,
+  "run_statuses": [
+    "error",
+    "success"
+  ]
+}

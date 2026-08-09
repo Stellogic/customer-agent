@@ -1,0 +1,42 @@
+{
+  "client_process_id": 29712,
+  "thread_id": "6d33790d-b2cd-5a4d-aabd-20d643fda850",
+  "first_and_reconciled_are_same": true,
+  "pending_before_reconcile": "PENDING",
+  "confirmed_after_reconcile": "CONFIRMED",
+  "thread_status": "idle",
+  "run_count": 1,
+  "initial_run_reconciled_by_metadata": true,
+  "submission_request_id": "initial-run:1e41637d-53f0-59e0-8c9d-20eef10969fc",
+  "run_statuses": [
+    "success"
+  ],
+  "state_next": [
+    "wait_for_confirmation"
+  ],
+  "state_interrupts": [
+    {
+      "id": "3f8ded3d53a66925f8c0699304f388fa",
+      "value": {
+        "kind": "investigation_confirmation",
+        "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc"
+      }
+    }
+  ],
+  "output": {
+    "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+    "ticket_id": "TICKET-SERVER-004",
+    "steps": [
+      "investigation_facts_loaded"
+    ],
+    "__interrupt__": [
+      {
+        "value": {
+          "kind": "investigation_confirmation",
+          "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc"
+        },
+        "id": "3f8ded3d53a66925f8c0699304f388fa"
+      }
+    ]
+  }
+}

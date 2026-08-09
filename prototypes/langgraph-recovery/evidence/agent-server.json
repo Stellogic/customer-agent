@@ -1,0 +1,204 @@
+{
+  "checks": {
+    "deterministic_thread_reconcile": true,
+    "initial_run_reconciled_after_lost_response": true,
+    "interrupt_persisted": true,
+    "resume_reached_tool_and_reported_lost_response": true,
+    "tool_commit_survived_lost_response": true,
+    "retry_in_new_run_reused_effect": true,
+    "one_thread_multiple_runs": true,
+    "stale_generation_rejected_by_spring": true
+  },
+  "passed": true,
+  "bootstrap": {
+    "client_process_id": 29712,
+    "thread_id": "6d33790d-b2cd-5a4d-aabd-20d643fda850",
+    "first_and_reconciled_are_same": true,
+    "pending_before_reconcile": "PENDING",
+    "confirmed_after_reconcile": "CONFIRMED",
+    "thread_status": "idle",
+    "run_count": 1,
+    "initial_run_reconciled_by_metadata": true,
+    "submission_request_id": "initial-run:1e41637d-53f0-59e0-8c9d-20eef10969fc",
+    "run_statuses": [
+      "success"
+    ],
+    "state_next": [
+      "wait_for_confirmation"
+    ],
+    "state_interrupts": [
+      {
+        "id": "3f8ded3d53a66925f8c0699304f388fa",
+        "value": {
+          "kind": "investigation_confirmation",
+          "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc"
+        }
+      }
+    ],
+    "output": {
+      "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+      "ticket_id": "TICKET-SERVER-004",
+      "steps": [
+        "investigation_facts_loaded"
+      ],
+      "__interrupt__": [
+        {
+          "value": {
+            "kind": "investigation_confirmation",
+            "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc"
+          },
+          "id": "3f8ded3d53a66925f8c0699304f388fa"
+        }
+      ]
+    }
+  },
+  "resume_same_server_process": {
+    "client_process_id": 25092,
+    "error": null,
+    "output": {
+      "__error__": {
+        "error": "SimulatedResponseLoss",
+        "message": "Spring committed the effect; Agent did not receive the response"
+      }
+    },
+    "effect_count_after_loss": 1,
+    "state_next": [
+      "persist_proposal"
+    ],
+    "run_count": 2,
+    "run_statuses": [
+      "error",
+      "success"
+    ]
+  },
+  "recover_same_server_process": {
+    "client_process_id": 36140,
+    "output": {
+      "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+      "ticket_id": "TICKET-SERVER-004",
+      "steps": [
+        "investigation_facts_loaded",
+        "interrupt_resumed",
+        "proposal_persisted"
+      ],
+      "confirmation": "yes",
+      "proposal": {
+        "proposal_revision": "proposal-1e41637d-r1",
+        "status": "PROPOSED"
+      }
+    },
+    "effect_count_after_recovery": 1,
+    "effect_replayed": true,
+    "state_next": [],
+    "run_count": 3,
+    "run_statuses": [
+      "success",
+      "error",
+      "success"
+    ]
+  },
+  "stale_generation_same_server_process": {
+    "client_process_id": 31392,
+    "replacement_generation_id": "1111314a-8589-5e73-9f66-c523d49b7209",
+    "old_generation_interrupt_seen": true,
+    "server_error": {
+      "error": "StaleGenerationRejected",
+      "message": "1e41637d-53f0-59e0-8c9d-20eef10969fc"
+    },
+    "stale_audit_count": 1,
+    "effect_count_unchanged": true,
+    "run_count": 5
+  },
+  "spring_snapshot": {
+    "tickets": [
+      {
+        "ticket_id": "TICKET-SERVER-004",
+        "current_generation_id": "1111314a-8589-5e73-9f66-c523d49b7209",
+        "generation_seq": 2
+      }
+    ],
+    "generations": [
+      {
+        "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+        "ticket_id": "TICKET-SERVER-004",
+        "generation_seq": 1,
+        "status": "ACTIVE",
+        "thread_id": "6d33790d-b2cd-5a4d-aabd-20d643fda850"
+      },
+      {
+        "generation_id": "1111314a-8589-5e73-9f66-c523d49b7209",
+        "ticket_id": "TICKET-SERVER-004",
+        "generation_seq": 2,
+        "status": "PENDING_SUBMISSION",
+        "thread_id": null
+      }
+    ],
+    "submission_outbox": [
+      {
+        "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+        "requested_thread_id": "6d33790d-b2cd-5a4d-aabd-20d643fda850",
+        "status": "CONFIRMED",
+        "attempts": 1
+      },
+      {
+        "generation_id": "1111314a-8589-5e73-9f66-c523d49b7209",
+        "requested_thread_id": "a68247c3-63c9-598c-a4c3-2b1817ee2cf8",
+        "status": "PENDING",
+        "attempts": 0
+      }
+    ],
+    "resume_requests": [],
+    "effects": [
+      {
+        "idempotency_key": "investigation-result:1e41637d-53f0-59e0-8c9d-20eef10969fc",
+        "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+        "payload_hash": "ebfe57f57d93442248c4f076d9f5ac3279c640fef9d038901d9965f781dd25e2",
+        "result_json": "{\"proposal_revision\": \"proposal-1e41637d-r1\", \"status\": \"PROPOSED\"}"
+      }
+    ],
+    "faults": [
+      {
+        "name": "tool_response_loss",
+        "remaining": 0
+      }
+    ],
+    "audit": [
+      {
+        "seq": 7,
+        "event_type": "GENERATION_CREATED",
+        "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+        "details_json": "{\"thread_id\": \"6d33790d-b2cd-5a4d-aabd-20d643fda850\"}"
+      },
+      {
+        "seq": 8,
+        "event_type": "THREAD_CONFIRMED",
+        "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+        "details_json": "{\"thread_id\": \"6d33790d-b2cd-5a4d-aabd-20d643fda850\"}"
+      },
+      {
+        "seq": 9,
+        "event_type": "EFFECT_COMMITTED",
+        "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+        "details_json": "{\"idempotency_key\": \"investigation-result:1e41637d-53f0-59e0-8c9d-20eef10969fc\"}"
+      },
+      {
+        "seq": 10,
+        "event_type": "EFFECT_REPLAYED",
+        "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+        "details_json": "{\"idempotency_key\": \"investigation-result:1e41637d-53f0-59e0-8c9d-20eef10969fc\"}"
+      },
+      {
+        "seq": 11,
+        "event_type": "GENERATION_CREATED",
+        "generation_id": "1111314a-8589-5e73-9f66-c523d49b7209",
+        "details_json": "{\"thread_id\": \"a68247c3-63c9-598c-a4c3-2b1817ee2cf8\"}"
+      },
+      {
+        "seq": 12,
+        "event_type": "STALE_RESULT_REJECTED",
+        "generation_id": "1e41637d-53f0-59e0-8c9d-20eef10969fc",
+        "details_json": "{\"idempotency_key\": \"investigation-result:1e41637d-53f0-59e0-8c9d-20eef10969fc\", \"ticket_id\": \"TICKET-SERVER-004\"}"
+      }
+    ]
+  }
+}

@@ -13,6 +13,13 @@ The following points are the current user-confirmed requirements:
 - Study relevant mature open-source projects and official documentation before making implementation decisions; do not invent designs without evidence.
 - Write project documentation and human-facing engineering artifacts in Chinese by default so they are easy for the user and agents to review together. Keep code identifiers and protocol fields in English where appropriate.
 
+## Engineering decision principles
+
+- Before implementing common or non-differentiating capabilities, investigate whether a mature, actively maintained library or component already provides a natural fit.
+- Prefer reuse when the candidate has reliable documentation, an acceptable license, active maintenance, compatible technology, and reasonable security, bundle-size, operational, and lock-in costs.
+- Do not introduce a dependency merely to avoid a small amount of straightforward project-specific code.
+- Record consequential dependency choices, rejected alternatives, and supporting evidence in the relevant decision issue or ADR before implementation.
+
 ## Deliberately unresolved
 
 Architecture and implementation details have not yet been designed or approved. In particular, do not treat any previously generated service boundaries, domain model, workflow, storage choice, API or event protocol, security model, MVP scope, or test matrix as a user requirement.
