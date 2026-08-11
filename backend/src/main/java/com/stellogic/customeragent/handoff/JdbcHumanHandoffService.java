@@ -2,6 +2,7 @@ package com.stellogic.customeragent.handoff;
 
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
+import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -19,7 +20,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 class JdbcHumanHandoffService implements HumanHandoffService {
-    private static final String CUSTOMER_PUBLIC_EPOCH = "customer-public-v1";
     private static final String CUSTOMER_REQUESTED_REASON = "CUSTOMER_REQUESTED";
     private static final String CUSTOMER_PUBLIC_MESSAGE = "已按您的要求转由客服继续处理。客服将在此工单中与您联系。";
     private static final String AGENT_HANDOFF_PUBLIC_MESSAGE = "为确保处理安全，此工单已转由客服继续调查。客服将在此工单中与您联系。";
@@ -32,13 +32,19 @@ class JdbcHumanHandoffService implements HumanHandoffService {
     private final Clock clock;
     private final TicketAuthorityLock authorityLock;
     private final ObjectMapper objectMapper;
+    private final CustomerPublicProjectionAppender publicProjection;
 
     JdbcHumanHandoffService(
-            JdbcTemplate jdbc, Clock clock, TicketAuthorityLock authorityLock, ObjectMapper objectMapper) {
+            JdbcTemplate jdbc,
+            Clock clock,
+            TicketAuthorityLock authorityLock,
+            ObjectMapper objectMapper,
+            CustomerPublicProjectionAppender publicProjection) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.authorityLock = authorityLock;
         this.objectMapper = objectMapper;
+        this.publicProjection = publicProjection;
     }
 
     @Override
@@ -205,7 +211,7 @@ class JdbcHumanHandoffService implements HumanHandoffService {
                         + "values (?, ?, ?) on conflict do nothing",
                 ticketId, queueReason, at);
         if (publicTransitionRequired) {
-            appendPublicTransition(ticketId, generationId, publicMessage, at.toInstant(), at);
+            publicProjection.appendHandoffMessage(ticketId, generationId, publicMessage, at.toInstant());
         }
         audit(ticketId, "HUMAN_HANDOFF_RECORDED", actorId, at);
         if (!activeGenerations.isEmpty()) audit(ticketId, "AGENT_GENERATION_HANDED_OFF", "spring-system", at);
@@ -273,32 +279,6 @@ class JdbcHumanHandoffService implements HumanHandoffService {
         authorityLock.acquire(ticketId);
         jdbc.query("select pg_advisory_xact_lock(hashtextextended(?, 0))", rs -> null,
                 ticketId + "\n" + requestId);
-    }
-
-    private void appendPublicTransition(
-            UUID ticketId, UUID sourceGenerationId, String publicMessage, Instant now, Timestamp at) {
-        Long messageSequence = jdbc.queryForObject(
-                "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?",
-                Long.class, ticketId);
-        Long eventSequence = jdbc.queryForObject(
-                "select coalesce(max(sequence), 0) + 1 from customer_public_event where ticket_id = ? and epoch = ?",
-                Long.class, ticketId, CUSTOMER_PUBLIC_EPOCH);
-        jdbc.update(
-                "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) "
-                        + "values (?, ?, ?, 'SUPPORT', ?, ?)",
-                UUID.randomUUID(), ticketId, messageSequence, publicMessage, at);
-        jdbc.update(
-                "insert into customer_public_event "
-                        + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
-                        + "values (?, ?, ?, coalesce((select generation_number from agent_processing_generation "
-                        + "where id = ? and ticket_id = ?), 0), 'PUBLIC_MESSAGE_APPENDED', "
-                        + "jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?), "
-                        + "(?, ?, ?, coalesce((select generation_number from agent_processing_generation "
-                        + "where id = ? and ticket_id = ?), 0), 'TICKET_HANDED_OFF', "
-                        + "jsonb_build_object('handlingMode', 'HUMAN', 'clarification', null), ?)",
-                ticketId, CUSTOMER_PUBLIC_EPOCH, eventSequence, sourceGenerationId, ticketId,
-                publicMessage, now.toString(), at,
-                ticketId, CUSTOMER_PUBLIC_EPOCH, eventSequence + 1, sourceGenerationId, ticketId, at);
     }
 
     private void audit(UUID ticketId, String eventType, String actorId, Timestamp at) {
