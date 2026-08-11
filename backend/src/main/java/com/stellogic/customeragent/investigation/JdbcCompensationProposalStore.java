@@ -4,7 +4,6 @@ import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.approval.CompensationProposalExpiry;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -14,12 +13,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 class JdbcCompensationProposalStore {
     private final JdbcTemplate jdbc;
-    private final Clock clock;
     private final CompensationProposalExpiry expiry;
 
-    JdbcCompensationProposalStore(JdbcTemplate jdbc, Clock clock, CompensationProposalExpiry expiry) {
+    JdbcCompensationProposalStore(JdbcTemplate jdbc, CompensationProposalExpiry expiry) {
         this.jdbc = jdbc;
-        this.clock = clock;
         this.expiry = expiry;
     }
 
@@ -28,8 +25,7 @@ class JdbcCompensationProposalStore {
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
                 content.orderReference() + "\nLOGISTICS_DELAY");
-        expiry.expireDueForOrder(content.orderReference());
-        Instant now = clock.instant();
+        Instant now = expiry.expireDueForOrder(content.orderReference());
         List<ActiveProposal> active = jdbc.query(
                 "select id, proposal_id, revision_number, ticket_id, content_digest, status "
                         + "from compensation_proposal_revision where order_reference = ? "

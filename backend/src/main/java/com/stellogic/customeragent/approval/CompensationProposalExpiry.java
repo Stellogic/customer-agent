@@ -26,7 +26,7 @@ public final class CompensationProposalExpiry {
         revisionIds.forEach(revisionId -> expireLocked(revisionId, now));
     }
 
-    public void expireDueForOrder(String orderReference) {
+    public Instant expireDueForOrder(String orderReference) {
         List<PendingRevision> revisions = jdbc.query(
                 "select id, expires_at from compensation_proposal_revision where order_reference = ? "
                         + "and reason_code = 'LOGISTICS_DELAY' and status = 'PENDING_APPROVAL' "
@@ -37,6 +37,7 @@ public final class CompensationProposalExpiry {
         revisions.stream()
                 .filter(revision -> !revision.expiresAt().isAfter(now))
                 .forEach(revision -> expireLocked(revision.id(), now));
+        return now;
     }
 
     public boolean expireIfDue(UUID revisionId, Instant now) {

@@ -542,6 +542,16 @@ def main() -> None:
             },
         )
         expect_status(expired_view, 403)
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            assert connection.execute(
+                "select status from approval_lease where proposal_revision_id = %s and lease_version = 2",
+                (first_revision_id,),
+            ).fetchone()[0] == "EXPIRED"
+            assert connection.execute(
+                "select count(*) from audit_event where subject_id = %s "
+                "and event_type = 'APPROVAL_LEASE_EXPIRED' and authorization_version = 2",
+                (first_revision_id,),
+            ).fetchone()[0] == 1
         reclaim_three = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
             headers={
@@ -553,6 +563,19 @@ def main() -> None:
         expect_status(reclaim_three, 201)
         lease_three = reclaim_three.json()
         assert lease_three["leaseVersion"] == 3
+        lease_three_view = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
+            headers={
+                **winner_headers,
+                "X-Approval-Lease-Token": lease_three["leaseToken"],
+                "X-Approval-Lease-Version": "3",
+            },
+        )
+        expect_status(lease_three_view, 200)
+        assert any(
+            event["eventType"] == "APPROVAL_LEASE_EXPIRED" and event["leaseVersion"] == 2
+            for event in lease_three_view.json()["responsibilityChain"]
+        )
 
     expired_revision_id = uuid.uuid4()
     expired_lease_token = uuid.uuid4()
