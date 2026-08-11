@@ -11,7 +11,7 @@ Copy-Item .env.example .env
 docker compose up --detach --build --wait
 ```
 
-打开 <http://127.0.0.1:4180>。客户使用合成身份提交物流延迟问题，页面先读取完整 `CUSTOMER_PUBLIC` 权威快照，再从同一视图的 `epoch:sequence` 游标请求 SSE 增量。客服从 <http://127.0.0.1:4180/api/demo/enter/support> 建立服务端 `HttpOnly` 合成会话后进入 `/support`，只显示共享队列与 SLA 违约升级队列的最小摘要；直接访问 `/support` 不会自动提升角色。工作台使用独立的 `SUPPORT_WORKBENCH` 快照、游标和事件流，不提供自由角色切换或未领取工单详情入口。浏览器只请求同源的 Spring `/api`；Agent Server 和 PostgreSQL 均未发布主机端口。
+打开 <http://127.0.0.1:4180>。客户使用合成身份提交物流延迟问题，页面先读取完整 `CUSTOMER_PUBLIC` 权威快照，再从同一视图的 `epoch:sequence` 游标请求 SSE 增量。客服从 <http://127.0.0.1:4180/api/demo/enter/support> 建立服务端 `HttpOnly` 合成会话后进入 `/support`，只显示共享队列与 SLA 违约升级队列的最小摘要；直接访问 `/support` 不会自动提升角色。审批人从 <http://127.0.0.1:4180/api/demo/enter/approver/approver-demo> 进入 `/approver`；审批证据只在当前租约存续时显示，旧 URL 不会自动重新领取责任。两个工作台分别使用独立的 `SUPPORT_WORKBENCH` 与 `APPROVAL_VIEW` 快照、游标和事件流，不提供自由角色切换或越权详情入口。浏览器只请求同源的 Spring `/api`；Agent Server 和 PostgreSQL 均未发布主机端口。
 
 从空数据库重复验证全部基线：
 

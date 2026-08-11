@@ -25,6 +25,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 class JdbcApprovalService implements ApprovalService {
+    static final String APPROVAL_VIEW_EPOCH = "approval-view-v1";
     private static final String APPROVAL_PUBLIC_MESSAGE = "补偿方案已获批准，正在等待补偿处理。";
     private final JdbcTemplate jdbc;
     private final Clock clock;
@@ -215,11 +216,66 @@ class JdbcApprovalService implements ApprovalService {
                         rs.getString(1), rs.getString(2), rs.getTimestamp(3).toInstant(),
                         rs.getObject(4, Long.class)), command.revisionId(), command.leaseVersion());
         return new ApprovalModels.ApprovalView(
-                "APPROVAL_VIEW", command.revisionId(), row.revisionNumber(), row.contentDigest(),
+                "APPROVAL_VIEW", APPROVAL_VIEW_EPOCH, approvalCursor(command),
+                command.revisionId(), row.revisionNumber(), row.contentDigest(),
                 row.orderReference(), row.reasonCode(), row.delayHours(), row.delaySeconds(), row.method(),
                 row.amount(), authoritative.amount(), row.policyVersion(), tier(row.delaySeconds()), checks,
                 evidence, snapshot, responsibility, command.leaseToken(), command.leaseVersion(), row.leaseExpiresAt(),
                 row.submittedAt(), row.proposalExpiresAt());
+    }
+
+    @Override
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public List<ApprovalModels.ApprovalViewEvent> events(
+            ApprovalModels.ViewCommand command, String afterCursor) {
+        view(command);
+        long after = parseApprovalCursor(afterCursor);
+        Long latest = jdbc.queryForObject(
+                "select coalesce(max(sequence), 0) from approval_view_event "
+                        + "where proposal_revision_id = ? and lease_version = ?",
+                Long.class, command.revisionId(), command.leaseVersion());
+        long authoritySequence = latest == null ? 0 : latest;
+        if (after < 0 || after > authoritySequence) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "approval view snapshot required");
+        }
+        Long firstRetained = jdbc.queryForObject(
+                "select min(sequence) from approval_view_event "
+                        + "where proposal_revision_id = ? and lease_version = ?",
+                Long.class, command.revisionId(), command.leaseVersion());
+        if (after < authoritySequence && firstRetained != null && firstRetained > after + 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "approval view snapshot required");
+        }
+        return jdbc.query(
+                "select epoch, sequence, event_type, proposal_revision_id, lease_version, authority_state "
+                        + "from approval_view_event where proposal_revision_id = ? and lease_version = ? "
+                        + "and sequence > ? order by sequence",
+                (rs, rowNumber) -> new ApprovalModels.ApprovalViewEvent(
+                        rs.getString(1), rs.getLong(2), rs.getString(3),
+                        rs.getObject(4, UUID.class), rs.getLong(5), rs.getString(6)),
+                command.revisionId(), command.leaseVersion(), after);
+    }
+
+    private String approvalCursor(ApprovalModels.ViewCommand command) {
+        Long sequence = jdbc.queryForObject(
+                "select coalesce(max(sequence), 0) from approval_view_event "
+                        + "where proposal_revision_id = ? and lease_version = ?",
+                Long.class, command.revisionId(), command.leaseVersion());
+        return APPROVAL_VIEW_EPOCH + ":" + (sequence == null ? 0 : sequence);
+    }
+
+    private static long parseApprovalCursor(String cursor) {
+        if (cursor == null || cursor.isBlank()) return 0;
+        int separator = cursor.lastIndexOf(':');
+        if (separator < 1 || !APPROVAL_VIEW_EPOCH.equals(cursor.substring(0, separator))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "approval view snapshot required");
+        }
+        try {
+            long sequence = Long.parseLong(cursor.substring(separator + 1));
+            if (sequence < 0) throw new NumberFormatException();
+            return sequence;
+        } catch (NumberFormatException exception) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "approval view snapshot required");
+        }
     }
 
     @Override

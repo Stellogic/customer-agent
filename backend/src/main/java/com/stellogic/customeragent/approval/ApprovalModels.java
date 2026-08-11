@@ -29,6 +29,8 @@ final class ApprovalModels {
 
     record ApprovalView(
             String view,
+            String schema,
+            String cursor,
             UUID proposalRevisionId,
             int proposalRevision,
             String contentDigest,
@@ -50,6 +52,19 @@ final class ApprovalModels {
             Instant leaseExpiresAt,
             Instant submittedAt,
             Instant proposalExpiresAt) {}
+
+    record ApprovalViewEvent(
+            String epoch, long sequence, String eventType, UUID proposalRevisionId,
+            long leaseVersion, String authorityState) {
+        String cursor() { return epoch + ":" + sequence; }
+
+        String publicData() {
+            return "{\"view\":\"APPROVAL_VIEW\",\"schema\":\"" + epoch
+                    + "\",\"payload\":{\"proposalRevisionId\":\"" + proposalRevisionId
+                    + "\",\"leaseVersion\":" + leaseVersion + ",\"authorityState\":\""
+                    + authorityState + "\"}}";
+        }
+    }
 
     record ResponsibilityEvent(String eventType, String actorId, Instant occurredAt, Long leaseVersion) {}
 

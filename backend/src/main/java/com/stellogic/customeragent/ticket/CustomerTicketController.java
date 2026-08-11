@@ -1,10 +1,10 @@
 package com.stellogic.customeragent.ticket;
 
+import com.stellogic.customeragent.stream.AuthorizedSsePollingStream;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -58,61 +58,29 @@ public final class CustomerTicketController {
             @PathVariable UUID ticketId) {
         requireIdentity(customerId);
         String owner = customerId.trim();
-        List<CustomerPublicEvent> events = service.events(owner, ticketId, cursor);
-        SseEmitter emitter = new SseEmitter(60_000L);
-        try {
-            for (CustomerPublicEvent event : events) {
-                sendAuthorized(emitter, owner, ticketId, event);
-            }
-            emitter.send(SseEmitter.event().comment("connected"));
-        } catch (Exception exception) {
-            emitter.completeWithError(exception);
-            return emitter;
-        }
-        String nextCursor = events.isEmpty() ? cursor : events.getLast().cursor();
-        startIncrementalStream(emitter, owner, ticketId, nextCursor);
-        return emitter;
-    }
-
-    private void startIncrementalStream(SseEmitter emitter, String customerId, UUID ticketId, String initialCursor) {
-        AtomicBoolean closed = new AtomicBoolean();
-        emitter.onCompletion(() -> closed.set(true));
-        emitter.onTimeout(() -> {
-            closed.set(true);
-            emitter.complete();
-        });
-        emitter.onError(error -> closed.set(true));
-        Thread.ofVirtual().name("customer-ticket-events-" + ticketId).start(() -> {
-            String cursor = initialCursor;
-            try {
-                while (!closed.get()) {
-                    Thread.sleep(250);
-                    List<CustomerPublicEvent> incremental = service.events(customerId, ticketId, cursor);
-                    for (CustomerPublicEvent event : incremental) {
-                        sendAuthorized(emitter, customerId, ticketId, event);
-                        cursor = event.cursor();
+        return AuthorizedSsePollingStream.open(
+                "customer-ticket-events-" + ticketId, 250, 60_000L, cursor,
+                new AuthorizedSsePollingStream.Source<CustomerPublicEvent>() {
+                    @Override
+                    public List<CustomerPublicEvent> events(String afterCursor) {
+                        return service.events(owner, ticketId, afterCursor);
                     }
-                }
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                emitter.complete();
-            } catch (Exception exception) {
-                emitter.completeWithError(exception);
-            }
-        });
-    }
 
-    private static void send(SseEmitter emitter, CustomerPublicEvent event) throws java.io.IOException {
-        emitter.send(SseEmitter.event()
-                .id(event.cursor())
-                .name(event.type())
-                .data(event.publicData()));
-    }
+                    @Override
+                    public void authorize() {
+                        service.snapshot(owner, ticketId);
+                    }
 
-    private void sendAuthorized(
-            SseEmitter emitter, String customerId, UUID ticketId, CustomerPublicEvent event) throws java.io.IOException {
-        service.snapshot(customerId, ticketId);
-        send(emitter, event);
+                    @Override
+                    public String cursor(CustomerPublicEvent event) {
+                        return event.cursor();
+                    }
+
+                    @Override
+                    public SseEmitter.SseEventBuilder render(CustomerPublicEvent event) {
+                        return SseEmitter.event().id(event.cursor()).name(event.type()).data(event.publicData());
+                    }
+                });
     }
 
     private static void requireIdentity(String customerId) {

@@ -1,9 +1,12 @@
 package com.stellogic.customeragent.approval;
 
+import com.stellogic.customeragent.stream.AuthorizedSsePollingStream;
 import java.util.List;
 import com.stellogic.customeragent.identity.SyntheticApprovers;
 import java.util.UUID;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/approver/compensation-proposals")
@@ -45,16 +49,54 @@ public final class ApprovalController {
     }
 
     @GetMapping("/{revisionId}/approval-view")
-    ApprovalModels.ApprovalView view(
+    ResponseEntity<ApprovalModels.ApprovalView> view(
             @RequestHeader(value = "X-Synthetic-Approver-Id", required = false) String approverId,
             @RequestHeader(value = "X-Approval-Lease-Token", required = false) UUID leaseToken,
             @RequestHeader(value = "X-Approval-Lease-Version", required = false) Long leaseVersion,
             @PathVariable UUID revisionId) {
+        ApprovalModels.ViewCommand command = viewCommand(approverId, revisionId, leaseToken, leaseVersion);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.view(command));
+    }
+
+    @GetMapping(value = "/{revisionId}/approval-view/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    SseEmitter events(
+            @RequestHeader(value = "X-Synthetic-Approver-Id", required = false) String approverId,
+            @RequestHeader(value = "X-Approval-Lease-Token", required = false) UUID leaseToken,
+            @RequestHeader(value = "X-Approval-Lease-Version", required = false) Long leaseVersion,
+            @RequestHeader(value = "Last-Event-ID", required = false) String cursor,
+            @PathVariable UUID revisionId) {
+        ApprovalModels.ViewCommand command = viewCommand(approverId, revisionId, leaseToken, leaseVersion);
+        return AuthorizedSsePollingStream.open(
+                "approval-view-events", 100, 0L, cursor,
+                new AuthorizedSsePollingStream.Source<ApprovalModels.ApprovalViewEvent>() {
+                    @Override
+                    public List<ApprovalModels.ApprovalViewEvent> events(String afterCursor) {
+                        return service.events(command, afterCursor);
+                    }
+
+                    @Override
+                    public void authorize() {
+                        service.requireCurrentView(command);
+                    }
+
+                    @Override
+                    public String cursor(ApprovalModels.ApprovalViewEvent event) {
+                        return event.cursor();
+                    }
+
+                    @Override
+                    public SseEmitter.SseEventBuilder render(ApprovalModels.ApprovalViewEvent event) {
+                        return SseEmitter.event().id(event.cursor()).name(event.eventType()).data(event.publicData());
+                    }
+                });
+    }
+
+    private static ApprovalModels.ViewCommand viewCommand(
+            String approverId, UUID revisionId, UUID leaseToken, Long leaseVersion) {
         if (leaseToken == null || leaseVersion == null || leaseVersion < 1) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "current approval lease required");
         }
-        return service.view(new ApprovalModels.ViewCommand(
-                requireApprover(approverId), revisionId, leaseToken, leaseVersion));
+        return new ApprovalModels.ViewCommand(requireApprover(approverId), revisionId, leaseToken, leaseVersion);
     }
 
     @PostMapping("/{revisionId}/release")

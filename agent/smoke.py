@@ -16,6 +16,28 @@ def expect_status(response: httpx.Response, expected: int) -> None:
         raise AssertionError(f"expected {expected}, got {response.status_code}: {response.text}")
 
 
+def start_authorized_sse(url: str, headers: dict[str, str], cursor: str):
+    connected = threading.Event()
+
+    def observe_until_closed() -> bool:
+        with httpx.Client(timeout=20.0) as stream_client:
+            with stream_client.stream(
+                "GET", url, headers={**headers, "Last-Event-ID": cursor}
+            ) as response:
+                expect_status(response, 200)
+                for line in response.iter_lines():
+                    if line == ":connected":
+                        connected.set()
+            return True
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(observe_until_closed)
+    if not connected.wait(timeout=5):
+        executor.shutdown(wait=False, cancel_futures=True)
+        raise AssertionError("approval SSE did not establish")
+    return executor, future
+
+
 def main() -> None:
     agent_url = os.environ["AGENT_SERVER_URL"]
     spring_url = os.environ["SPRING_INTERNAL_URL"]
@@ -445,6 +467,8 @@ def main() -> None:
         expect_status(approval_view, 200)
         approval_projection = approval_view.json()
         assert approval_projection["view"] == "APPROVAL_VIEW"
+        assert approval_projection["schema"] == "approval-view-v1"
+        assert approval_projection["cursor"] == "approval-view-v1:1"
         assert approval_projection["contentDigest"] == proposal_row[9]
         assert approval_projection["authoritativeAmount"] == 26.8
         assert approval_projection["orderReference"] == proposal_order_reference
@@ -477,13 +501,27 @@ def main() -> None:
             },
         )
         expect_status(denied_old_token, 403)
+        incompatible_cursor = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view/events",
+            headers={**lease_headers, "Last-Event-ID": "support-workbench-v1:1"},
+        )
+        expect_status(incompatible_cursor, 409)
 
         release_request = f"issue-20-release-{uuid.uuid4()}"
-        released = client.post(
-            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/release",
-            headers={**lease_headers, "Idempotency-Key": release_request},
+        stream_executor, stream_closed = start_authorized_sse(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view/events",
+            lease_headers,
+            approval_projection["cursor"],
         )
-        expect_status(released, 200)
+        try:
+            released = client.post(
+                f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/release",
+                headers={**lease_headers, "Idempotency-Key": release_request},
+            )
+            expect_status(released, 200)
+            assert stream_closed.result(timeout=5) is True
+        finally:
+            stream_executor.shutdown(wait=False, cancel_futures=True)
         assert released.json() == {
             "proposalRevisionId": str(first_revision_id), "released": True, "replayed": False
         }
@@ -498,6 +536,11 @@ def main() -> None:
             headers=lease_headers,
         )
         expect_status(revoked_after_release, 403)
+        revoked_stream_after_release = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view/events",
+            headers={**lease_headers, "Last-Event-ID": approval_projection["cursor"]},
+        )
+        expect_status(revoked_stream_after_release, 403)
         rejection_after_release = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/reject",
             headers={**lease_headers, "Idempotency-Key": f"released-reject-{uuid.uuid4()}"},
@@ -528,6 +571,21 @@ def main() -> None:
             },
         )
         expect_status(stale_release, 403)
+        lease_two_headers = {
+            "X-Synthetic-Approver-Id": loser_id,
+            "X-Approval-Lease-Token": lease_two["leaseToken"],
+            "X-Approval-Lease-Version": "2",
+        }
+        lease_two_view = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
+            headers=lease_two_headers,
+        )
+        expect_status(lease_two_view, 200)
+        expiry_stream_executor, expiry_stream_closed = start_authorized_sse(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view/events",
+            lease_two_headers,
+            lease_two_view.json()["cursor"],
+        )
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         connection.execute(
@@ -543,13 +601,13 @@ def main() -> None:
         assert proposal_state[1].isoformat() == "2026-08-10T14:00:00+00:00"
 
     with httpx.Client(timeout=20.0) as client:
+        try:
+            assert expiry_stream_closed.result(timeout=5) is True
+        finally:
+            expiry_stream_executor.shutdown(wait=False, cancel_futures=True)
         expired_view = client.get(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
-            headers={
-                "X-Synthetic-Approver-Id": loser_id,
-                "X-Approval-Lease-Token": lease_two["leaseToken"],
-                "X-Approval-Lease-Version": "2",
-            },
+            headers=lease_two_headers,
         )
         expect_status(expired_view, 403)
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -573,18 +631,24 @@ def main() -> None:
         expect_status(reclaim_three, 201)
         lease_three = reclaim_three.json()
         assert lease_three["leaseVersion"] == 3
+        lease_three_headers = {
+            **winner_headers,
+            "X-Approval-Lease-Token": lease_three["leaseToken"],
+            "X-Approval-Lease-Version": "3",
+        }
         lease_three_view = client.get(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
-            headers={
-                **winner_headers,
-                "X-Approval-Lease-Token": lease_three["leaseToken"],
-                "X-Approval-Lease-Version": "3",
-            },
+            headers=lease_three_headers,
         )
         expect_status(lease_three_view, 200)
         assert any(
             event["eventType"] == "APPROVAL_LEASE_EXPIRED" and event["leaseVersion"] == 2
             for event in lease_three_view.json()["responsibilityChain"]
+        )
+        replacement_stream_executor, replacement_stream_closed = start_authorized_sse(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view/events",
+            lease_three_headers,
+            lease_three_view.json()["cursor"],
         )
 
     expired_revision_id = uuid.uuid4()
@@ -751,14 +815,14 @@ def main() -> None:
         expect_status(replacement, 200)
         assert replacement.json()["proposalRevision"] == 2
         assert replacement.json()["proposalStatus"] == "PENDING_APPROVAL"
+        try:
+            assert replacement_stream_closed.result(timeout=5) is True
+        finally:
+            replacement_stream_executor.shutdown(wait=False, cancel_futures=True)
 
         replaced_view = client.get(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
-            headers={
-                **winner_headers,
-                "X-Approval-Lease-Token": lease_three["leaseToken"],
-                "X-Approval-Lease-Version": "3",
-            },
+            headers=lease_three_headers,
         )
         expect_status(replaced_view, 403)
 
@@ -905,6 +969,16 @@ def main() -> None:
             "X-Approval-Lease-Token": approval_lease["leaseToken"],
             "X-Approval-Lease-Version": str(approval_lease["leaseVersion"]),
         }
+        approval_view_before_decision = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{approval_revision_id}/approval-view",
+            headers=approval_headers,
+        )
+        expect_status(approval_view_before_decision, 200)
+        decision_stream_executor, decision_stream_closed = start_authorized_sse(
+            f"{spring_url}/api/approver/compensation-proposals/{approval_revision_id}/approval-view/events",
+            approval_headers,
+            approval_view_before_decision.json()["cursor"],
+        )
         approval_url = (
             f"{spring_url}/api/approver/compensation-proposals/{approval_revision_id}/approve"
         )
@@ -920,6 +994,10 @@ def main() -> None:
             json=approval_body,
         )
         expect_status(approved, 200)
+        try:
+            assert decision_stream_closed.result(timeout=5) is True
+        finally:
+            decision_stream_executor.shutdown(wait=False, cancel_futures=True)
         approved_payload = approved.json()
         assert approved_payload["decision"] == "APPROVED"
         assert approved_payload["executionStatus"] == "READY"
@@ -1657,6 +1735,17 @@ def main() -> None:
         )
         expect_status(empty_reason, 400)
 
+        rejection_view_before_decision = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{rejection_revision_id}/approval-view",
+            headers=rejection_headers,
+        )
+        expect_status(rejection_view_before_decision, 200)
+        rejection_stream_executor, rejection_stream_closed = start_authorized_sse(
+            f"{spring_url}/api/approver/compensation-proposals/{rejection_revision_id}/approval-view/events",
+            rejection_headers,
+            rejection_view_before_decision.json()["cursor"],
+        )
+
         rejection_body = {
             "proposalRevision": 1,
             "contentDigest": rejection_digest,
@@ -1681,6 +1770,10 @@ def main() -> None:
             (response.status_code, response.text) for response in rejection_responses
         ]
         assert sorted(response.json()["replayed"] for response in rejection_responses) == [False, True]
+        try:
+            assert rejection_stream_closed.result(timeout=5) is True
+        finally:
+            rejection_stream_executor.shutdown(wait=False, cancel_futures=True)
         rejection_winner_index = next(
             index for index, response in enumerate(rejection_responses)
             if response.json()["replayed"] is False

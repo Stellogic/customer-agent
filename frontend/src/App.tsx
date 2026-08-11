@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { consumeSseEvents, hasOnlyKeys, isRecord, parseViewCursor, type SseEvent } from "./streamProtocol";
 
 const CUSTOMER_PUBLIC_SCHEMA = "customer-public-v1" as const;
 
@@ -11,7 +12,6 @@ type Snapshot = {
   clarification: { id: string; promptCode: string; question: string } | null;
 };
 
-type PublicEvent = { id: string; type: string; data: string };
 type EventEnvelope = {
   view: "CUSTOMER_PUBLIC";
   schema: typeof CUSTOMER_PUBLIC_SCHEMA;
@@ -174,28 +174,11 @@ export function App() {
         signal: controller.signal,
       });
       if (!response.ok) throw new Error("event stream failed");
-      const reader = response.body?.getReader();
-      if (reader) {
-        const decoder = new TextDecoder();
-        let buffer = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          buffer += decoder.decode(value, { stream: !done });
-          let boundary = buffer.search(/\r?\n\r?\n/);
-          while (boundary >= 0) {
-            const block = buffer.slice(0, boundary);
-            const separator = buffer.slice(boundary).match(/^\r?\n\r?\n/)?.[0].length ?? 2;
-            buffer = buffer.slice(boundary + separator);
-            const event = parsePublicEvent(block);
-            if (event && !applyPublicEvent(event)) {
-              controller.abort();
-              await loadTicket(ticketId);
-              return;
-            }
-            boundary = buffer.search(/\r?\n\r?\n/);
-          }
-          if (done) break;
-        }
+      const compatible = await consumeSseEvents(response.body, applyPublicEvent);
+      if (!compatible) {
+        controller.abort();
+        await loadTicket(ticketId);
+        return;
       }
     } catch {
       // The authoritative snapshot remains committed and readable after a stream failure.
@@ -204,7 +187,7 @@ export function App() {
     scheduleRecovery();
   }
 
-  function applyPublicEvent(event: PublicEvent) {
+  function applyPublicEvent(event: SseEvent) {
     const current = snapshotRef.current;
     if (!current) return true;
     const currentCursor = parseCursor(current.cursor);
@@ -330,20 +313,7 @@ function isSnapshot(value: unknown): value is Snapshot {
 }
 
 function parseCursor(cursor: string) {
-  const separator = cursor.lastIndexOf(":");
-  if (separator < 1 || cursor.slice(0, separator) !== CUSTOMER_PUBLIC_SCHEMA) return null;
-  const sequence = cursor.slice(separator + 1);
-  return /^(0|[1-9]\d*)$/.test(sequence)
-    ? { epoch: CUSTOMER_PUBLIC_SCHEMA, sequence: Number(sequence) }
-    : null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function hasOnlyKeys(value: Record<string, unknown>, keys: string[]) {
-  return Object.keys(value).every((key) => keys.includes(key));
+  return parseViewCursor(cursor, CUSTOMER_PUBLIC_SCHEMA);
 }
 
 function isPublicMessage(value: unknown): value is Snapshot["messages"][number] {
@@ -373,17 +343,4 @@ function isHandoffTransition(value: unknown): value is { handlingMode: string; c
 
 function isResolvedTransition(value: unknown): value is { lifecycleState: string } {
   return isRecord(value) && hasOnlyKeys(value, ["lifecycleState"]) && value.lifecycleState === "RESOLVED";
-}
-
-function parsePublicEvent(block: string): PublicEvent | null {
-  let id = "";
-  let type = "message";
-  const data: string[] = [];
-  for (const line of block.split(/\r?\n/)) {
-    if (line.startsWith(":")) continue;
-    if (line.startsWith("id:")) id = line.slice(3).trimStart();
-    else if (line.startsWith("event:")) type = line.slice(6).trimStart();
-    else if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
-  }
-  return id && data.length ? { id, type, data: data.join("\n") } : null;
 }
