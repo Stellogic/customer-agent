@@ -2663,6 +2663,26 @@ def main() -> None:
         assert not any(field in queue_item for field in (
             "customerId", "orderReference", "description", "messages", "investigationFacts"
         ))
+        workbench_before_handoff = client.get(
+            f"{spring_url}/api/support/workbench/snapshot",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(workbench_before_handoff, 200)
+        workbench_before_handoff = workbench_before_handoff.json()
+        assert workbench_before_handoff["view"] == "SUPPORT_WORKBENCH"
+        assert workbench_before_handoff["schema"] == "support-workbench-v1"
+        workbench_cursor = workbench_before_handoff["cursor"]
+        direct_support_session = client.get(f"{spring_url}/api/demo/session")
+        expect_status(direct_support_session, 401)
+        support_entry = client.get(f"{spring_url}/api/demo/enter/support", follow_redirects=False)
+        expect_status(support_entry, 302)
+        assert support_entry.headers["location"] == "/support"
+        assert "HttpOnly" in support_entry.headers["set-cookie"]
+        registered_support_session = client.get(f"{spring_url}/api/demo/session")
+        expect_status(registered_support_session, 200)
+        assert registered_support_session.json()["role"] == "SUPPORT"
+        cookie_authorized_snapshot = client.get(f"{spring_url}/api/support/workbench/snapshot")
+        expect_status(cookie_authorized_snapshot, 200)
         sla_handoff_request_id = f"sla-handoff-{uuid.uuid4()}"
         sla_handoff = client.post(
             f"{spring_url}/api/customer/tickets/{ticket_id}/human-handoff",
@@ -2687,16 +2707,96 @@ def main() -> None:
         )
         expect_status(escalations_after_handoff, 200)
         assert sum(item["ticketId"] == ticket_id for item in escalations_after_handoff.json()) == 1
+        workbench_after_handoff = client.get(
+            f"{spring_url}/api/support/workbench/snapshot",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(workbench_after_handoff, 200)
+        assert workbench_after_handoff.headers["cache-control"] == "no-store"
+        workbench_after_handoff = workbench_after_handoff.json()
+        shared_workbench_item = next(
+            item for item in workbench_after_handoff["sharedQueue"] if item["ticketId"] == ticket_id
+        )
+        escalation_workbench_item = next(
+            item for item in workbench_after_handoff["escalationQueue"] if item["ticketId"] == ticket_id
+        )
+        assert shared_workbench_item["handlingMode"] == "HUMAN"
+        assert escalation_workbench_item["handlingMode"] == "HUMAN"
+        assert set(shared_workbench_item) == {"ticketId", "lifecycleState", "handlingMode", "enteredAt"}
+        assert not any(field in json.dumps(workbench_after_handoff) for field in (
+            "reasonCode", "investigationSummary", "customerId", "orderReference", "description", "messages"
+        ))
+        with client.stream(
+            "GET",
+            f"{spring_url}/api/support/workbench/events",
+            headers={
+                "X-Synthetic-Support-Id": "support-demo",
+                "Last-Event-ID": workbench_cursor,
+            },
+        ) as stream:
+            expect_status(stream, 200)
+            replay_lines = []
+            for line in stream.iter_lines():
+                replay_lines.append(line)
+                if line == "" and any(part.startswith("id:support-workbench-v1:") for part in replay_lines):
+                    break
+        assert any(part == "event:QUEUE_TICKET_UPSERTED" for part in replay_lines)
+        assert any('"view":"SUPPORT_WORKBENCH"' in part for part in replay_lines)
+        assigned_detail = client.get(
+            f"{spring_url}/api/support/workbench/tickets/{ticket_id}",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(assigned_detail, 200)
+        assert assigned_detail.headers["cache-control"] == "no-store"
+        assert assigned_detail.json()["ticketId"] == ticket_id
+        assert "publicConversation" in assigned_detail.json()
+        assert "investigationFacts" in assigned_detail.json()
+        assert "businessTimeline" in assigned_detail.json()
         denied_queue = client.get(
             f"{spring_url}/api/support/escalations",
             headers={"X-Synthetic-Support-Id": "customer-demo"},
         )
         expect_status(denied_queue, 403)
+        denied_workbench = httpx.get(
+            f"{spring_url}/api/support/workbench/snapshot",
+            headers={"X-Synthetic-Approver-Id": "approver-demo"},
+            timeout=20.0,
+        )
+        expect_status(denied_workbench, 403)
+        unassigned_workbench_detail = client.get(
+            f"{spring_url}/api/support/workbench/tickets/{first_warning_ticket_id}",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(unassigned_workbench_detail, 404)
+        assert unassigned_workbench_detail.headers["cache-control"] == "no-store"
         unassigned_detail = client.get(
             f"{spring_url}/api/support/tickets/{first_warning_ticket_id}",
             headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(unassigned_detail, 404)
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        removal_ticket_id = first_warning_ticket_id
+        connection.execute(
+            "insert into shared_support_queue_entry (ticket_id, reason_code, entered_at) "
+            "values (%s, 'SLA_BREACH', %s)",
+            (removal_ticket_id, fixed_now),
+        )
+        connection.execute(
+            "delete from shared_support_queue_entry where ticket_id = %s",
+            (removal_ticket_id,),
+        )
+    with httpx.Client(timeout=20.0) as client:
+        workbench_after_removal = client.get(
+            f"{spring_url}/api/support/workbench/snapshot",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(workbench_after_removal, 200)
+        assert not any(
+            item["ticketId"] == str(removal_ticket_id)
+            for queue_name in ("sharedQueue", "escalationQueue")
+            for item in workbench_after_removal.json()[queue_name]
+        )
 
     immediate_ticket_id, immediate_projection = create_ambiguous_ticket("sla-resume-boundary")
     immediate_request_id = immediate_projection["clarification"]["id"]

@@ -11,7 +11,7 @@ Copy-Item .env.example .env
 docker compose up --detach --build --wait
 ```
 
-打开 <http://127.0.0.1:4180>。客户使用合成身份提交物流延迟问题，页面先读取完整 `CUSTOMER_PUBLIC` 权威快照，再从同一视图的 `epoch:sequence` 游标请求 SSE 增量。浏览器只请求同源的 Spring `/api`；Agent Server 和 PostgreSQL 均未发布主机端口。
+打开 <http://127.0.0.1:4180>。客户使用合成身份提交物流延迟问题，页面先读取完整 `CUSTOMER_PUBLIC` 权威快照，再从同一视图的 `epoch:sequence` 游标请求 SSE 增量。客服从 <http://127.0.0.1:4180/api/demo/enter/support> 建立服务端 `HttpOnly` 合成会话后进入 `/support`，只显示共享队列与 SLA 违约升级队列的最小摘要；直接访问 `/support` 不会自动提升角色。工作台使用独立的 `SUPPORT_WORKBENCH` 快照、游标和事件流，不提供自由角色切换或未领取工单详情入口。浏览器只请求同源的 Spring `/api`；Agent Server 和 PostgreSQL 均未发布主机端口。
 
 从空数据库重复验证全部基线：
 
@@ -56,6 +56,7 @@ docker compose down
 - 补偿执行器只处理已批准、已预占额度的不可变执行意图。模拟器可确定性注入副作用前失败、响应丢失、确认未发生及持续不确定；`UNKNOWN` 禁止普通重试，对账只接受持久化的 provider query，并始终复用原 `executionId` 与 `idempotencyKey`。对账预算耗尽会保留预占并写入域外运维告警，不会伪装成业务失败。
 - 客户澄清是当前唯一使用 LangGraph `interrupt/resume` 的业务路径。Spring 保存当前澄清请求、暂停并续接解决计时，以稳定客户消息身份和 `resumeRequestId` 幂等恢复同一 generation/thread；重复、并发、失效、转人工或客户人工偏好下的回复不能启动错误工作流。
 - 首次响应目标按 15 个连续自然分钟计算且从不暂停；解决目标按累计 24 个连续自然小时计算，仅 `WAITING_FOR_CUSTOMER` 暂停。80% 预警和 100% 违约以唯一 SLA 事实与审计事件原子提交，重复调度不会重复通知或投影；共享升级队列不改变生命周期、处理模式或补偿权限，也不授予完整工单读取权。
+- 客服共享队列使用独立 `support-workbench-v1` 快照和全局严格递增序号。数据库触发器把队列进入、摘要变化和移除写入白名单事件日志；重复或旧事件被忽略，缺口、裁剪、非法 payload 或不兼容游标要求整体重读快照。队列条目不包含客户、订单、问题描述、转人工理由详情或调查摘要；完整详情 API 只接受当前有效客服分配，并返回 `Cache-Control: no-store`。
 - Spring→Agent、Agent→Spring 与补偿执行器探针使用三个不同的本地演示机器令牌；跨能力调用返回 `401/403`。
 - 所有账号、令牌和探针数据均为本地合成数据，不可用于生产。
 

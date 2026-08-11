@@ -1,7 +1,13 @@
 package com.stellogic.customeragent.identity;
 
+import java.net.URI;
 import java.util.List;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -10,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Profile("local-demo")
 @RequestMapping("/api/demo")
 public final class SyntheticIdentityController {
+    public static final String SESSION_COOKIE = "synthetic-demo-session";
 
     @GetMapping("/identities")
     public List<SyntheticIdentity> identities() {
@@ -23,6 +30,28 @@ public final class SyntheticIdentityController {
                 .map(entry -> new SyntheticIdentity(entry.id(), "APPROVER", entry.label()))
                 .forEach(identities::add);
         return List.copyOf(identities);
+    }
+
+    @GetMapping("/enter/support")
+    public ResponseEntity<Void> enterSupport() {
+        ResponseCookie cookie = ResponseCookie.from(SESSION_COOKIE, "support-demo")
+                .httpOnly(true)
+                .sameSite("Strict")
+                .path("/")
+                .build();
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create("/support"))
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .build();
+    }
+
+    @GetMapping("/session")
+    public ResponseEntity<SyntheticIdentity> session(
+            @CookieValue(value = SESSION_COOKIE, required = false) String sessionId) {
+        if (!"support-demo".equals(sessionId)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(new SyntheticIdentity("support-demo", "SUPPORT", "客服演示入口"));
     }
 
     public record SyntheticIdentity(String id, String role, String label) {}
