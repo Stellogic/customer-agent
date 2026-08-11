@@ -95,7 +95,12 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, 'AGENT_GENERATION_CREATED', 'spring-system', ?)",
                 ticketId, databaseTime);
         jdbc.update(
-                "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) values (?, ?, 1, 'TICKET_ACCEPTED', jsonb_build_object('ticketId', ?::text, 'lifecycleState', 'INVESTIGATING', 'handlingMode', 'AGENT'), ?), (?, ?, 2, 'PUBLIC_MESSAGE_APPENDED', jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?)",
+                "insert into customer_public_event "
+                        + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
+                        + "values (?, ?, 1, 1, 'TICKET_ACCEPTED', "
+                        + "jsonb_build_object('ticketId', ?::text, 'lifecycleState', 'INVESTIGATING', 'handlingMode', 'AGENT'), ?), "
+                        + "(?, ?, 2, 1, 'PUBLIC_MESSAGE_APPENDED', "
+                        + "jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?)",
                 ticketId, EPOCH, ticketId.toString(), databaseTime,
                 ticketId, EPOCH, ACKNOWLEDGEMENT, now.toString(), databaseTime);
         return new TicketCreationResult(ticketId, false);

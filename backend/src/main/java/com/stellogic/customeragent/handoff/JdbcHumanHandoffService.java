@@ -204,7 +204,9 @@ class JdbcHumanHandoffService implements HumanHandoffService {
                 "insert into shared_support_queue_entry (ticket_id, reason_code, entered_at) "
                         + "values (?, ?, ?) on conflict do nothing",
                 ticketId, queueReason, at);
-        if (publicTransitionRequired) appendPublicTransition(ticketId, publicMessage, at.toInstant(), at);
+        if (publicTransitionRequired) {
+            appendPublicTransition(ticketId, generationId, publicMessage, at.toInstant(), at);
+        }
         audit(ticketId, "HUMAN_HANDOFF_RECORDED", actorId, at);
         if (!activeGenerations.isEmpty()) audit(ticketId, "AGENT_GENERATION_HANDED_OFF", "spring-system", at);
         if (queueInserted == 1) audit(ticketId, "SHARED_SUPPORT_QUEUE_ENTERED", "spring-system", at);
@@ -273,7 +275,8 @@ class JdbcHumanHandoffService implements HumanHandoffService {
                 ticketId + "\n" + requestId);
     }
 
-    private void appendPublicTransition(UUID ticketId, String publicMessage, Instant now, Timestamp at) {
+    private void appendPublicTransition(
+            UUID ticketId, UUID sourceGenerationId, String publicMessage, Instant now, Timestamp at) {
         Long messageSequence = jdbc.queryForObject(
                 "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?",
                 Long.class, ticketId);
@@ -285,13 +288,17 @@ class JdbcHumanHandoffService implements HumanHandoffService {
                         + "values (?, ?, ?, 'SUPPORT', ?, ?)",
                 UUID.randomUUID(), ticketId, messageSequence, publicMessage, at);
         jdbc.update(
-                "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                        + "values (?, ?, ?, 'PUBLIC_MESSAGE_APPENDED', "
+                "insert into customer_public_event "
+                        + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
+                        + "values (?, ?, ?, coalesce((select generation_number from agent_processing_generation "
+                        + "where id = ? and ticket_id = ?), 0), 'PUBLIC_MESSAGE_APPENDED', "
                         + "jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?), "
-                        + "(?, ?, ?, 'TICKET_HANDED_OFF', "
+                        + "(?, ?, ?, coalesce((select generation_number from agent_processing_generation "
+                        + "where id = ? and ticket_id = ?), 0), 'TICKET_HANDED_OFF', "
                         + "jsonb_build_object('handlingMode', 'HUMAN', 'clarification', null), ?)",
-                ticketId, CUSTOMER_PUBLIC_EPOCH, eventSequence, publicMessage, now.toString(), at,
-                ticketId, CUSTOMER_PUBLIC_EPOCH, eventSequence + 1, at);
+                ticketId, CUSTOMER_PUBLIC_EPOCH, eventSequence, sourceGenerationId, ticketId,
+                publicMessage, now.toString(), at,
+                ticketId, CUSTOMER_PUBLIC_EPOCH, eventSequence + 1, sourceGenerationId, ticketId, at);
     }
 
     private void audit(UUID ticketId, String eventType, String actorId, Timestamp at) {

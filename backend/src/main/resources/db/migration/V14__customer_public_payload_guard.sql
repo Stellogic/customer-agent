@@ -15,10 +15,17 @@ LANGUAGE plpgsql AS $$
 DECLARE
     allowed_keys text[];
 BEGIN
-    SELECT coalesce(max(generation_number), 0)
-    INTO NEW.agent_generation
-    FROM agent_processing_generation
-    WHERE ticket_id = NEW.ticket_id;
+    IF NEW.agent_generation = 0 THEN
+        SELECT coalesce(max(generation_number), 0)
+        INTO NEW.agent_generation
+        FROM agent_processing_generation
+        WHERE ticket_id = NEW.ticket_id;
+    ELSIF NOT EXISTS (
+        SELECT 1 FROM agent_processing_generation
+        WHERE ticket_id = NEW.ticket_id AND generation_number = NEW.agent_generation
+    ) THEN
+        RAISE EXCEPTION 'customer public event generation is not scoped to the ticket';
+    END IF;
     IF jsonb_typeof(NEW.payload) <> 'object' THEN
         RAISE EXCEPTION 'customer public payload must be an object';
     END IF;
@@ -48,6 +55,24 @@ BEGIN
         AND jsonb_typeof(NEW.payload->'sentAt') = 'string'
     ) THEN
         RAISE EXCEPTION 'invalid public message payload';
+    END IF;
+    IF NEW.event_type = 'PUBLIC_MESSAGE_APPENDED' AND NEW.payload->>'author' = 'AGENT'
+       AND NOT EXISTS (
+        SELECT 1
+        FROM agent_processing_generation g
+        JOIN support_ticket t ON t.id = g.ticket_id
+        WHERE g.ticket_id = NEW.ticket_id
+          AND g.generation_number = NEW.agent_generation
+          AND g.status IN ('ACTIVE', 'COMPLETED')
+          AND g.generation_number = (
+              SELECT max(current_generation.generation_number)
+              FROM agent_processing_generation current_generation
+              WHERE current_generation.ticket_id = NEW.ticket_id
+          )
+          AND t.handling_mode = 'AGENT'
+          AND NOT t.customer_human_preference
+    ) THEN
+        RAISE EXCEPTION 'stale agent generation cannot enter the customer public projection';
     END IF;
     IF NEW.event_type IN ('CUSTOMER_CLARIFICATION_REQUESTED', 'TICKET_INVESTIGATION_RESUMED')
        AND NEW.payload->'clarification' IS DISTINCT FROM 'null'::jsonb AND NOT (

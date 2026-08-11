@@ -88,7 +88,7 @@ class JdbcClarificationService implements ClarificationService {
                 at, command.ticketId());
         slaService.evaluateTicket(command.ticketId(), now);
         appendPublicMessage(
-                command.ticketId(), "AGENT", PUBLIC_QUESTION, now,
+                command.ticketId(), command.generationId(), "AGENT", PUBLIC_QUESTION, now,
                 "CUSTOMER_CLARIFICATION_REQUESTED", requestId);
         audit(command.ticketId(), "CUSTOMER_CLARIFICATION_REQUESTED", "agent-machine", at);
         return new ClarificationRequestResult(requestId, PROMPT_CODE, PUBLIC_QUESTION);
@@ -182,7 +182,7 @@ class JdbcClarificationService implements ClarificationService {
                 command.resumeRequestId(), command.customerMessageId(), command.clarificationRequestId(),
                 scope.generationId(), scope.threadId(), parameterDigest, answerDigest, normalizedAnswer, at, at);
         appendPublicMessage(
-                command.ticketId(), "CUSTOMER", command.answer().trim(), now,
+                command.ticketId(), scope.generationId(), "CUSTOMER", command.answer().trim(), now,
                 "TICKET_INVESTIGATION_RESUMED", null);
         audit(command.ticketId(), "CUSTOMER_CLARIFICATION_ANSWERED", command.customerId(), at);
         audit(command.ticketId(), "AGENT_RESUME_REQUESTED", "spring-system", at);
@@ -208,7 +208,8 @@ class JdbcClarificationService implements ClarificationService {
     }
 
     private void appendPublicMessage(
-            UUID ticketId, String author, String body, Instant now, String transitionType, UUID clarificationId) {
+            UUID ticketId, UUID generationId, String author, String body, Instant now,
+            String transitionType, UUID clarificationId) {
         Long messageSequence = jdbc.queryForObject(
                 "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?", Long.class, ticketId);
         Long eventSequence = jdbc.queryForObject(
@@ -219,21 +220,30 @@ class JdbcClarificationService implements ClarificationService {
                 "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) values (?, ?, ?, ?, ?, ?)",
                 UUID.randomUUID(), ticketId, messageSequence, author, body, at);
         jdbc.update(
-                "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                        + "values (?, ?, ?, 'PUBLIC_MESSAGE_APPENDED', jsonb_build_object('author', ?, 'body', ?, 'sentAt', ?::text), ?)",
-                ticketId, EPOCH, eventSequence, author, body, now.toString(), at);
+                "insert into customer_public_event "
+                        + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
+                        + "values (?, ?, ?, (select generation_number from agent_processing_generation "
+                        + "where id = ? and ticket_id = ?), 'PUBLIC_MESSAGE_APPENDED', "
+                        + "jsonb_build_object('author', ?, 'body', ?, 'sentAt', ?::text), ?)",
+                ticketId, EPOCH, eventSequence, generationId, ticketId, author, body, now.toString(), at);
         if (clarificationId != null) {
             jdbc.update(
-                    "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                            + "values (?, ?, ?, ?, jsonb_build_object('lifecycleState', 'WAITING_FOR_CUSTOMER', "
+                    "insert into customer_public_event "
+                            + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
+                            + "values (?, ?, ?, (select generation_number from agent_processing_generation "
+                            + "where id = ? and ticket_id = ?), ?, "
+                            + "jsonb_build_object('lifecycleState', 'WAITING_FOR_CUSTOMER', "
                             + "'clarification', jsonb_build_object('id', ?::text, 'promptCode', ?, 'question', ?)), ?)",
-                    ticketId, EPOCH, eventSequence + 1, transitionType,
+                    ticketId, EPOCH, eventSequence + 1, generationId, ticketId, transitionType,
                     clarificationId.toString(), PROMPT_CODE, PUBLIC_QUESTION, at);
         } else {
             jdbc.update(
-                    "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                            + "values (?, ?, ?, ?, jsonb_build_object('lifecycleState', 'INVESTIGATING', 'clarification', null), ?)",
-                    ticketId, EPOCH, eventSequence + 1, transitionType, at);
+                    "insert into customer_public_event "
+                            + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
+                            + "values (?, ?, ?, (select generation_number from agent_processing_generation "
+                            + "where id = ? and ticket_id = ?), ?, "
+                            + "jsonb_build_object('lifecycleState', 'INVESTIGATING', 'clarification', null), ?)",
+                    ticketId, EPOCH, eventSequence + 1, generationId, ticketId, transitionType, at);
         }
     }
 

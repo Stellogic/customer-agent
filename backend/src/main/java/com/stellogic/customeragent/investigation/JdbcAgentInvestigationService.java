@@ -169,7 +169,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 databaseTime, ticketId);
         if (ticketUpdated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
         completeGeneration(generationId, databaseTime);
-        appendPublicMessage(ticketId, PUBLIC_NO_COMPENSATION_CONCLUSION, now, databaseTime, true);
+        appendPublicMessage(ticketId, generationId, PUBLIC_NO_COMPENSATION_CONCLUSION, now, databaseTime, true);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values "
                         + "(?, 'AGENT_CONCLUSION_ACCEPTED', 'agent-machine', ?), (?, 'TICKET_RESOLVED', 'spring-system', ?)",
@@ -214,7 +214,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        appendPublicMessage(ticketId, PUBLIC_WAITING_APPROVAL, now, databaseTime, false);
+        appendPublicMessage(ticketId, generationId, PUBLIC_WAITING_APPROVAL, now, databaseTime, false);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, subject_type, subject_id) values "
                         + "(?, ?, 'spring-system', ?, 'COMPENSATION_PROPOSAL_REVISION', ?), "
@@ -269,7 +269,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     }
 
     private void appendPublicMessage(
-            UUID ticketId, String body, Instant now, Timestamp databaseTime, boolean resolved) {
+            UUID ticketId, UUID generationId, String body, Instant now, Timestamp databaseTime, boolean resolved) {
         Long messageSequence = jdbc.queryForObject(
                 "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?",
                 Long.class, ticketId);
@@ -280,14 +280,20 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) values (?, ?, ?, 'AGENT', ?, ?)",
                 UUID.randomUUID(), ticketId, messageSequence, body, databaseTime);
         jdbc.update(
-                "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                        + "values (?, ?, ?, 'PUBLIC_MESSAGE_APPENDED', jsonb_build_object('author', 'AGENT', 'body', ?, 'sentAt', ?::text), ?)",
-                ticketId, EPOCH, eventSequence, body, now.toString(), databaseTime);
+                "insert into customer_public_event "
+                        + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
+                        + "values (?, ?, ?, (select generation_number from agent_processing_generation "
+                        + "where id = ? and ticket_id = ?), 'PUBLIC_MESSAGE_APPENDED', "
+                        + "jsonb_build_object('author', 'AGENT', 'body', ?, 'sentAt', ?::text), ?)",
+                ticketId, EPOCH, eventSequence, generationId, ticketId, body, now.toString(), databaseTime);
         if (resolved) {
             jdbc.update(
-                    "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                            + "values (?, ?, ?, 'TICKET_RESOLVED', jsonb_build_object('lifecycleState', 'RESOLVED'), ?)",
-                    ticketId, EPOCH, eventSequence + 1, databaseTime);
+                    "insert into customer_public_event "
+                            + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
+                            + "values (?, ?, ?, (select generation_number from agent_processing_generation "
+                            + "where id = ? and ticket_id = ?), 'TICKET_RESOLVED', "
+                            + "jsonb_build_object('lifecycleState', 'RESOLVED'), ?)",
+                    ticketId, EPOCH, eventSequence + 1, generationId, ticketId, databaseTime);
         }
     }
 

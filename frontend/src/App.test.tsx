@@ -237,13 +237,13 @@ describe("客户帮助中心", () => {
     expect(screen.queryByText(/当前内容可能过期/)).not.toBeInTheDocument();
   });
 
-  it("未知事件或含内部字段的 payload 不进入页面并触发快照恢复", async () => {
+  it("未知事件不进入页面并触发快照恢复", async () => {
     const ticketId = "25000000-0000-0000-0000-000000000003";
     globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(snapshotResponse(ticketId, "customer-public-v1:2", [message("初始快照")]))
       .mockResolvedValueOnce(eventResponse([
-        publicEvent("customer-public-v1:3", "MODEL_REASONING", { reasoning: "secret" }),
+        publicEvent("customer-public-v1:3", "UNKNOWN_AGENT_EVENT", { value: "ignored" }),
       ]))
       .mockResolvedValueOnce(snapshotResponse(ticketId, "customer-public-v1:4", [message("安全快照")]))
       .mockResolvedValueOnce(eventResponse([]));
@@ -251,6 +251,26 @@ describe("客户帮助中心", () => {
     render(<App />);
 
     expect(await screen.findByText("安全快照")).toBeInTheDocument();
+    expect(screen.queryByText("ignored")).not.toBeInTheDocument();
+  });
+
+  it("已知事件含内部字段时也拒绝 payload 并从快照恢复", async () => {
+    const ticketId = "25000000-0000-0000-0000-000000000006";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(snapshotResponse(ticketId, "customer-public-v1:2", [message("初始快照")]))
+      .mockResolvedValueOnce(eventResponse([
+        publicEvent("customer-public-v1:3", "PUBLIC_MESSAGE_APPENDED", {
+          ...message("不应展示的消息"), reasoning: "secret",
+        }),
+      ]))
+      .mockResolvedValueOnce(snapshotResponse(ticketId, "customer-public-v1:4", [message("非法字段后安全快照")]))
+      .mockResolvedValueOnce(openEventResponse());
+
+    render(<App />);
+
+    expect(await screen.findByText("非法字段后安全快照")).toBeInTheDocument();
+    expect(screen.queryByText("不应展示的消息")).not.toBeInTheDocument();
     expect(screen.queryByText("secret")).not.toBeInTheDocument();
   });
 
