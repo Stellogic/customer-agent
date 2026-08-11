@@ -517,7 +517,7 @@ class JdbcApprovalService implements ApprovalService {
         jdbc.update("update compensation_proposal_revision set status = 'APPROVED' where id = ?",
                 command.revisionId());
         auditApproved(ticketId, decisionId, command.leaseVersion(), command.approverId(), at);
-        publicProjection.appendSupportMessage(ticketId, APPROVAL_PUBLIC_MESSAGE, now, false);
+        publicProjection.appendSupportMessage(ticketId, APPROVAL_PUBLIC_MESSAGE, now);
         return new ApprovalModels.ApprovalResult(
                 command.revisionId(), command.proposalRevision(), ApprovalModels.ProposalDecision.APPROVED,
                 executionId, ApprovalModels.CompensationExecutionStatus.READY, false);

@@ -39,7 +39,8 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
     public List<CompensationExecutionModels.Assignment> assignments(String executorId) {
         return jdbc.query(
                 "select id, compensation_method, amount, status from compensation_execution "
-                        + "where assigned_executor_id = ? and status = 'READY' order by created_at, id",
+                        + "where assigned_executor_id = ? and status in ('READY', 'PROCESSING') "
+                        + "order by created_at, id",
                 (rs, row) -> new CompensationExecutionModels.Assignment(
                         rs.getObject(1, UUID.class), method(rs.getString(2)), rs.getBigDecimal(3),
                         status(rs.getString(4))),
@@ -172,7 +173,7 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
                         + "resolution_running_since = null where id = ? and lifecycle_state <> 'CLOSED'",
                 at, ticketId);
         if (resolved != 1) conflict("ticket is no longer resolvable");
-        publicProjection.appendSupportMessage(ticketId, customerMessage, now, true);
+        publicProjection.appendSupportMessageAndResolutionEvent(ticketId, customerMessage, now);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, subject_type, subject_id) "
                         + "values (?, 'COMPENSATION_EXECUTION_SUCCEEDED', ?, ?, 'COMPENSATION_EXECUTION', ?), "

@@ -15,7 +15,20 @@ public final class CustomerPublicProjectionAppender {
         this.jdbc = jdbc;
     }
 
-    public void appendSupportMessage(UUID ticketId, String body, Instant now, boolean resolved) {
+    public void appendSupportMessage(UUID ticketId, String body, Instant now) {
+        appendMessage(ticketId, body, now);
+    }
+
+    public void appendSupportMessageAndResolutionEvent(UUID ticketId, String body, Instant now) {
+        long resolutionEventSequence = appendMessage(ticketId, body, now);
+        jdbc.update(
+                "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
+                        + "values (?, ?, ?, 'TICKET_RESOLVED', "
+                        + "jsonb_build_object('lifecycleState', 'RESOLVED'), ?)",
+                ticketId, EPOCH, resolutionEventSequence, Timestamp.from(now));
+    }
+
+    private long appendMessage(UUID ticketId, String body, Instant now) {
         Timestamp at = Timestamp.from(now);
         Long messageSequence = jdbc.queryForObject(
                 "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?",
@@ -32,12 +45,6 @@ public final class CustomerPublicProjectionAppender {
                         + "values (?, ?, ?, 'PUBLIC_MESSAGE_APPENDED', "
                         + "jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?)",
                 ticketId, EPOCH, eventSequence, body, now.toString(), at);
-        if (resolved) {
-            jdbc.update(
-                    "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                            + "values (?, ?, ?, 'TICKET_RESOLVED', "
-                            + "jsonb_build_object('lifecycleState', 'RESOLVED'), ?)",
-                    ticketId, EPOCH, eventSequence + 1, at);
-        }
+        return eventSequence + 1;
     }
 }
