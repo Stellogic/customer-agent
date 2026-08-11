@@ -590,6 +590,12 @@ def main() -> None:
         )
 
     with httpx.Client(timeout=20.0) as client:
+        claim_at_proposal_expiry = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{expired_revision_id}/claims",
+            headers={**approver_headers, "Idempotency-Key": f"expired-claim-{uuid.uuid4()}"},
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(claim_at_proposal_expiry, 410)
         queue_at_proposal_expiry = client.get(
             f"{spring_url}/api/approver/compensation-proposals", headers=approver_headers
         )
@@ -598,12 +604,6 @@ def main() -> None:
             item["proposalRevisionId"] != str(expired_revision_id)
             for item in queue_at_proposal_expiry.json()
         )
-        claim_at_proposal_expiry = client.post(
-            f"{spring_url}/api/approver/compensation-proposals/{expired_revision_id}/claims",
-            headers={**approver_headers, "Idempotency-Key": f"expired-claim-{uuid.uuid4()}"},
-            json={"requestedLeaseSeconds": 900},
-        )
-        expect_status(claim_at_proposal_expiry, 410)
         expired_scope_headers = {
             **approver_headers,
             "X-Approval-Lease-Token": str(expired_lease_token),

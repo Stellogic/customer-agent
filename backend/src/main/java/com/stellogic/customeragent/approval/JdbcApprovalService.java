@@ -64,7 +64,7 @@ class JdbcApprovalService implements ApprovalService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public ApprovalModels.LeaseResult claim(ApprovalModels.ClaimCommand command) {
         int leaseSeconds = command.requestedLeaseSeconds() == null
                 ? defaultLeaseSeconds : command.requestedLeaseSeconds();
@@ -88,9 +88,6 @@ class JdbcApprovalService implements ApprovalService {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "unsupported approval lease duration");
         }
 
-        Instant now = clock.instant();
-        proposalExpiry.expireIfDue(command.revisionId(), now);
-        Timestamp at = Timestamp.from(now);
         List<ProposalScope> proposals = jdbc.query(
                 "select ticket_id, status, expires_at from compensation_proposal_revision where id = ? for update",
                 (rs, row) -> new ProposalScope(
@@ -100,9 +97,15 @@ class JdbcApprovalService implements ApprovalService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
         }
         ProposalScope proposal = proposals.getFirst();
-        if (!"PENDING_APPROVAL".equals(proposal.status()) || !proposal.expiresAt().isAfter(now)) {
+        if (!"PENDING_APPROVAL".equals(proposal.status())) {
             throw new ResponseStatusException(HttpStatus.GONE, "approval proposal is no longer claimable");
         }
+        Instant now = clock.instant();
+        if (!proposal.expiresAt().isAfter(now)) {
+            proposalExpiry.expireIfDue(command.revisionId(), now);
+            throw new ResponseStatusException(HttpStatus.GONE, "approval proposal is no longer claimable");
+        }
+        Timestamp at = Timestamp.from(now);
         jdbc.update(
                 "update approval_lease set status = 'EXPIRED' "
                         + "where proposal_revision_id = ? and status = 'ACTIVE' and expires_at <= ?",
@@ -141,38 +144,47 @@ class JdbcApprovalService implements ApprovalService {
     @Override
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public ApprovalModels.ApprovalView view(ApprovalModels.ViewCommand command) {
-        Instant now = clock.instant();
-        proposalExpiry.expireIfDue(command.revisionId(), now);
-        jdbc.update(
-                "update approval_lease set status = 'EXPIRED' where proposal_revision_id = ? "
-                        + "and approver_id = ? and lease_token = ? and lease_version = ? "
-                        + "and status = 'ACTIVE' and expires_at <= ?",
-                command.revisionId(), command.approverId(), command.leaseToken(),
-                command.leaseVersion(), Timestamp.from(now));
         List<ViewRow> rows = jdbc.query(
                 "select p.ticket_id, p.revision_number, p.content_digest, p.order_reference, p.reason_code, "
                         + "p.delay_hours, p.delay_seconds, p.compensation_method, p.amount, p.policy_version, "
                         + "s.paid_amount, s.available_compensation_amount, "
                         + "s.active_reservation_amount, s.paid, s.cancelled, s.fully_refunded, "
-                        + "s.existing_compensation, s.evidence_references::text, l.expires_at, p.created_at, p.expires_at "
+                        + "s.existing_compensation, s.evidence_references::text, l.expires_at, p.created_at, p.expires_at, "
+                        + "p.status, l.status "
                         + "from approval_lease l join compensation_proposal_revision p on p.id = l.proposal_revision_id "
                         + "join approval_evidence_snapshot s on s.proposal_revision_id = p.id "
-                        + "where p.id = ? and p.status = 'PENDING_APPROVAL' and p.expires_at > ? "
-                        + "and l.approver_id = ? and l.lease_token = ? and l.lease_version = ? "
-                        + "and l.status = 'ACTIVE' and l.expires_at > ? for update of l, p",
+                        + "where p.id = ? and l.approver_id = ? and l.lease_token = ? and l.lease_version = ? "
+                        + "for update of l, p",
                 (rs, row) -> new ViewRow(
                         rs.getObject(1, UUID.class), rs.getInt(2), rs.getString(3), rs.getString(4),
                         rs.getString(5), rs.getInt(6), rs.getLong(7), rs.getString(8), rs.getBigDecimal(9),
                         rs.getString(10), rs.getBigDecimal(11), rs.getBigDecimal(12), rs.getBigDecimal(13),
                         rs.getBoolean(14), rs.getBoolean(15), rs.getBoolean(16), rs.getBoolean(17),
                         rs.getString(18), rs.getTimestamp(19).toInstant(), rs.getTimestamp(20).toInstant(),
-                        rs.getTimestamp(21).toInstant()),
-                command.revisionId(), Timestamp.from(now), command.approverId(), command.leaseToken(),
-                command.leaseVersion(), Timestamp.from(now));
+                        rs.getTimestamp(21).toInstant(), rs.getString(22), rs.getString(23)),
+                command.revisionId(), command.approverId(), command.leaseToken(), command.leaseVersion());
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
         }
         ViewRow row = rows.getFirst();
+        Instant now = clock.instant();
+        if ("PENDING_APPROVAL".equals(row.proposalStatus()) && !row.proposalExpiresAt().isAfter(now)) {
+            proposalExpiry.expireIfDue(command.revisionId(), now);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
+        }
+        if (!"PENDING_APPROVAL".equals(row.proposalStatus())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
+        }
+        if ("ACTIVE".equals(row.leaseStatus()) && !row.leaseExpiresAt().isAfter(now)) {
+            jdbc.update(
+                    "update approval_lease set status = 'EXPIRED' where proposal_revision_id = ? "
+                            + "and lease_version = ? and status = 'ACTIVE'",
+                    command.revisionId(), command.leaseVersion());
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
+        }
+        if (!"ACTIVE".equals(row.leaseStatus())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
+        }
         DelayCompensationPolicy.Decision authoritative =
                 policy.evaluate(Duration.ofSeconds(row.delaySeconds()), row.paidAmount());
         if (!DelayCompensationPolicy.VERSION.equals(row.policyVersion())
@@ -221,9 +233,6 @@ class JdbcApprovalService implements ApprovalService {
             if (!existing.getFirst().parameterDigest().equals(digest)) conflict();
             return new ApprovalModels.ReleaseResult(existing.getFirst().revisionId(), true, true);
         }
-        Instant now = clock.instant();
-        proposalExpiry.expireIfDue(command.revisionId(), now);
-        Timestamp at = Timestamp.from(now);
         List<LeaseScope> leases = jdbc.query(
                 "select p.ticket_id, p.status, p.expires_at, l.status, l.expires_at from approval_lease l "
                         + "join compensation_proposal_revision p on p.id = l.proposal_revision_id "
@@ -233,18 +242,27 @@ class JdbcApprovalService implements ApprovalService {
                         rs.getObject(1, UUID.class), rs.getString(2), rs.getTimestamp(3).toInstant(),
                         rs.getString(4), rs.getTimestamp(5).toInstant()),
                 command.revisionId(), command.approverId(), command.leaseToken(), command.leaseVersion());
-        if (leases.isEmpty() || !"PENDING_APPROVAL".equals(leases.getFirst().proposalStatus())
-                || !leases.getFirst().proposalExpiresAt().isAfter(now)
-                || !"ACTIVE".equals(leases.getFirst().leaseStatus())
-                || !leases.getFirst().leaseExpiresAt().isAfter(now)) {
-            if (!leases.isEmpty() && "ACTIVE".equals(leases.getFirst().leaseStatus())) {
+        if (leases.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
+        }
+        LeaseScope lease = leases.getFirst();
+        Instant now = clock.instant();
+        if ("PENDING_APPROVAL".equals(lease.proposalStatus())
+                && !lease.proposalExpiresAt().isAfter(now)) {
+            proposalExpiry.expireIfDue(command.revisionId(), now);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
+        }
+        if (!"PENDING_APPROVAL".equals(lease.proposalStatus())
+                || !"ACTIVE".equals(lease.leaseStatus())
+                || !lease.leaseExpiresAt().isAfter(now)) {
+            if ("ACTIVE".equals(lease.leaseStatus())) {
                 jdbc.update("update approval_lease set status = 'EXPIRED' where proposal_revision_id = ? "
                                 + "and lease_version = ? and status = 'ACTIVE'",
                         command.revisionId(), command.leaseVersion());
             }
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
         }
-        LeaseScope lease = leases.getFirst();
+        Timestamp at = Timestamp.from(now);
         jdbc.update(
                 "update approval_lease set status = 'RELEASED', released_at = ? "
                         + "where proposal_revision_id = ? and lease_version = ? and status = 'ACTIVE'",
@@ -315,5 +333,5 @@ class JdbcApprovalService implements ApprovalService {
             BigDecimal paidAmount, BigDecimal availableAmount,
             BigDecimal reservedAmount, boolean paid, boolean cancelled, boolean fullyRefunded,
             boolean existingCompensation, String evidenceJson, Instant leaseExpiresAt,
-            Instant submittedAt, Instant proposalExpiresAt) {}
+            Instant submittedAt, Instant proposalExpiresAt, String proposalStatus, String leaseStatus) {}
 }
