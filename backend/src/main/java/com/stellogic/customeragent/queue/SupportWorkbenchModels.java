@@ -4,7 +4,25 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-record SupportQueueItem(UUID ticketId, String lifecycleState, String handlingMode, Instant enteredAt) {}
+enum SupportTicketLifecycleState {
+    NEW,
+    INVESTIGATING,
+    WAITING_FOR_CUSTOMER,
+    WAITING_FOR_EXTERNAL,
+    RESOLVED,
+    CLOSED
+}
+
+enum SupportHandlingMode {
+    AGENT,
+    HUMAN
+}
+
+record SupportQueueItem(
+        UUID ticketId,
+        SupportTicketLifecycleState lifecycleState,
+        SupportHandlingMode handlingMode,
+        Instant enteredAt) {}
 
 record SupportWorkbenchSnapshot(
         String epoch,
@@ -28,8 +46,8 @@ record SupportTicketDetails(
         String customerId,
         String orderReference,
         String description,
-        String lifecycleState,
-        String handlingMode,
+        SupportTicketLifecycleState lifecycleState,
+        SupportHandlingMode handlingMode,
         List<SupportConversationMessage> publicConversation,
         List<SupportInvestigationFact> investigationFacts,
         List<SupportTimelineEvent> businessTimeline) {}

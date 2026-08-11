@@ -16,6 +16,7 @@ describe("客服共享队列工作台", () => {
   it("只在客服路由读取独立权威快照并呈现两种最小摘要", async () => {
     globalThis.history.replaceState(null, "", "/support");
     vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ id: "support-demo", role: "SUPPORT" }))
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:7", [handoffItem(), breachedItem()], [breachedItem()]))
       .mockResolvedValueOnce(openStream());
 
@@ -24,25 +25,39 @@ describe("客服共享队列工作台", () => {
     expect(await screen.findByRole("heading", { name: "客服共享队列" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "待接手工单" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "SLA 违约升级" })).toBeInTheDocument();
-    expect(screen.getAllByText(HANDOFF_TICKET)).toHaveLength(1);
-    expect(screen.getAllByText(BREACHED_TICKET)).toHaveLength(2);
+    expect(await screen.findAllByText(HANDOFF_TICKET)).toHaveLength(1);
+    expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
     expect(screen.queryByRole("combobox", { name: /角色/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/CUSTOMER_REQUESTED|AGENT_HUMAN_HANDOFF|调查摘要/)).not.toBeInTheDocument();
-    expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe("/api/support/workbench/snapshot");
+    expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe("/api/demo/session");
+    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe("/api/support/workbench/snapshot");
+  });
+
+  it("客户或审批人直接访问客服 URL 不会被自动提升为客服", async () => {
+    globalThis.history.replaceState(null, "", "/support");
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(null, { status: 401 }));
+
+    render(<RootApplication />);
+
+    expect(await screen.findByRole("heading", { name: "无权访问客服工作台" })).toBeInTheDocument();
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalledWith("/api/support/workbench/snapshot", expect.anything());
   });
 
   it("序号缺口停止旧流并整体替换为新快照", async () => {
+    let resolveRecovery: ((response: Response) => void) | undefined;
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:2", [handoffItem()], []))
       .mockResolvedValueOnce(sseResponse(eventBlock("support-workbench-v1:4", "QUEUE_TICKET_REMOVED", {
         ticketId: HANDOFF_TICKET,
       })))
-      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:8", [breachedItem()], [breachedItem()]))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveRecovery = resolve; }))
       .mockResolvedValueOnce(openStream());
 
-    render(<SupportWorkbench />);
+    render(<SupportWorkbench supportId="support-demo" />);
 
-    expect(await screen.findByText("正在从 Spring 权威快照重新同步…")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("当前队列可能过期");
+    resolveRecovery?.(snapshotResponse("support-workbench-v1:8", [breachedItem()], [breachedItem()]));
     expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
     expect(screen.queryByText(HANDOFF_TICKET)).not.toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"))
@@ -65,7 +80,7 @@ describe("客服共享队列工作台", () => {
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:10", [breachedItem()], [breachedItem()]))
       .mockResolvedValueOnce(openStream());
 
-    render(<SupportWorkbench />);
+    render(<SupportWorkbench supportId="support-demo" />);
 
     expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
     expect(screen.queryByText("不得进入浏览器事件")).not.toBeInTheDocument();
@@ -80,7 +95,7 @@ describe("客服共享队列工作台", () => {
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:3", [breachedItem()], [breachedItem()]))
       .mockResolvedValueOnce(openStream());
 
-    render(<SupportWorkbench />);
+    render(<SupportWorkbench supportId="support-demo" />);
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("可能过期");
@@ -99,7 +114,7 @@ describe("客服共享队列工作台", () => {
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:1", [handoffItem()], []))
       .mockResolvedValueOnce(openStream());
 
-    render(<SupportWorkbench />);
+    render(<SupportWorkbench supportId="support-demo" />);
 
     expect(await screen.findByRole("main", { name: "客服工作台" })).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "待接手工单" })).toBeInTheDocument();

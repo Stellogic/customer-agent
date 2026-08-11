@@ -101,12 +101,12 @@ React 实时验收通过，生产构建扫描未发现 Agent 地址、本地机�
 
 ## Issue #26 增量验证
 
-验证日期：2026-08-11（Asia/Shanghai）。先 fetch 并确认干净工作树的 `HEAD`、`origin/main` 与指定基线均为 `a5412e7193537dc89bc8c1884522c95b3713a839`。在从未存在过的隔离 Compose project `customer-agent-issue26-a5412e7` 中创建全新 PostgreSQL 卷并执行 V1→V15；完整后端 Gradle 套件、Agent 测试镜像、React 15 项行为测试、TypeScript 类型检查、生产构建、真实 PostgreSQL/LangGraph/Spring smoke 和 2 项 React 实时验收全部通过。最终状态为 Spring、PostgreSQL、Agent 均 `UP`，既有主闭环仍产生 69 条 checkpoint。
+验证日期：2026-08-11（Asia/Shanghai）。先 fetch 并确认干净工作树的 `HEAD`、`origin/main` 与指定基线均为 `a5412e7193537dc89bc8c1884522c95b3713a839`。在从未存在过的隔离 Compose project `customer-agent-issue26-a5412e7` 中创建全新 PostgreSQL 卷并执行 V1→V15；完整后端 Gradle 套件、Agent 测试镜像、React 16 项行为测试、TypeScript 类型检查、生产构建、真实 PostgreSQL/LangGraph/Spring smoke 和 2 项 React 实时验收全部通过。最终状态为 Spring、PostgreSQL、Agent 均 `UP`，既有主闭环仍产生 69 条 checkpoint。
 
 `SUPPORT_WORKBENCH` 快照显式返回独立 `view=SUPPORT_WORKBENCH`、`schema=support-workbench-v1` 与全局 `epoch:sequence` 游标，并把普通共享队列和 SLA 违约升级队列分为两个最小摘要集合。真实回读确认每个条目只有 `ticketId`、`lifecycleState`、`handlingMode`、`enteredAt`；转人工理由详情、调查摘要、客户、订单、描述、公开沟通和调查事实均未进入队列快照或事件。审批身份读取工作台返回 `403`；可见队列但没有当前有效分配的客服读取详情返回不可枚举 `404` 与 `Cache-Control: no-store`，当前有效负责客服才可读取详情投影。
 
 V15 触发器在共享队列进入、原因集合变化、摘要变化和最后一个原因移除时追加 `QUEUE_TICKET_UPSERTED` 或 `QUEUE_TICKET_REMOVED`；数据库 payload 白名单拒绝客户、订单、描述、转人工理由、调查、消息、审计和 Agent 内部字段。真实 smoke 从快照游标连接 SSE，回放了并发转人工产生的严格下一事件；再插入并删除专用队列条目，最终快照在普通与升级队列均无幽灵条目。React reducer 仅应用严格下一序号，重复或旧序号被忽略，缺口、epoch/view/schema 不兼容、未知事件、非法 payload 或服务端 `SNAPSHOT_REQUIRED` 会关闭旧流并整体换入新快照；普通断线明确标记“可能过期”并提供保持键盘焦点的手动重新同步，不使用浏览器自动重连继续套用错误状态。
 
-真实浏览器分别在默认桌面视口和 `360×800` 视口检查 `/support`。桌面 `innerWidth=1280`、`scrollWidth=1265`，双队列面板边界均在主内容范围；窄屏 `innerWidth=360`、`scrollWidth=345`，面板单列堆叠、重新同步按钮宽度 309px，未出现水平溢出。DOM 保留 `main` 地标、唯一一级标题、两个二级队列 region、具名列表、同步 `status/alert` 与原生按钮；页面没有角色选择器，控制台无错误或警告。
+真实浏览器分别在默认桌面视口和 `360×800` 视口检查 `/support`。桌面 `innerWidth=1280`、`scrollWidth=1265`，双队列面板边界均在主内容范围；窄屏 `innerWidth=360`、`scrollWidth=345`，面板单列堆叠、重新同步按钮宽度 309px，未出现水平溢出。DOM 保留 `main` 地标、唯一一级标题、两个二级队列 region、具名列表、同步 `status/alert` 与原生按钮；页面没有角色选择器，控制台无错误或警告。审查修复后，客服页面仅在 Spring 通过 `HttpOnly` 合成会话回读注册 `SUPPORT` 身份时挂载；客户、审批人或无会话浏览器直接访问 `/support` 只得到拒绝页，不会由前端自行注入客服身份。`SNAPSHOT_REQUIRED` 期间旧队列保持可见但明确标记“当前队列可能过期”，直到新权威快照替换成功。
 
 首次完整 Compose 构建仍因宿主 Docker 代理 `127.0.0.1:7897` 无法读取 Temurin/nginx 元数据。随后使用本轮已通过测试的 JAR/前端 `dist` 与本地缓存的固定运行时层离线组装镜像，在上述全新隔离卷完成真实进程验证；该结果不表示外部镜像仓库可用。隔离容器在验证后已停止，验证卷被保留而未删除。

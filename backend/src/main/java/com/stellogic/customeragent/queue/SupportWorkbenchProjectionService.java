@@ -60,7 +60,8 @@ class SupportWorkbenchProjectionService {
                         + "where t.id = ? and a.support_id = ? and a.status = 'ACTIVE'",
                 (rs, row) -> new SupportTicketDetails(
                         rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4),
-                        rs.getString(5), rs.getString(6), List.of(), List.of(), List.of()),
+                        SupportTicketLifecycleState.valueOf(rs.getString(5)),
+                        SupportHandlingMode.valueOf(rs.getString(6)), List.of(), List.of(), List.of()),
                 ticketId,
                 supportId);
         if (tickets.isEmpty()) throw new SupportTicketNotFoundException();
@@ -95,7 +96,9 @@ class SupportWorkbenchProjectionService {
                         + "group by q.ticket_id, t.lifecycle_state, t.handling_mode "
                         + "order by min(q.entered_at), q.ticket_id",
                 (rs, row) -> new SupportQueueItem(
-                        rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3),
+                        rs.getObject(1, UUID.class),
+                        SupportTicketLifecycleState.valueOf(rs.getString(2)),
+                        SupportHandlingMode.valueOf(rs.getString(3)),
                         rs.getTimestamp(4).toInstant()));
     }
 

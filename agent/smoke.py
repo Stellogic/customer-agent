@@ -2672,6 +2672,17 @@ def main() -> None:
         assert workbench_before_handoff["view"] == "SUPPORT_WORKBENCH"
         assert workbench_before_handoff["schema"] == "support-workbench-v1"
         workbench_cursor = workbench_before_handoff["cursor"]
+        direct_support_session = client.get(f"{spring_url}/api/demo/session")
+        expect_status(direct_support_session, 401)
+        support_entry = client.get(f"{spring_url}/api/demo/enter/support", follow_redirects=False)
+        expect_status(support_entry, 302)
+        assert support_entry.headers["location"] == "/support"
+        assert "HttpOnly" in support_entry.headers["set-cookie"]
+        registered_support_session = client.get(f"{spring_url}/api/demo/session")
+        expect_status(registered_support_session, 200)
+        assert registered_support_session.json()["role"] == "SUPPORT"
+        cookie_authorized_snapshot = client.get(f"{spring_url}/api/support/workbench/snapshot")
+        expect_status(cookie_authorized_snapshot, 200)
         sla_handoff_request_id = f"sla-handoff-{uuid.uuid4()}"
         sla_handoff = client.post(
             f"{spring_url}/api/customer/tickets/{ticket_id}/human-handoff",
@@ -2746,9 +2757,10 @@ def main() -> None:
             headers={"X-Synthetic-Support-Id": "customer-demo"},
         )
         expect_status(denied_queue, 403)
-        denied_workbench = client.get(
+        denied_workbench = httpx.get(
             f"{spring_url}/api/support/workbench/snapshot",
             headers={"X-Synthetic-Approver-Id": "approver-demo"},
+            timeout=20.0,
         )
         expect_status(denied_workbench, 403)
         unassigned_workbench_detail = client.get(

@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.queue;
 
+import com.stellogic.customeragent.identity.SyntheticIdentityController;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -7,6 +8,7 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,29 +27,31 @@ public final class SupportWorkbenchController {
 
     @GetMapping("/snapshot")
     ResponseEntity<SnapshotResponse> snapshot(
-            @RequestHeader(value = SUPPORT_HEADER, required = false) String supportId) {
-        SupportWorkbenchProjectionService.requireSupport(supportId);
+            @RequestHeader(value = SUPPORT_HEADER, required = false) String supportHeader,
+            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false) String sessionId) {
+        String supportId = resolveSupportId(supportHeader, sessionId);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(SnapshotResponse.from(service.snapshot(supportId.trim())));
+                .body(SnapshotResponse.from(service.snapshot(supportId)));
     }
 
     @GetMapping("/tickets/{ticketId}")
     ResponseEntity<SupportTicketDetails> details(
-            @RequestHeader(value = SUPPORT_HEADER, required = false) String supportId,
+            @RequestHeader(value = SUPPORT_HEADER, required = false) String supportHeader,
+            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false) String sessionId,
             @PathVariable UUID ticketId) {
-        SupportWorkbenchProjectionService.requireSupport(supportId);
+        String supportId = resolveSupportId(supportHeader, sessionId);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(service.details(supportId.trim(), ticketId));
+                .body(service.details(supportId, ticketId));
     }
 
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     SseEmitter events(
-            @RequestHeader(value = SUPPORT_HEADER, required = false) String supportId,
+            @RequestHeader(value = SUPPORT_HEADER, required = false) String supportHeader,
+            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false) String sessionId,
             @RequestHeader(value = "Last-Event-ID", required = false) String cursor) {
-        SupportWorkbenchProjectionService.requireSupport(supportId);
-        String support = supportId.trim();
+        String support = resolveSupportId(supportHeader, sessionId);
         List<SupportWorkbenchEvent> replay = service.events(support, cursor);
         SseEmitter emitter = new SseEmitter(60_000L);
         try {
@@ -60,6 +64,12 @@ public final class SupportWorkbenchController {
         String nextCursor = replay.isEmpty() ? cursor : replay.getLast().cursor();
         startIncrementalStream(emitter, support, nextCursor);
         return emitter;
+    }
+
+    private static String resolveSupportId(String supportHeader, String sessionId) {
+        String supportId = supportHeader == null || supportHeader.isBlank() ? sessionId : supportHeader.trim();
+        SupportWorkbenchProjectionService.requireSupport(supportId);
+        return supportId;
     }
 
     private void startIncrementalStream(SseEmitter emitter, String supportId, String initialCursor) {

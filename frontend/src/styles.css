@@ -49,6 +49,7 @@ h2 { max-width: 290px; margin: 7px 0 0; overflow-wrap: anywhere; font-size: 1rem
 .workbench-header .lede { margin: 0; }
 .connection-state { max-width: 280px; border: 1px solid #9fb2a4; border-radius: 999px; background: #f8faf6; padding: 10px 14px; color: #31573f; font-size: .8rem; font-weight: 750; line-height: 1.35; }
 .connection-state.stale { border-color: #c88375; background: #fff2ef; color: #8c2f25; }
+.connection-state.resetting { border-color: #c88375; background: #fff2ef; color: #8c2f25; }
 .connection-state.syncing, .connection-state.loading { border-color: #c4a85b; background: #fff8e5; color: #705814; }
 .authorization-note { display: inline-block; margin: 22px 0; border-left: 3px solid var(--forest); padding: 3px 0 3px 12px; color: #526259; font-size: .88rem; font-weight: 720; }
 .queue-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr); gap: 22px; }
@@ -81,3 +82,5 @@ button:focus-visible, a:focus-visible { outline: 3px solid #81b895; outline-offs
   .workbench-footer button { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .support-workbench * { scroll-behavior: auto; } }
+.route-state { display: grid; align-content: center; min-height: 100vh; box-sizing: border-box; max-width: 820px; margin: 0 auto; padding: 40px 28px; }
+.route-state h1 { margin-bottom: 18px; }

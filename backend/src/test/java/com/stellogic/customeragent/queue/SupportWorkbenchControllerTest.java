@@ -30,9 +30,11 @@ class SupportWorkbenchControllerTest {
     @Test
     void supportReadsAViewScopedAuthoritativeSnapshotWithOnlyMinimumQueueSummaries() throws Exception {
         var handoff = new SupportQueueItem(
-                HANDOFF_TICKET, "WAITING_FOR_CUSTOMER", "HUMAN", Instant.parse("2026-08-11T01:00:00Z"));
+                HANDOFF_TICKET, SupportTicketLifecycleState.WAITING_FOR_CUSTOMER, SupportHandlingMode.HUMAN,
+                Instant.parse("2026-08-11T01:00:00Z"));
         var breach = new SupportQueueItem(
-                BREACHED_TICKET, "INVESTIGATING", "AGENT", Instant.parse("2026-08-11T01:05:00Z"));
+                BREACHED_TICKET, SupportTicketLifecycleState.INVESTIGATING, SupportHandlingMode.AGENT,
+                Instant.parse("2026-08-11T01:05:00Z"));
         when(service.snapshot("support-demo")).thenReturn(new SupportWorkbenchSnapshot(
                 "support-workbench-v1", 7, List.of(handoff, breach), List.of(breach)));
 
@@ -64,6 +66,17 @@ class SupportWorkbenchControllerTest {
         mvc.perform(get("/api/support/workbench/snapshot")
                         .header("X-Synthetic-Approver-Id", "approver-demo"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void serverIssuedSupportSessionCanReadWithoutAClientForgedRoleHeader() throws Exception {
+        when(service.snapshot("support-demo")).thenReturn(new SupportWorkbenchSnapshot(
+                "support-workbench-v1", 0, List.of(), List.of()));
+
+        mvc.perform(get("/api/support/workbench/snapshot")
+                        .cookie(new jakarta.servlet.http.Cookie("synthetic-demo-session", "support-demo")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.view").value("SUPPORT_WORKBENCH"));
     }
 
     @Test

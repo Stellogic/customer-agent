@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 
 const SUPPORT_SCHEMA = "support-workbench-v1" as const;
-const supportHeaders = { "X-Synthetic-Support-Id": "support-demo" };
+const lifecycleStates = ["NEW", "INVESTIGATING", "WAITING_FOR_CUSTOMER", "WAITING_FOR_EXTERNAL", "RESOLVED", "CLOSED"] as const;
+const handlingModes = ["AGENT", "HUMAN"] as const;
+type LifecycleState = typeof lifecycleStates[number];
+type HandlingMode = typeof handlingModes[number];
 
 type QueueItem = {
   ticketId: string;
-  lifecycleState: string;
-  handlingMode: string;
+  lifecycleState: LifecycleState;
+  handlingMode: HandlingMode;
   enteredAt: string;
 };
 
@@ -26,18 +29,19 @@ type EventEnvelope = {
 };
 type QueueUpsert = QueueItem & { sharedEnteredAt: string; escalationEnteredAt: string | null };
 
-export function SupportWorkbench() {
+export function SupportWorkbench({ supportId }: { supportId: string }) {
   const [snapshot, setSnapshot] = useState<WorkbenchSnapshot | null>(null);
-  const [connection, setConnection] = useState<"loading" | "syncing" | "live" | "stale">("loading");
+  const [connection, setConnection] = useState<"loading" | "syncing" | "resetting" | "live" | "stale">("loading");
   const snapshotRef = useRef<WorkbenchSnapshot | null>(null);
   const streamController = useRef<AbortController | null>(null);
+  const supportHeaders = { "X-Synthetic-Support-Id": supportId };
 
   useEffect(() => {
     void loadSnapshot("loading");
     return () => streamController.current?.abort();
   }, []);
 
-  async function loadSnapshot(status: "loading" | "syncing" = "syncing") {
+  async function loadSnapshot(status: "loading" | "syncing" | "resetting" = "syncing") {
     streamController.current?.abort();
     setConnection(status);
     try {
@@ -103,9 +107,9 @@ export function SupportWorkbench() {
   async function recoverFromSnapshot(controller: AbortController) {
     if (streamController.current !== controller) return;
     controller.abort();
-    setConnection("syncing");
+    setConnection("resetting");
     await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
-    await loadSnapshot("syncing");
+    await loadSnapshot("resetting");
   }
 
   function applyEvent(event: StreamEvent) {
@@ -168,9 +172,10 @@ export function SupportWorkbench() {
           <h1>客服共享队列</h1>
           <p className="lede">发现需要人工关注的客服工单；领取与完整人工处理不在当前切片中。</p>
         </div>
-        <div className={`connection-state ${connection}`} role={connection === "stale" ? "alert" : "status"} aria-live="polite">
+        <div className={`connection-state ${connection}`} role={connection === "stale" || connection === "resetting" ? "alert" : "status"} aria-live="polite">
           {connection === "loading" && "正在读取权威快照…"}
           {connection === "syncing" && "正在从 Spring 权威快照重新同步…"}
+          {connection === "resetting" && "事件流已失效；当前队列可能过期，正在重新读取权威快照…"}
           {connection === "live" && "队列已与 Spring 权威状态同步"}
           {connection === "stale" && "实时连接已断开；当前队列可能过期。"}
         </div>
@@ -178,7 +183,7 @@ export function SupportWorkbench() {
 
       <p className="authorization-note">队列可发现不等于工单详情授权</p>
 
-      <div className="queue-grid" aria-busy={connection === "loading" || connection === "syncing"}>
+      <div className="queue-grid" aria-busy={connection === "loading" || connection === "syncing" || connection === "resetting"}>
         <QueueSection
           title="待接手工单"
           description="转人工与其他共享队列条目"
@@ -194,7 +199,7 @@ export function SupportWorkbench() {
 
       <footer className="workbench-footer">
         <p>快照游标与客户、审批视图相互独立；刷新不会沿用旧本地队列。</p>
-        <button type="button" onClick={() => void loadSnapshot()} disabled={connection === "loading" || connection === "syncing"}>
+        <button type="button" onClick={() => void loadSnapshot()} disabled={connection === "loading" || connection === "syncing" || connection === "resetting"}>
           重新同步队列
         </button>
       </footer>
@@ -247,23 +252,33 @@ function isSnapshot(value: unknown): value is WorkbenchSnapshot {
 
 function isQueueItem(value: unknown): value is QueueItem {
   return isRecord(value) && hasOnlyKeys(value, ["ticketId", "lifecycleState", "handlingMode", "enteredAt"])
-    && typeof value.ticketId === "string" && /^[0-9a-f-]{36}$/i.test(value.ticketId)
-    && typeof value.lifecycleState === "string" && typeof value.handlingMode === "string"
+    && isTicketId(value.ticketId) && isLifecycleState(value.lifecycleState) && isHandlingMode(value.handlingMode)
     && typeof value.enteredAt === "string";
 }
 
 function isRemoval(value: unknown): value is { ticketId: string } {
   return isRecord(value) && hasOnlyKeys(value, ["ticketId"])
-    && typeof value.ticketId === "string" && /^[0-9a-f-]{36}$/i.test(value.ticketId);
+    && isTicketId(value.ticketId);
 }
 
 function isUpsert(value: unknown): value is QueueUpsert {
   return isRecord(value)
     && hasOnlyKeys(value, ["ticketId", "lifecycleState", "handlingMode", "sharedEnteredAt", "escalationEnteredAt"])
-    && typeof value.ticketId === "string" && /^[0-9a-f-]{36}$/i.test(value.ticketId)
-    && typeof value.lifecycleState === "string" && typeof value.handlingMode === "string"
+    && isTicketId(value.ticketId) && isLifecycleState(value.lifecycleState) && isHandlingMode(value.handlingMode)
     && typeof value.sharedEnteredAt === "string"
     && (value.escalationEnteredAt === null || typeof value.escalationEnteredAt === "string");
+}
+
+function isTicketId(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
+}
+
+function isLifecycleState(value: unknown): value is LifecycleState {
+  return typeof value === "string" && lifecycleStates.some((state) => state === value);
+}
+
+function isHandlingMode(value: unknown): value is HandlingMode {
+  return typeof value === "string" && handlingModes.some((mode) => mode === value);
 }
 
 function parseCursor(cursor: string) {
@@ -293,8 +308,8 @@ function upsertAndSort(items: QueueItem[], item: QueueItem) {
     .sort((left, right) => left.enteredAt.localeCompare(right.enteredAt) || left.ticketId.localeCompare(right.ticketId));
 }
 
-function stateLabel(state: string) {
-  const labels: Record<string, string> = {
+function stateLabel(state: LifecycleState) {
+  const labels: Record<LifecycleState, string> = {
     NEW: "新建",
     INVESTIGATING: "调查中",
     WAITING_FOR_CUSTOMER: "等待客户",
@@ -302,7 +317,7 @@ function stateLabel(state: string) {
     RESOLVED: "已解决",
     CLOSED: "已关闭",
   };
-  return labels[state] ?? state;
+  return labels[state];
 }
 
 function formatTime(value: string) {

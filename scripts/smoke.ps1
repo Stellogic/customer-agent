@@ -32,6 +32,9 @@ if (($migrationHistory -join ',') -ne '1:true,2:true,3:true,4:true,5:true,6:true
 
 docker compose stop compensation-executor
 docker compose --profile smoke run --rm integration-smoke
+if ($LASTEXITCODE -ne 0) {
+    throw "集成 smoke 失败，退出码: $LASTEXITCODE"
+}
 docker compose start compensation-executor
 $automaticExecutorEvidence = $null
 for ($attempt = 0; $attempt -lt 40; $attempt++) {
@@ -43,6 +46,9 @@ if ($automaticExecutorEvidence -ne 'SUCCEEDED:1:RESOLVED') {
     throw "常驻补偿执行器未完成唯一模拟优惠券: $automaticExecutorEvidence"
 }
 docker compose --profile smoke run --rm frontend-acceptance
+if ($LASTEXITCODE -ne 0) {
+    throw "React 实时验收失败，退出码: $LASTEXITCODE"
+}
 
 $status = Invoke-RestMethod -Uri 'http://127.0.0.1:4180/api/system/status'
 if ($status.status -ne 'UP') {
