@@ -4,6 +4,7 @@ import com.stellogic.customeragent.compensation.DelayCompensationPolicy;
 import com.stellogic.customeragent.handoff.HumanHandoffService;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
+import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
@@ -24,7 +25,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 class JdbcApprovalService implements ApprovalService {
-    private static final String CUSTOMER_PUBLIC_EPOCH = "customer-public-v1";
     private static final String APPROVAL_PUBLIC_MESSAGE = "补偿方案已获批准，正在等待补偿处理。";
     private final JdbcTemplate jdbc;
     private final Clock clock;
@@ -32,6 +32,7 @@ class JdbcApprovalService implements ApprovalService {
     private final CompensationProposalExpiry proposalExpiry;
     private final TicketAuthorityLock authorityLock;
     private final HumanHandoffService handoffService;
+    private final CustomerPublicProjectionAppender publicProjection;
     private final int defaultLeaseSeconds;
     private final int maximumLeaseSeconds;
     private final DelayCompensationPolicy policy = new DelayCompensationPolicy();
@@ -43,6 +44,7 @@ class JdbcApprovalService implements ApprovalService {
             CompensationProposalExpiry proposalExpiry,
             TicketAuthorityLock authorityLock,
             HumanHandoffService handoffService,
+            CustomerPublicProjectionAppender publicProjection,
             @Value("${baseline.approval.default-lease-seconds:900}") int defaultLeaseSeconds,
             @Value("${baseline.approval.maximum-lease-seconds:900}") int maximumLeaseSeconds) {
         this.jdbc = jdbc;
@@ -51,6 +53,7 @@ class JdbcApprovalService implements ApprovalService {
         this.proposalExpiry = proposalExpiry;
         this.authorityLock = authorityLock;
         this.handoffService = handoffService;
+        this.publicProjection = publicProjection;
         this.defaultLeaseSeconds = defaultLeaseSeconds;
         this.maximumLeaseSeconds = maximumLeaseSeconds;
     }
@@ -478,6 +481,9 @@ class JdbcApprovalService implements ApprovalService {
         UUID executionId = stableUuid("compensation-execution\n" + command.revisionId());
         UUID reservationId = stableUuid("compensation-reservation\n" + command.revisionId());
         String executionKey = "compensation-execution:" + command.revisionId();
+        String executionDigest = StableParameterDigest.sha256(
+                executionId.toString(), executionKey, proposal.orderReference(), proposal.reasonCode(),
+                proposal.method().name(), authoritative.amount().toPlainString());
         jdbc.update(
                 "insert into proposal_decision (id, proposal_revision_id, proposal_revision, content_digest, "
                         + "approver_id, lease_token, lease_version, decision_type, internal_reason, decided_at) "
@@ -498,10 +504,12 @@ class JdbcApprovalService implements ApprovalService {
                 reservationId, proposal.orderReference(), authoritative.amount(), at, command.revisionId());
         jdbc.update(
                 "insert into compensation_execution (id, proposal_revision_id, decision_id, reservation_id, "
-                        + "order_reference, reason_code, compensation_method, amount, status, idempotency_key, created_at) "
-                        + "values (?, ?, ?, ?, ?, ?, ?, ?, 'READY', ?, ?)",
+                        + "order_reference, reason_code, compensation_method, amount, status, idempotency_key, "
+                        + "assigned_executor_id, parameter_digest, created_at) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?, 'READY', ?, 'compensation-executor', ?, ?)",
                 executionId, command.revisionId(), decisionId, reservationId, proposal.orderReference(),
-                proposal.reasonCode(), proposal.method().name(), authoritative.amount(), executionKey, at);
+                proposal.reasonCode(), proposal.method().name(), authoritative.amount(), executionKey,
+                executionDigest, at);
         jdbc.update(
                 "update approval_lease set status = 'DECIDED', decided_at = ? "
                         + "where proposal_revision_id = ? and lease_version = ? and status = 'ACTIVE'",
@@ -509,7 +517,7 @@ class JdbcApprovalService implements ApprovalService {
         jdbc.update("update compensation_proposal_revision set status = 'APPROVED' where id = ?",
                 command.revisionId());
         auditApproved(ticketId, decisionId, command.leaseVersion(), command.approverId(), at);
-        appendApprovalPublicMessage(ticketId, now, at);
+        publicProjection.appendSupportMessage(ticketId, APPROVAL_PUBLIC_MESSAGE, now);
         return new ApprovalModels.ApprovalResult(
                 command.revisionId(), command.proposalRevision(), ApprovalModels.ProposalDecision.APPROVED,
                 executionId, ApprovalModels.CompensationExecutionStatus.READY, false);
@@ -564,24 +572,6 @@ class JdbcApprovalService implements ApprovalService {
                 "COMPENSATION_PROPOSAL_INVALIDATED_" + reason, "spring-system", at);
         throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "proposal no longer matches authoritative facts");
-    }
-
-    private void appendApprovalPublicMessage(UUID ticketId, Instant now, Timestamp at) {
-        Long messageSequence = jdbc.queryForObject(
-                "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?",
-                Long.class, ticketId);
-        Long eventSequence = jdbc.queryForObject(
-                "select coalesce(max(sequence), 0) + 1 from customer_public_event where ticket_id = ? and epoch = ?",
-                Long.class, ticketId, CUSTOMER_PUBLIC_EPOCH);
-        jdbc.update(
-                "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) "
-                        + "values (?, ?, ?, 'SUPPORT', ?, ?)",
-                UUID.randomUUID(), ticketId, messageSequence, APPROVAL_PUBLIC_MESSAGE, at);
-        jdbc.update(
-                "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                        + "values (?, ?, ?, 'PUBLIC_MESSAGE_APPENDED', "
-                        + "jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?)",
-                ticketId, CUSTOMER_PUBLIC_EPOCH, eventSequence, APPROVAL_PUBLIC_MESSAGE, now.toString(), at);
     }
 
     private static UUID stableUuid(String value) {

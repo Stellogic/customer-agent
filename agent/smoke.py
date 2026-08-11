@@ -404,17 +404,17 @@ def main() -> None:
             )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        claim_responses = list(executor.map(
+        approval_claim_responses = list(executor.map(
             claim_concurrently, ["approver-demo", "approver-other-demo"]
         ))
-    assert sorted(response.status_code for response in claim_responses) == [201, 409], [
-        (response.status_code, response.text) for response in claim_responses
+    assert sorted(response.status_code for response in approval_claim_responses) == [201, 409], [
+        (response.status_code, response.text) for response in approval_claim_responses
     ]
-    winner_index = next(index for index, response in enumerate(claim_responses) if response.status_code == 201)
+    winner_index = next(index for index, response in enumerate(approval_claim_responses) if response.status_code == 201)
     winner_id = ["approver-demo", "approver-other-demo"][winner_index]
     loser_id = "approver-other-demo" if winner_id == "approver-demo" else "approver-demo"
     winner_headers = {"X-Synthetic-Approver-Id": winner_id}
-    lease_one = claim_responses[winner_index].json()
+    lease_one = approval_claim_responses[winner_index].json()
     assert lease_one["leaseVersion"] == 1 and lease_one["replayed"] is False
 
     with httpx.Client(timeout=20.0) as client:
@@ -838,7 +838,10 @@ def main() -> None:
         ).fetchall() == [(1, "SUPERSEDED"), (2, "APPROVED")]
 
     def seed_pending_decision_fixture(
-        order_reference: str, content_digest: str, description: str
+        order_reference: str, content_digest: str, description: str,
+        delay_hours: int = 80, delay_seconds: int = 288000,
+        compensation_method: str = "SIMULATED_PARTIAL_REFUND",
+        amount: Decimal = Decimal("26.80"),
     ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
         fixture_ticket_id = uuid.uuid4()
         fixture_generation_id = uuid.uuid4()
@@ -863,24 +866,25 @@ def main() -> None:
             "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, delay_hours, "
             "delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, "
             "content_digest, status, created_at, expires_at) values "
-            "(%s, %s, 1, %s, %s, %s, 80, 288000, "
-            "'SIMULATED_PARTIAL_REFUND', 26.80, 'LOGISTICS_DELAY', "
+            "(%s, %s, 1, %s, %s, %s, %s, %s, "
+            "%s, %s, 'LOGISTICS_DELAY', "
             "jsonb_build_array('order:' || %s, 'logistics:' || %s), "
             "'delay-policy-v1', %s, 'PENDING_APPROVAL', "
             "'2026-08-09T13:57:00Z', '2026-08-10T13:57:00Z')",
                 (fixture_revision_id, uuid.uuid4(), fixture_ticket_id, order_reference,
-                 fixture_generation_id, order_reference, order_reference, content_digest),
+                 fixture_generation_id, delay_hours, delay_seconds, compensation_method, amount,
+                 order_reference, order_reference, content_digest),
             )
             connection.execute(
             "insert into approval_evidence_snapshot "
             "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "
             "available_compensation_amount, active_reservation_amount, paid, cancelled, fully_refunded, "
             "existing_compensation, evidence_references, captured_at) "
-            "select %s, order_reference, 80, 288000, paid_amount, available_compensation_amount, 0.00, "
+            "select %s, order_reference, %s, %s, paid_amount, available_compensation_amount, 0.00, "
             "paid, cancelled, fully_refunded, existing_compensation, "
             "jsonb_build_array('order:' || order_reference, 'logistics:' || order_reference), "
             "'2026-08-09T13:57:00Z' from synthetic_order where order_reference = %s",
-                (fixture_revision_id, order_reference),
+                (fixture_revision_id, delay_hours, delay_seconds, order_reference),
             )
         return fixture_ticket_id, fixture_generation_id, fixture_revision_id
 
@@ -996,6 +1000,251 @@ def main() -> None:
             "and event_type = 'COMPENSATION_PROPOSAL_APPROVED'",
             (approval_record[0],),
         ).fetchone()[0] == 1
+
+    executor_headers = {
+        "Authorization": f"Bearer {os.environ['EXECUTOR_MACHINE_TOKEN']}"
+    }
+    with httpx.Client(timeout=20.0) as client:
+        assignments = client.get(
+            f"{spring_url}/internal/compensation-executions", headers=executor_headers
+        )
+        expect_status(assignments, 200)
+        assert any(
+            item["executionId"] == approved_payload["executionId"]
+            and item["status"] == "READY"
+            for item in assignments.json()
+        )
+        denied_assignments = client.get(
+            f"{spring_url}/internal/compensation-executions",
+            headers={"Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}"},
+        )
+        expect_status(denied_assignments, 403)
+
+    execution_id = approved_payload["executionId"]
+    claim_request_ids = [f"execution-claim-{uuid.uuid4()}" for _ in range(2)]
+    claim_barrier = threading.Barrier(2)
+
+    def claim_execution(request_id: str) -> httpx.Response:
+        claim_barrier.wait()
+        with httpx.Client(timeout=20.0) as client:
+            return client.post(
+                f"{spring_url}/internal/compensation-executions/{execution_id}/claims",
+                headers={**executor_headers, "Idempotency-Key": request_id},
+            )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        execution_claim_responses = list(executor.map(claim_execution, claim_request_ids))
+    assert sorted(response.status_code for response in execution_claim_responses) == [201, 409]
+    winning_claim_index = next(
+        index for index, response in enumerate(execution_claim_responses) if response.status_code == 201
+    )
+    winning_claim = execution_claim_responses[winning_claim_index].json()
+    winning_claim_request_id = claim_request_ids[winning_claim_index]
+    assert winning_claim["status"] == "PROCESSING"
+    assert winning_claim["compensationMethod"] == "SIMULATED_PARTIAL_REFUND"
+    assert winning_claim["amount"] == 26.80
+
+    with httpx.Client(timeout=20.0) as client:
+        claim_replay = client.post(
+            f"{spring_url}/internal/compensation-executions/{execution_id}/claims",
+            headers={**executor_headers, "Idempotency-Key": winning_claim_request_id},
+        )
+        expect_status(claim_replay, 200)
+        assert claim_replay.json() == {**winning_claim, "replayed": True}
+        claim_identity_conflict = client.post(
+            f"{spring_url}/internal/compensation-executions/{uuid.uuid4()}/claims",
+            headers={**executor_headers, "Idempotency-Key": winning_claim_request_id},
+        )
+        expect_status(claim_identity_conflict, 409)
+        success_url = (
+            f"{spring_url}/internal/compensation-executions/{execution_id}/success"
+        )
+        success_body = {
+            "attemptId": winning_claim["attemptId"],
+            "idempotencyKey": winning_claim["idempotencyKey"],
+            "parameterDigest": winning_claim["parameterDigest"],
+        }
+        mismatched_result = client.post(
+            success_url,
+            headers={**executor_headers, "Idempotency-Key": f"result-{uuid.uuid4()}"},
+            json={**success_body, "parameterDigest": "0" * 64},
+        )
+        expect_status(mismatched_result, 409)
+        success_request_id = f"result-{uuid.uuid4()}"
+        succeeded = client.post(
+            success_url,
+            headers={**executor_headers, "Idempotency-Key": success_request_id},
+            json=success_body,
+        )
+        expect_status(succeeded, 200)
+        succeeded_payload = succeeded.json()
+        assert succeeded_payload == {
+            "executionId": execution_id,
+            "attemptId": winning_claim["attemptId"],
+            "status": "SUCCEEDED",
+            "compensationMethod": "SIMULATED_PARTIAL_REFUND",
+            "amount": 26.80,
+            "customerMessage": "已完成 26.80 CNY 模拟部分退款，退回原支付方式（尾号 4242）。",
+            "replayed": False,
+        }
+        success_replay = client.post(
+            success_url,
+            headers={**executor_headers, "Idempotency-Key": success_request_id},
+            json=success_body,
+        )
+        expect_status(success_replay, 200)
+        assert success_replay.json() == {**succeeded_payload, "replayed": True}
+        redelivered_success = client.post(
+            success_url,
+            headers={**executor_headers, "Idempotency-Key": f"redelivered-{uuid.uuid4()}"},
+            json=success_body,
+        )
+        expect_status(redelivered_success, 200)
+        assert redelivered_success.json() == {**succeeded_payload, "replayed": True}
+        terminal_claim_request_id = f"terminal-claim-{uuid.uuid4()}"
+        terminal_claim = client.post(
+            f"{spring_url}/internal/compensation-executions/{execution_id}/claims",
+            headers={**executor_headers, "Idempotency-Key": terminal_claim_request_id},
+        )
+        expect_status(terminal_claim, 200)
+        assert terminal_claim.json()["status"] == "SUCCEEDED"
+        terminal_claim_identity_conflict = client.post(
+            f"{spring_url}/internal/compensation-executions/{uuid.uuid4()}/claims",
+            headers={**executor_headers, "Idempotency-Key": terminal_claim_request_id},
+        )
+        expect_status(terminal_claim_identity_conflict, 409)
+        execution_customer = client.get(
+            f"{spring_url}/api/customer/tickets/{approval_ticket_id}",
+            headers={"X-Synthetic-Customer-Id": "customer-demo"},
+        )
+        expect_status(execution_customer, 200)
+        execution_customer_payload = execution_customer.json()
+        assert execution_customer_payload["ticket"]["lifecycleState"] == "RESOLVED"
+        assert execution_customer_payload["messages"][-1]["body"] == succeeded_payload["customerMessage"]
+        customer_projection_text = json.dumps(execution_customer_payload, ensure_ascii=False)
+        assert execution_id not in customer_projection_text
+        assert winning_claim["idempotencyKey"] not in customer_projection_text
+        assert winning_claim["parameterDigest"] not in customer_projection_text
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select e.status, r.status, o.existing_compensation "
+            "from compensation_execution e "
+            "join compensation_reservation r on r.id = e.reservation_id "
+            "join synthetic_order o on o.order_reference = e.order_reference where e.id = %s",
+            (uuid.UUID(execution_id),),
+        ).fetchone() == ("SUCCEEDED", "CONSUMED", True)
+        assert connection.execute(
+            "select count(*) from compensation_execution_attempt where execution_id = %s",
+            (uuid.UUID(execution_id),),
+        ).fetchone()[0] == 1
+        assert connection.execute(
+            "select count(*) from compensation_execution_result where execution_id = %s",
+            (uuid.UUID(execution_id),),
+        ).fetchone()[0] == 1
+        assert connection.execute(
+            "select count(*) from simulated_partial_refund where execution_id = %s",
+            (uuid.UUID(execution_id),),
+        ).fetchone()[0] == 1
+        assert connection.execute(
+            "select count(*) from audit_event where ticket_id = %s and "
+            "event_type in ('COMPENSATION_EXECUTION_SUCCEEDED', 'TICKET_RESOLVED')",
+            (approval_ticket_id,),
+        ).fetchone()[0] == 2
+
+    def approve_and_execute_coupon(
+        order_reference: str, delay_hours: int, delay_seconds: int, amount: Decimal
+    ) -> tuple[str, str]:
+        digest = uuid.uuid4().hex * 2
+        ticket, _, revision = seed_pending_decision_fixture(
+            order_reference, digest, f"{amount} CNY 优惠券执行验收",
+            delay_hours, delay_seconds, "COUPON", amount,
+        )
+        with httpx.Client(timeout=20.0) as client:
+            lease_response = client.post(
+                f"{spring_url}/api/approver/compensation-proposals/{revision}/claims",
+                headers={**approver_headers, "Idempotency-Key": f"coupon-claim-{uuid.uuid4()}"},
+                json={"requestedLeaseSeconds": 900},
+            )
+            expect_status(lease_response, 201)
+            lease = lease_response.json()
+            approval_response = client.post(
+                f"{spring_url}/api/approver/compensation-proposals/{revision}/approve",
+                headers={
+                    **approver_headers,
+                    "X-Approval-Lease-Token": lease["leaseToken"],
+                    "X-Approval-Lease-Version": str(lease["leaseVersion"]),
+                    "Idempotency-Key": f"coupon-approve-{uuid.uuid4()}",
+                },
+                json={"proposalRevision": 1, "contentDigest": digest},
+            )
+            expect_status(approval_response, 200)
+            coupon_execution_id = approval_response.json()["executionId"]
+            coupon_claim = client.post(
+                f"{spring_url}/internal/compensation-executions/{coupon_execution_id}/claims",
+                headers={**executor_headers, "Idempotency-Key": f"coupon-execute-{uuid.uuid4()}"},
+            )
+            expect_status(coupon_claim, 201)
+            coupon_claim_payload = coupon_claim.json()
+            coupon_success = client.post(
+                f"{spring_url}/internal/compensation-executions/{coupon_execution_id}/success",
+                headers={**executor_headers, "Idempotency-Key": f"coupon-result-{uuid.uuid4()}"},
+                json={
+                    "attemptId": coupon_claim_payload["attemptId"],
+                    "idempotencyKey": coupon_claim_payload["idempotencyKey"],
+                    "parameterDigest": coupon_claim_payload["parameterDigest"],
+                },
+            )
+            expect_status(coupon_success, 200)
+            expected_message = f"已发放 {amount:.2f} CNY 优惠券。"
+            assert coupon_success.json()["customerMessage"] == expected_message
+            customer = client.get(
+                f"{spring_url}/api/customer/tickets/{ticket}",
+                headers={"X-Synthetic-Customer-Id": "customer-demo"},
+            )
+            expect_status(customer, 200)
+            assert customer.json()["ticket"]["lifecycleState"] == "RESOLVED"
+            assert customer.json()["messages"][-1]["body"] == expected_message
+        return coupon_execution_id, str(ticket)
+
+    coupon_10_execution_id, coupon_10_ticket_id = approve_and_execute_coupon(
+        "ORDER-DELAY-EXECUTION-10", 24, 86400, Decimal("10.00")
+    )
+    coupon_20_execution_id, coupon_20_ticket_id = approve_and_execute_coupon(
+        "ORDER-DELAY-EXECUTION-20", 48, 172800, Decimal("20.00")
+    )
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select amount from simulated_coupon where execution_id in (%s, %s) order by amount",
+            (uuid.UUID(coupon_10_execution_id), uuid.UUID(coupon_20_execution_id)),
+        ).fetchall() == [(Decimal("10.00"),), (Decimal("20.00"),)]
+
+    auto_digest = uuid.uuid4().hex * 2
+    auto_ticket_id, _, auto_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-EXECUTOR-AUTO", auto_digest, "常驻执行器自动消费验收",
+        24, 86400, "COUPON", Decimal("10.00"),
+    )
+    with httpx.Client(timeout=20.0) as client:
+        auto_lease_response = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{auto_revision_id}/claims",
+            headers={**approver_headers, "Idempotency-Key": f"auto-claim-{uuid.uuid4()}"},
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(auto_lease_response, 201)
+        auto_lease = auto_lease_response.json()
+        auto_approval = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{auto_revision_id}/approve",
+            headers={
+                **approver_headers,
+                "X-Approval-Lease-Token": auto_lease["leaseToken"],
+                "X-Approval-Lease-Version": str(auto_lease["leaseVersion"]),
+                "Idempotency-Key": f"auto-approve-{uuid.uuid4()}",
+            },
+            json={"proposalRevision": 1, "contentDigest": auto_digest},
+        )
+        expect_status(auto_approval, 200)
+        auto_execution_id = auto_approval.json()["executionId"]
+        assert auto_approval.json()["executionStatus"] == "READY"
 
     drift_digest = "8" * 64
     drift_ticket_id, _, drift_revision_id = seed_pending_decision_fixture(
@@ -2387,7 +2636,7 @@ def main() -> None:
         "sla_fact_count": len(sla_facts),
         "sla_resume_immediate": True,
         "concurrent_replays": 7,
-        "approval_claim_statuses": sorted(response.status_code for response in claim_responses),
+        "approval_claim_statuses": sorted(response.status_code for response in approval_claim_responses),
         "approval_lease_versions": [1, 2, 3],
         "approval_replacement_revoked": True,
         "approval_rejection_ticket_id": str(rejection_ticket_id),
@@ -2396,6 +2645,15 @@ def main() -> None:
             response.status_code for response in rejection_responses
         ),
         "approval_execution_id": approved_payload["executionId"],
+        "execution_claim_statuses": sorted(response.status_code for response in execution_claim_responses),
+        "execution_success_replayed": True,
+        "coupon_10_execution_id": coupon_10_execution_id,
+        "coupon_10_ticket_id": coupon_10_ticket_id,
+        "coupon_20_execution_id": coupon_20_execution_id,
+        "coupon_20_ticket_id": coupon_20_ticket_id,
+        "partial_refund_ticket_id": str(approval_ticket_id),
+        "automatic_executor_execution_id": auto_execution_id,
+        "automatic_executor_ticket_id": str(auto_ticket_id),
         "approval_fact_drift_invalidated": str(drift_ticket_id),
         "concurrent_proposal_intent_results": sorted(proposal_race_results),
         "approve_reject_statuses": sorted(response.status_code for response in race_responses),

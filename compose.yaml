@@ -22,7 +22,7 @@ services:
     networks: [data]
 
   spring-migrate:
-    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-issue21}
+    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
     build:
       context: ./backend
       args:
@@ -45,7 +45,7 @@ services:
     networks: [data, services]
 
   agent-migrate:
-    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue21}
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
     build:
       context: ./agent
       target: runtime
@@ -59,7 +59,7 @@ services:
     networks: [data]
 
   agent-server:
-    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue21}
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
     build:
       context: ./agent
       target: runtime
@@ -79,7 +79,7 @@ services:
     networks: [data, services]
 
   backend:
-    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-issue21}
+    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
     build:
       context: ./backend
       args:
@@ -104,8 +104,21 @@ services:
       retries: 30
     networks: [data, services, edge]
 
+  compensation-executor:
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
+    entrypoint: ["python", "-m", "baseline_agent.compensation_executor"]
+    environment:
+      SPRING_INTERNAL_URL: http://backend:8080
+      EXECUTOR_MACHINE_TOKEN: ${EXECUTOR_MACHINE_TOKEN:-local-executor-machine}
+      EXECUTOR_POLL_DELAY: ${EXECUTOR_POLL_DELAY:-0.25}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [services]
+
   frontend:
-    image: customer-agent/frontend:${CUSTOMER_AGENT_IMAGE_TAG:-issue21}
+    image: customer-agent/frontend:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
     build: ./frontend
     depends_on:
       backend:
@@ -120,7 +133,7 @@ services:
     networks: [edge]
 
   integration-smoke:
-    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue21}
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
     profiles: [smoke]
     entrypoint: ["python", "/smoke/smoke.py"]
     volumes:
@@ -140,7 +153,7 @@ services:
     networks: [data, services]
 
   frontend-acceptance:
-    image: customer-agent/frontend-test:${CUSTOMER_AGENT_IMAGE_TAG:-issue21}
+    image: customer-agent/frontend-test:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
     profiles: [smoke]
     entrypoint: ["npm", "test", "--", "src/App.integration.test.tsx"]
     environment:
