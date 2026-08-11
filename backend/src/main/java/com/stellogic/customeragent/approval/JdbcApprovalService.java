@@ -478,6 +478,9 @@ class JdbcApprovalService implements ApprovalService {
         UUID executionId = stableUuid("compensation-execution\n" + command.revisionId());
         UUID reservationId = stableUuid("compensation-reservation\n" + command.revisionId());
         String executionKey = "compensation-execution:" + command.revisionId();
+        String executionDigest = StableParameterDigest.sha256(
+                executionId.toString(), executionKey, proposal.orderReference(), proposal.reasonCode(),
+                proposal.method().name(), authoritative.amount().toPlainString());
         jdbc.update(
                 "insert into proposal_decision (id, proposal_revision_id, proposal_revision, content_digest, "
                         + "approver_id, lease_token, lease_version, decision_type, internal_reason, decided_at) "
@@ -498,10 +501,12 @@ class JdbcApprovalService implements ApprovalService {
                 reservationId, proposal.orderReference(), authoritative.amount(), at, command.revisionId());
         jdbc.update(
                 "insert into compensation_execution (id, proposal_revision_id, decision_id, reservation_id, "
-                        + "order_reference, reason_code, compensation_method, amount, status, idempotency_key, created_at) "
-                        + "values (?, ?, ?, ?, ?, ?, ?, ?, 'READY', ?, ?)",
+                        + "order_reference, reason_code, compensation_method, amount, status, idempotency_key, "
+                        + "assigned_executor_id, parameter_digest, created_at) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?, 'READY', ?, 'compensation-executor', ?, ?)",
                 executionId, command.revisionId(), decisionId, reservationId, proposal.orderReference(),
-                proposal.reasonCode(), proposal.method().name(), authoritative.amount(), executionKey, at);
+                proposal.reasonCode(), proposal.method().name(), authoritative.amount(), executionKey,
+                executionDigest, at);
         jdbc.update(
                 "update approval_lease set status = 'DECIDED', decided_at = ? "
                         + "where proposal_revision_id = ? and lease_version = ? and status = 'ACTIVE'",
