@@ -18,7 +18,7 @@ class CompensationSimulatorControllerTest {
     private static final UUID EXECUTION_ID = UUID.fromString("30000000-0000-0000-0000-000000000007");
     private final CompensationSimulatorService service = org.mockito.Mockito.mock(CompensationSimulatorService.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-                    new CompensationSimulatorController(service, "executor-secret"))
+                    new CompensationSimulatorController(service, new ExecutorMachineIdentity("executor-secret")))
             .build();
 
     @Test
@@ -40,13 +40,15 @@ class CompensationSimulatorControllerTest {
 
     @Test
     void simulatorReconcilesByTheOriginalExecutionIdentity() throws Exception {
-        when(service.reconcile(EXECUTION_ID)).thenReturn(new CompensationSimulatorModels.ReconciliationResult(
+        when(service.reconcile(EXECUTION_ID, "compensation-execution:revision"))
+                .thenReturn(new CompensationSimulatorModels.ReconciliationResult(
                 "provider-query:" + EXECUTION_ID,
                 CompensationExecutionModels.ReconciliationOutcome.FOUND,
                 "simulated-refund:" + EXECUTION_ID));
 
         mvc.perform(get("/internal/compensation-simulator/{executionId}/reconciliation", EXECUTION_ID)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer executor-secret"))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer executor-secret")
+                        .header("Idempotency-Key", "compensation-execution:revision"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.outcome").value("FOUND"))
                 .andExpect(jsonPath("$.resultReference").value("simulated-refund:" + EXECUTION_ID));

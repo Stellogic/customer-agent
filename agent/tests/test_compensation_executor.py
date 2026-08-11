@@ -117,6 +117,7 @@ def test_executor_reconciles_same_refund_after_provider_response_is_lost() -> No
             status = "READY" if provider_execute_calls == 0 else "UNKNOWN"
             return httpx.Response(200, json=[{
                 "executionId": execution_id,
+                "idempotencyKey": idempotency_key,
                 "compensationMethod": "SIMULATED_PARTIAL_REFUND",
                 "amount": 26.80,
                 "status": status,
@@ -140,6 +141,7 @@ def test_executor_reconciles_same_refund_after_provider_response_is_lost() -> No
             spring_paths.append(path)
             return httpx.Response(200, json={"status": "UNKNOWN"})
         if path == f"/internal/compensation-simulator/{execution_id}/reconciliation":
+            assert request.headers["Idempotency-Key"] == idempotency_key
             return httpx.Response(200, json={
                 "queryId": "provider-query-1",
                 "outcome": "FOUND",

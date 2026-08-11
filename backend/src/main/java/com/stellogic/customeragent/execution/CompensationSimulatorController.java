@@ -1,10 +1,7 @@
 package com.stellogic.customeragent.execution;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,13 +17,13 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/internal/compensation-simulator")
 final class CompensationSimulatorController {
     private final CompensationSimulatorService service;
-    private final byte[] executorToken;
+    private final ExecutorMachineIdentity executorIdentity;
 
     CompensationSimulatorController(
             CompensationSimulatorService service,
-            @Value("${baseline.identity.executor-token}") String executorToken) {
+            ExecutorMachineIdentity executorIdentity) {
         this.service = service;
-        this.executorToken = executorToken.getBytes(StandardCharsets.UTF_8);
+        this.executorIdentity = executorIdentity;
     }
 
     @PostMapping("/{executionId}/executions")
@@ -61,18 +58,17 @@ final class CompensationSimulatorController {
     @GetMapping("/{executionId}/reconciliation")
     CompensationSimulatorModels.ReconciliationResult reconcile(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @PathVariable UUID executionId) {
         requireExecutor(authorization);
-        return service.reconcile(executionId);
+        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "original execution identity required");
+        }
+        return service.reconcile(executionId, idempotencyKey.trim());
     }
 
     private void requireExecutor(String authorization) {
-        byte[] actual = authorization != null && authorization.startsWith("Bearer ")
-                ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
-                : new byte[0];
-        if (!MessageDigest.isEqual(actual, executorToken)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "executor identity required");
-        }
+        executorIdentity.require(authorization);
     }
 
     record ExecuteRequest(String parameterDigest, BigDecimal amount) {}

@@ -6,7 +6,12 @@ import java.util.UUID;
 final class CompensationExecutionModels {
     private CompensationExecutionModels() {}
 
-    record Assignment(UUID executionId, CompensationMethod compensationMethod, BigDecimal amount, ExecutionStatus status) {}
+    record Assignment(
+            UUID executionId,
+            CompensationMethod compensationMethod,
+            BigDecimal amount,
+            ExecutionStatus status,
+            String idempotencyKey) {}
 
     record ClaimCommand(String executorId, UUID executionId, String requestId) {}
 
@@ -20,13 +25,17 @@ final class CompensationExecutionModels {
             BigDecimal amount,
             boolean replayed) {}
 
+    record BoundAttempt(UUID attemptId, String idempotencyKey, String parameterDigest) {}
+
     record SuccessCommand(
             String executorId,
             UUID executionId,
-            UUID attemptId,
             String requestId,
-            String idempotencyKey,
-            String parameterDigest) {}
+            BoundAttempt attempt) {
+        UUID attemptId() { return attempt.attemptId(); }
+        String idempotencyKey() { return attempt.idempotencyKey(); }
+        String parameterDigest() { return attempt.parameterDigest(); }
+    }
 
     record SuccessResult(
             UUID executionId,
@@ -40,18 +49,22 @@ final class CompensationExecutionModels {
     record UnknownCommand(
             String executorId,
             UUID executionId,
-            UUID attemptId,
             String requestId,
-            String idempotencyKey,
-            String parameterDigest) {}
+            BoundAttempt attempt) {
+        UUID attemptId() { return attempt.attemptId(); }
+        String idempotencyKey() { return attempt.idempotencyKey(); }
+        String parameterDigest() { return attempt.parameterDigest(); }
+    }
 
     record FailureCommand(
             String executorId,
             UUID executionId,
-            UUID attemptId,
             String requestId,
-            String idempotencyKey,
-            String parameterDigest) {}
+            BoundAttempt attempt) {
+        UUID attemptId() { return attempt.attemptId(); }
+        String idempotencyKey() { return attempt.idempotencyKey(); }
+        String parameterDigest() { return attempt.parameterDigest(); }
+    }
 
     record ReconciliationCommand(
             String executorId,

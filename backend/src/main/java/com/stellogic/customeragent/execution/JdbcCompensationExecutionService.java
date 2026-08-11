@@ -39,12 +39,13 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
     @Transactional(readOnly = true)
     public List<CompensationExecutionModels.Assignment> assignments(String executorId) {
         return jdbc.query(
-                "select id, compensation_method, amount, status from compensation_execution "
-                        + "where assigned_executor_id = ? and status in ('READY', 'PROCESSING', 'UNKNOWN') "
+                "select id, compensation_method, amount, status, idempotency_key from compensation_execution "
+                        + "where assigned_executor_id = ? and (status in ('READY', 'PROCESSING') "
+                        + "or (status = 'UNKNOWN' and reconciliation_count < 3)) "
                         + "order by created_at, id",
                 (rs, row) -> new CompensationExecutionModels.Assignment(
                         rs.getObject(1, UUID.class), method(rs.getString(2)), rs.getBigDecimal(3),
-                        status(rs.getString(4))),
+                        status(rs.getString(4)), rs.getString(5)),
                 executorId);
     }
 
@@ -204,8 +205,7 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
         authorityLock.acquire(ticketId);
         ExecutionRow execution = lockExecution(command.executionId(), command.executorId());
         requireBoundParameters(execution, new CompensationExecutionModels.SuccessCommand(
-                command.executorId(), command.executionId(), command.attemptId(), command.requestId(),
-                command.idempotencyKey(), command.parameterDigest()));
+                command.executorId(), command.executionId(), command.requestId(), command.attempt()));
         if (execution.status() != CompensationExecutionModels.ExecutionStatus.PROCESSING
                 || !command.attemptId().equals(execution.processingAttemptId())) {
             conflict("execution is not held by this attempt");
@@ -250,8 +250,7 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
         authorityLock.acquire(ticketId);
         ExecutionRow execution = lockExecution(command.executionId(), command.executorId());
         requireBoundParameters(execution, new CompensationExecutionModels.SuccessCommand(
-                command.executorId(), command.executionId(), command.attemptId(), command.requestId(),
-                command.idempotencyKey(), command.parameterDigest()));
+                command.executorId(), command.executionId(), command.requestId(), command.attempt()));
         if (execution.status() != CompensationExecutionModels.ExecutionStatus.PROCESSING
                 || !command.attemptId().equals(execution.processingAttemptId())) {
             conflict("execution is not held by this attempt");
@@ -322,6 +321,9 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
         if (execution.status() != CompensationExecutionModels.ExecutionStatus.UNKNOWN) {
             conflict("only an unknown execution can be reconciled");
         }
+        if (execution.reconciliationCount() >= 3) {
+            conflict("reconciliation budget is exhausted");
+        }
         requireProviderQuery(command);
         if (command.outcome() == CompensationExecutionModels.ReconciliationOutcome.FOUND
                 && !expectedResultReference(execution).equals(command.resultReference())) {
@@ -345,8 +347,9 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
                     attemptId, execution.id());
             CompensationExecutionModels.SuccessResult success = succeed(
                     new CompensationExecutionModels.SuccessCommand(
-                            command.executorId(), execution.id(), attemptId, command.requestId(),
-                            execution.idempotencyKey(), execution.parameterDigest()));
+                            command.executorId(), execution.id(), command.requestId(),
+                            new CompensationExecutionModels.BoundAttempt(
+                                    attemptId, execution.idempotencyKey(), execution.parameterDigest())));
             status = success.status();
             customerMessage = success.customerMessage();
         } else if (command.outcome() == CompensationExecutionModels.ReconciliationOutcome.NOT_FOUND) {
@@ -392,12 +395,12 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
     private ExecutionRow lockExecution(UUID executionId, String executorId) {
         List<ExecutionRow> executions = jdbc.query(
                 "select id, reservation_id, order_reference, compensation_method, amount, status, "
-                        + "idempotency_key, parameter_digest, processing_attempt_id "
+                        + "idempotency_key, parameter_digest, processing_attempt_id, reconciliation_count "
                         + "from compensation_execution where id = ? and assigned_executor_id = ? for update",
                 (rs, row) -> new ExecutionRow(
                         rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), rs.getString(3),
                         method(rs.getString(4)), rs.getBigDecimal(5), status(rs.getString(6)), rs.getString(7),
-                        rs.getString(8), rs.getObject(9, UUID.class)),
+                        rs.getString(8), rs.getObject(9, UUID.class), rs.getInt(10)),
                 executionId, executorId);
         if (executions.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "assigned execution not found");
@@ -557,7 +560,7 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
             UUID id, UUID reservationId, String orderReference,
             CompensationExecutionModels.CompensationMethod method, BigDecimal amount,
             CompensationExecutionModels.ExecutionStatus status, String idempotencyKey,
-            String parameterDigest, UUID processingAttemptId) {}
+            String parameterDigest, UUID processingAttemptId, int reconciliationCount) {}
 
     private record ClaimReplay(
             String requestDigest, UUID executionId, UUID attemptId,

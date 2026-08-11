@@ -1,10 +1,7 @@
 package com.stellogic.customeragent.execution;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,13 +19,13 @@ import org.springframework.web.server.ResponseStatusException;
 public final class CompensationExecutionController {
     private static final String EXECUTOR_ID = "compensation-executor";
     private final CompensationExecutionService service;
-    private final byte[] executorToken;
+    private final ExecutorMachineIdentity executorIdentity;
 
     CompensationExecutionController(
             CompensationExecutionService service,
-            @Value("${baseline.identity.executor-token}") String executorToken) {
+            ExecutorMachineIdentity executorIdentity) {
         this.service = service;
-        this.executorToken = executorToken.getBytes(StandardCharsets.UTF_8);
+        this.executorIdentity = executorIdentity;
     }
 
     @GetMapping
@@ -66,8 +63,8 @@ public final class CompensationExecutionController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bound execution result required");
         }
         return service.succeed(new CompensationExecutionModels.SuccessCommand(
-                EXECUTOR_ID, executionId, body.attemptId(), requestId.trim(),
-                body.idempotencyKey(), body.parameterDigest()));
+                EXECUTOR_ID, executionId, requestId.trim(), new CompensationExecutionModels.BoundAttempt(
+                        body.attemptId(), body.idempotencyKey(), body.parameterDigest())));
     }
 
     @PostMapping("/{executionId}/unknown")
@@ -84,8 +81,8 @@ public final class CompensationExecutionController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bound unknown result required");
         }
         return service.markUnknown(new CompensationExecutionModels.UnknownCommand(
-                EXECUTOR_ID, executionId, body.attemptId(), requestId.trim(),
-                body.idempotencyKey(), body.parameterDigest()));
+                EXECUTOR_ID, executionId, requestId.trim(), new CompensationExecutionModels.BoundAttempt(
+                        body.attemptId(), body.idempotencyKey(), body.parameterDigest())));
     }
 
     @PostMapping("/{executionId}/failures")
@@ -102,8 +99,8 @@ public final class CompensationExecutionController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bound confirmed failure required");
         }
         return service.markFailed(new CompensationExecutionModels.FailureCommand(
-                EXECUTOR_ID, executionId, body.attemptId(), requestId.trim(),
-                body.idempotencyKey(), body.parameterDigest()));
+                EXECUTOR_ID, executionId, requestId.trim(), new CompensationExecutionModels.BoundAttempt(
+                        body.attemptId(), body.idempotencyKey(), body.parameterDigest())));
     }
 
     @PostMapping("/{executionId}/reconciliations")
@@ -131,12 +128,7 @@ public final class CompensationExecutionController {
     }
 
     private void requireExecutor(String authorization) {
-        byte[] actual = authorization != null && authorization.startsWith("Bearer ")
-                ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
-                : new byte[0];
-        if (!MessageDigest.isEqual(actual, executorToken)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "executor identity required");
-        }
+        executorIdentity.require(authorization);
     }
 
     record SuccessRequest(UUID attemptId, String idempotencyKey, String parameterDigest) {}

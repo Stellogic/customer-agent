@@ -1089,7 +1089,7 @@ def main() -> None:
         expect_status(ordinary_retry, 409)
         provider_reconciliation = client.get(
             f"{spring_url}/internal/compensation-simulator/{execution_id}/reconciliation",
-            headers=executor_headers,
+            headers={**executor_headers, "Idempotency-Key": winning_claim["idempotencyKey"]},
         )
         expect_status(provider_reconciliation, 200)
         provider_reconciliation_payload = provider_reconciliation.json()
@@ -1107,13 +1107,26 @@ def main() -> None:
         reconciliation_request_id = (
             f"reconcile:{execution_id}:{provider_reconciliation_payload['queryId']}"
         )
-        reconciled = client.post(
-            f"{spring_url}/internal/compensation-executions/{execution_id}/reconciliations",
-            headers={**executor_headers, "Idempotency-Key": reconciliation_request_id},
-            json=provider_reconciliation_payload,
+        reconciliation_barrier = threading.Barrier(2)
+
+        def submit_same_reconciliation() -> httpx.Response:
+            reconciliation_barrier.wait()
+            with httpx.Client(timeout=20.0) as concurrent_client:
+                return concurrent_client.post(
+                    f"{spring_url}/internal/compensation-executions/{execution_id}/reconciliations",
+                    headers={**executor_headers, "Idempotency-Key": reconciliation_request_id},
+                    json=provider_reconciliation_payload,
+                )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            concurrent_reconciliations = list(executor.map(
+                lambda _: submit_same_reconciliation(), range(2)
+            ))
+        assert [response.status_code for response in concurrent_reconciliations] == [200, 200]
+        assert sorted(response.json()["replayed"] for response in concurrent_reconciliations) == [False, True]
+        succeeded_payload = next(
+            response.json() for response in concurrent_reconciliations if not response.json()["replayed"]
         )
-        expect_status(reconciled, 200)
-        succeeded_payload = reconciled.json()
         assert succeeded_payload["status"] == "SUCCEEDED"
         assert succeeded_payload["customerMessage"] == (
             "已完成 26.80 CNY 模拟部分退款，退回原支付方式（尾号 4242）。"
@@ -1173,6 +1186,15 @@ def main() -> None:
             "select count(*) from compensation_execution_result where execution_id = %s",
             (uuid.UUID(execution_id),),
         ).fetchone()[0] == 1
+        assignments_after_budget = httpx.get(
+            f"{spring_url}/internal/compensation-executions",
+            headers=executor_headers,
+            timeout=20.0,
+        )
+        expect_status(assignments_after_budget, 200)
+        assert not any(
+            item["executionId"] == persistent_unknown_id for item in assignments_after_budget.json()
+        )
         assert connection.execute(
             "select count(*) from simulated_partial_refund where execution_id = %s",
             (uuid.UUID(execution_id),),
@@ -1285,7 +1307,7 @@ def main() -> None:
             for _ in range(reconciliation_rounds):
                 query = client.get(
                     f"{spring_url}/internal/compensation-simulator/{scenario_execution_id}/reconciliation",
-                    headers=executor_headers,
+                    headers={**executor_headers, "Idempotency-Key": claim["idempotencyKey"]},
                 )
                 expect_status(query, 200)
                 assert query.json()["outcome"] == expected

@@ -18,7 +18,8 @@ def execute_ready_once(client: httpx.Client) -> int:
         execution_id = assignment["executionId"]
         if assignment["status"] == "UNKNOWN":
             reconciliation = client.get(
-                f"/internal/compensation-simulator/{execution_id}/reconciliation"
+                f"/internal/compensation-simulator/{execution_id}/reconciliation",
+                headers={"Idempotency-Key": assignment["idempotencyKey"]},
             )
             reconciliation.raise_for_status()
             provider_result = reconciliation.json()

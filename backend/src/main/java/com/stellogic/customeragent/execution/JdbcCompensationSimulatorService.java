@@ -58,12 +58,15 @@ class JdbcCompensationSimulatorService implements CompensationSimulatorService {
 
     @Override
     @Transactional
-    public CompensationSimulatorModels.ReconciliationResult reconcile(UUID executionId) {
+    public CompensationSimulatorModels.ReconciliationResult reconcile(UUID executionId, String idempotencyKey) {
         List<ProviderOperation> operations = providerOperation(executionId, true);
         if (operations.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "provider execution identity not found");
         }
         ProviderOperation operation = operations.getFirst();
+        if (!operation.idempotencyKey().equals(idempotencyKey)) {
+            conflict("reconciliation identity conflict");
+        }
         int queryNumber = operation.queryCount() + 1;
         jdbc.update(
                 "update simulated_compensation_provider_operation set query_count = ? where execution_id = ?",

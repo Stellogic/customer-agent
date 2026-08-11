@@ -24,7 +24,7 @@ class CompensationExecutionControllerTest {
     private final CompensationExecutionService service =
             org.mockito.Mockito.mock(CompensationExecutionService.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-                    new CompensationExecutionController(service, "executor-secret"))
+                    new CompensationExecutionController(service, new ExecutorMachineIdentity("executor-secret")))
             .build();
 
     @Test
@@ -32,7 +32,8 @@ class CompensationExecutionControllerTest {
         when(service.assignments("compensation-executor")).thenReturn(List.of(
                 new CompensationExecutionModels.Assignment(
                         EXECUTION_ID, CompensationExecutionModels.CompensationMethod.COUPON,
-                        new BigDecimal("10.00"), CompensationExecutionModels.ExecutionStatus.READY)));
+                        new BigDecimal("10.00"), CompensationExecutionModels.ExecutionStatus.READY,
+                        "compensation-execution:revision")));
         when(service.claim(any())).thenReturn(new CompensationExecutionModels.ClaimResult(
                 EXECUTION_ID, ATTEMPT_ID, CompensationExecutionModels.ExecutionStatus.PROCESSING,
                 "compensation-execution:revision", PARAMETER_DIGEST,
@@ -44,6 +45,7 @@ class CompensationExecutionControllerTest {
                 .andExpect(jsonPath("$[0].executionId").value(EXECUTION_ID.toString()))
                 .andExpect(jsonPath("$[0].compensationMethod").value("COUPON"))
                 .andExpect(jsonPath("$[0].amount").value(10.00))
+                .andExpect(jsonPath("$[0].idempotencyKey").value("compensation-execution:revision"))
                 .andExpect(jsonPath("$[0].proposalRevisionId").doesNotExist())
                 .andExpect(jsonPath("$[0].decisionId").doesNotExist());
 
