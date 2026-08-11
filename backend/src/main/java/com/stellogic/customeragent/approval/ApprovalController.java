@@ -3,7 +3,10 @@ package com.stellogic.customeragent.approval;
 import java.util.List;
 import com.stellogic.customeragent.identity.SyntheticApprovers;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/approver/compensation-proposals")
@@ -45,16 +49,78 @@ public final class ApprovalController {
     }
 
     @GetMapping("/{revisionId}/approval-view")
-    ApprovalModels.ApprovalView view(
+    ResponseEntity<ApprovalModels.ApprovalView> view(
             @RequestHeader(value = "X-Synthetic-Approver-Id", required = false) String approverId,
             @RequestHeader(value = "X-Approval-Lease-Token", required = false) UUID leaseToken,
             @RequestHeader(value = "X-Approval-Lease-Version", required = false) Long leaseVersion,
             @PathVariable UUID revisionId) {
+        ApprovalModels.ViewCommand command = viewCommand(approverId, revisionId, leaseToken, leaseVersion);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.view(command));
+    }
+
+    @GetMapping(value = "/{revisionId}/approval-view/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    SseEmitter events(
+            @RequestHeader(value = "X-Synthetic-Approver-Id", required = false) String approverId,
+            @RequestHeader(value = "X-Approval-Lease-Token", required = false) UUID leaseToken,
+            @RequestHeader(value = "X-Approval-Lease-Version", required = false) Long leaseVersion,
+            @RequestHeader(value = "Last-Event-ID", required = false) String cursor,
+            @PathVariable UUID revisionId) {
+        ApprovalModels.ViewCommand command = viewCommand(approverId, revisionId, leaseToken, leaseVersion);
+        List<ApprovalModels.ApprovalViewEvent> replay = service.events(command, cursor);
+        SseEmitter emitter = new SseEmitter(60_000L);
+        try {
+            for (ApprovalModels.ApprovalViewEvent event : replay) sendAuthorized(emitter, command, event);
+            service.requireCurrentView(command);
+            emitter.send(SseEmitter.event().comment("connected"));
+        } catch (Exception exception) {
+            emitter.completeWithError(exception);
+            return emitter;
+        }
+        String nextCursor = replay.isEmpty() ? cursor : replay.getLast().cursor();
+        startIncrementalStream(emitter, command, nextCursor);
+        return emitter;
+    }
+
+    private void startIncrementalStream(
+            SseEmitter emitter, ApprovalModels.ViewCommand command, String initialCursor) {
+        AtomicBoolean closed = new AtomicBoolean();
+        emitter.onCompletion(() -> closed.set(true));
+        emitter.onTimeout(() -> { closed.set(true); emitter.complete(); });
+        emitter.onError(error -> closed.set(true));
+        Thread.ofVirtual().name("approval-view-events").start(() -> {
+            String cursor = initialCursor;
+            try {
+                while (!closed.get()) {
+                    Thread.sleep(100);
+                    List<ApprovalModels.ApprovalViewEvent> incremental = service.events(command, cursor);
+                    service.requireCurrentView(command);
+                    for (ApprovalModels.ApprovalViewEvent event : incremental) {
+                        sendAuthorized(emitter, command, event);
+                        cursor = event.cursor();
+                    }
+                }
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                emitter.complete();
+            } catch (Exception exception) {
+                emitter.completeWithError(exception);
+            }
+        });
+    }
+
+    private void sendAuthorized(
+            SseEmitter emitter, ApprovalModels.ViewCommand command, ApprovalModels.ApprovalViewEvent event)
+            throws java.io.IOException {
+        service.requireCurrentView(command);
+        emitter.send(SseEmitter.event().id(event.cursor()).name(event.eventType()).data(event.publicData()));
+    }
+
+    private static ApprovalModels.ViewCommand viewCommand(
+            String approverId, UUID revisionId, UUID leaseToken, Long leaseVersion) {
         if (leaseToken == null || leaseVersion == null || leaseVersion < 1) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "current approval lease required");
         }
-        return service.view(new ApprovalModels.ViewCommand(
-                requireApprover(approverId), revisionId, leaseToken, leaseVersion));
+        return new ApprovalModels.ViewCommand(requireApprover(approverId), revisionId, leaseToken, leaseVersion);
     }
 
     @PostMapping("/{revisionId}/release")

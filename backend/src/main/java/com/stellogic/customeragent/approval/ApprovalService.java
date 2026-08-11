@@ -9,6 +9,12 @@ interface ApprovalService {
 
     ApprovalModels.ApprovalView view(ApprovalModels.ViewCommand command);
 
+    List<ApprovalModels.ApprovalViewEvent> events(ApprovalModels.ViewCommand command, String afterCursor);
+
+    default void requireCurrentView(ApprovalModels.ViewCommand command) {
+        view(command);
+    }
+
     ApprovalModels.ReleaseResult release(ApprovalModels.ReleaseCommand command);
 
     ApprovalModels.RejectionResult reject(ApprovalModels.RejectionCommand command);

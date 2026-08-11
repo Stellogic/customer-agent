@@ -9,6 +9,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -45,13 +46,34 @@ public final class SyntheticIdentityController {
                 .build();
     }
 
+    @GetMapping("/enter/approver/{approverId}")
+    public ResponseEntity<Void> enterApprover(@PathVariable String approverId) {
+        if (!SyntheticApprovers.contains(approverId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        ResponseCookie cookie = ResponseCookie.from(SESSION_COOKIE, approverId)
+                .httpOnly(true)
+                .sameSite("Strict")
+                .path("/")
+                .build();
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create("/approver"))
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .build();
+    }
+
     @GetMapping("/session")
     public ResponseEntity<SyntheticIdentity> session(
             @CookieValue(value = SESSION_COOKIE, required = false) String sessionId) {
-        if (!"support-demo".equals(sessionId)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if ("support-demo".equals(sessionId)) {
+            return ResponseEntity.ok(new SyntheticIdentity("support-demo", "SUPPORT", "客服演示入口"));
         }
-        return ResponseEntity.ok(new SyntheticIdentity("support-demo", "SUPPORT", "客服演示入口"));
+        return SyntheticApprovers.entries().stream()
+                .filter(entry -> entry.id().equals(sessionId))
+                .findFirst()
+                .<ResponseEntity<SyntheticIdentity>>map(entry -> ResponseEntity.ok(
+                        new SyntheticIdentity(entry.id(), "APPROVER", entry.label())))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 
     public record SyntheticIdentity(String id, String role, String label) {}

@@ -445,6 +445,8 @@ def main() -> None:
         expect_status(approval_view, 200)
         approval_projection = approval_view.json()
         assert approval_projection["view"] == "APPROVAL_VIEW"
+        assert approval_projection["schema"] == "approval-view-v1"
+        assert approval_projection["cursor"] == "approval-view-v1:1"
         assert approval_projection["contentDigest"] == proposal_row[9]
         assert approval_projection["authoritativeAmount"] == 26.8
         assert approval_projection["orderReference"] == proposal_order_reference
@@ -477,6 +479,11 @@ def main() -> None:
             },
         )
         expect_status(denied_old_token, 403)
+        incompatible_cursor = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view/events",
+            headers={**lease_headers, "Last-Event-ID": "support-workbench-v1:1"},
+        )
+        expect_status(incompatible_cursor, 409)
 
         release_request = f"issue-20-release-{uuid.uuid4()}"
         released = client.post(
@@ -498,6 +505,11 @@ def main() -> None:
             headers=lease_headers,
         )
         expect_status(revoked_after_release, 403)
+        revoked_stream_after_release = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view/events",
+            headers={**lease_headers, "Last-Event-ID": approval_projection["cursor"]},
+        )
+        expect_status(revoked_stream_after_release, 403)
         rejection_after_release = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/reject",
             headers={**lease_headers, "Idempotency-Key": f"released-reject-{uuid.uuid4()}"},

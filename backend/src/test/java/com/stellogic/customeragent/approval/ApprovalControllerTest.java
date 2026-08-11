@@ -2,10 +2,14 @@ package com.stellogic.customeragent.approval;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -61,7 +65,7 @@ class ApprovalControllerTest {
     @Test
     void currentLeaseHolderLoadsOnlyTheApprovalView() throws Exception {
         when(service.view(any())).thenReturn(new ApprovalModels.ApprovalView(
-                "APPROVAL_VIEW", REVISION_ID, 1, "digest", "ORDER-DELAY-001", "LOGISTICS_DELAY",
+                "APPROVAL_VIEW", "approval-view-v1", "approval-view-v1:1", REVISION_ID, 1, "digest", "ORDER-DELAY-001", "LOGISTICS_DELAY",
                 80, 288000, "SIMULATED_PARTIAL_REFUND",
                 new BigDecimal("26.80"), new BigDecimal("26.80"), "delay-policy-v1", "OVER_72_HOURS",
                 List.of("ORDER_PAID", "ORDER_NOT_CANCELLED", "ORDER_NOT_FULLY_REFUNDED",
@@ -79,13 +83,46 @@ class ApprovalControllerTest {
                         .header("X-Approval-Lease-Token", LEASE_TOKEN)
                         .header("X-Approval-Lease-Version", "1"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.view").value("APPROVAL_VIEW"))
+                .andExpect(jsonPath("$.schema").value("approval-view-v1"))
+                .andExpect(jsonPath("$.cursor").value("approval-view-v1:1"))
                 .andExpect(jsonPath("$.contentDigest").value("digest"))
                 .andExpect(jsonPath("$.authoritativeAmount").value(26.80))
                 .andExpect(jsonPath("$.ticket").doesNotExist())
                 .andExpect(jsonPath("$.publicMessages").doesNotExist())
                 .andExpect(jsonPath("$.internalNotes").doesNotExist())
                 .andExpect(jsonPath("$.execution").doesNotExist());
+    }
+
+    @Test
+    void approvalViewEventStreamRequiresTheExactCurrentLeaseBeforeConnecting() throws Exception {
+        when(service.events(any(), any())).thenThrow(
+                new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN, "current approval lease required"));
+
+        mvc.perform(get("/api/approver/compensation-proposals/{revisionId}/approval-view/events", REVISION_ID)
+                        .header("X-Synthetic-Approver-Id", "approver-demo")
+                        .header("X-Approval-Lease-Token", LEASE_TOKEN)
+                        .header("X-Approval-Lease-Version", "1")
+                        .header("Last-Event-ID", "approval-view-v1:1"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void approvalViewReplayAndLiveDeliveryReauthorizeTheExactLease() throws Exception {
+        var event = new ApprovalModels.ApprovalViewEvent(
+                "approval-view-v1", 1, "APPROVAL_AUTHORITY_STARTED", REVISION_ID, 1, "ACTIVE");
+        when(service.events(any(), any())).thenReturn(List.of(event), List.of());
+
+        mvc.perform(get("/api/approver/compensation-proposals/{revisionId}/approval-view/events", REVISION_ID)
+                        .header("X-Synthetic-Approver-Id", "approver-demo")
+                        .header("X-Approval-Lease-Token", LEASE_TOKEN)
+                        .header("X-Approval-Lease-Version", "1")
+                        .header("Last-Event-ID", "approval-view-v1:0"))
+                .andExpect(request().asyncStarted());
+
+        verify(service, timeout(1_000).atLeast(3)).requireCurrentView(any());
     }
 
     @Test
