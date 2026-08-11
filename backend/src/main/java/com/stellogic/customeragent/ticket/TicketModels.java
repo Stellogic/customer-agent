@@ -4,7 +4,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-record CreateCustomerTicket(String customerId, String requestId, String orderReference, String description) {}
+record CreateCustomerTicket(
+        String customerId, String requestId, String orderReference, String description, String issueKind) {}
 
 record TicketCreationResult(UUID ticketId, boolean replayed) {}
 

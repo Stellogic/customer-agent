@@ -5,6 +5,7 @@ import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import com.stellogic.customeragent.sla.SlaService;
 import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
+import com.stellogic.customeragent.ticket.TicketResolutionTransition;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -33,6 +34,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private final SlaService slaService;
     private final TicketAuthorityLock authorityLock;
     private final CustomerPublicProjectionAppender publicProjection;
+    private final TicketResolutionTransition ticketResolution;
     private final DelayCompensationPolicy policy = new DelayCompensationPolicy();
 
     @Autowired
@@ -43,7 +45,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             JdbcCompensationProposalStore proposalStore,
             SlaService slaService,
             TicketAuthorityLock authorityLock,
-            CustomerPublicProjectionAppender publicProjection) {
+            CustomerPublicProjectionAppender publicProjection,
+            TicketResolutionTransition ticketResolution) {
         this.jdbc = jdbc;
         this.accessAudit = accessAudit;
         this.clock = clock;
@@ -51,6 +54,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         this.slaService = slaService;
         this.authorityLock = authorityLock;
         this.publicProjection = publicProjection;
+        this.ticketResolution = ticketResolution;
     }
 
     @Override
@@ -163,13 +167,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         slaService.evaluateTicket(ticketId, now);
-        int ticketUpdated = jdbc.update(
-                "update support_ticket set lifecycle_state = 'RESOLVED', "
-                        + "resolution_elapsed_seconds = resolution_elapsed_seconds + "
-                        + "case when resolution_running_since is null then 0 else greatest(0, extract(epoch from (?::timestamptz - resolution_running_since))::bigint) end, "
-                        + "resolution_running_since = null "
-                        + "where id = ? and lifecycle_state = 'INVESTIGATING' and handling_mode = 'AGENT'",
-                databaseTime, ticketId);
+        int ticketUpdated = ticketResolution.fromAgentInvestigation(ticketId, now);
         if (ticketUpdated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
         completeGeneration(generationId, databaseTime);
         publicProjection.appendAgentMessage(
