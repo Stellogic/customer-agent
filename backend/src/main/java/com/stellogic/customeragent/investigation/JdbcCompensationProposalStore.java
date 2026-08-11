@@ -28,8 +28,8 @@ class JdbcCompensationProposalStore {
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
                 content.orderReference() + "\nLOGISTICS_DELAY");
+        expiry.expireDueForOrder(content.orderReference());
         Instant now = clock.instant();
-        expiry.expireDueForOrder(content.orderReference(), now);
         List<ActiveProposal> active = jdbc.query(
                 "select id, proposal_id, revision_number, ticket_id, content_digest, status "
                         + "from compensation_proposal_revision where order_reference = ? "

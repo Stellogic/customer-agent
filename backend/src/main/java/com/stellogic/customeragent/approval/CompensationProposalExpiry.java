@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.approval;
 
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -10,9 +11,11 @@ import org.springframework.stereotype.Component;
 @Component
 public final class CompensationProposalExpiry {
     private final JdbcTemplate jdbc;
+    private final Clock clock;
 
-    public CompensationProposalExpiry(JdbcTemplate jdbc) {
+    public CompensationProposalExpiry(JdbcTemplate jdbc, Clock clock) {
         this.jdbc = jdbc;
+        this.clock = clock;
     }
 
     public void expireDue(Instant now) {
@@ -23,13 +26,17 @@ public final class CompensationProposalExpiry {
         revisionIds.forEach(revisionId -> expireLocked(revisionId, now));
     }
 
-    public void expireDueForOrder(String orderReference, Instant now) {
-        List<UUID> revisionIds = jdbc.query(
-                "select id from compensation_proposal_revision where order_reference = ? "
+    public void expireDueForOrder(String orderReference) {
+        List<PendingRevision> revisions = jdbc.query(
+                "select id, expires_at from compensation_proposal_revision where order_reference = ? "
                         + "and reason_code = 'LOGISTICS_DELAY' and status = 'PENDING_APPROVAL' "
-                        + "and expires_at <= ? for update",
-                (rs, row) -> rs.getObject(1, UUID.class), orderReference, Timestamp.from(now));
-        revisionIds.forEach(revisionId -> expireLocked(revisionId, now));
+                        + "for update",
+                (rs, row) -> new PendingRevision(
+                        rs.getObject(1, UUID.class), rs.getTimestamp(2).toInstant()), orderReference);
+        Instant now = clock.instant();
+        revisions.stream()
+                .filter(revision -> !revision.expiresAt().isAfter(now))
+                .forEach(revision -> expireLocked(revision.id(), now));
     }
 
     public boolean expireIfDue(UUID revisionId, Instant now) {
@@ -72,4 +79,5 @@ public final class CompensationProposalExpiry {
     }
 
     private record ExpiryScope(UUID ticketId, Long leaseVersion) {}
+    private record PendingRevision(UUID id, Instant expiresAt) {}
 }

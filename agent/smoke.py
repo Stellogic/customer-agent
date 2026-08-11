@@ -525,16 +525,12 @@ def main() -> None:
             "expires_at = '2026-08-09T14:00:00Z' where proposal_revision_id = %s and lease_version = 2",
             (first_revision_id,),
         )
-        proposal_expiry = connection.execute(
-            "select expires_at from compensation_proposal_revision where id = %s",
+        proposal_state = connection.execute(
+            "select status, expires_at from compensation_proposal_revision where id = %s",
             (first_revision_id,),
-        ).fetchone()[0]
-        assert proposal_expiry.isoformat() == "2026-08-10T14:00:00+00:00"
-        assert connection.execute(
-            "select count(*) from compensation_proposal_revision "
-            "where id = %s and status = 'PENDING_APPROVAL' and expires_at > %s",
-            (first_revision_id, proposal_expiry),
-        ).fetchone()[0] == 0
+        ).fetchone()
+        assert proposal_state[0] == "PENDING_APPROVAL"
+        assert proposal_state[1].isoformat() == "2026-08-10T14:00:00+00:00"
 
     with httpx.Client(timeout=20.0) as client:
         expired_view = client.get(
