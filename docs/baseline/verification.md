@@ -89,7 +89,7 @@ React 实时验收通过，生产构建扫描未发现 Agent 地址、本地机�
 
 ## Issue #25 增量验证
 
-验证日期：2026-08-11（Asia/Shanghai）。从空 Compose 合成数据卷执行 V1→V14，完整后端 Gradle 套件、Agent 测试镜像、React 7 项单测/类型检查/生产构建、真实 PostgreSQL/LangGraph/Spring smoke 和 React 实时验收全部通过。smoke 结果为 `status=UP`、69 条 checkpoint，并继续通过补偿、澄清恢复、SLA、客户与 Agent 转人工、审批、执行和对账不变量。
+验证日期：2026-08-11（Asia/Shanghai）。从空 Compose 合成数据卷执行 V1→V14，完整后端 Gradle 套件、Agent 测试镜像、React 9 项单测/类型检查/生产构建、真实 PostgreSQL/LangGraph/Spring smoke 和 React 实时验收全部通过。smoke 结果为 `status=UP`、69 条 checkpoint，并继续通过补偿、澄清恢复、SLA、客户与 Agent 转人工、审批、执行和对账不变量。
 
 `CUSTOMER_PUBLIC` 快照显式返回独立 `view=CUSTOMER_PUBLIC`、`schema=customer-public-v1` 和 `epoch:sequence` 游标；SSE 事件使用同一 view/schema envelope。React 验收证明重复或旧序号被忽略，仅严格下一序号可增量应用；序号缺口、epoch/view/schema 不兼容、未知事件或非白名单 payload 会中止旧流并整体换入新快照，断线期间显示“当前内容可能过期”并自动重读 Spring 快照。
 

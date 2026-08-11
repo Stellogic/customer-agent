@@ -68,6 +68,7 @@ class CustomerTicketApiTest {
                 Instant.parse("2026-08-09T00:00:00Z"),
                 "customer-public-v1",
                 2,
+                1,
                 List.of(
                         new PublicMessage("CUSTOMER", "物流已经延迟多日", Instant.parse("2026-08-09T00:00:00Z")),
                         new PublicMessage("SUPPORT", "已受理", Instant.parse("2026-08-09T00:00:00Z"))),
@@ -83,6 +84,7 @@ class CustomerTicketApiTest {
                 .andExpect(jsonPath("$.cursor").value("customer-public-v1:2"))
                 .andExpect(jsonPath("$.ticket.lifecycleState").value("INVESTIGATING"))
                 .andExpect(jsonPath("$.ticket.handlingMode").value("AGENT"))
+                .andExpect(jsonPath("$.ticket.agentGeneration").value(1))
                 .andExpect(jsonPath("$.ticket.firstRespondedAt").exists())
                 .andExpect(jsonPath("$.messages.length()").value(2))
                 .andExpect(jsonPath("$.internalNotes").doesNotExist())
@@ -94,13 +96,13 @@ class CustomerTicketApiTest {
     }
 
     @Test
-    void customerCanReplayViewScopedSseAfterASequence() throws Exception {
+    void eventArrivingBetweenInitialReplayAndLivePollingIsDeliveredWithoutAGap() throws Exception {
         when(service.events("customer-demo", TICKET_ID, "customer-public-v1:0"))
                 .thenReturn(List.of(new CustomerPublicEvent(
-                        "customer-public-v1", 1, "TICKET_ACCEPTED", "{\"ticketId\":\"" + TICKET_ID + "\"}")));
+                        "customer-public-v1", 1, 1, "TICKET_ACCEPTED", "{\"ticketId\":\"" + TICKET_ID + "\"}")));
         when(service.events("customer-demo", TICKET_ID, "customer-public-v1:1"))
                 .thenReturn(List.of(new CustomerPublicEvent(
-                        "customer-public-v1", 2, "PUBLIC_MESSAGE_APPENDED", "{\"author\":\"SUPPORT\"}")));
+                        "customer-public-v1", 2, 1, "PUBLIC_MESSAGE_APPENDED", "{\"author\":\"SUPPORT\"}")));
         when(service.events("customer-demo", TICKET_ID, "customer-public-v1:2")).thenReturn(List.of());
 
         mvc.perform(get("/api/customer/tickets/{ticketId}/events", TICKET_ID)
@@ -111,16 +113,17 @@ class CustomerTicketApiTest {
                 .andExpect(request().asyncStarted());
 
         verify(service, timeout(2_000)).events("customer-demo", TICKET_ID, "customer-public-v1:1");
+        verify(service, timeout(2_000)).events("customer-demo", TICKET_ID, "customer-public-v1:2");
     }
 
     @Test
     void publicEventUsesViewScopedSchemaEnvelope() {
         var event = new CustomerPublicEvent(
-                "customer-public-v1", 3, "PUBLIC_MESSAGE_APPENDED",
+                "customer-public-v1", 3, 1, "PUBLIC_MESSAGE_APPENDED",
                 "{\"author\":\"SUPPORT\",\"body\":\"正在处理\",\"sentAt\":\"2026-08-09T00:01:00Z\"}");
 
         org.assertj.core.api.Assertions.assertThat(event.publicData()).isEqualTo(
-                "{\"view\":\"CUSTOMER_PUBLIC\",\"schema\":\"customer-public-v1\",\"payload\":"
+                "{\"view\":\"CUSTOMER_PUBLIC\",\"schema\":\"customer-public-v1\",\"generation\":1,\"payload\":"
                         + "{\"author\":\"SUPPORT\",\"body\":\"正在处理\",\"sentAt\":\"2026-08-09T00:01:00Z\"}}");
     }
 

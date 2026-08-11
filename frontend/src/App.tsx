@@ -1,16 +1,23 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 
+const CUSTOMER_PUBLIC_SCHEMA = "customer-public-v1" as const;
+
 type Snapshot = {
   view: "CUSTOMER_PUBLIC";
-  schema: "customer-public-v1";
+  schema: typeof CUSTOMER_PUBLIC_SCHEMA;
   cursor: string;
-  ticket: { id: string; lifecycleState: string; handlingMode: string; firstRespondedAt: string };
+  ticket: { id: string; lifecycleState: string; handlingMode: string; agentGeneration: number; firstRespondedAt: string };
   messages: Array<{ author: string; body: string; sentAt: string }>;
   clarification: { id: string; promptCode: string; question: string } | null;
 };
 
 type PublicEvent = { id: string; type: string; data: string };
-type EventEnvelope = { view: "CUSTOMER_PUBLIC"; schema: "customer-public-v1"; payload: unknown };
+type EventEnvelope = {
+  view: "CUSTOMER_PUBLIC";
+  schema: typeof CUSTOMER_PUBLIC_SCHEMA;
+  generation: number;
+  payload: unknown;
+};
 
 const customerHeaders = { "X-Synthetic-Customer-Id": "customer-demo" };
 
@@ -66,6 +73,7 @@ export function App() {
     if (!isSnapshot(authoritative)) throw new Error("incompatible snapshot");
     snapshotRef.current = authoritative;
     setSnapshot(authoritative);
+    setError("");
     globalThis.history.replaceState(null, "", `?ticket=${ticketId}`);
     void consumeEvents(ticketId, authoritative.cursor);
   }
@@ -210,8 +218,16 @@ export function App() {
     } catch {
       return false;
     }
-    if (!isRecord(envelope) || !hasOnlyKeys(envelope, ["view", "schema", "payload"])
-      || envelope.view !== "CUSTOMER_PUBLIC" || envelope.schema !== "customer-public-v1") return false;
+    if (!isRecord(envelope) || !hasOnlyKeys(envelope, ["view", "schema", "generation", "payload"])
+      || envelope.view !== "CUSTOMER_PUBLIC" || envelope.schema !== CUSTOMER_PUBLIC_SCHEMA
+      || !Number.isSafeInteger(envelope.generation) || envelope.generation < 0) return false;
+    if (envelope.generation < current.ticket.agentGeneration) {
+      const next = { ...current, cursor: event.id };
+      snapshotRef.current = next;
+      setSnapshot(next);
+      return true;
+    }
+    if (envelope.generation > current.ticket.agentGeneration) return false;
     const payload = envelope.payload;
     let next: Snapshot;
     if (event.type === "PUBLIC_MESSAGE_APPENDED") {
@@ -306,15 +322,20 @@ export function App() {
 }
 
 function isSnapshot(value: unknown): value is Snapshot {
-  if (!isRecord(value) || value.view !== "CUSTOMER_PUBLIC" || value.schema !== "customer-public-v1") return false;
+  if (!isRecord(value) || value.view !== "CUSTOMER_PUBLIC" || value.schema !== CUSTOMER_PUBLIC_SCHEMA) return false;
   const cursor = typeof value.cursor === "string" ? parseCursor(value.cursor) : null;
   return cursor?.epoch === value.schema && isRecord(value.ticket) && Array.isArray(value.messages)
+    && Number.isSafeInteger(value.ticket.agentGeneration) && Number(value.ticket.agentGeneration) >= 0
     && value.messages.every(isPublicMessage);
 }
 
 function parseCursor(cursor: string) {
-  const match = /^(customer-public-v1):(0|[1-9]\d*)$/.exec(cursor);
-  return match ? { epoch: match[1], sequence: Number(match[2]) } : null;
+  const separator = cursor.lastIndexOf(":");
+  if (separator < 1 || cursor.slice(0, separator) !== CUSTOMER_PUBLIC_SCHEMA) return null;
+  const sequence = cursor.slice(separator + 1);
+  return /^(0|[1-9]\d*)$/.test(sequence)
+    ? { epoch: CUSTOMER_PUBLIC_SCHEMA, sequence: Number(sequence) }
+    : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

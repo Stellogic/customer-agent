@@ -1,8 +1,24 @@
+ALTER TABLE customer_public_event
+    ADD COLUMN agent_generation bigint NOT NULL DEFAULT 0 CHECK (agent_generation >= 0);
+
+UPDATE customer_public_event e
+SET agent_generation = generation.latest
+FROM (
+    SELECT ticket_id, max(generation_number) AS latest
+    FROM agent_processing_generation
+    GROUP BY ticket_id
+) generation
+WHERE generation.ticket_id = e.ticket_id;
+
 CREATE FUNCTION validate_customer_public_event_payload() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
     allowed_keys text[];
 BEGIN
+    SELECT coalesce(max(generation_number), 0)
+    INTO NEW.agent_generation
+    FROM agent_processing_generation
+    WHERE ticket_id = NEW.ticket_id;
     IF jsonb_typeof(NEW.payload) <> 'object' THEN
         RAISE EXCEPTION 'customer public payload must be an object';
     END IF;

@@ -20,15 +20,17 @@ record CustomerPublicSnapshot(
         Instant firstRespondedAt,
         String epoch,
         long sequence,
+        long agentGeneration,
         List<PublicMessage> messages,
         CurrentClarification clarification) {}
 
-record CustomerPublicEvent(String epoch, long sequence, String type, String jsonPayload) {
+record CustomerPublicEvent(String epoch, long sequence, long agentGeneration, String type, String jsonPayload) {
     String cursor() {
         return epoch + ":" + sequence;
     }
 
     String publicData() {
-        return "{\"view\":\"CUSTOMER_PUBLIC\",\"schema\":\"" + epoch + "\",\"payload\":" + jsonPayload + "}";
+        return "{\"view\":\"CUSTOMER_PUBLIC\",\"schema\":\"" + epoch + "\",\"generation\":"
+                + agentGeneration + ",\"payload\":" + jsonPayload + "}";
     }
 }

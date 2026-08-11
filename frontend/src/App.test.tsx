@@ -16,7 +16,7 @@ describe("客户帮助中心", () => {
         view: "CUSTOMER_PUBLIC",
         schema: "customer-public-v1",
         cursor: "customer-public-v1:2",
-        ticket: { id: "ticket-13", lifecycleState: "INVESTIGATING", handlingMode: "AGENT", firstRespondedAt: "2026-08-09T00:00:00Z" },
+        ticket: { id: "ticket-13", lifecycleState: "INVESTIGATING", handlingMode: "AGENT", agentGeneration: 1, firstRespondedAt: "2026-08-09T00:00:00Z" },
         messages: [
           { author: "CUSTOMER", body: "物流已经延迟多日", sentAt: "2026-08-09T00:00:00Z" },
           { author: "SUPPORT", body: "您的问题已受理", sentAt: "2026-08-09T00:00:00Z" },
@@ -61,6 +61,7 @@ describe("客户帮助中心", () => {
             id: ticketId,
             lifecycleState: waiting ? "WAITING_FOR_CUSTOMER" : "INVESTIGATING",
             handlingMode: "AGENT",
+            agentGeneration: 1,
             firstRespondedAt: "2026-08-09T00:00:00Z",
           },
           messages: [],
@@ -115,6 +116,7 @@ describe("客户帮助中心", () => {
             id: ticketId,
             lifecycleState: "WAITING_FOR_CUSTOMER",
             handlingMode: handedOff ? "HUMAN" : "AGENT",
+            agentGeneration: 1,
             firstRespondedAt: "2026-08-09T00:00:00Z",
           },
           messages: handedOff ? [{
@@ -167,6 +169,7 @@ describe("客户帮助中心", () => {
         id: ticketId,
         lifecycleState: "INVESTIGATING",
         handlingMode: "HUMAN",
+        agentGeneration: 1,
         firstRespondedAt: "2026-08-09T00:00:00Z",
       },
       messages: [{
@@ -218,7 +221,7 @@ describe("客户帮助中心", () => {
       if (url.endsWith("/events")) {
         init?.signal?.addEventListener("abort", () => { aborted = true; });
         streamReads += 1;
-        return streamReads === 1 ? firstStream : eventResponse([]);
+        return streamReads === 1 ? firstStream : openEventResponse();
       }
       const snapshotReads = vi.mocked(globalThis.fetch).mock.calls.filter(([value]) => !String(value).endsWith("/events")).length;
       return snapshotResponse(ticketId, snapshotReads === 1 ? "customer-public-v1:2" : "customer-public-v1:8",
@@ -231,6 +234,7 @@ describe("客户帮助中心", () => {
     expect(screen.queryByText("旧快照")).not.toBeInTheDocument();
     expect(screen.queryByText("不应拼接的缺口消息")).not.toBeInTheDocument();
     expect(aborted).toBe(true);
+    expect(screen.queryByText(/当前内容可能过期/)).not.toBeInTheDocument();
   });
 
   it("未知事件或含内部字段的 payload 不进入页面并触发快照恢复", async () => {
@@ -249,6 +253,37 @@ describe("客户帮助中心", () => {
     expect(await screen.findByText("安全快照")).toBeInTheDocument();
     expect(screen.queryByText("secret")).not.toBeInTheDocument();
   });
+
+  it("在 AGENT 模式下也用公开 generation fence 忽略旧代次迟到事件", async () => {
+    const ticketId = "25000000-0000-0000-0000-000000000004";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(snapshotResponse(ticketId, "customer-public-v1:2", []))
+      .mockResolvedValueOnce(eventResponse([
+        publicEvent("customer-public-v1:3", "PUBLIC_MESSAGE_APPENDED", message("旧代次消息"), 0),
+        publicEvent("customer-public-v1:4", "PUBLIC_MESSAGE_APPENDED", message("当前代次消息"), 1),
+      ]));
+
+    render(<App />);
+
+    expect(await screen.findByText("当前代次消息")).toBeInTheDocument();
+    expect(screen.queryByText("旧代次消息")).not.toBeInTheDocument();
+  });
+
+  it("窄屏下仍可读取会话状态并使用主要操作", async () => {
+    const ticketId = "25000000-0000-0000-0000-000000000005";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    Object.defineProperty(globalThis, "innerWidth", { configurable: true, value: 375 });
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(snapshotResponse(ticketId, "customer-public-v1:2", [message("窄屏公开会话")]))
+      .mockResolvedValueOnce(eventResponse([]));
+
+    render(<App />);
+
+    expect(await screen.findByText("窄屏公开会话")).toBeInTheDocument();
+    expect(screen.getByText("调查中")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "转人工处理" })).toBeInTheDocument();
+  });
 });
 
 function message(body: string) {
@@ -260,16 +295,23 @@ function snapshotResponse(ticketId: string, cursor: string, messages: ReturnType
     view: "CUSTOMER_PUBLIC",
     schema: "customer-public-v1",
     cursor,
-    ticket: { id: ticketId, lifecycleState: "INVESTIGATING", handlingMode: "AGENT", firstRespondedAt: "2026-08-09T00:00:00Z" },
+    ticket: { id: ticketId, lifecycleState: "INVESTIGATING", handlingMode: "AGENT", agentGeneration: 1, firstRespondedAt: "2026-08-09T00:00:00Z" },
     messages,
     clarification: null,
   }), { status: 200 });
 }
 
-function publicEvent(id: string, type: string, payload: unknown) {
-  return `id:${id}\nevent:${type}\ndata:${JSON.stringify({ view: "CUSTOMER_PUBLIC", schema: "customer-public-v1", payload })}\n\n`;
+function publicEvent(id: string, type: string, payload: unknown, generation = 1) {
+  return `id:${id}\nevent:${type}\ndata:${JSON.stringify({ view: "CUSTOMER_PUBLIC", schema: "customer-public-v1", generation, payload })}\n\n`;
 }
 
 function eventResponse(events: string[]) {
   return new Response(events.join(""), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+}
+
+function openEventResponse() {
+  return new Response(new ReadableStream({ start() {} }), {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  });
 }
