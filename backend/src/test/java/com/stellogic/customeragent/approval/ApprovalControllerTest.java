@@ -104,7 +104,7 @@ class ApprovalControllerTest {
     @Test
     void currentLeaseHolderRejectsTheBoundRevisionWithAnInternalReason() throws Exception {
         when(service.reject(any())).thenReturn(new ApprovalModels.RejectionResult(
-                REVISION_ID, 1, "REJECTED", false));
+                REVISION_ID, 1, ApprovalModels.ProposalDecision.REJECTED, false));
 
         mvc.perform(post("/api/approver/compensation-proposals/{revisionId}/reject", REVISION_ID)
                         .header("X-Synthetic-Approver-Id", "approver-demo")
@@ -121,6 +121,32 @@ class ApprovalControllerTest {
                 .andExpect(jsonPath("$.decision").value("REJECTED"))
                 .andExpect(jsonPath("$.replayed").value(false))
                 .andExpect(jsonPath("$.internalReason").doesNotExist());
+    }
+
+    @Test
+    void currentLeaseHolderApprovesTheBoundRevisionWithoutClaimingExecutionSuccess() throws Exception {
+        UUID executionId = UUID.fromString("20000000-0000-0000-0000-000000000003");
+        when(service.approve(any())).thenReturn(new ApprovalModels.ApprovalResult(
+                REVISION_ID, 1, ApprovalModels.ProposalDecision.APPROVED, executionId,
+                ApprovalModels.CompensationExecutionStatus.READY, false));
+
+        mvc.perform(post("/api/approver/compensation-proposals/{revisionId}/approve", REVISION_ID)
+                        .header("X-Synthetic-Approver-Id", "approver-demo")
+                        .header("X-Approval-Lease-Token", LEASE_TOKEN)
+                        .header("X-Approval-Lease-Version", "1")
+                        .header("Idempotency-Key", "decision-22")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"proposalRevision":1,"contentDigest":"%s","internalNote":"符合当前政策"}
+                                """.formatted(CONTENT_DIGEST)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.proposalRevisionId").value(REVISION_ID.toString()))
+                .andExpect(jsonPath("$.decision").value("APPROVED"))
+                .andExpect(jsonPath("$.executionId").value(executionId.toString()))
+                .andExpect(jsonPath("$.executionStatus").value("READY"))
+                .andExpect(jsonPath("$.replayed").value(false))
+                .andExpect(jsonPath("$.executionSucceeded").doesNotExist())
+                .andExpect(jsonPath("$.internalNote").doesNotExist());
     }
 
     @Test

@@ -12,4 +12,6 @@ interface ApprovalService {
     ApprovalModels.ReleaseResult release(ApprovalModels.ReleaseCommand command);
 
     ApprovalModels.RejectionResult reject(ApprovalModels.RejectionCommand command);
+
+    ApprovalModels.ApprovalResult approve(ApprovalModels.ApprovalCommand command);
 }
