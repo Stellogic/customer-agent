@@ -14,6 +14,7 @@ describe("客户帮助中心", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ ticketId: "ticket-13", replayed: false }), { status: 201 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         view: "CUSTOMER_PUBLIC",
+        schema: "customer-public-v1",
         cursor: "customer-public-v1:2",
         ticket: { id: "ticket-13", lifecycleState: "INVESTIGATING", handlingMode: "AGENT", firstRespondedAt: "2026-08-09T00:00:00Z" },
         messages: [
@@ -22,8 +23,8 @@ describe("客户帮助中心", () => {
         ],
       }), { status: 200 }))
       .mockResolvedValueOnce(new Response(
-        'id:customer-public-v1:3\nevent:PUBLIC_MESSAGE_APPENDED\ndata:{"author":"SUPPORT","body":"正在核对物流轨迹","sentAt":"2026-08-09T00:01:00Z"}\n\n' +
-        'id:customer-public-v1:4\nevent:CUSTOMER_CLARIFICATION_REQUESTED\ndata:{"lifecycleState":"WAITING_FOR_CUSTOMER","clarification":{"id":"clarification-16","promptCode":"ORDER_CONFIRMATION_CODE","question":"请回复订单确认码（A 或 B）。"}}\n\n',
+        publicEvent("customer-public-v1:3", "PUBLIC_MESSAGE_APPENDED", { author: "SUPPORT", body: "正在核对物流轨迹", sentAt: "2026-08-09T00:01:00Z" }) +
+        publicEvent("customer-public-v1:4", "CUSTOMER_CLARIFICATION_REQUESTED", { lifecycleState: "WAITING_FOR_CUSTOMER", clarification: { id: "clarification-16", promptCode: "ORDER_CONFIRMATION_CODE", question: "请回复订单确认码（A 或 B）。" } }),
         { status: 200, headers: { "Content-Type": "text/event-stream" } },
       ));
 
@@ -54,6 +55,7 @@ describe("客户帮助中心", () => {
         const waiting = snapshotReads === 1;
         return new Response(JSON.stringify({
           view: "CUSTOMER_PUBLIC",
+          schema: "customer-public-v1",
           cursor: waiting ? "customer-public-v1:4" : "customer-public-v1:6",
           ticket: {
             id: ticketId,
@@ -107,6 +109,7 @@ describe("客户帮助中心", () => {
         const handedOff = snapshotReads > 1;
         return new Response(JSON.stringify({
           view: "CUSTOMER_PUBLIC",
+          schema: "customer-public-v1",
           cursor: handedOff ? "customer-public-v1:6" : "customer-public-v1:4",
           ticket: {
             id: ticketId,
@@ -158,6 +161,7 @@ describe("客户帮助中心", () => {
     globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({
       view: "CUSTOMER_PUBLIC",
+      schema: "customer-public-v1",
       cursor: "customer-public-v1:6",
       ticket: {
         id: ticketId,
@@ -172,7 +176,7 @@ describe("客户帮助中心", () => {
       }],
       clarification: null,
     }), { status: 200 })).mockResolvedValueOnce(new Response(
-      'id:customer-public-v1:7\nevent:PUBLIC_MESSAGE_APPENDED\ndata:{"author":"AGENT","body":"不应展示的旧代次结论","sentAt":"2026-08-09T00:02:00Z"}\n\n',
+      publicEvent("customer-public-v1:7", "PUBLIC_MESSAGE_APPENDED", { author: "AGENT", body: "不应展示的旧代次结论", sentAt: "2026-08-09T00:02:00Z" }),
       { status: 200, headers: { "Content-Type": "text/event-stream" } },
     ));
 
@@ -182,4 +186,90 @@ describe("客户帮助中心", () => {
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
     expect(screen.queryByText("不应展示的旧代次结论")).not.toBeInTheDocument();
   });
+
+  it("忽略重复和旧序号，只按严格下一序号应用增量", async () => {
+    const ticketId = "25000000-0000-0000-0000-000000000001";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(snapshotResponse(ticketId, "customer-public-v1:2", []))
+      .mockResolvedValueOnce(eventResponse([
+        publicEvent("customer-public-v1:2", "PUBLIC_MESSAGE_APPENDED", message("old")),
+        publicEvent("customer-public-v1:3", "PUBLIC_MESSAGE_APPENDED", message("严格下一条")),
+        publicEvent("customer-public-v1:3", "PUBLIC_MESSAGE_APPENDED", message("duplicate")),
+      ]));
+
+    render(<App />);
+
+    expect(await screen.findByText("严格下一条")).toBeInTheDocument();
+    expect(screen.queryByText("old")).not.toBeInTheDocument();
+    expect(screen.queryByText("duplicate")).not.toBeInTheDocument();
+  });
+
+  it("序号缺口时关闭旧流并整体替换为新的权威快照", async () => {
+    const ticketId = "25000000-0000-0000-0000-000000000002";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    let aborted = false;
+    const firstStream = eventResponse([
+      publicEvent("customer-public-v1:4", "PUBLIC_MESSAGE_APPENDED", message("不应拼接的缺口消息")),
+    ]);
+    let streamReads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith("/events")) {
+        init?.signal?.addEventListener("abort", () => { aborted = true; });
+        streamReads += 1;
+        return streamReads === 1 ? firstStream : eventResponse([]);
+      }
+      const snapshotReads = vi.mocked(globalThis.fetch).mock.calls.filter(([value]) => !String(value).endsWith("/events")).length;
+      return snapshotResponse(ticketId, snapshotReads === 1 ? "customer-public-v1:2" : "customer-public-v1:8",
+        snapshotReads === 1 ? [message("旧快照")] : [message("恢复后权威快照")]);
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("恢复后权威快照")).toBeInTheDocument();
+    expect(screen.queryByText("旧快照")).not.toBeInTheDocument();
+    expect(screen.queryByText("不应拼接的缺口消息")).not.toBeInTheDocument();
+    expect(aborted).toBe(true);
+  });
+
+  it("未知事件或含内部字段的 payload 不进入页面并触发快照恢复", async () => {
+    const ticketId = "25000000-0000-0000-0000-000000000003";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(snapshotResponse(ticketId, "customer-public-v1:2", [message("初始快照")]))
+      .mockResolvedValueOnce(eventResponse([
+        publicEvent("customer-public-v1:3", "MODEL_REASONING", { reasoning: "secret" }),
+      ]))
+      .mockResolvedValueOnce(snapshotResponse(ticketId, "customer-public-v1:4", [message("安全快照")]))
+      .mockResolvedValueOnce(eventResponse([]));
+
+    render(<App />);
+
+    expect(await screen.findByText("安全快照")).toBeInTheDocument();
+    expect(screen.queryByText("secret")).not.toBeInTheDocument();
+  });
 });
+
+function message(body: string) {
+  return { author: "SUPPORT", body, sentAt: "2026-08-09T00:01:00Z" };
+}
+
+function snapshotResponse(ticketId: string, cursor: string, messages: ReturnType<typeof message>[]) {
+  return new Response(JSON.stringify({
+    view: "CUSTOMER_PUBLIC",
+    schema: "customer-public-v1",
+    cursor,
+    ticket: { id: ticketId, lifecycleState: "INVESTIGATING", handlingMode: "AGENT", firstRespondedAt: "2026-08-09T00:00:00Z" },
+    messages,
+    clarification: null,
+  }), { status: 200 });
+}
+
+function publicEvent(id: string, type: string, payload: unknown) {
+  return `id:${id}\nevent:${type}\ndata:${JSON.stringify({ view: "CUSTOMER_PUBLIC", schema: "customer-public-v1", payload })}\n\n`;
+}
+
+function eventResponse(events: string[]) {
+  return new Response(events.join(""), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+}

@@ -138,7 +138,7 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
     @Override
     @Transactional(readOnly = true)
     public List<CustomerPublicEvent> events(String customerId, UUID ticketId, String afterCursor) {
-        snapshot(customerId, ticketId);
+        CustomerPublicSnapshot authority = snapshot(customerId, ticketId);
         long after = 0;
         if (afterCursor != null && !afterCursor.isBlank()) {
             int separator = afterCursor.lastIndexOf(':');
@@ -150,6 +150,13 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
             } catch (NumberFormatException exception) {
                 throw new ProjectionCursorException();
             }
+        }
+        if (after < 0 || after > authority.sequence()) throw new ProjectionCursorException();
+        Long firstRetained = jdbc.queryForObject(
+                "select min(sequence) from customer_public_event where ticket_id = ? and epoch = ?",
+                Long.class, ticketId, EPOCH);
+        if (after < authority.sequence() && firstRetained != null && firstRetained > after + 1) {
+            throw new ProjectionCursorException();
         }
         return jdbc.query(
                 "select epoch, sequence, event_type, payload::text from customer_public_event where ticket_id = ? and epoch = ? and sequence > ? order by sequence",

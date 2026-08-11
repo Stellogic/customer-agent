@@ -27,4 +27,8 @@ record CustomerPublicEvent(String epoch, long sequence, String type, String json
     String cursor() {
         return epoch + ":" + sequence;
     }
+
+    String publicData() {
+        return "{\"view\":\"CUSTOMER_PUBLIC\",\"schema\":\"" + epoch + "\",\"payload\":" + jsonPayload + "}";
+    }
 }

@@ -86,3 +86,13 @@ React 实时验收通过，生产构建扫描未发现 Agent 地址、本地机�
 调查异常转人工复用 #18 的同一 `HumanHandoffService` 事务：保留生命周期、切换 `HUMAN`、撤销当前 generation、失效澄清、发布固定公开说明、写入共享队列和审计。客户人工偏好保持 `false`，不会把 Agent 发起的转人工伪造成客户请求。相同 generation/request/参数在转人工后仍可历史重放；不同参数复用返回 `409`，新请求和旧 generation 工具调用返回 `403`。两个不同异常理由并发触发观察到 `[202, 403]`，数据库只有一条请求、一个固定公开消息和一个 `AGENT_HUMAN_HANDOFF` 队列原因。
 
 持久化摘要仅包含 `conclusionCode` 与受控的事实 `type`、`value`、`evidenceReference`，并且每项事实必须精确匹配当前 generation 在 Spring 中已经记录的调查事实；伪造值或仅伪造合法引用前缀会返回 `422`，不会改变工单或发布消息。客户投影不含内部理由码或摘要，共享队列只呈现聚合理由，不提供完整摘要读取入口。集成验收还发现 Agent 发起转人工最初错误限制为 `INVESTIGATING`；修复后当前有效 generation 在 `WAITING_FOR_CUSTOMER` 等未关闭生命周期也可转人工，同时保持原生命周期。宿主 Docker 代理仍不可达，本轮运行镜像由本地 #18 固定运行时层与本轮已通过测试的 JAR、Agent 源码和前端产物离线组装，不把该结果表述为外部镜像仓库可用性验证。
+
+## Issue #25 增量验证
+
+验证日期：2026-08-11（Asia/Shanghai）。从空 Compose 合成数据卷执行 V1→V14，完整后端 Gradle 套件、Agent 测试镜像、React 7 项单测/类型检查/生产构建、真实 PostgreSQL/LangGraph/Spring smoke 和 React 实时验收全部通过。smoke 结果为 `status=UP`、69 条 checkpoint，并继续通过补偿、澄清恢复、SLA、客户与 Agent 转人工、审批、执行和对账不变量。
+
+`CUSTOMER_PUBLIC` 快照显式返回独立 `view=CUSTOMER_PUBLIC`、`schema=customer-public-v1` 和 `epoch:sequence` 游标；SSE 事件使用同一 view/schema envelope。React 验收证明重复或旧序号被忽略，仅严格下一序号可增量应用；序号缺口、epoch/view/schema 不兼容、未知事件或非白名单 payload 会中止旧流并整体换入新快照，断线期间显示“当前内容可能过期”并自动重读 Spring 快照。
+
+真实 API 回读确认非本人事件流返回 `404`，不兼容游标返回 `409/SNAPSHOT_REQUIRED`，SSE 数据包含预期 view/schema envelope。V14 数据库触发器用事件类型白名单约束 payload 顶层字段和澄清子结构；直接写入含 `reasoning` 的公开消息被数据库拒绝。旧 generation 的迟到业务写入仍由既有 Spring 权威入口拒绝，React 对 `HUMAN` 模式下迟到的 Agent 消息再做防御。
+
+完整 Compose 构建仍因宿主 Docker 代理 `127.0.0.1:7897` 无法读取 Temurin/nginx 元数据；本轮使用已通过测试的 JAR 和前端产物与本地缓存运行时层离线组装。真实进程验收不表示外部镜像仓库可用。
