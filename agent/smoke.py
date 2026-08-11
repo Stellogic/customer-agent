@@ -884,6 +884,276 @@ def main() -> None:
             )
         return fixture_ticket_id, fixture_generation_id, fixture_revision_id
 
+    approval_digest = "9" * 64
+    approval_ticket_id, _, approval_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-APPROVAL", approval_digest, "审批成功验收"
+    )
+    with httpx.Client(timeout=20.0) as client:
+        approval_claim = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{approval_revision_id}/claims",
+            headers={**approver_headers, "Idempotency-Key": f"approve-claim-{uuid.uuid4()}"},
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(approval_claim, 201)
+        approval_lease = approval_claim.json()
+        approval_headers = {
+            **approver_headers,
+            "X-Approval-Lease-Token": approval_lease["leaseToken"],
+            "X-Approval-Lease-Version": str(approval_lease["leaseVersion"]),
+        }
+        approval_url = (
+            f"{spring_url}/api/approver/compensation-proposals/{approval_revision_id}/approve"
+        )
+        approval_body = {
+            "proposalRevision": 1,
+            "contentDigest": approval_digest,
+            "internalNote": "当前事实与政策一致",
+        }
+        approval_request_id = f"approve-decision-{uuid.uuid4()}"
+        approved = client.post(
+            approval_url,
+            headers={**approval_headers, "Idempotency-Key": approval_request_id},
+            json=approval_body,
+        )
+        expect_status(approved, 200)
+        approved_payload = approved.json()
+        assert approved_payload["decision"] == "APPROVED"
+        assert approved_payload["executionStatus"] == "READY"
+        assert approved_payload["replayed"] is False
+        assert "executionSucceeded" not in approved_payload
+        approval_replay = client.post(
+            approval_url,
+            headers={**approval_headers, "Idempotency-Key": approval_request_id},
+            json=approval_body,
+        )
+        expect_status(approval_replay, 200)
+        assert approval_replay.json() == {**approved_payload, "replayed": True}
+        approval_conflict = client.post(
+            approval_url,
+            headers={**approval_headers, "Idempotency-Key": approval_request_id},
+            json={**approval_body, "internalNote": "不同参数"},
+        )
+        expect_status(approval_conflict, 409)
+        decided_view = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{approval_revision_id}/approval-view",
+            headers=approval_headers,
+        )
+        expect_status(decided_view, 403)
+        reject_after_approval = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{approval_revision_id}/reject",
+            headers={**approval_headers, "Idempotency-Key": f"reject-approved-{uuid.uuid4()}"},
+            json={
+                "proposalRevision": 1,
+                "contentDigest": approval_digest,
+                "internalReason": "最终批准不可撤销",
+            },
+        )
+        expect_status(reject_after_approval, 403)
+        approval_customer = client.get(
+            f"{spring_url}/api/customer/tickets/{approval_ticket_id}",
+            headers={"X-Synthetic-Customer-Id": "customer-demo"},
+        )
+        expect_status(approval_customer, 200)
+        approval_customer_payload = approval_customer.json()
+        assert approval_customer_payload["messages"][-1] == {
+            "author": "SUPPORT",
+            "body": "补偿方案已获批准，正在等待补偿处理。",
+            "sentAt": "2026-08-09T14:00:00Z",
+        }
+        assert "SUCCEEDED" not in json.dumps(approval_customer_payload)
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        approval_record = connection.execute(
+            "select d.id, d.decision_type, d.internal_reason, p.status, l.status, "
+            "r.id, r.status, e.id, e.status, e.idempotency_key, e.amount "
+            "from proposal_decision d "
+            "join compensation_proposal_revision p on p.id = d.proposal_revision_id "
+            "join approval_lease l on l.proposal_revision_id = d.proposal_revision_id "
+            "and l.lease_version = d.lease_version "
+            "join compensation_reservation r on r.proposal_revision_id = d.proposal_revision_id "
+            "join compensation_execution e on e.decision_id = d.id "
+            "where d.proposal_revision_id = %s",
+            (approval_revision_id,),
+        ).fetchone()
+        assert approval_record[1:5] == (
+            "APPROVED", approval_body["internalNote"], "APPROVED", "DECIDED"
+        )
+        assert approval_record[6] == "ACTIVE"
+        assert str(approval_record[7]) == approved_payload["executionId"]
+        assert approval_record[8:] == (
+            "READY", f"compensation-execution:{approval_revision_id}", Decimal("26.80")
+        )
+        assert connection.execute(
+            "select count(*) from proposal_decision where proposal_revision_id = %s",
+            (approval_revision_id,),
+        ).fetchone()[0] == 1
+        assert connection.execute(
+            "select count(*) from compensation_execution where proposal_revision_id = %s",
+            (approval_revision_id,),
+        ).fetchone()[0] == 1
+        assert connection.execute(
+            "select count(*) from audit_event where subject_id = %s "
+            "and event_type = 'COMPENSATION_PROPOSAL_APPROVED'",
+            (approval_record[0],),
+        ).fetchone()[0] == 1
+
+    drift_digest = "8" * 64
+    drift_ticket_id, _, drift_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-APPROVAL-DRIFT", drift_digest, "审批事实漂移验收"
+    )
+    with httpx.Client(timeout=20.0) as client:
+        drift_claim = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{drift_revision_id}/claims",
+            headers={**approver_headers, "Idempotency-Key": f"drift-claim-{uuid.uuid4()}"},
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(drift_claim, 201)
+        drift_lease = drift_claim.json()
+    def approve_while_order_writer_holds_lock() -> httpx.Response:
+        with httpx.Client(timeout=20.0) as concurrent_client:
+            return concurrent_client.post(
+                f"{spring_url}/api/approver/compensation-proposals/{drift_revision_id}/approve",
+                headers={
+                    **approver_headers,
+                    "X-Approval-Lease-Token": drift_lease["leaseToken"],
+                    "X-Approval-Lease-Version": str(drift_lease["leaseVersion"]),
+                    "Idempotency-Key": f"drift-approve-{uuid.uuid4()}",
+                },
+                json={"proposalRevision": 1, "contentDigest": drift_digest},
+            )
+
+    with psycopg.connect(os.environ["SPRING_FIXTURE_DATABASE_URI"]) as connection:
+        connection.execute(
+            "update synthetic_order set delay_hours = 81, delay_seconds = 291600 "
+            "where order_reference = 'ORDER-DELAY-APPROVAL-DRIFT'"
+        )
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            drift_future = executor.submit(approve_while_order_writer_holds_lock)
+            time.sleep(0.25)
+            assert not drift_future.done(), "approval did not wait for the authoritative order writer"
+            connection.commit()
+            drift_approval = drift_future.result()
+    expect_status(drift_approval, 409)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select p.status, l.status from compensation_proposal_revision p "
+            "join approval_lease l on l.proposal_revision_id = p.id where p.id = %s",
+            (drift_revision_id,),
+        ).fetchone() == ("SUPERSEDED", "REVOKED")
+        assert connection.execute(
+            "select count(*) from proposal_decision where proposal_revision_id = %s",
+            (drift_revision_id,),
+        ).fetchone()[0] == 0
+        assert connection.execute(
+            "select count(*) from compensation_execution where proposal_revision_id = %s",
+            (drift_revision_id,),
+        ).fetchone()[0] == 0
+
+    proposal_race_scopes = []
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        for index in range(2):
+            candidate_ticket_id = uuid.uuid4()
+            candidate_generation_id = uuid.uuid4()
+            candidate_revision_id = uuid.uuid4()
+            connection.execute(
+                "insert into support_ticket "
+                "(id, customer_id, order_reference, description, lifecycle_state, handling_mode, "
+                "created_at, first_responded_at) values "
+                "(%s, 'customer-demo', 'ORDER-DELAY-PROPOSAL-RACE', %s, "
+                "'INVESTIGATING', 'AGENT', '2026-08-09T13:55:00Z', '2026-08-09T13:56:00Z')",
+                (candidate_ticket_id, f"并发提案 {index}"),
+            )
+            connection.execute(
+                "insert into agent_processing_generation "
+                "(id, ticket_id, generation_number, thread_id, status, created_at) "
+                "values (%s, %s, 1, %s, 'COMPLETED', '2026-08-09T13:56:00Z')",
+                (candidate_generation_id, candidate_ticket_id, uuid.uuid4()),
+            )
+            proposal_race_scopes.append(
+                (candidate_ticket_id, candidate_generation_id, candidate_revision_id)
+            )
+    proposal_barrier = threading.Barrier(2)
+
+    def create_competing_proposal(scope: tuple[uuid.UUID, uuid.UUID, uuid.UUID]) -> str:
+        candidate_ticket_id, candidate_generation_id, candidate_revision_id = scope
+        try:
+            with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                proposal_barrier.wait()
+                connection.execute(
+                    "insert into compensation_proposal_revision "
+                    "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, "
+                    "delay_hours, delay_seconds, compensation_method, amount, reason_code, "
+                    "evidence_references, policy_version, content_digest, status, created_at, expires_at) "
+                    "values (%s, %s, 1, %s, 'ORDER-DELAY-PROPOSAL-RACE', %s, 80, 288000, "
+                    "'SIMULATED_PARTIAL_REFUND', 26.80, 'LOGISTICS_DELAY', "
+                    "'[\"order:ORDER-DELAY-PROPOSAL-RACE\",\"logistics:ORDER-DELAY-PROPOSAL-RACE\"]', "
+                    "'delay-policy-v1', %s, 'PENDING_APPROVAL', "
+                    "'2026-08-09T13:57:00Z', '2026-08-10T13:57:00Z')",
+                    (
+                        candidate_revision_id, uuid.uuid4(), candidate_ticket_id,
+                        candidate_generation_id, candidate_revision_id.hex * 2,
+                    ),
+                )
+            return "accepted"
+        except psycopg.errors.UniqueViolation as error:
+            return error.diag.constraint_name
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        proposal_race_results = list(executor.map(create_competing_proposal, proposal_race_scopes))
+    assert sorted(proposal_race_results) == ["accepted", "one_active_logistics_compensation_intent"]
+
+    race_digest = "7" * 64
+    _, _, race_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-APPROVAL-RACE", race_digest, "批准驳回竞争验收"
+    )
+    with httpx.Client(timeout=20.0) as client:
+        race_claim = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{race_revision_id}/claims",
+            headers={**approver_headers, "Idempotency-Key": f"race-claim-{uuid.uuid4()}"},
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(race_claim, 201)
+    race_lease = race_claim.json()
+    race_headers = {
+        **approver_headers,
+        "X-Approval-Lease-Token": race_lease["leaseToken"],
+        "X-Approval-Lease-Version": str(race_lease["leaseVersion"]),
+    }
+    decision_barrier = threading.Barrier(2)
+
+    def submit_racing_decision(decision: str) -> httpx.Response:
+        decision_barrier.wait()
+        with httpx.Client(timeout=20.0) as concurrent_client:
+            return concurrent_client.post(
+                f"{spring_url}/api/approver/compensation-proposals/{race_revision_id}/{decision}",
+                headers={**race_headers, "Idempotency-Key": f"race-{decision}-{uuid.uuid4()}"},
+                json={
+                    "proposalRevision": 1,
+                    "contentDigest": race_digest,
+                    **({"internalReason": "并发驳回"} if decision == "reject" else {}),
+                },
+            )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        race_responses = list(executor.map(submit_racing_decision, ["approve", "reject"]))
+    assert sorted(response.status_code for response in race_responses) == [200, 403], [
+        (response.status_code, response.text) for response in race_responses
+    ]
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        race_decision = connection.execute(
+            "select decision_type from proposal_decision where proposal_revision_id = %s",
+            (race_revision_id,),
+        ).fetchone()[0]
+        assert race_decision in ("APPROVED", "REJECTED")
+        assert connection.execute(
+            "select count(*) from proposal_decision where proposal_revision_id = %s",
+            (race_revision_id,),
+        ).fetchone()[0] == 1
+        assert connection.execute(
+            "select count(*) from compensation_execution where proposal_revision_id = %s",
+            (race_revision_id,),
+        ).fetchone()[0] == (1 if race_decision == "APPROVED" else 0)
+
     rejection_digest = "a" * 64
     rejection_ticket_id, rejection_generation_id, rejection_revision_id = seed_pending_decision_fixture(
         "ORDER-DELAY-CANCELLED", rejection_digest, "审批驳回验收"
@@ -984,6 +1254,12 @@ def main() -> None:
             json={**rejection_body, "internalReason": "不同理由"},
         )
         expect_status(rejection_conflict, 409)
+        cross_decision_conflict = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{rejection_revision_id}/approve",
+            headers={**rejection_headers, "Idempotency-Key": rejection_request_id},
+            json={"proposalRevision": 1, "contentDigest": rejection_digest},
+        )
+        expect_status(cross_decision_conflict, 409)
         stale_page_reject = client.post(
             rejection_url,
             headers={**rejection_headers, "Idempotency-Key": f"stale-page-{uuid.uuid4()}"},
@@ -2074,56 +2350,6 @@ def main() -> None:
     except psycopg.errors.CheckViolation as error:
         assert error.diag.constraint_name == "resolution_elapsed_seconds_monotonic"
 
-    # #22 尚未实现批准业务事务；这里仅在隔离 fixture 上证明 #21 建立的跨决定类型
-    # PostgreSQL 仲裁点能让 APPROVED/REJECTED 并发至多接受一个最终事实。
-    decision_race_digest = "d" * 64
-    _, _, decision_race_revision_id = seed_pending_decision_fixture(
-        "ORDER-DELAY-LOW-ALLOWANCE", decision_race_digest, "批准驳回并发仲裁验收"
-    )
-    decision_race_token = uuid.uuid4()
-    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        connection.execute(
-            "insert into approval_lease "
-            "(id, proposal_revision_id, approver_id, lease_token, lease_version, status, "
-            "claimed_at, expires_at) values "
-            "(%s, %s, 'approver-demo', %s, 1, 'ACTIVE', "
-            "'2026-08-09T13:59:00Z', '2026-08-09T14:15:00Z')",
-            (uuid.uuid4(), decision_race_revision_id, decision_race_token),
-        )
-    decision_barrier = threading.Barrier(2)
-
-    def record_competing_decision(decision_type: str) -> str:
-        try:
-            with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-                decision_barrier.wait()
-                connection.execute(
-                    "insert into proposal_decision "
-                    "(id, proposal_revision_id, proposal_revision, content_digest, approver_id, "
-                    "lease_token, lease_version, decision_type, internal_reason, decided_at) "
-                    "values (%s, %s, 1, %s, 'approver-demo', %s, 1, %s, %s, "
-                    "'2026-08-09T14:00:00Z')",
-                    (
-                        uuid.uuid4(), decision_race_revision_id, decision_race_digest,
-                        decision_race_token, decision_type,
-                        "并发驳回理由" if decision_type == "REJECTED" else None,
-                    ),
-                )
-            return f"accepted:{decision_type}"
-        except psycopg.errors.UniqueViolation as error:
-            return error.diag.constraint_name
-
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        approve_reject_race = list(executor.map(
-            record_competing_decision, ["APPROVED", "REJECTED"]
-        ))
-    assert sum(result.startswith("accepted:") for result in approve_reject_race) == 1
-    assert "proposal_decision_proposal_revision_id_key" in approve_reject_race
-    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        assert connection.execute(
-            "select count(*) from proposal_decision where proposal_revision_id = %s",
-            (decision_race_revision_id,),
-        ).fetchone()[0] == 1
-
     with psycopg.connect(os.environ["AGENT_DATABASE_URI"]) as connection:
         assert connection.execute("select current_database(), current_user").fetchone() == (
             "agent_checkpoint",
@@ -2169,7 +2395,11 @@ def main() -> None:
         "concurrent_rejection_statuses": sorted(
             response.status_code for response in rejection_responses
         ),
-        "approve_reject_arbitration": sorted(approve_reject_race),
+        "approval_execution_id": approved_payload["executionId"],
+        "approval_fact_drift_invalidated": str(drift_ticket_id),
+        "concurrent_proposal_intent_results": sorted(proposal_race_results),
+        "approve_reject_statuses": sorted(response.status_code for response in race_responses),
+        "approve_reject_winner": race_decision,
     }))
 
 

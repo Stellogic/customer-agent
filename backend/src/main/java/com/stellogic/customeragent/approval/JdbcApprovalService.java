@@ -5,6 +5,7 @@ import com.stellogic.customeragent.handoff.HumanHandoffService;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -23,6 +24,8 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 class JdbcApprovalService implements ApprovalService {
+    private static final String CUSTOMER_PUBLIC_EPOCH = "customer-public-v1";
+    private static final String APPROVAL_PUBLIC_MESSAGE = "补偿方案已获批准，正在等待补偿处理。";
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final ObjectMapper objectMapper;
@@ -276,7 +279,8 @@ class JdbcApprovalService implements ApprovalService {
                 "select r.parameter_digest, r.proposal_revision_id, r.proposal_revision, r.decision_type "
                         + "from proposal_decision_request r where r.approver_id = ? and r.request_id = ?",
                 (rs, row) -> new DecisionReplay(
-                        rs.getString(1), rs.getObject(2, UUID.class), rs.getInt(3), rs.getString(4)),
+                        rs.getString(1), rs.getObject(2, UUID.class), rs.getInt(3),
+                        ApprovalModels.ProposalDecision.valueOf(rs.getString(4))),
                 command.approverId(), command.requestId());
         if (!existing.isEmpty()) {
             DecisionReplay replay = existing.getFirst();
@@ -356,7 +360,159 @@ class JdbcApprovalService implements ApprovalService {
         auditDecision(ticketId, decisionId, command.leaseVersion(), command.approverId(), at);
         handoffService.handoffAfterProposalRejection(ticketId, command.approverId());
         return new ApprovalModels.RejectionResult(
-                command.revisionId(), command.proposalRevision(), "REJECTED", false);
+                command.revisionId(), command.proposalRevision(), ApprovalModels.ProposalDecision.REJECTED, false);
+    }
+
+    @Override
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public ApprovalModels.ApprovalResult approve(ApprovalModels.ApprovalCommand command) {
+        String normalizedNote = command.internalNote() == null ? "" : command.internalNote();
+        String digest = StableParameterDigest.sha256(
+                "APPROVED", command.revisionId().toString(), Integer.toString(command.proposalRevision()),
+                command.contentDigest(), command.leaseToken().toString(), Long.toString(command.leaseVersion()),
+                normalizedNote);
+        lockRequest(command.approverId(), command.requestId(), "PROPOSAL_DECISION");
+        List<ApprovalReplay> existing = jdbc.query(
+                "select r.parameter_digest, r.proposal_revision_id, r.proposal_revision, r.decision_type, "
+                        + "e.id, e.status from proposal_decision_request r "
+                        + "left join compensation_execution e on e.decision_id = r.decision_id "
+                        + "where r.approver_id = ? and r.request_id = ?",
+                (rs, row) -> new ApprovalReplay(
+                        rs.getString(1), rs.getObject(2, UUID.class), rs.getInt(3),
+                        ApprovalModels.ProposalDecision.valueOf(rs.getString(4)),
+                        rs.getObject(5, UUID.class),
+                        rs.getString(6) == null ? null
+                                : ApprovalModels.CompensationExecutionStatus.valueOf(rs.getString(6))),
+                command.approverId(), command.requestId());
+        if (!existing.isEmpty()) {
+            ApprovalReplay replay = existing.getFirst();
+            if (!replay.parameterDigest().equals(digest)) conflict();
+            if (replay.executionId() == null) conflict();
+            return new ApprovalModels.ApprovalResult(
+                    replay.revisionId(), replay.proposalRevision(), replay.decisionType(),
+                    replay.executionId(), replay.executionStatus(), true);
+        }
+
+        List<UUID> ticketIds = jdbc.query(
+                "select ticket_id from compensation_proposal_revision where id = ?",
+                (rs, row) -> rs.getObject(1, UUID.class), command.revisionId());
+        if (ticketIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
+        }
+        UUID ticketId = ticketIds.getFirst();
+        authorityLock.acquire(ticketId);
+        List<String> ticketStates = jdbc.query(
+                "select lifecycle_state from support_ticket where id = ? for update",
+                (rs, row) -> rs.getString(1), ticketId);
+        if (ticketStates.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal ticket not found");
+        }
+        if ("CLOSED".equals(ticketStates.getFirst())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "ticket is no longer current");
+        }
+
+        List<ApprovalProposal> proposals = jdbc.query(
+                "select p.ticket_id, p.revision_number, p.content_digest, p.status, p.expires_at, "
+                        + "p.order_reference, p.delay_hours, p.delay_seconds, p.compensation_method, p.amount, "
+                        + "p.reason_code, p.policy_version, s.paid_amount, s.available_compensation_amount, "
+                        + "s.active_reservation_amount, s.paid, s.cancelled, s.fully_refunded, s.existing_compensation "
+                        + "from compensation_proposal_revision p join approval_evidence_snapshot s "
+                        + "on s.proposal_revision_id = p.id where p.id = ? for update of p",
+                (rs, row) -> new ApprovalProposal(
+                        rs.getObject(1, UUID.class), rs.getInt(2), rs.getString(3), rs.getString(4),
+                        rs.getTimestamp(5).toInstant(), rs.getString(6), rs.getInt(7), rs.getLong(8),
+                        DelayCompensationPolicy.Method.valueOf(rs.getString(9)), rs.getBigDecimal(10),
+                        rs.getString(11), rs.getString(12), new ApprovalEvidenceFacts(
+                                rs.getBigDecimal(13), rs.getBigDecimal(14), rs.getBigDecimal(15),
+                                rs.getBoolean(16), rs.getBoolean(17), rs.getBoolean(18), rs.getBoolean(19))),
+                command.revisionId());
+        if (proposals.isEmpty() || !ticketId.equals(proposals.getFirst().ticketId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
+        }
+        ApprovalProposal proposal = proposals.getFirst();
+        Instant now = clock.instant();
+        List<DecisionLease> leases = jdbc.query(
+                "select status, expires_at from approval_lease where proposal_revision_id = ? "
+                        + "and approver_id = ? and lease_token = ? and lease_version = ? for update",
+                (rs, row) -> new DecisionLease(rs.getString(1), rs.getTimestamp(2).toInstant()),
+                command.revisionId(), command.approverId(), command.leaseToken(), command.leaseVersion());
+        if (leases.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
+        }
+        DecisionLease lease = leases.getFirst();
+        requireCurrentLease(new CurrentLeaseScope(
+                ticketId, command.revisionId(), command.leaseVersion(), proposal.status(),
+                proposal.expiresAt(), lease.status(), lease.expiresAt(), now));
+        if (proposal.revisionNumber() != command.proposalRevision()
+                || !proposal.contentDigest().equals(command.contentDigest())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "proposal revision content mismatch");
+        }
+
+        lockAllowance(proposal.orderReference());
+        List<AuthoritativeOrderFacts> orders = jdbc.query(
+                "select paid_amount, available_compensation_amount, delay_hours, delay_seconds, paid, cancelled, "
+                        + "fully_refunded, existing_compensation, policy_version "
+                        + "from lock_authoritative_order(?)",
+                (rs, row) -> new AuthoritativeOrderFacts(
+                        rs.getBigDecimal(1), rs.getBigDecimal(2), rs.getInt(3), rs.getLong(4),
+                        rs.getBoolean(5), rs.getBoolean(6), rs.getBoolean(7), rs.getBoolean(8), rs.getString(9)),
+                proposal.orderReference());
+        if (orders.isEmpty()) {
+            invalidateProposal(ticketId, command, now, "ORDER_MISSING");
+        }
+        AuthoritativeOrderFacts order = orders.getFirst();
+        BigDecimal activeReservations = jdbc.queryForObject(
+                "select coalesce(sum(amount), 0) from compensation_reservation "
+                        + "where order_reference = ? and status = 'ACTIVE'",
+                BigDecimal.class, proposal.orderReference());
+        if (activeReservations == null) activeReservations = BigDecimal.ZERO;
+        DelayCompensationPolicy.Decision authoritative =
+                policy.evaluate(Duration.ofSeconds(order.delaySeconds()), order.paidAmount());
+        boolean valid = matchesAuthoritativeFacts(proposal, order, activeReservations, authoritative);
+        if (!valid) {
+            invalidateProposal(ticketId, command, now, "AUTHORITATIVE_FACT_DRIFT");
+        }
+
+        Timestamp at = Timestamp.from(now);
+        UUID decisionId = UUID.randomUUID();
+        UUID executionId = stableUuid("compensation-execution\n" + command.revisionId());
+        UUID reservationId = stableUuid("compensation-reservation\n" + command.revisionId());
+        String executionKey = "compensation-execution:" + command.revisionId();
+        jdbc.update(
+                "insert into proposal_decision (id, proposal_revision_id, proposal_revision, content_digest, "
+                        + "approver_id, lease_token, lease_version, decision_type, internal_reason, decided_at) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, 'APPROVED', ?, ?)",
+                decisionId, command.revisionId(), command.proposalRevision(), command.contentDigest(),
+                command.approverId(), command.leaseToken(), command.leaseVersion(), command.internalNote(), at);
+        jdbc.update(
+                "insert into proposal_decision_request (approver_id, request_id, parameter_digest, decision_id, "
+                        + "proposal_revision_id, proposal_revision, content_digest, lease_token, lease_version, "
+                        + "decision_type, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED', ?)",
+                command.approverId(), command.requestId(), digest, decisionId, command.revisionId(),
+                command.proposalRevision(), command.contentDigest(), command.leaseToken(),
+                command.leaseVersion(), at);
+        jdbc.update(
+                "insert into compensation_reservation "
+                        + "(id, order_reference, amount, status, created_at, proposal_revision_id) "
+                        + "values (?, ?, ?, 'ACTIVE', ?, ?)",
+                reservationId, proposal.orderReference(), authoritative.amount(), at, command.revisionId());
+        jdbc.update(
+                "insert into compensation_execution (id, proposal_revision_id, decision_id, reservation_id, "
+                        + "order_reference, reason_code, compensation_method, amount, status, idempotency_key, created_at) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?, 'READY', ?, ?)",
+                executionId, command.revisionId(), decisionId, reservationId, proposal.orderReference(),
+                proposal.reasonCode(), proposal.method().name(), authoritative.amount(), executionKey, at);
+        jdbc.update(
+                "update approval_lease set status = 'DECIDED', decided_at = ? "
+                        + "where proposal_revision_id = ? and lease_version = ? and status = 'ACTIVE'",
+                at, command.revisionId(), command.leaseVersion());
+        jdbc.update("update compensation_proposal_revision set status = 'APPROVED' where id = ?",
+                command.revisionId());
+        auditApproved(ticketId, decisionId, command.leaseVersion(), command.approverId(), at);
+        appendApprovalPublicMessage(ticketId, now, at);
+        return new ApprovalModels.ApprovalResult(
+                command.revisionId(), command.proposalRevision(), ApprovalModels.ProposalDecision.APPROVED,
+                executionId, ApprovalModels.CompensationExecutionStatus.READY, false);
     }
 
     private void lockRequest(String approverId, String requestId, String operation) {
@@ -368,6 +524,68 @@ class JdbcApprovalService implements ApprovalService {
         jdbc.query(
                 "select id from compensation_proposal_revision where id = ? for update",
                 (rs, row) -> rs.getObject(1, UUID.class), revisionId);
+    }
+
+    private void lockAllowance(String orderReference) {
+        jdbc.query("select pg_advisory_xact_lock(hashtextextended(?, 0))", rs -> null,
+                orderReference + "\nCOMPENSATION_ALLOWANCE");
+    }
+
+    private static boolean matchesAuthoritativeFacts(
+            ApprovalProposal proposal,
+            AuthoritativeOrderFacts order,
+            BigDecimal activeReservations,
+            DelayCompensationPolicy.Decision authoritative) {
+        ApprovalEvidenceFacts snapshot = proposal.snapshot();
+        return order.paid() && !order.cancelled() && !order.fullyRefunded()
+                && !order.existingCompensation() && authoritative.eligible()
+                && DelayCompensationPolicy.VERSION.equals(order.policyVersion())
+                && DelayCompensationPolicy.VERSION.equals(proposal.policyVersion())
+                && proposal.delayHours() == order.delayHours()
+                && proposal.delaySeconds() == order.delaySeconds()
+                && proposal.method() == authoritative.method()
+                && proposal.amount().compareTo(authoritative.amount()) == 0
+                && snapshot.paidAmount().compareTo(order.paidAmount()) == 0
+                && snapshot.availableAmount().compareTo(order.availableAmount()) == 0
+                && snapshot.reservedAmount().compareTo(activeReservations) == 0
+                && snapshot.paid() == order.paid()
+                && snapshot.cancelled() == order.cancelled()
+                && snapshot.fullyRefunded() == order.fullyRefunded()
+                && snapshot.existingCompensation() == order.existingCompensation()
+                && activeReservations.add(authoritative.amount()).compareTo(order.availableAmount()) <= 0;
+    }
+
+    private void invalidateProposal(
+            UUID ticketId, ApprovalModels.ApprovalCommand command, Instant now, String reason) {
+        Timestamp at = Timestamp.from(now);
+        jdbc.update("update compensation_proposal_revision set status = 'SUPERSEDED' "
+                + "where id = ? and status = 'PENDING_APPROVAL'", command.revisionId());
+        audit(ticketId, command.revisionId(), command.leaseVersion(),
+                "COMPENSATION_PROPOSAL_INVALIDATED_" + reason, "spring-system", at);
+        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "proposal no longer matches authoritative facts");
+    }
+
+    private void appendApprovalPublicMessage(UUID ticketId, Instant now, Timestamp at) {
+        Long messageSequence = jdbc.queryForObject(
+                "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?",
+                Long.class, ticketId);
+        Long eventSequence = jdbc.queryForObject(
+                "select coalesce(max(sequence), 0) + 1 from customer_public_event where ticket_id = ? and epoch = ?",
+                Long.class, ticketId, CUSTOMER_PUBLIC_EPOCH);
+        jdbc.update(
+                "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) "
+                        + "values (?, ?, ?, 'SUPPORT', ?, ?)",
+                UUID.randomUUID(), ticketId, messageSequence, APPROVAL_PUBLIC_MESSAGE, at);
+        jdbc.update(
+                "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
+                        + "values (?, ?, ?, 'PUBLIC_MESSAGE_APPENDED', "
+                        + "jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?)",
+                ticketId, CUSTOMER_PUBLIC_EPOCH, eventSequence, APPROVAL_PUBLIC_MESSAGE, now.toString(), at);
+    }
+
+    private static UUID stableUuid(String value) {
+        return UUID.nameUUIDFromBytes(value.getBytes(StandardCharsets.UTF_8));
     }
 
     private void expireLease(UUID ticketId, UUID revisionId, long leaseVersion, Instant now) {
@@ -418,6 +636,15 @@ class JdbcApprovalService implements ApprovalService {
                 ticketId, actorId, at, decisionId, leaseVersion);
     }
 
+    private void auditApproved(
+            UUID ticketId, UUID decisionId, long leaseVersion, String actorId, Timestamp at) {
+        jdbc.update(
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, "
+                        + "subject_type, subject_id, authorization_version) "
+                        + "values (?, 'COMPENSATION_PROPOSAL_APPROVED', ?, ?, 'PROPOSAL_DECISION', ?, ?)",
+                ticketId, actorId, at, decisionId, leaseVersion);
+    }
+
     private List<String> parseEvidence(String json) {
         try {
             return objectMapper.readValue(
@@ -450,11 +677,27 @@ class JdbcApprovalService implements ApprovalService {
     private record ClaimReplay(String parameterDigest, UUID revisionId, UUID token, long version, Instant expiresAt) {}
     private record ReleaseReplay(String parameterDigest, UUID revisionId) {}
     private record DecisionReplay(
-            String parameterDigest, UUID revisionId, int proposalRevision, String decisionType) {}
+            String parameterDigest, UUID revisionId, int proposalRevision,
+            ApprovalModels.ProposalDecision decisionType) {}
+    private record ApprovalReplay(
+            String parameterDigest, UUID revisionId, int proposalRevision,
+            ApprovalModels.ProposalDecision decisionType, UUID executionId,
+            ApprovalModels.CompensationExecutionStatus executionStatus) {}
     private record ProposalScope(UUID ticketId, String status, Instant expiresAt) {}
     private record DecisionProposal(
             UUID ticketId, int revisionNumber, String contentDigest, String status, Instant expiresAt) {}
     private record DecisionLease(String status, Instant expiresAt) {}
+    private record ApprovalProposal(
+            UUID ticketId, int revisionNumber, String contentDigest, String status, Instant expiresAt,
+            String orderReference, int delayHours, long delaySeconds, DelayCompensationPolicy.Method method,
+            BigDecimal amount, String reasonCode, String policyVersion, ApprovalEvidenceFacts snapshot) {}
+    private record ApprovalEvidenceFacts(
+            BigDecimal paidAmount, BigDecimal availableAmount, BigDecimal reservedAmount,
+            boolean paid, boolean cancelled, boolean fullyRefunded, boolean existingCompensation) {}
+    private record AuthoritativeOrderFacts(
+            BigDecimal paidAmount, BigDecimal availableAmount, int delayHours, long delaySeconds,
+            boolean paid, boolean cancelled, boolean fullyRefunded, boolean existingCompensation,
+            String policyVersion) {}
     private record CurrentLeaseScope(
             UUID ticketId,
             UUID revisionId,

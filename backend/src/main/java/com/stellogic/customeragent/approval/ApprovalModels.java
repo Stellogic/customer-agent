@@ -71,6 +71,28 @@ final class ApprovalModels {
     record RejectionResult(
             UUID proposalRevisionId,
             int proposalRevision,
-            String decision,
+            ProposalDecision decision,
             boolean replayed) {}
+
+    record ApprovalCommand(
+            String approverId,
+            UUID revisionId,
+            int proposalRevision,
+            String contentDigest,
+            UUID leaseToken,
+            long leaseVersion,
+            String requestId,
+            String internalNote) {}
+
+    record ApprovalResult(
+            UUID proposalRevisionId,
+            int proposalRevision,
+            ProposalDecision decision,
+            UUID executionId,
+            CompensationExecutionStatus executionStatus,
+            boolean replayed) {}
+
+    enum ProposalDecision { APPROVED, REJECTED }
+
+    enum CompensationExecutionStatus { READY, PROCESSING, UNKNOWN, SUCCEEDED, FAILED }
 }
