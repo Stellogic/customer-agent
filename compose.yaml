@@ -22,7 +22,7 @@ services:
     networks: [data]
 
   spring-migrate:
-    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-issue26}
+    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-local}
     build:
       context: ./backend
       args:
@@ -45,7 +45,7 @@ services:
     networks: [data, services]
 
   agent-migrate:
-    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue26}
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-local}
     build:
       context: ./agent
       target: runtime
@@ -59,7 +59,7 @@ services:
     networks: [data]
 
   agent-server:
-    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue26}
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-local}
     build:
       context: ./agent
       target: runtime
@@ -68,6 +68,11 @@ services:
       SPRING_INTERNAL_URL: http://backend:8080
       SPRING_TO_AGENT_TOKEN: ${SPRING_TO_AGENT_TOKEN:-local-spring-to-agent}
       AGENT_MACHINE_TOKEN: ${AGENT_MACHINE_TOKEN:-local-agent-machine}
+      LOG_LEVEL: ERROR
+    command: ["--server-log-level", "ERROR"]
+    # 私有编排运行时的第三方错误日志会携带 thread/run/checkpoint 标识；产品日志面不采集该流。
+    logging:
+      driver: "none"
     depends_on:
       agent-migrate:
         condition: service_completed_successfully
@@ -79,7 +84,7 @@ services:
     networks: [data, services]
 
   backend:
-    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-issue26}
+    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-local}
     build:
       context: ./backend
       args:
@@ -105,12 +110,13 @@ services:
     networks: [data, services, edge]
 
   compensation-executor:
-    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue26}
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-local}
     entrypoint: ["python", "-m", "baseline_agent.compensation_executor"]
     environment:
       SPRING_INTERNAL_URL: http://backend:8080
       EXECUTOR_MACHINE_TOKEN: ${EXECUTOR_MACHINE_TOKEN:-local-executor-machine}
       EXECUTOR_POLL_DELAY: ${EXECUTOR_POLL_DELAY:-0.25}
+      EXECUTOR_SIMULATION_SCENARIO: ${EXECUTOR_SIMULATION_SCENARIO:-}
     depends_on:
       backend:
         condition: service_healthy
@@ -118,7 +124,7 @@ services:
     networks: [services]
 
   frontend:
-    image: customer-agent/frontend:${CUSTOMER_AGENT_IMAGE_TAG:-issue26}
+    image: customer-agent/frontend:${CUSTOMER_AGENT_IMAGE_TAG:-local}
     build: ./frontend
     depends_on:
       backend:
@@ -133,7 +139,7 @@ services:
     networks: [edge]
 
   integration-smoke:
-    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue26}
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-local}
     profiles: [smoke]
     entrypoint: ["python", "/smoke/smoke.py"]
     volumes:
@@ -153,11 +159,12 @@ services:
     networks: [data, services]
 
   frontend-acceptance:
-    image: customer-agent/frontend-test:${CUSTOMER_AGENT_IMAGE_TAG:-issue26}
+    image: customer-agent/frontend-test:${CUSTOMER_AGENT_IMAGE_TAG:-local}
     profiles: [smoke]
     entrypoint: ["npm", "test", "--", "src/App.integration.test.tsx"]
     environment:
       VITE_SMOKE_BASE_URL: http://frontend:8080
+      VITE_E2E_SCENARIO: ${VITE_E2E_SCENARIO:-}
     depends_on:
       frontend:
         condition: service_healthy

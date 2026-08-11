@@ -19,6 +19,17 @@ docker compose up --detach --build --wait
 pwsh -File scripts/smoke.ps1 -Reset
 ```
 
+该命令还会运行 Issue #29 的两条命名 React 全栈验收：正常执行，以及模拟部分退款已发生但响应丢失后进入 `UNKNOWN`、禁止普通重试并自动对账到同一结果。3–5 分钟现场演示与录屏后备见 `docs/demo/issue-29-demo.md`。
+
+普通 CI 始终使用固定假模型和固定工具结果。少量真实模型 release smoke 必须显式执行，且不会读取 Compose 或浏览器身份：
+
+```powershell
+$env:OPENAI_API_KEY = '<仅在当前终端设置>'
+pwsh -File scripts/real-model-smoke.ps1
+```
+
+它只评价固定合成场景的结构化正确性、最小证据和安全不变量，不评价逐字措辞；详细口径见 `docs/delivery/issue-29-verification.md`。
+
 `-Reset` 只删除本 Compose 项目的本地合成数据卷。日常复测可省略该参数。停止服务：
 
 ```powershell
