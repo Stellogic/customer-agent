@@ -26,6 +26,8 @@ baseline:
     fixed-instant: ${DEMO_FIXED_INSTANT:}
   sla:
     poll-delay: ${SLA_POLL_DELAY:1000}
+  closure:
+    poll-delay: ${CLOSURE_POLL_DELAY:1000}
   migrate-only: ${BASELINE_MIGRATE_ONLY:false}
   agent:
     base-url: ${AGENT_SERVER_URL:http://localhost:2024}

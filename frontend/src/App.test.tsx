@@ -208,6 +208,96 @@ describe("客户帮助中心", () => {
     expect(screen.queryByText("duplicate")).not.toBeInTheDocument();
   });
 
+  it("按关闭等待期事件更新为最终关闭", async () => {
+    const ticketId = "28000000-0000-0000-0000-000000000001";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        view: "CUSTOMER_PUBLIC",
+        schema: "customer-public-v1",
+        cursor: "customer-public-v1:4",
+        ticket: { id: ticketId, lifecycleState: "RESOLVED", handlingMode: "HUMAN", agentGeneration: 1,
+          firstRespondedAt: "2026-08-09T00:00:00Z" },
+        messages: [],
+        clarification: null,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(eventResponse([
+        publicEvent("customer-public-v1:5", "TICKET_CLOSED", { lifecycleState: "CLOSED" }),
+      ]));
+
+    render(<App />);
+
+    expect(await screen.findByText("已关闭")).toBeInTheDocument();
+  });
+
+  it("按等待期内同一问题回复事件更新为调查中", async () => {
+    const ticketId = "28000000-0000-0000-0000-000000000002";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        view: "CUSTOMER_PUBLIC",
+        schema: "customer-public-v1",
+        cursor: "customer-public-v1:4",
+        ticket: { id: ticketId, lifecycleState: "RESOLVED", handlingMode: "AGENT", agentGeneration: 1,
+          firstRespondedAt: "2026-08-09T00:00:00Z" },
+        messages: [],
+        clarification: null,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(eventResponse([
+        publicEvent("customer-public-v1:5", "TICKET_REOPENED", { lifecycleState: "INVESTIGATING" }),
+      ]));
+
+    render(<App />);
+
+    expect(await screen.findByText("调查中")).toBeInTheDocument();
+  });
+
+  it("已解决工单可从客户界面重开或进入关联新工单", async () => {
+    const originalId = "28000000-0000-0000-0000-000000000003";
+    const linkedId = "28000000-0000-0000-0000-000000000004";
+    globalThis.history.replaceState(null, "", `/?ticket=${originalId}`);
+    let submittedBody = "";
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/tickets/${originalId}`)) {
+        return new Response(JSON.stringify({
+          view: "CUSTOMER_PUBLIC", schema: "customer-public-v1", cursor: "customer-public-v1:4",
+          ticket: { id: originalId, lifecycleState: "RESOLVED", handlingMode: "AGENT", agentGeneration: 1,
+            firstRespondedAt: "2026-08-09T00:00:00Z" },
+          messages: [], clarification: null,
+        }), { status: 200 });
+      }
+      if (url.endsWith(`/api/customer/tickets/${originalId}/replies`) && init?.method === "POST") {
+        submittedBody = String(init.body);
+        return new Response(JSON.stringify({ ticketId: linkedId, outcome: "LINKED_TICKET_CREATED" }), { status: 201 });
+      }
+      if (url.endsWith(`/api/customer/tickets/${linkedId}`)) {
+        return new Response(JSON.stringify({
+          view: "CUSTOMER_PUBLIC", schema: "customer-public-v1", cursor: "customer-public-v1:2",
+          ticket: { id: linkedId, lifecycleState: "INVESTIGATING", handlingMode: "HUMAN", agentGeneration: 0,
+            firstRespondedAt: "2026-08-09T00:01:00Z" },
+          messages: [], clarification: null,
+        }), { status: 200 });
+      }
+      if (url.endsWith("/events")) {
+        return new Response("", { status: 200, headers: { "Content-Type": "text/event-stream" } });
+      }
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+    expect(await screen.findByRole("button", { name: "发送回复" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("回复订单编号"), { target: { value: "ORDER-INTAKE-ONLY" } });
+    fireEvent.change(screen.getByLabelText("回复问题类型"), { target: { value: "OTHER" } });
+    fireEvent.change(screen.getByLabelText("工单回复"), { target: { value: "同一订单的另一个问题" } });
+    fireEvent.click(screen.getByRole("button", { name: "发送回复" }));
+
+    expect(await screen.findByText(linkedId)).toBeInTheDocument();
+    expect(JSON.parse(submittedBody)).toEqual({
+      orderReference: "ORDER-INTAKE-ONLY", issueKind: "OTHER", message: "同一订单的另一个问题",
+    });
+  });
+
   it("序号缺口时关闭旧流并整体替换为新的权威快照", async () => {
     const ticketId = "25000000-0000-0000-0000-000000000002";
     globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);

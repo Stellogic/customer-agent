@@ -27,11 +27,15 @@ export function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [clarificationAnswer, setClarificationAnswer] = useState("");
+  const [ticketReplyOrderReference, setTicketReplyOrderReference] = useState("");
+  const [ticketReplyIssueKind, setTicketReplyIssueKind] = useState("LOGISTICS_DELAY");
+  const [ticketReplyBody, setTicketReplyBody] = useState("");
   const [error, setError] = useState("");
   const requestId = useRef(globalThis.crypto.randomUUID());
   const replyMessageId = useRef(globalThis.crypto.randomUUID());
   const resumeRequestId = useRef(globalThis.crypto.randomUUID());
   const handoffRequestId = useRef(globalThis.crypto.randomUUID());
+  const ticketReplyRequestId = useRef(globalThis.crypto.randomUUID());
   const streamController = useRef<AbortController | null>(null);
   const reconnectTimer = useRef<number | null>(null);
   const snapshotRef = useRef<Snapshot | null>(null);
@@ -147,6 +151,38 @@ export function App() {
     }
   }
 
+  async function submitTicketReply(event: FormEvent) {
+    event.preventDefault();
+    if (!snapshot || !["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState)) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/customer/tickets/${snapshot.ticket.id}/replies`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          ...customerHeaders,
+          "Content-Type": "application/json",
+          "Idempotency-Key": ticketReplyRequestId.current,
+        },
+        body: JSON.stringify({
+          orderReference: ticketReplyOrderReference,
+          issueKind: ticketReplyIssueKind,
+          message: ticketReplyBody,
+        }),
+      });
+      if (!response.ok) throw new Error("ticket reply failed");
+      const result = await response.json() as { ticketId: string };
+      await loadTicket(result.ticketId);
+      ticketReplyRequestId.current = globalThis.crypto.randomUUID();
+      setTicketReplyBody("");
+    } catch {
+      setError("回复状态暂时未知；请保留本页重试，相同消息身份不会重开或创建第二张工单。");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function consumeEvents(ticketId: string, cursor: string) {
     streamController.current?.abort();
     const controller = new AbortController();
@@ -242,8 +278,8 @@ export function App() {
           ticket: { ...current.ticket, handlingMode: payload.handlingMode },
           clarification: null,
         };
-    } else if (event.type === "TICKET_RESOLVED") {
-      if (!isResolvedTransition(payload)) return false;
+    } else if (event.type === "TICKET_RESOLVED" || event.type === "TICKET_REOPENED" || event.type === "TICKET_CLOSED") {
+      if (!isLifecycleTransition(payload, event.type)) return false;
       next = { ...current, cursor: event.id, ticket: { ...current.ticket, lifecycleState: payload.lifecycleState } };
     } else {
       return false;
@@ -272,7 +308,7 @@ export function App() {
         <section className="ticket-card" aria-live="polite">
           <div className="ticket-heading">
             <div><p className="eyebrow">客服工单</p><h2>{snapshot.ticket.id}</h2></div>
-            <span className="status">{snapshot.ticket.handlingMode === "HUMAN" ? "人工处理中" : snapshot.ticket.lifecycleState === "INVESTIGATING" ? "调查中" : snapshot.ticket.lifecycleState === "WAITING_FOR_CUSTOMER" ? "等待你的回复" : snapshot.ticket.lifecycleState}</span>
+            <span className="status">{snapshot.ticket.lifecycleState === "CLOSED" ? "已关闭" : snapshot.ticket.handlingMode === "HUMAN" ? "人工处理中" : snapshot.ticket.lifecycleState === "INVESTIGATING" ? "调查中" : snapshot.ticket.lifecycleState === "WAITING_FOR_CUSTOMER" ? "等待你的回复" : snapshot.ticket.lifecycleState}</span>
           </div>
           <ol className="conversation">
             {snapshot.messages.map((message, index) => (
@@ -289,6 +325,26 @@ export function App() {
                   onChange={(event) => setClarificationAnswer(event.target.value)} required />
               </label>
               <button disabled={submitting}>{submitting ? "正在恢复调查…" : "回复并继续调查"}</button>
+            </form>
+          )}
+          {["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState) && (
+            <form className="clarification-form" onSubmit={submitTicketReply}>
+              <label>回复涉及的订单编号
+                <input aria-label="回复订单编号" value={ticketReplyOrderReference}
+                  onChange={(event) => setTicketReplyOrderReference(event.target.value)} required />
+              </label>
+              <label>这是哪类问题
+                <select aria-label="回复问题类型" value={ticketReplyIssueKind}
+                  onChange={(event) => setTicketReplyIssueKind(event.target.value)}>
+                  <option value="LOGISTICS_DELAY">原物流延迟问题</option>
+                  <option value="OTHER">其他问题</option>
+                </select>
+              </label>
+              <label>你的回复
+                <textarea aria-label="工单回复" value={ticketReplyBody}
+                  onChange={(event) => setTicketReplyBody(event.target.value)} required rows={3} />
+              </label>
+              <button disabled={submitting}>{submitting ? "正在提交…" : "发送回复"}</button>
             </form>
           )}
           {snapshot.ticket.handlingMode === "AGENT" && snapshot.ticket.lifecycleState !== "CLOSED" && (
@@ -341,6 +397,9 @@ function isHandoffTransition(value: unknown): value is { handlingMode: string; c
     && value.handlingMode === "HUMAN" && value.clarification === null;
 }
 
-function isResolvedTransition(value: unknown): value is { lifecycleState: string } {
-  return isRecord(value) && hasOnlyKeys(value, ["lifecycleState"]) && value.lifecycleState === "RESOLVED";
+function isLifecycleTransition(value: unknown, eventType: string): value is { lifecycleState: string } {
+  if (!isRecord(value) || !hasOnlyKeys(value, ["lifecycleState"])) return false;
+  const expected = eventType === "TICKET_RESOLVED" ? "RESOLVED"
+    : eventType === "TICKET_REOPENED" ? "INVESTIGATING" : "CLOSED";
+  return value.lifecycleState === expected;
 }

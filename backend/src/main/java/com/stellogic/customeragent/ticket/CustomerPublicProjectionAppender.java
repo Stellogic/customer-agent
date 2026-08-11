@@ -19,6 +19,18 @@ public final class CustomerPublicProjectionAppender {
         appendMessage(ticketId, body, now);
     }
 
+    public void appendCustomerReplyAndReopened(UUID ticketId, String body, Instant now) {
+        long transitionSequence = appendMessage(ticketId, null, "CUSTOMER", body, now);
+        appendTicketTransition(ticketId, transitionSequence, "TICKET_REOPENED", "INVESTIGATING", now);
+    }
+
+    public void appendClosed(UUID ticketId, Instant now) {
+        Long sequence = jdbc.queryForObject(
+                "select coalesce(max(sequence), 0) + 1 from customer_public_event where ticket_id = ? and epoch = ?",
+                Long.class, ticketId, EPOCH);
+        appendTicketTransition(ticketId, sequence, "TICKET_CLOSED", "CLOSED", now);
+    }
+
     public void appendSupportMessageAndResolutionEvent(UUID ticketId, String body, Instant now) {
         long resolutionEventSequence = appendMessage(ticketId, body, now);
         jdbc.update(
@@ -141,6 +153,15 @@ public final class CustomerPublicProjectionAppender {
                         + "values (?, ?, ?, ?, ?, " + payloadExpression + ", ?)",
                 ticketId, EPOCH, sequence, sourceGeneration(ticketId, generationId),
                 eventType, Timestamp.from(now));
+    }
+
+    private void appendTicketTransition(
+            UUID ticketId, long sequence, String eventType, String lifecycleState, Instant now) {
+        jdbc.update(
+                "insert into customer_public_event "
+                        + "(ticket_id, epoch, sequence, event_type, payload, occurred_at) "
+                        + "values (?, ?, ?, ?, jsonb_build_object('lifecycleState', ?), ?)",
+                ticketId, EPOCH, sequence, eventType, lifecycleState, Timestamp.from(now));
     }
 
     private long sourceGeneration(UUID ticketId, UUID generationId) {

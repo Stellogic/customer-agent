@@ -3,6 +3,7 @@ package com.stellogic.customeragent.execution;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
+import com.stellogic.customeragent.ticket.TicketResolutionTransition;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
@@ -23,16 +24,19 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
     private final Clock clock;
     private final TicketAuthorityLock authorityLock;
     private final CustomerPublicProjectionAppender publicProjection;
+    private final TicketResolutionTransition ticketResolution;
 
     JdbcCompensationExecutionService(
             JdbcTemplate jdbc,
             Clock clock,
             TicketAuthorityLock authorityLock,
-            CustomerPublicProjectionAppender publicProjection) {
+            CustomerPublicProjectionAppender publicProjection,
+            TicketResolutionTransition ticketResolution) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.authorityLock = authorityLock;
         this.publicProjection = publicProjection;
+        this.ticketResolution = ticketResolution;
     }
 
     @Override
@@ -165,13 +169,7 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
                 execution.reservationId());
         jdbc.update("update synthetic_order set existing_compensation = true where order_reference = ?",
                 execution.orderReference());
-        int resolved = jdbc.update(
-                "update support_ticket set lifecycle_state = 'RESOLVED', "
-                        + "resolution_elapsed_seconds = resolution_elapsed_seconds + "
-                        + "case when resolution_running_since is null then 0 else greatest(0, "
-                        + "extract(epoch from (?::timestamptz - resolution_running_since))::bigint) end, "
-                        + "resolution_running_since = null where id = ? and lifecycle_state <> 'CLOSED'",
-                at, ticketId);
+        int resolved = ticketResolution.afterCompensationExecution(ticketId, now);
         if (resolved != 1) conflict("ticket is no longer resolvable");
         publicProjection.appendSupportMessageAndResolutionEvent(ticketId, customerMessage, now);
         jdbc.update(

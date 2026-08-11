@@ -38,7 +38,8 @@ public final class CustomerTicketController {
         requireText(request.orderReference(), "缺少订单编号");
         requireText(request.description(), "缺少问题描述");
         var result = service.create(new CreateCustomerTicket(
-                customerId.trim(), requestId.trim(), request.orderReference().trim(), request.description().trim()));
+                customerId.trim(), requestId.trim(), request.orderReference().trim(), request.description().trim(),
+                "LOGISTICS_DELAY"));
         return ResponseEntity.status(result.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .body(new CreateTicketResponse(result.ticketId(), true, result.replayed()));
     }

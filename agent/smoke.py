@@ -4,6 +4,7 @@ import sys
 import threading
 import time
 import uuid
+import datetime
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 
@@ -2955,8 +2956,9 @@ def main() -> None:
         )
         time.sleep(1.25)
         connection.execute(
-            "update support_ticket set lifecycle_state = 'RESOLVED' where id = %s",
-            (concurrent_state_ticket_id,),
+            "update support_ticket set lifecycle_state = 'RESOLVED', resolved_at = %s, "
+            "close_due_at = %s::timestamptz + interval '72 hours' where id = %s",
+            (fixed_now, fixed_now, concurrent_state_ticket_id),
         )
     time.sleep(1.25)
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -2970,7 +2972,7 @@ def main() -> None:
         ).fetchone()[0] == 2
         connection.execute(
             "update support_ticket set lifecycle_state = 'INVESTIGATING', "
-            "resolution_running_since = %s where id = %s",
+            "resolution_running_since = %s, resolved_at = null, close_due_at = null where id = %s",
             (fixed_now, concurrent_state_ticket_id),
         )
     time.sleep(1.25)
@@ -2993,6 +2995,248 @@ def main() -> None:
         raise AssertionError("resolution elapsed time unexpectedly reset on reopen")
     except psycopg.errors.CheckViolation as error:
         assert error.diag.constraint_name == "resolution_elapsed_seconds_monotonic"
+
+    def create_closure_fixture(suffix: str, resolved_at, handling_mode: str = "HUMAN"):
+        with httpx.Client(timeout=20.0) as client:
+            response = client.post(
+                f"{spring_url}/api/customer/tickets",
+                headers={
+                    "X-Synthetic-Customer-Id": "customer-demo",
+                    "Idempotency-Key": f"issue-28-{suffix}-{uuid.uuid4()}",
+                },
+                json={
+                    "orderReference": "ORDER-INTAKE-ONLY",
+                    "description": f"关闭等待期验收 {suffix}",
+                },
+            )
+            expect_status(response, 201)
+            fixture_id = uuid.UUID(response.json()["ticketId"])
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            connection.execute(
+                "update support_ticket set lifecycle_state = 'RESOLVED', handling_mode = %s, "
+                "resolution_elapsed_seconds = 3600, resolution_running_since = null, "
+                "resolved_at = %s, close_due_at = %s::timestamptz + interval '72 hours' where id = %s",
+                (handling_mode, resolved_at, resolved_at, fixture_id),
+            )
+        return fixture_id
+
+    closure_now = datetime.datetime.fromisoformat(fixed_now.replace("Z", "+00:00"))
+    before_boundary_id = create_closure_fixture(
+        "before-boundary", closure_now - datetime.timedelta(hours=72) + datetime.timedelta(microseconds=1), "AGENT"
+    )
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        before_first_response = connection.execute(
+            "select first_responded_at from support_ticket where id = %s", (before_boundary_id,)
+        ).fetchone()[0]
+        before_generation = connection.execute(
+            "select generation_number, thread_id from agent_processing_generation where ticket_id = %s",
+            (before_boundary_id,),
+        ).fetchone()
+    with httpx.Client(timeout=20.0) as client:
+        reopened = client.post(
+            f"{spring_url}/api/customer/tickets/{before_boundary_id}/replies",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": "issue-28-before-boundary-message",
+            },
+            json={
+                "orderReference": "ORDER-INTAKE-ONLY",
+                "issueKind": "LOGISTICS_DELAY",
+                "message": "原问题仍未解决",
+            },
+        )
+        expect_status(reopened, 200)
+        assert reopened.json() == {
+            "ticketId": str(before_boundary_id), "outcome": "REOPENED", "replayed": False
+        }
+        reopened_replay = client.post(
+            f"{spring_url}/api/customer/tickets/{before_boundary_id}/replies",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": "issue-28-before-boundary-message",
+            },
+            json={
+                "orderReference": "ORDER-INTAKE-ONLY",
+                "issueKind": "LOGISTICS_DELAY",
+                "message": "原问题仍未解决",
+            },
+        )
+        expect_status(reopened_replay, 200)
+        assert reopened_replay.json()["replayed"] is True
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        reopened_state = connection.execute(
+            "select lifecycle_state, resolution_elapsed_seconds, first_responded_at, "
+            "resolved_at is null, close_due_at is null from support_ticket where id = %s",
+            (before_boundary_id,),
+        ).fetchone()
+        assert reopened_state == ("INVESTIGATING", 3600, before_first_response, True, True)
+        generations = connection.execute(
+            "select generation_number, thread_id from agent_processing_generation "
+            "where ticket_id = %s order by generation_number",
+            (before_boundary_id,),
+        ).fetchall()
+        assert len(generations) == 2
+        assert generations[0] == before_generation
+        assert generations[1][0] == before_generation[0] + 1
+        assert generations[1][1] != before_generation[1]
+        assert connection.execute(
+            "select count(*) from customer_reply_request where customer_id = 'customer-demo' "
+            "and message_id = 'issue-28-before-boundary-message'",
+        ).fetchone()[0] == 1
+
+    different_issue_id = create_closure_fixture(
+        "different-issue", closure_now - datetime.timedelta(hours=1)
+    )
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        original_message_count = connection.execute(
+            "select count(*) from public_message where ticket_id = %s", (different_issue_id,)
+        ).fetchone()[0]
+    with httpx.Client(timeout=20.0) as client:
+        different = client.post(
+            f"{spring_url}/api/customer/tickets/{different_issue_id}/replies",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": "issue-28-different-message",
+            },
+            json={
+                "orderReference": "ORDER-INTAKE-ONLY",
+                "issueKind": "OTHER",
+                "message": "同一订单的另一个问题",
+            },
+        )
+        expect_status(different, 201)
+        different_linked_id = uuid.UUID(different.json()["ticketId"])
+        conflict = client.post(
+            f"{spring_url}/api/customer/tickets/{different_issue_id}/replies",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": "issue-28-different-message",
+            },
+            json={
+                "orderReference": "ORDER-INTAKE-ONLY",
+                "issueKind": "OTHER",
+                "message": "复用身份但改变内容",
+            },
+        )
+        expect_status(conflict, 409)
+        assert conflict.json()["code"] == "MESSAGE_ID_CONFLICT"
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select lifecycle_state from support_ticket where id = %s", (different_issue_id,)
+        ).fetchone()[0] == "RESOLVED"
+        assert connection.execute(
+            "select count(*) from public_message where ticket_id = %s", (different_issue_id,)
+        ).fetchone()[0] == original_message_count
+        assert connection.execute(
+            "select follow_up_of, issue_kind, handling_mode from support_ticket where id = %s",
+            (different_linked_id,),
+        ).fetchone() == (different_issue_id, "OTHER", "HUMAN")
+        assert connection.execute(
+            "select count(*) from agent_processing_generation where ticket_id = %s", (different_linked_id,)
+        ).fetchone()[0] == 0
+        assert connection.execute(
+            "select count(*) from shared_support_queue_entry where ticket_id = %s "
+            "and reason_code = 'UNSUPPORTED_ISSUE'",
+            (different_linked_id,),
+        ).fetchone()[0] == 1
+
+    exact_boundary_id = create_closure_fixture(
+        "exact-boundary", closure_now - datetime.timedelta(hours=1)
+    )
+    boundary_headers = {
+        "X-Synthetic-Customer-Id": "customer-demo",
+        "Idempotency-Key": "issue-28-exact-boundary-message",
+    }
+    boundary_payload = {
+        "orderReference": "ORDER-INTAKE-ONLY",
+        "issueKind": "LOGISTICS_DELAY",
+        "message": "边界时刻回复",
+    }
+
+    def reply_at_boundary(_: int):
+        with httpx.Client(timeout=20.0) as concurrent_client:
+            return concurrent_client.post(
+                f"{spring_url}/api/customer/tickets/{exact_boundary_id}/replies",
+                headers=boundary_headers,
+                json=boundary_payload,
+            )
+
+    authority_key = f"{exact_boundary_id}\nBUSINESS_AUTHORITY"
+    lock_connection = psycopg.connect(os.environ["SPRING_DATABASE_URI"])
+    lock_connection.execute("select pg_advisory_lock(hashtextextended(%s, 0))", (authority_key,))
+    lock_connection.execute(
+        "update support_ticket set resolved_at = %s, "
+        "close_due_at = %s::timestamptz + interval '72 hours' where id = %s",
+        (closure_now - datetime.timedelta(hours=72),
+         closure_now - datetime.timedelta(hours=72), exact_boundary_id),
+    )
+    lock_connection.commit()
+    boundary_pool = ThreadPoolExecutor(max_workers=1)
+    boundary_future = boundary_pool.submit(reply_at_boundary, 0)
+    blocked_authority_writers = 0
+    for _ in range(40):
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as observation:
+            blocked_authority_writers = observation.execute(
+                "select count(*) from pg_locks where locktype = 'advisory' and not granted"
+            ).fetchone()[0]
+        if blocked_authority_writers >= 2:
+            break
+        time.sleep(0.25)
+    unlocked = lock_connection.execute(
+        "select pg_advisory_unlock(hashtextextended(%s, 0))", (authority_key,)
+    ).fetchone()[0]
+    lock_connection.commit()
+    lock_connection.close()
+    boundary_responses = [boundary_future.result(timeout=20)]
+    boundary_pool.shutdown()
+    assert unlocked is True
+    assert blocked_authority_writers >= 2, blocked_authority_writers
+    with ThreadPoolExecutor(max_workers=7) as replay_pool:
+        boundary_responses.extend(replay_pool.map(reply_at_boundary, range(1, 8)))
+    assert sorted(response.status_code for response in boundary_responses) == [200] * 7 + [201]
+    boundary_result_ids = {response.json()["ticketId"] for response in boundary_responses}
+    assert len(boundary_result_ids) == 1
+    boundary_linked_id = uuid.UUID(boundary_result_ids.pop())
+    time.sleep(1.5)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select lifecycle_state from support_ticket where id = %s", (exact_boundary_id,)
+        ).fetchone()[0] == "CLOSED"
+        assert connection.execute(
+            "select count(*) from audit_event where ticket_id = %s and event_type = 'TICKET_CLOSED'",
+            (exact_boundary_id,),
+        ).fetchone()[0] == 1
+        assert connection.execute(
+            "select follow_up_of from support_ticket where id = %s", (boundary_linked_id,)
+        ).fetchone()[0] == exact_boundary_id
+        assert connection.execute(
+            "select count(*) from customer_reply_request where original_ticket_id = %s "
+            "and message_id = 'issue-28-exact-boundary-message'",
+            (exact_boundary_id,),
+        ).fetchone()[0] == 1
+
+    with httpx.Client(timeout=20.0) as client:
+        closed_follow_up = client.post(
+            f"{spring_url}/api/customer/tickets/{exact_boundary_id}/replies",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": "issue-28-closed-message",
+            },
+            json={
+                "orderReference": "ORDER-INTAKE-ONLY",
+                "issueKind": "LOGISTICS_DELAY",
+                "message": "关闭后的后续回复",
+            },
+        )
+        expect_status(closed_follow_up, 201)
+        closed_follow_up_id = uuid.UUID(closed_follow_up.json()["ticketId"])
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select follow_up_of from support_ticket where id = %s", (closed_follow_up_id,)
+        ).fetchone()[0] == exact_boundary_id
+        assert connection.execute(
+            "select lifecycle_state from support_ticket where id = %s", (exact_boundary_id,)
+        ).fetchone()[0] == "CLOSED"
 
     with psycopg.connect(os.environ["AGENT_DATABASE_URI"]) as connection:
         assert connection.execute("select current_database(), current_user").fetchone() == (
