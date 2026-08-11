@@ -1,0 +1,5 @@
+ARG TEST_IMAGE=customer-agent/agent-test:required
+ARG RUNTIME_IMAGE=customer-agent/agent:required
+FROM ${TEST_IMAGE} AS tested
+FROM ${RUNTIME_IMAGE}
+COPY --from=tested /app/src /app/src

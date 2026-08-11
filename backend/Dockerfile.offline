@@ -1,0 +1,5 @@
+ARG TEST_IMAGE=customer-agent/backend-test:required
+ARG RUNTIME_IMAGE=customer-agent/backend:required
+FROM ${TEST_IMAGE} AS tested
+FROM ${RUNTIME_IMAGE}
+COPY --from=tested /workspace/build/libs/customer-agent-backend-0.1.0-SNAPSHOT.jar /app/app.jar

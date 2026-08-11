@@ -1,0 +1,17 @@
+{
+  "contentPatterns": [
+    "OPENAI_API_KEY",
+    "sk-[A-Za-z0-9_-]{20,}",
+    "payment(Token|Credential|Secret)|payment_(token|credential|secret)",
+    "card(Number|Cvv)|card_(number|cvv)",
+    "clientSecret|client_secret",
+    "rawToolPayload|raw_tool_payload",
+    "rawPrompt|raw_prompt|modelPrompt|model_prompt",
+    "freeFormReasoning|free_form_reasoning|chainOfThought|chain_of_thought",
+    "(^|[^A-Za-z0-9_])(prompt|reasoning)([^A-Za-z0-9_]|$)",
+    "(checkpoint|thread|run|trace)(_id|Id)"
+  ],
+  "internalAddressPatterns": [
+    "agent-server|agent:2024|local-(spring|agent|executor|postgres)|postgresql://"
+  ]
+}

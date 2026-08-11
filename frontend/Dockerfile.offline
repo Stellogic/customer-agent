@@ -1,0 +1,6 @@
+ARG TEST_IMAGE=customer-agent/frontend-test:required
+ARG RUNTIME_IMAGE=customer-agent/frontend:required
+FROM ${TEST_IMAGE} AS tested
+FROM ${RUNTIME_IMAGE}
+RUN rm -rf /usr/share/nginx/html/*
+COPY --from=tested /app/dist /usr/share/nginx/html
