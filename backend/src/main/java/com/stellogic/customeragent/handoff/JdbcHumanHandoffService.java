@@ -23,6 +23,8 @@ class JdbcHumanHandoffService implements HumanHandoffService {
     private static final String CUSTOMER_REQUESTED_REASON = "CUSTOMER_REQUESTED";
     private static final String CUSTOMER_PUBLIC_MESSAGE = "已按您的要求转由客服继续处理。客服将在此工单中与您联系。";
     private static final String AGENT_HANDOFF_PUBLIC_MESSAGE = "为确保处理安全，此工单已转由客服继续调查。客服将在此工单中与您联系。";
+    private static final String APPROVAL_REJECTION_PUBLIC_MESSAGE =
+            "为继续妥善处理，此工单已转由客服跟进。客服将在此工单中与您联系。";
     private static final String INCOMPLETE_INVESTIGATION_CONCLUSION = "INVESTIGATION_COULD_NOT_CONTINUE";
     private static final Set<String> SUMMARY_FACT_TYPES = Set.of(
             "ORDER", "LOGISTICS_DELAY_SECONDS", "PAYMENT", "POLICY", "PENDING_ACTION_COUNT");
@@ -152,6 +154,15 @@ class JdbcHumanHandoffService implements HumanHandoffService {
                 (rs, row) -> rs.getString(1), ticketId, requestId, customerId);
         if (matches.isEmpty()) notFound();
         return new HumanHandoffResult(requestId, matches.getFirst(), true);
+    }
+
+    @Override
+    @Transactional
+    public void handoffAfterProposalRejection(UUID ticketId, String approverId) {
+        authorityLock.acquire(ticketId);
+        transitionToHuman(
+                ticketId, "APPROVAL_REJECTED", "APPROVAL_REJECTED_HANDOFF",
+                APPROVAL_REJECTION_PUBLIC_MESSAGE, false, approverId);
     }
 
     private HandoffTransition transitionToHuman(

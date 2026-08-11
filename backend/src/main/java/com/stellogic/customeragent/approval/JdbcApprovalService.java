@@ -1,7 +1,9 @@
 package com.stellogic.customeragent.approval;
 
 import com.stellogic.customeragent.compensation.DelayCompensationPolicy;
+import com.stellogic.customeragent.handoff.HumanHandoffService;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
+import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -25,6 +27,8 @@ class JdbcApprovalService implements ApprovalService {
     private final Clock clock;
     private final ObjectMapper objectMapper;
     private final CompensationProposalExpiry proposalExpiry;
+    private final TicketAuthorityLock authorityLock;
+    private final HumanHandoffService handoffService;
     private final int defaultLeaseSeconds;
     private final int maximumLeaseSeconds;
     private final DelayCompensationPolicy policy = new DelayCompensationPolicy();
@@ -34,12 +38,16 @@ class JdbcApprovalService implements ApprovalService {
             Clock clock,
             ObjectMapper objectMapper,
             CompensationProposalExpiry proposalExpiry,
+            TicketAuthorityLock authorityLock,
+            HumanHandoffService handoffService,
             @Value("${baseline.approval.default-lease-seconds:900}") int defaultLeaseSeconds,
             @Value("${baseline.approval.maximum-lease-seconds:900}") int maximumLeaseSeconds) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.objectMapper = objectMapper;
         this.proposalExpiry = proposalExpiry;
+        this.authorityLock = authorityLock;
+        this.handoffService = handoffService;
         this.defaultLeaseSeconds = defaultLeaseSeconds;
         this.maximumLeaseSeconds = maximumLeaseSeconds;
     }
@@ -171,20 +179,9 @@ class JdbcApprovalService implements ApprovalService {
         }
         ViewRow row = rows.getFirst();
         Instant now = clock.instant();
-        if ("PENDING_APPROVAL".equals(row.proposalStatus()) && !row.proposalExpiresAt().isAfter(now)) {
-            proposalExpiry.expireIfDue(command.revisionId(), now);
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
-        }
-        if (!"PENDING_APPROVAL".equals(row.proposalStatus())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
-        }
-        if ("ACTIVE".equals(row.leaseStatus()) && !row.leaseExpiresAt().isAfter(now)) {
-            expireLease(row.ticketId(), command.revisionId(), command.leaseVersion(), now);
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
-        }
-        if (!"ACTIVE".equals(row.leaseStatus())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
-        }
+        requireCurrentLease(new CurrentLeaseScope(
+                row.ticketId(), command.revisionId(), command.leaseVersion(), row.proposalStatus(),
+                row.proposalExpiresAt(), row.leaseStatus(), row.leaseExpiresAt(), now));
         DelayCompensationPolicy.Decision authoritative =
                 policy.evaluate(Duration.ofSeconds(row.delaySeconds()), row.paidAmount());
         if (!DelayCompensationPolicy.VERSION.equals(row.policyVersion())
@@ -249,19 +246,9 @@ class JdbcApprovalService implements ApprovalService {
         }
         LeaseScope lease = leases.getFirst();
         Instant now = clock.instant();
-        if ("PENDING_APPROVAL".equals(lease.proposalStatus())
-                && !lease.proposalExpiresAt().isAfter(now)) {
-            proposalExpiry.expireIfDue(command.revisionId(), now);
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
-        }
-        if (!"PENDING_APPROVAL".equals(lease.proposalStatus())
-                || !"ACTIVE".equals(lease.leaseStatus())
-                || !lease.leaseExpiresAt().isAfter(now)) {
-            if ("ACTIVE".equals(lease.leaseStatus()) && !lease.leaseExpiresAt().isAfter(now)) {
-                expireLease(lease.ticketId(), command.revisionId(), command.leaseVersion(), now);
-            }
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
-        }
+        requireCurrentLease(new CurrentLeaseScope(
+                lease.ticketId(), command.revisionId(), command.leaseVersion(), lease.proposalStatus(),
+                lease.proposalExpiresAt(), lease.leaseStatus(), lease.leaseExpiresAt(), now));
         Timestamp at = Timestamp.from(now);
         jdbc.update(
                 "update approval_lease set status = 'RELEASED', released_at = ? "
@@ -275,6 +262,101 @@ class JdbcApprovalService implements ApprovalService {
         audit(lease.ticketId(), command.revisionId(), command.leaseVersion(),
                 "APPROVAL_LEASE_RELEASED", command.approverId(), at);
         return new ApprovalModels.ReleaseResult(command.revisionId(), true, false);
+    }
+
+    @Override
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public ApprovalModels.RejectionResult reject(ApprovalModels.RejectionCommand command) {
+        String digest = StableParameterDigest.sha256(
+                "REJECTED", command.revisionId().toString(), Integer.toString(command.proposalRevision()),
+                command.contentDigest(), command.leaseToken().toString(), Long.toString(command.leaseVersion()),
+                command.internalReason());
+        lockRequest(command.approverId(), command.requestId(), "PROPOSAL_DECISION");
+        List<DecisionReplay> existing = jdbc.query(
+                "select r.parameter_digest, r.proposal_revision_id, r.proposal_revision, r.decision_type "
+                        + "from proposal_decision_request r where r.approver_id = ? and r.request_id = ?",
+                (rs, row) -> new DecisionReplay(
+                        rs.getString(1), rs.getObject(2, UUID.class), rs.getInt(3), rs.getString(4)),
+                command.approverId(), command.requestId());
+        if (!existing.isEmpty()) {
+            DecisionReplay replay = existing.getFirst();
+            if (!replay.parameterDigest().equals(digest)) conflict();
+            return new ApprovalModels.RejectionResult(
+                    replay.revisionId(), replay.proposalRevision(), replay.decisionType(), true);
+        }
+
+        List<UUID> ticketIds = jdbc.query(
+                "select ticket_id from compensation_proposal_revision where id = ?",
+                (rs, row) -> rs.getObject(1, UUID.class), command.revisionId());
+        if (ticketIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
+        }
+        UUID ticketId = ticketIds.getFirst();
+        authorityLock.acquire(ticketId);
+        List<String> ticketStates = jdbc.query(
+                "select lifecycle_state from support_ticket where id = ? for update",
+                (rs, row) -> rs.getString(1), ticketId);
+        if (ticketStates.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal ticket not found");
+        }
+        if ("CLOSED".equals(ticketStates.getFirst())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "ticket is no longer current");
+        }
+        List<DecisionProposal> proposals = jdbc.query(
+                "select ticket_id, revision_number, content_digest, status, expires_at "
+                        + "from compensation_proposal_revision where id = ? for update",
+                (rs, row) -> new DecisionProposal(
+                        rs.getObject(1, UUID.class), rs.getInt(2), rs.getString(3),
+                        rs.getString(4), rs.getTimestamp(5).toInstant()),
+                command.revisionId());
+        if (proposals.isEmpty() || !ticketId.equals(proposals.getFirst().ticketId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
+        }
+        DecisionProposal proposal = proposals.getFirst();
+        Instant now = clock.instant();
+        List<DecisionLease> leases = jdbc.query(
+                "select status, expires_at from approval_lease where proposal_revision_id = ? "
+                        + "and approver_id = ? and lease_token = ? and lease_version = ? for update",
+                (rs, row) -> new DecisionLease(rs.getString(1), rs.getTimestamp(2).toInstant()),
+                command.revisionId(), command.approverId(), command.leaseToken(), command.leaseVersion());
+        if (leases.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
+        }
+        DecisionLease lease = leases.getFirst();
+        requireCurrentLease(new CurrentLeaseScope(
+                ticketId, command.revisionId(), command.leaseVersion(), proposal.status(),
+                proposal.expiresAt(), lease.status(), lease.expiresAt(), now));
+        if (proposal.revisionNumber() != command.proposalRevision()
+                || !proposal.contentDigest().equals(command.contentDigest())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "proposal revision content mismatch");
+        }
+
+        Timestamp at = Timestamp.from(now);
+        UUID decisionId = UUID.randomUUID();
+        jdbc.update(
+                "insert into proposal_decision (id, proposal_revision_id, proposal_revision, content_digest, "
+                        + "approver_id, lease_token, lease_version, decision_type, internal_reason, decided_at) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, 'REJECTED', ?, ?)",
+                decisionId, command.revisionId(), command.proposalRevision(), command.contentDigest(),
+                command.approverId(), command.leaseToken(), command.leaseVersion(), command.internalReason(), at);
+        jdbc.update(
+                "insert into proposal_decision_request (approver_id, request_id, parameter_digest, decision_id, "
+                        + "proposal_revision_id, proposal_revision, content_digest, lease_token, lease_version, "
+                        + "decision_type, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'REJECTED', ?)",
+                command.approverId(), command.requestId(), digest, decisionId, command.revisionId(),
+                command.proposalRevision(), command.contentDigest(), command.leaseToken(),
+                command.leaseVersion(), at);
+        jdbc.update(
+                "update approval_lease set status = 'DECIDED', decided_at = ? "
+                        + "where proposal_revision_id = ? and lease_version = ? and status = 'ACTIVE'",
+                at, command.revisionId(), command.leaseVersion());
+        jdbc.update(
+                "update compensation_proposal_revision set status = 'REJECTED' where id = ?",
+                command.revisionId());
+        auditDecision(ticketId, decisionId, command.leaseVersion(), command.approverId(), at);
+        handoffService.handoffAfterProposalRejection(ticketId, command.approverId());
+        return new ApprovalModels.RejectionResult(
+                command.revisionId(), command.proposalRevision(), "REJECTED", false);
     }
 
     private void lockRequest(String approverId, String requestId, String operation) {
@@ -299,6 +381,24 @@ class JdbcApprovalService implements ApprovalService {
         }
     }
 
+    private void requireCurrentLease(CurrentLeaseScope scope) {
+        if ("PENDING_APPROVAL".equals(scope.proposalStatus())
+                && !scope.proposalExpiresAt().isAfter(scope.serverNow())) {
+            proposalExpiry.expireIfDue(scope.revisionId(), scope.serverNow());
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
+        }
+        if (!"PENDING_APPROVAL".equals(scope.proposalStatus())
+                || !"ACTIVE".equals(scope.leaseStatus())
+                || !scope.leaseExpiresAt().isAfter(scope.serverNow())) {
+            if ("ACTIVE".equals(scope.leaseStatus())
+                    && !scope.leaseExpiresAt().isAfter(scope.serverNow())) {
+                expireLease(
+                        scope.ticketId(), scope.revisionId(), scope.leaseVersion(), scope.serverNow());
+            }
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
+        }
+    }
+
     private void audit(
             UUID ticketId, UUID revisionId, long leaseVersion,
             String eventType, String actorId, Timestamp at) {
@@ -307,6 +407,15 @@ class JdbcApprovalService implements ApprovalService {
                         + "subject_type, subject_id, authorization_version) "
                         + "values (?, ?, ?, ?, 'COMPENSATION_PROPOSAL_REVISION', ?, ?)",
                 ticketId, eventType, actorId, at, revisionId, leaseVersion);
+    }
+
+    private void auditDecision(
+            UUID ticketId, UUID decisionId, long leaseVersion, String actorId, Timestamp at) {
+        jdbc.update(
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, "
+                        + "subject_type, subject_id, authorization_version) "
+                        + "values (?, 'COMPENSATION_PROPOSAL_REJECTED', ?, ?, 'PROPOSAL_DECISION', ?, ?)",
+                ticketId, actorId, at, decisionId, leaseVersion);
     }
 
     private List<String> parseEvidence(String json) {
@@ -340,7 +449,21 @@ class JdbcApprovalService implements ApprovalService {
 
     private record ClaimReplay(String parameterDigest, UUID revisionId, UUID token, long version, Instant expiresAt) {}
     private record ReleaseReplay(String parameterDigest, UUID revisionId) {}
+    private record DecisionReplay(
+            String parameterDigest, UUID revisionId, int proposalRevision, String decisionType) {}
     private record ProposalScope(UUID ticketId, String status, Instant expiresAt) {}
+    private record DecisionProposal(
+            UUID ticketId, int revisionNumber, String contentDigest, String status, Instant expiresAt) {}
+    private record DecisionLease(String status, Instant expiresAt) {}
+    private record CurrentLeaseScope(
+            UUID ticketId,
+            UUID revisionId,
+            long leaseVersion,
+            String proposalStatus,
+            Instant proposalExpiresAt,
+            String leaseStatus,
+            Instant leaseExpiresAt,
+            Instant serverNow) {}
     private record LeaseScope(
             UUID ticketId, String proposalStatus, Instant proposalExpiresAt,
             String leaseStatus, Instant leaseExpiresAt) {}

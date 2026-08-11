@@ -498,6 +498,16 @@ def main() -> None:
             headers=lease_headers,
         )
         expect_status(revoked_after_release, 403)
+        rejection_after_release = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/reject",
+            headers={**lease_headers, "Idempotency-Key": f"released-reject-{uuid.uuid4()}"},
+            json={
+                "proposalRevision": proposal_row[2],
+                "contentDigest": proposal_row[9],
+                "internalReason": "已释放的审批责任不得继续提交决定",
+            },
+        )
+        expect_status(rejection_after_release, 403)
 
         reclaim_two = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
@@ -641,6 +651,19 @@ def main() -> None:
             },
         )
         expect_status(release_at_proposal_expiry, 403)
+        reject_at_proposal_expiry = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{expired_revision_id}/reject",
+            headers={
+                **expired_scope_headers,
+                "Idempotency-Key": f"expired-reject-{uuid.uuid4()}",
+            },
+            json={
+                "proposalRevision": 1,
+                "contentDigest": "e" * 64,
+                "internalReason": "过期边界提交",
+            },
+        )
+        expect_status(reject_at_proposal_expiry, 403)
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert connection.execute(
             "select p.status, l.status from compensation_proposal_revision p "
@@ -813,6 +836,259 @@ def main() -> None:
             "where ticket_id = %s order by revision_number",
             (uuid.UUID(proposal_ticket_id),),
         ).fetchall() == [(1, "SUPERSEDED"), (2, "APPROVED")]
+
+    def seed_pending_decision_fixture(
+        order_reference: str, content_digest: str, description: str
+    ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
+        fixture_ticket_id = uuid.uuid4()
+        fixture_generation_id = uuid.uuid4()
+        fixture_revision_id = uuid.uuid4()
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            connection.execute(
+            "insert into support_ticket "
+            "(id, customer_id, order_reference, description, lifecycle_state, handling_mode, "
+            "created_at, first_responded_at) values "
+            "(%s, 'customer-demo', %s, %s, "
+            "'INVESTIGATING', 'AGENT', '2026-08-09T13:55:00Z', '2026-08-09T13:56:00Z')",
+                (fixture_ticket_id, order_reference, description),
+            )
+            connection.execute(
+            "insert into agent_processing_generation "
+            "(id, ticket_id, generation_number, thread_id, status, created_at) "
+            "values (%s, %s, 1, %s, 'ACTIVE', '2026-08-09T13:56:00Z')",
+                (fixture_generation_id, fixture_ticket_id, uuid.uuid4()),
+            )
+            connection.execute(
+            "insert into compensation_proposal_revision "
+            "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, delay_hours, "
+            "delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, "
+            "content_digest, status, created_at, expires_at) values "
+            "(%s, %s, 1, %s, %s, %s, 80, 288000, "
+            "'SIMULATED_PARTIAL_REFUND', 26.80, 'LOGISTICS_DELAY', "
+            "jsonb_build_array('order:' || %s, 'logistics:' || %s), "
+            "'delay-policy-v1', %s, 'PENDING_APPROVAL', "
+            "'2026-08-09T13:57:00Z', '2026-08-10T13:57:00Z')",
+                (fixture_revision_id, uuid.uuid4(), fixture_ticket_id, order_reference,
+                 fixture_generation_id, order_reference, order_reference, content_digest),
+            )
+            connection.execute(
+            "insert into approval_evidence_snapshot "
+            "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "
+            "available_compensation_amount, active_reservation_amount, paid, cancelled, fully_refunded, "
+            "existing_compensation, evidence_references, captured_at) "
+            "select %s, order_reference, 80, 288000, paid_amount, available_compensation_amount, 0.00, "
+            "paid, cancelled, fully_refunded, existing_compensation, "
+            "jsonb_build_array('order:' || order_reference, 'logistics:' || order_reference), "
+            "'2026-08-09T13:57:00Z' from synthetic_order where order_reference = %s",
+                (fixture_revision_id, order_reference),
+            )
+        return fixture_ticket_id, fixture_generation_id, fixture_revision_id
+
+    rejection_digest = "a" * 64
+    rejection_ticket_id, rejection_generation_id, rejection_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-CANCELLED", rejection_digest, "审批驳回验收"
+    )
+
+    with httpx.Client(timeout=20.0) as client:
+        rejection_claim = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{rejection_revision_id}/claims",
+            headers={**approver_headers, "Idempotency-Key": f"reject-claim-{uuid.uuid4()}"},
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(rejection_claim, 201)
+        rejection_lease = rejection_claim.json()
+        rejection_headers = {
+            **approver_headers,
+            "X-Approval-Lease-Token": rejection_lease["leaseToken"],
+            "X-Approval-Lease-Version": str(rejection_lease["leaseVersion"]),
+        }
+        rejection_url = (
+            f"{spring_url}/api/approver/compensation-proposals/{rejection_revision_id}/reject"
+        )
+        old_revision = client.post(
+            rejection_url,
+            headers={**rejection_headers, "Idempotency-Key": f"old-revision-{uuid.uuid4()}"},
+            json={
+                "proposalRevision": 2,
+                "contentDigest": rejection_digest,
+                "internalReason": "旧版本页面",
+            },
+        )
+        expect_status(old_revision, 409)
+        wrong_digest = client.post(
+            rejection_url,
+            headers={**rejection_headers, "Idempotency-Key": f"wrong-digest-{uuid.uuid4()}"},
+            json={
+                "proposalRevision": 1,
+                "contentDigest": "b" * 64,
+                "internalReason": "摘要不匹配",
+            },
+        )
+        expect_status(wrong_digest, 409)
+        empty_reason = client.post(
+            rejection_url,
+            headers={**rejection_headers, "Idempotency-Key": f"empty-reason-{uuid.uuid4()}"},
+            json={
+                "proposalRevision": 1,
+                "contentDigest": rejection_digest,
+                "internalReason": "   ",
+            },
+        )
+        expect_status(empty_reason, 400)
+
+        rejection_body = {
+            "proposalRevision": 1,
+            "contentDigest": rejection_digest,
+            "internalReason": "审批证据不足，需要客服继续核实",
+        }
+        rejection_request_id = f"reject-decision-{uuid.uuid4()}"
+        rejection_request_ids = [rejection_request_id, rejection_request_id]
+
+        def reject_concurrently(request_id: str) -> httpx.Response:
+            with httpx.Client(timeout=20.0) as concurrent_client:
+                return concurrent_client.post(
+                    rejection_url,
+                    headers={**rejection_headers, "Idempotency-Key": request_id},
+                    json=rejection_body,
+                )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            rejection_responses = list(executor.map(
+                reject_concurrently, rejection_request_ids
+            ))
+        assert sorted(response.status_code for response in rejection_responses) == [200, 200], [
+            (response.status_code, response.text) for response in rejection_responses
+        ]
+        assert sorted(response.json()["replayed"] for response in rejection_responses) == [False, True]
+        rejection_winner_index = next(
+            index for index, response in enumerate(rejection_responses)
+            if response.json()["replayed"] is False
+        )
+        rejected = rejection_responses[rejection_winner_index]
+        assert rejected.json() == {
+            "proposalRevisionId": str(rejection_revision_id),
+            "proposalRevision": 1,
+            "decision": "REJECTED",
+            "replayed": False,
+        }
+        rejection_replay = client.post(
+            rejection_url,
+            headers={**rejection_headers, "Idempotency-Key": rejection_request_id},
+            json=rejection_body,
+        )
+        expect_status(rejection_replay, 200)
+        assert rejection_replay.json()["replayed"] is True
+        rejection_conflict = client.post(
+            rejection_url,
+            headers={**rejection_headers, "Idempotency-Key": rejection_request_id},
+            json={**rejection_body, "internalReason": "不同理由"},
+        )
+        expect_status(rejection_conflict, 409)
+        stale_page_reject = client.post(
+            rejection_url,
+            headers={**rejection_headers, "Idempotency-Key": f"stale-page-{uuid.uuid4()}"},
+            json=rejection_body,
+        )
+        expect_status(stale_page_reject, 403)
+        rejected_view = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{rejection_revision_id}/approval-view",
+            headers=rejection_headers,
+        )
+        expect_status(rejected_view, 403)
+        rejection_customer = client.get(
+            f"{spring_url}/api/customer/tickets/{rejection_ticket_id}",
+            headers={"X-Synthetic-Customer-Id": "customer-demo"},
+        )
+        expect_status(rejection_customer, 200)
+        rejection_projection = rejection_customer.json()
+        assert rejection_projection["ticket"]["handlingMode"] == "HUMAN"
+        assert rejection_projection["ticket"]["lifecycleState"] == "INVESTIGATING"
+        assert rejection_projection["messages"][-1]["body"] == (
+            "为继续妥善处理，此工单已转由客服跟进。客服将在此工单中与您联系。"
+        )
+        rejection_public_json = json.dumps(rejection_projection, ensure_ascii=False)
+        assert rejection_body["internalReason"] not in rejection_public_json
+        assert "APPROVAL_REJECTED" not in rejection_public_json
+        rejection_queue = client.get(
+            f"{spring_url}/api/support/queue",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(rejection_queue, 200)
+        rejection_queue_item = next(
+            item for item in rejection_queue.json()
+            if item["ticketId"] == str(rejection_ticket_id)
+        )
+        assert rejection_queue_item["reasonCodes"] == ["APPROVAL_REJECTED_HANDOFF"]
+        assert "internalReason" not in rejection_queue_item
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        rejection_record = connection.execute(
+            "select d.id, d.decision_type, d.internal_reason, p.status, l.status, "
+            "t.handling_mode, t.human_handoff_reason_code, g.status "
+            "from proposal_decision d "
+            "join compensation_proposal_revision p on p.id = d.proposal_revision_id "
+            "join approval_lease l on l.proposal_revision_id = d.proposal_revision_id "
+            "and l.lease_version = d.lease_version "
+            "join support_ticket t on t.id = p.ticket_id "
+            "join agent_processing_generation g on g.id = p.generation_id "
+            "where d.proposal_revision_id = %s",
+            (rejection_revision_id,),
+        ).fetchone()
+        assert rejection_record[1:] == (
+            "REJECTED", rejection_body["internalReason"], "REJECTED", "DECIDED",
+            "HUMAN", "APPROVAL_REJECTED", "HANDED_OFF",
+        )
+        assert connection.execute(
+            "select count(*) from compensation_reservation where order_reference = 'ORDER-DELAY-CANCELLED'"
+        ).fetchone()[0] == 0
+        assert connection.execute(
+            "select count(*) from audit_event where subject_type = 'PROPOSAL_DECISION' "
+            "and subject_id = %s and event_type = 'COMPENSATION_PROPOSAL_REJECTED'",
+            (rejection_record[0],),
+        ).fetchone()[0] == 1
+
+    boundary_digest = "c" * 64
+    boundary_ticket_id, _, boundary_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-REFUNDED", boundary_digest, "审批租约到期边界验收"
+    )
+    boundary_token = uuid.uuid4()
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into approval_lease "
+            "(id, proposal_revision_id, approver_id, lease_token, lease_version, status, "
+            "claimed_at, expires_at) values "
+            "(%s, %s, 'approver-demo', %s, 1, 'ACTIVE', "
+            "'2026-08-09T13:59:59Z', '2026-08-09T14:00:00Z')",
+            (uuid.uuid4(), boundary_revision_id, boundary_token),
+        )
+    with httpx.Client(timeout=20.0) as client:
+        boundary_rejection = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{boundary_revision_id}/reject",
+            headers={
+                **approver_headers,
+                "X-Approval-Lease-Token": str(boundary_token),
+                "X-Approval-Lease-Version": "1",
+                "Idempotency-Key": f"boundary-reject-{uuid.uuid4()}",
+            },
+            json={
+                "proposalRevision": 1,
+                "contentDigest": boundary_digest,
+                "internalReason": "租约恰在服务器时间到期",
+            },
+        )
+        expect_status(boundary_rejection, 403)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select status from approval_lease where proposal_revision_id = %s and lease_version = 1",
+            (boundary_revision_id,),
+        ).fetchone()[0] == "EXPIRED"
+        assert connection.execute(
+            "select count(*) from proposal_decision where proposal_revision_id = %s",
+            (boundary_revision_id,),
+        ).fetchone()[0] == 0
+        assert connection.execute(
+            "select handling_mode from support_ticket where id = %s", (boundary_ticket_id,)
+        ).fetchone()[0] == "AGENT"
 
     reservation_barrier = threading.Barrier(2)
 
@@ -1798,6 +2074,56 @@ def main() -> None:
     except psycopg.errors.CheckViolation as error:
         assert error.diag.constraint_name == "resolution_elapsed_seconds_monotonic"
 
+    # #22 尚未实现批准业务事务；这里仅在隔离 fixture 上证明 #21 建立的跨决定类型
+    # PostgreSQL 仲裁点能让 APPROVED/REJECTED 并发至多接受一个最终事实。
+    decision_race_digest = "d" * 64
+    _, _, decision_race_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-LOW-ALLOWANCE", decision_race_digest, "批准驳回并发仲裁验收"
+    )
+    decision_race_token = uuid.uuid4()
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into approval_lease "
+            "(id, proposal_revision_id, approver_id, lease_token, lease_version, status, "
+            "claimed_at, expires_at) values "
+            "(%s, %s, 'approver-demo', %s, 1, 'ACTIVE', "
+            "'2026-08-09T13:59:00Z', '2026-08-09T14:15:00Z')",
+            (uuid.uuid4(), decision_race_revision_id, decision_race_token),
+        )
+    decision_barrier = threading.Barrier(2)
+
+    def record_competing_decision(decision_type: str) -> str:
+        try:
+            with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                decision_barrier.wait()
+                connection.execute(
+                    "insert into proposal_decision "
+                    "(id, proposal_revision_id, proposal_revision, content_digest, approver_id, "
+                    "lease_token, lease_version, decision_type, internal_reason, decided_at) "
+                    "values (%s, %s, 1, %s, 'approver-demo', %s, 1, %s, %s, "
+                    "'2026-08-09T14:00:00Z')",
+                    (
+                        uuid.uuid4(), decision_race_revision_id, decision_race_digest,
+                        decision_race_token, decision_type,
+                        "并发驳回理由" if decision_type == "REJECTED" else None,
+                    ),
+                )
+            return f"accepted:{decision_type}"
+        except psycopg.errors.UniqueViolation as error:
+            return error.diag.constraint_name
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        approve_reject_race = list(executor.map(
+            record_competing_decision, ["APPROVED", "REJECTED"]
+        ))
+    assert sum(result.startswith("accepted:") for result in approve_reject_race) == 1
+    assert "proposal_decision_proposal_revision_id_key" in approve_reject_race
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select count(*) from proposal_decision where proposal_revision_id = %s",
+            (decision_race_revision_id,),
+        ).fetchone()[0] == 1
+
     with psycopg.connect(os.environ["AGENT_DATABASE_URI"]) as connection:
         assert connection.execute("select current_database(), current_user").fetchone() == (
             "agent_checkpoint",
@@ -1838,6 +2164,12 @@ def main() -> None:
         "approval_claim_statuses": sorted(response.status_code for response in claim_responses),
         "approval_lease_versions": [1, 2, 3],
         "approval_replacement_revoked": True,
+        "approval_rejection_ticket_id": str(rejection_ticket_id),
+        "approval_rejection_replayed": True,
+        "concurrent_rejection_statuses": sorted(
+            response.status_code for response in rejection_responses
+        ),
+        "approve_reject_arbitration": sorted(approve_reject_race),
     }))
 
 

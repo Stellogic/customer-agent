@@ -2,7 +2,7 @@ package com.stellogic.customeragent.handoff;
 
 import java.util.UUID;
 
-interface HumanHandoffService {
+public interface HumanHandoffService {
     HumanHandoffResult request(RequestHumanHandoff command);
 
     HumanHandoffResult status(String customerId, UUID ticketId, String requestId);
@@ -10,4 +10,6 @@ interface HumanHandoffService {
     AgentHumanHandoffResult requestAgentHumanHandoff(RequestAgentHumanHandoff command);
 
     void auditAgentRejected(UUID ticketId, String reason);
+
+    void handoffAfterProposalRejection(UUID ticketId, String approverId);
 }
