@@ -11,5 +11,5 @@ public interface HumanHandoffService {
 
     void auditAgentRejected(UUID ticketId, String reason);
 
-    void rejectProposal(UUID ticketId, String approverId);
+    void handoffAfterProposalRejection(UUID ticketId, String approverId);
 }

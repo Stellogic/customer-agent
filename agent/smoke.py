@@ -837,49 +837,57 @@ def main() -> None:
             (uuid.UUID(proposal_ticket_id),),
         ).fetchall() == [(1, "SUPERSEDED"), (2, "APPROVED")]
 
-    rejection_ticket_id = uuid.uuid4()
-    rejection_generation_id = uuid.uuid4()
-    rejection_revision_id = uuid.uuid4()
-    rejection_proposal_id = uuid.uuid4()
-    rejection_digest = "a" * 64
-    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        connection.execute(
+    def seed_pending_decision_fixture(
+        order_reference: str, content_digest: str, description: str
+    ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
+        fixture_ticket_id = uuid.uuid4()
+        fixture_generation_id = uuid.uuid4()
+        fixture_revision_id = uuid.uuid4()
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            connection.execute(
             "insert into support_ticket "
             "(id, customer_id, order_reference, description, lifecycle_state, handling_mode, "
             "created_at, first_responded_at) values "
-            "(%s, 'customer-demo', 'ORDER-DELAY-CANCELLED', '审批驳回验收', "
+            "(%s, 'customer-demo', %s, %s, "
             "'INVESTIGATING', 'AGENT', '2026-08-09T13:55:00Z', '2026-08-09T13:56:00Z')",
-            (rejection_ticket_id,),
-        )
-        connection.execute(
+                (fixture_ticket_id, order_reference, description),
+            )
+            connection.execute(
             "insert into agent_processing_generation "
             "(id, ticket_id, generation_number, thread_id, status, created_at) "
             "values (%s, %s, 1, %s, 'ACTIVE', '2026-08-09T13:56:00Z')",
-            (rejection_generation_id, rejection_ticket_id, uuid.uuid4()),
-        )
-        connection.execute(
+                (fixture_generation_id, fixture_ticket_id, uuid.uuid4()),
+            )
+            connection.execute(
             "insert into compensation_proposal_revision "
             "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, delay_hours, "
             "delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, "
             "content_digest, status, created_at, expires_at) values "
-            "(%s, %s, 1, %s, 'ORDER-DELAY-CANCELLED', %s, 80, 288000, "
+            "(%s, %s, 1, %s, %s, %s, 80, 288000, "
             "'SIMULATED_PARTIAL_REFUND', 26.80, 'LOGISTICS_DELAY', "
-            "'[\"order:ORDER-DELAY-CANCELLED\",\"logistics:ORDER-DELAY-CANCELLED\"]', "
+            "jsonb_build_array('order:' || %s, 'logistics:' || %s), "
             "'delay-policy-v1', %s, 'PENDING_APPROVAL', "
             "'2026-08-09T13:57:00Z', '2026-08-10T13:57:00Z')",
-            (rejection_revision_id, rejection_proposal_id, rejection_ticket_id,
-             rejection_generation_id, rejection_digest),
-        )
-        connection.execute(
+                (fixture_revision_id, uuid.uuid4(), fixture_ticket_id, order_reference,
+                 fixture_generation_id, order_reference, order_reference, content_digest),
+            )
+            connection.execute(
             "insert into approval_evidence_snapshot "
             "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "
             "available_compensation_amount, active_reservation_amount, paid, cancelled, fully_refunded, "
-            "existing_compensation, evidence_references, captured_at) values "
-            "(%s, 'ORDER-DELAY-CANCELLED', 80, 288000, 268.00, 268.00, 0.00, true, true, false, false, "
-            "'[\"order:ORDER-DELAY-CANCELLED\",\"logistics:ORDER-DELAY-CANCELLED\"]', "
-            "'2026-08-09T13:57:00Z')",
-            (rejection_revision_id,),
-        )
+            "existing_compensation, evidence_references, captured_at) "
+            "select %s, order_reference, 80, 288000, paid_amount, available_compensation_amount, 0.00, "
+            "paid, cancelled, fully_refunded, existing_compensation, "
+            "jsonb_build_array('order:' || order_reference, 'logistics:' || order_reference), "
+            "'2026-08-09T13:57:00Z' from synthetic_order where order_reference = %s",
+                (fixture_revision_id, order_reference),
+            )
+        return fixture_ticket_id, fixture_generation_id, fixture_revision_id
+
+    rejection_digest = "a" * 64
+    rejection_ticket_id, rejection_generation_id, rejection_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-CANCELLED", rejection_digest, "审批驳回验收"
+    )
 
     with httpx.Client(timeout=20.0) as client:
         rejection_claim = client.post(
@@ -933,10 +941,8 @@ def main() -> None:
             "contentDigest": rejection_digest,
             "internalReason": "审批证据不足，需要客服继续核实",
         }
-        rejection_request_ids = [
-            f"reject-decision-a-{uuid.uuid4()}",
-            f"reject-decision-b-{uuid.uuid4()}",
-        ]
+        rejection_request_id = f"reject-decision-{uuid.uuid4()}"
+        rejection_request_ids = [rejection_request_id, rejection_request_id]
 
         def reject_concurrently(request_id: str) -> httpx.Response:
             with httpx.Client(timeout=20.0) as concurrent_client:
@@ -950,14 +956,14 @@ def main() -> None:
             rejection_responses = list(executor.map(
                 reject_concurrently, rejection_request_ids
             ))
-        assert sorted(response.status_code for response in rejection_responses) == [200, 403], [
+        assert sorted(response.status_code for response in rejection_responses) == [200, 200], [
             (response.status_code, response.text) for response in rejection_responses
         ]
+        assert sorted(response.json()["replayed"] for response in rejection_responses) == [False, True]
         rejection_winner_index = next(
             index for index, response in enumerate(rejection_responses)
-            if response.status_code == 200
+            if response.json()["replayed"] is False
         )
-        rejection_request_id = rejection_request_ids[rejection_winner_index]
         rejected = rejection_responses[rejection_winner_index]
         assert rejected.json() == {
             "proposalRevisionId": str(rejection_revision_id),
@@ -1019,7 +1025,7 @@ def main() -> None:
         rejection_record = connection.execute(
             "select d.id, d.decision_type, d.internal_reason, p.status, l.status, "
             "t.handling_mode, t.human_handoff_reason_code, g.status "
-            "from approval_decision d "
+            "from proposal_decision d "
             "join compensation_proposal_revision p on p.id = d.proposal_revision_id "
             "join approval_lease l on l.proposal_revision_id = d.proposal_revision_id "
             "and l.lease_version = d.lease_version "
@@ -1036,10 +1042,53 @@ def main() -> None:
             "select count(*) from compensation_reservation where order_reference = 'ORDER-DELAY-CANCELLED'"
         ).fetchone()[0] == 0
         assert connection.execute(
-            "select count(*) from audit_event where subject_type = 'APPROVAL_DECISION' "
+            "select count(*) from audit_event where subject_type = 'PROPOSAL_DECISION' "
             "and subject_id = %s and event_type = 'COMPENSATION_PROPOSAL_REJECTED'",
             (rejection_record[0],),
         ).fetchone()[0] == 1
+
+    boundary_digest = "c" * 64
+    boundary_ticket_id, _, boundary_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-REFUNDED", boundary_digest, "审批租约到期边界验收"
+    )
+    boundary_token = uuid.uuid4()
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into approval_lease "
+            "(id, proposal_revision_id, approver_id, lease_token, lease_version, status, "
+            "claimed_at, expires_at) values "
+            "(%s, %s, 'approver-demo', %s, 1, 'ACTIVE', "
+            "'2026-08-09T13:59:59Z', '2026-08-09T14:00:00Z')",
+            (uuid.uuid4(), boundary_revision_id, boundary_token),
+        )
+    with httpx.Client(timeout=20.0) as client:
+        boundary_rejection = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{boundary_revision_id}/reject",
+            headers={
+                **approver_headers,
+                "X-Approval-Lease-Token": str(boundary_token),
+                "X-Approval-Lease-Version": "1",
+                "Idempotency-Key": f"boundary-reject-{uuid.uuid4()}",
+            },
+            json={
+                "proposalRevision": 1,
+                "contentDigest": boundary_digest,
+                "internalReason": "租约恰在服务器时间到期",
+            },
+        )
+        expect_status(boundary_rejection, 403)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select status from approval_lease where proposal_revision_id = %s and lease_version = 1",
+            (boundary_revision_id,),
+        ).fetchone()[0] == "EXPIRED"
+        assert connection.execute(
+            "select count(*) from proposal_decision where proposal_revision_id = %s",
+            (boundary_revision_id,),
+        ).fetchone()[0] == 0
+        assert connection.execute(
+            "select handling_mode from support_ticket where id = %s", (boundary_ticket_id,)
+        ).fetchone()[0] == "AGENT"
 
     reservation_barrier = threading.Barrier(2)
 
@@ -2025,6 +2074,56 @@ def main() -> None:
     except psycopg.errors.CheckViolation as error:
         assert error.diag.constraint_name == "resolution_elapsed_seconds_monotonic"
 
+    # #22 尚未实现批准业务事务；这里仅在隔离 fixture 上证明 #21 建立的跨决定类型
+    # PostgreSQL 仲裁点能让 APPROVED/REJECTED 并发至多接受一个最终事实。
+    decision_race_digest = "d" * 64
+    _, _, decision_race_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-LOW-ALLOWANCE", decision_race_digest, "批准驳回并发仲裁验收"
+    )
+    decision_race_token = uuid.uuid4()
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into approval_lease "
+            "(id, proposal_revision_id, approver_id, lease_token, lease_version, status, "
+            "claimed_at, expires_at) values "
+            "(%s, %s, 'approver-demo', %s, 1, 'ACTIVE', "
+            "'2026-08-09T13:59:00Z', '2026-08-09T14:15:00Z')",
+            (uuid.uuid4(), decision_race_revision_id, decision_race_token),
+        )
+    decision_barrier = threading.Barrier(2)
+
+    def record_competing_decision(decision_type: str) -> str:
+        try:
+            with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                decision_barrier.wait()
+                connection.execute(
+                    "insert into proposal_decision "
+                    "(id, proposal_revision_id, proposal_revision, content_digest, approver_id, "
+                    "lease_token, lease_version, decision_type, internal_reason, decided_at) "
+                    "values (%s, %s, 1, %s, 'approver-demo', %s, 1, %s, %s, "
+                    "'2026-08-09T14:00:00Z')",
+                    (
+                        uuid.uuid4(), decision_race_revision_id, decision_race_digest,
+                        decision_race_token, decision_type,
+                        "并发驳回理由" if decision_type == "REJECTED" else None,
+                    ),
+                )
+            return f"accepted:{decision_type}"
+        except psycopg.errors.UniqueViolation as error:
+            return error.diag.constraint_name
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        approve_reject_race = list(executor.map(
+            record_competing_decision, ["APPROVED", "REJECTED"]
+        ))
+    assert sum(result.startswith("accepted:") for result in approve_reject_race) == 1
+    assert "proposal_decision_proposal_revision_id_key" in approve_reject_race
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select count(*) from proposal_decision where proposal_revision_id = %s",
+            (decision_race_revision_id,),
+        ).fetchone()[0] == 1
+
     with psycopg.connect(os.environ["AGENT_DATABASE_URI"]) as connection:
         assert connection.execute("select current_database(), current_user").fetchone() == (
             "agent_checkpoint",
@@ -2070,6 +2169,7 @@ def main() -> None:
         "concurrent_rejection_statuses": sorted(
             response.status_code for response in rejection_responses
         ),
+        "approve_reject_arbitration": sorted(approve_reject_race),
     }))
 
 

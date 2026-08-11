@@ -158,7 +158,7 @@ class JdbcHumanHandoffService implements HumanHandoffService {
 
     @Override
     @Transactional
-    public void rejectProposal(UUID ticketId, String approverId) {
+    public void handoffAfterProposalRejection(UUID ticketId, String approverId) {
         authorityLock.acquire(ticketId);
         transitionToHuman(
                 ticketId, "APPROVAL_REJECTED", "APPROVAL_REJECTED_HANDOFF",

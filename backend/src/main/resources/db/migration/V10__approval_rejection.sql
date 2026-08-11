@@ -21,7 +21,7 @@ ALTER TABLE approval_lease
     ADD CONSTRAINT approval_lease_decided_at_complete
         CHECK ((status = 'DECIDED') = (decided_at IS NOT NULL));
 
-CREATE TABLE approval_decision (
+CREATE TABLE proposal_decision (
     id uuid PRIMARY KEY,
     proposal_revision_id uuid NOT NULL UNIQUE REFERENCES compensation_proposal_revision(id),
     proposal_revision integer NOT NULL CHECK (proposal_revision > 0),
@@ -41,11 +41,11 @@ CREATE TABLE approval_decision (
     )
 );
 
-CREATE TABLE approval_decision_request (
+CREATE TABLE proposal_decision_request (
     approver_id text NOT NULL,
     request_id text NOT NULL,
     parameter_digest char(64) NOT NULL,
-    decision_id uuid NOT NULL UNIQUE REFERENCES approval_decision(id),
+    decision_id uuid NOT NULL UNIQUE REFERENCES proposal_decision(id),
     proposal_revision_id uuid NOT NULL,
     proposal_revision integer NOT NULL CHECK (proposal_revision > 0),
     content_digest char(64) NOT NULL,
@@ -59,4 +59,4 @@ CREATE TABLE approval_decision_request (
         REFERENCES approval_lease(proposal_revision_id, lease_version)
 );
 
-GRANT SELECT, INSERT ON approval_decision, approval_decision_request TO spring_app;
+GRANT SELECT, INSERT ON proposal_decision, proposal_decision_request TO spring_app;
