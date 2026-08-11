@@ -354,6 +354,310 @@ def main() -> None:
     except psycopg.errors.RaiseException:
         pass
 
+    approver_headers = {"X-Synthetic-Approver-Id": "approver-demo"}
+    other_approver_headers = {"X-Synthetic-Approver-Id": "approver-other-demo"}
+    with httpx.Client(timeout=20.0) as client:
+        queue = client.get(
+            f"{spring_url}/api/approver/compensation-proposals", headers=approver_headers
+        )
+        expect_status(queue, 200)
+        queue_item = next(
+            item for item in queue.json() if item["proposalRevisionId"] == str(first_revision_id)
+        )
+        assert set(queue_item) == {
+            "proposalRevisionId", "compensationMethod", "amount", "submittedAt", "expiresAt"
+        }
+
+        for forbidden_identity in ("customer-demo", "support-demo"):
+            denied = client.get(
+                f"{spring_url}/api/approver/compensation-proposals",
+                headers={"X-Synthetic-Approver-Id": forbidden_identity},
+            )
+            expect_status(denied, 401)
+        approver_customer_detail = client.get(
+            f"{spring_url}/api/customer/tickets/{proposal_ticket_id}", headers=approver_headers
+        )
+        expect_status(approver_customer_detail, 401)
+        approver_support_detail = client.get(
+            f"{spring_url}/api/support/tickets/{proposal_ticket_id}", headers=approver_headers
+        )
+        expect_status(approver_support_detail, 404)
+        approver_execution = client.get(
+            f"{spring_url}/internal/capabilities/executor/probe", headers=approver_headers
+        )
+        expect_status(approver_execution, 400)
+
+    claim_requests = {
+        "approver-demo": f"issue-20-claim-a-{uuid.uuid4()}",
+        "approver-other-demo": f"issue-20-claim-b-{uuid.uuid4()}",
+    }
+
+    def claim_concurrently(approver_id: str) -> httpx.Response:
+        with httpx.Client(timeout=20.0) as concurrent_client:
+            return concurrent_client.post(
+                f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
+                headers={
+                    "X-Synthetic-Approver-Id": approver_id,
+                    "Idempotency-Key": claim_requests[approver_id],
+                },
+                json={"requestedLeaseSeconds": 900},
+            )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        claim_responses = list(executor.map(
+            claim_concurrently, ["approver-demo", "approver-other-demo"]
+        ))
+    assert sorted(response.status_code for response in claim_responses) == [201, 409], [
+        (response.status_code, response.text) for response in claim_responses
+    ]
+    winner_index = next(index for index, response in enumerate(claim_responses) if response.status_code == 201)
+    winner_id = ["approver-demo", "approver-other-demo"][winner_index]
+    loser_id = "approver-other-demo" if winner_id == "approver-demo" else "approver-demo"
+    winner_headers = {"X-Synthetic-Approver-Id": winner_id}
+    lease_one = claim_responses[winner_index].json()
+    assert lease_one["leaseVersion"] == 1 and lease_one["replayed"] is False
+
+    with httpx.Client(timeout=20.0) as client:
+        replay = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
+            headers={**winner_headers, "Idempotency-Key": claim_requests[winner_id]},
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(replay, 200)
+        assert replay.json()["leaseToken"] == lease_one["leaseToken"]
+        assert replay.json()["replayed"] is True
+        parameter_conflict = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
+            headers={**winner_headers, "Idempotency-Key": claim_requests[winner_id]},
+            json={"requestedLeaseSeconds": 899},
+        )
+        expect_status(parameter_conflict, 409)
+
+        lease_headers = {
+            **winner_headers,
+            "X-Approval-Lease-Token": lease_one["leaseToken"],
+            "X-Approval-Lease-Version": str(lease_one["leaseVersion"]),
+        }
+        approval_view = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
+            headers=lease_headers,
+        )
+        expect_status(approval_view, 200)
+        approval_projection = approval_view.json()
+        assert approval_projection["view"] == "APPROVAL_VIEW"
+        assert approval_projection["contentDigest"] == proposal_row[9]
+        assert approval_projection["authoritativeAmount"] == 26.8
+        assert approval_projection["orderReference"] == proposal_order_reference
+        assert approval_projection["reasonCode"] == "LOGISTICS_DELAY"
+        assert approval_projection["delaySeconds"] == 288000
+        assert approval_projection["leaseToken"] == lease_one["leaseToken"]
+        assert [event["eventType"] for event in approval_projection["responsibilityChain"]] == [
+            "COMPENSATION_PROPOSAL_REVISION_CREATED", "APPROVAL_LEASE_CLAIMED"
+        ]
+        assert approval_projection["responsibilityChain"][1]["leaseVersion"] == 1
+        assert not any(field in approval_projection for field in (
+            "ticket", "ticketId", "customerId", "description", "publicMessages", "internalNotes",
+            "execution", "generationId", "threadId", "toolPayload",
+        ))
+        denied_other_approver = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
+            headers={
+                "X-Synthetic-Approver-Id": loser_id,
+                "X-Approval-Lease-Token": lease_one["leaseToken"],
+                "X-Approval-Lease-Version": "1",
+            },
+        )
+        expect_status(denied_other_approver, 403)
+        denied_old_token = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
+            headers={
+                **winner_headers,
+                "X-Approval-Lease-Token": str(uuid.uuid4()),
+                "X-Approval-Lease-Version": "1",
+            },
+        )
+        expect_status(denied_old_token, 403)
+
+        release_request = f"issue-20-release-{uuid.uuid4()}"
+        released = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/release",
+            headers={**lease_headers, "Idempotency-Key": release_request},
+        )
+        expect_status(released, 200)
+        assert released.json() == {
+            "proposalRevisionId": str(first_revision_id), "released": True, "replayed": False
+        }
+        release_replay = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/release",
+            headers={**lease_headers, "Idempotency-Key": release_request},
+        )
+        expect_status(release_replay, 200)
+        assert release_replay.json()["replayed"] is True
+        revoked_after_release = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
+            headers=lease_headers,
+        )
+        expect_status(revoked_after_release, 403)
+
+        reclaim_two = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
+            headers={
+                "X-Synthetic-Approver-Id": loser_id,
+                "Idempotency-Key": f"issue-20-reclaim-2-{uuid.uuid4()}",
+            },
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(reclaim_two, 201)
+        lease_two = reclaim_two.json()
+        assert lease_two["leaseVersion"] == 2
+        stale_release = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/release",
+            headers={
+                **lease_headers,
+                "Idempotency-Key": f"issue-20-stale-release-{uuid.uuid4()}",
+            },
+        )
+        expect_status(stale_release, 403)
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "update approval_lease set claimed_at = '2026-08-09T13:59:59Z', "
+            "expires_at = '2026-08-09T14:00:00Z' where proposal_revision_id = %s and lease_version = 2",
+            (first_revision_id,),
+        )
+        proposal_state = connection.execute(
+            "select status, expires_at from compensation_proposal_revision where id = %s",
+            (first_revision_id,),
+        ).fetchone()
+        assert proposal_state[0] == "PENDING_APPROVAL"
+        assert proposal_state[1].isoformat() == "2026-08-10T14:00:00+00:00"
+
+    with httpx.Client(timeout=20.0) as client:
+        expired_view = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
+            headers={
+                "X-Synthetic-Approver-Id": loser_id,
+                "X-Approval-Lease-Token": lease_two["leaseToken"],
+                "X-Approval-Lease-Version": "2",
+            },
+        )
+        expect_status(expired_view, 403)
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            assert connection.execute(
+                "select status from approval_lease where proposal_revision_id = %s and lease_version = 2",
+                (first_revision_id,),
+            ).fetchone()[0] == "EXPIRED"
+            assert connection.execute(
+                "select count(*) from audit_event where subject_id = %s "
+                "and event_type = 'APPROVAL_LEASE_EXPIRED' and authorization_version = 2",
+                (first_revision_id,),
+            ).fetchone()[0] == 1
+        reclaim_three = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
+            headers={
+                **winner_headers,
+                "Idempotency-Key": f"issue-20-reclaim-3-{uuid.uuid4()}",
+            },
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(reclaim_three, 201)
+        lease_three = reclaim_three.json()
+        assert lease_three["leaseVersion"] == 3
+        lease_three_view = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
+            headers={
+                **winner_headers,
+                "X-Approval-Lease-Token": lease_three["leaseToken"],
+                "X-Approval-Lease-Version": "3",
+            },
+        )
+        expect_status(lease_three_view, 200)
+        assert any(
+            event["eventType"] == "APPROVAL_LEASE_EXPIRED" and event["leaseVersion"] == 2
+            for event in lease_three_view.json()["responsibilityChain"]
+        )
+
+    expired_revision_id = uuid.uuid4()
+    expired_lease_token = uuid.uuid4()
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into compensation_proposal_revision "
+            "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, delay_hours, "
+            "delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, "
+            "content_digest, status, created_at, expires_at) values "
+            "(%s, %s, 1, %s, 'ORDER-DELAY-UNDER-24', %s, 24, 86400, 'COUPON', 10.00, "
+            "'LOGISTICS_DELAY', '[\"order:ORDER-DELAY-UNDER-24\",\"logistics:ORDER-DELAY-UNDER-24\"]', "
+            "'delay-policy-v1', %s, 'PENDING_APPROVAL', '2026-08-08T14:00:00Z', '2026-08-09T14:00:00Z')",
+            (expired_revision_id, uuid.uuid4(), resolved_uuid, generation[0], "e" * 64),
+        )
+        connection.execute(
+            "insert into approval_evidence_snapshot "
+            "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "
+            "available_compensation_amount, active_reservation_amount, paid, cancelled, fully_refunded, "
+            "existing_compensation, evidence_references, captured_at) values "
+            "(%s, 'ORDER-DELAY-UNDER-24', 24, 86400, 268.00, 268.00, 0.00, true, false, false, false, "
+            "'[\"order:ORDER-DELAY-UNDER-24\",\"logistics:ORDER-DELAY-UNDER-24\"]', "
+            "'2026-08-08T14:00:00Z')",
+            (expired_revision_id,),
+        )
+        connection.execute(
+            "insert into approval_lease "
+            "(id, proposal_revision_id, approver_id, lease_token, lease_version, status, claimed_at, expires_at) "
+            "values (%s, %s, 'approver-demo', %s, 1, 'ACTIVE', "
+            "'2026-08-09T13:45:00Z', '2026-08-09T14:15:00Z')",
+            (uuid.uuid4(), expired_revision_id, expired_lease_token),
+        )
+
+    with httpx.Client(timeout=20.0) as client:
+        claim_at_proposal_expiry = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{expired_revision_id}/claims",
+            headers={**approver_headers, "Idempotency-Key": f"expired-claim-{uuid.uuid4()}"},
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(claim_at_proposal_expiry, 410)
+        queue_at_proposal_expiry = client.get(
+            f"{spring_url}/api/approver/compensation-proposals", headers=approver_headers
+        )
+        expect_status(queue_at_proposal_expiry, 200)
+        assert all(
+            item["proposalRevisionId"] != str(expired_revision_id)
+            for item in queue_at_proposal_expiry.json()
+        )
+        expired_scope_headers = {
+            **approver_headers,
+            "X-Approval-Lease-Token": str(expired_lease_token),
+            "X-Approval-Lease-Version": "1",
+        }
+        view_at_proposal_expiry = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{expired_revision_id}/approval-view",
+            headers=expired_scope_headers,
+        )
+        expect_status(view_at_proposal_expiry, 403)
+        release_at_proposal_expiry = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{expired_revision_id}/release",
+            headers={
+                **expired_scope_headers,
+                "Idempotency-Key": f"expired-release-{uuid.uuid4()}",
+            },
+        )
+        expect_status(release_at_proposal_expiry, 403)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select p.status, l.status from compensation_proposal_revision p "
+            "join approval_lease l on l.proposal_revision_id = p.id where p.id = %s",
+            (expired_revision_id,),
+        ).fetchone() == ("EXPIRED", "REVOKED")
+        expiry_audit = connection.execute(
+            "select event_type, occurred_at from audit_event where subject_id = %s "
+            "and event_type in ('COMPENSATION_PROPOSAL_REVISION_EXPIRED', 'APPROVAL_LEASE_REVOKED') "
+            "order by id",
+            (expired_revision_id,),
+        ).fetchall()
+        assert [(event_type, occurred_at.isoformat()) for event_type, occurred_at in expiry_audit] == [
+            ("COMPENSATION_PROPOSAL_REVISION_EXPIRED", "2026-08-09T14:00:00+00:00"),
+            ("APPROVAL_LEASE_REVOKED", "2026-08-09T14:00:00+00:00"),
+        ]
+
     duplicate_ticket = uuid.uuid4()
     duplicate_generation = uuid.uuid4()
     try:
@@ -370,8 +674,8 @@ def main() -> None:
             )
             connection.execute(
                 "insert into compensation_proposal_revision "
-                "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, content_digest, status, created_at) "
-                "select %s, %s, 1, %s, order_reference, %s, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, %s, 'PENDING_APPROVAL', now() "
+                "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, content_digest, status, created_at, expires_at) "
+                "select %s, %s, 1, %s, order_reference, %s, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, %s, 'PENDING_APPROVAL', now(), now() + interval '24 hours' "
                 "from compensation_proposal_revision where id = %s",
                 (uuid.uuid4(), uuid.uuid4(), duplicate_ticket, duplicate_generation, "f" * 64, first_revision_id),
             )
@@ -425,6 +729,16 @@ def main() -> None:
         assert replacement.json()["proposalRevision"] == 2
         assert replacement.json()["proposalStatus"] == "PENDING_APPROVAL"
 
+        replaced_view = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
+            headers={
+                **winner_headers,
+                "X-Approval-Lease-Token": lease_three["leaseToken"],
+                "X-Approval-Lease-Version": "3",
+            },
+        )
+        expect_status(replaced_view, 403)
+
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         revisions = connection.execute(
             "select proposal_id, revision_number, delay_hours, delay_seconds, amount, status "
@@ -435,6 +749,15 @@ def main() -> None:
             (proposal_id, 1, 80, 288000, Decimal("26.80"), "SUPERSEDED"),
             (proposal_id, 2, 81, 291600, Decimal("26.80"), "PENDING_APPROVAL"),
         ]
+        assert connection.execute(
+            "select status from approval_lease where proposal_revision_id = %s and lease_version = 3",
+            (first_revision_id,),
+        ).fetchone()[0] == "REVOKED"
+        assert connection.execute(
+            "select count(*) from audit_event where ticket_id = %s and event_type in "
+            "('APPROVAL_LEASE_CLAIMED', 'APPROVAL_LEASE_RELEASED', 'APPROVAL_LEASE_REVOKED')",
+            (uuid.UUID(proposal_ticket_id),),
+        ).fetchone()[0] == 5
 
     third_generation = uuid.uuid4()
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -1512,6 +1835,9 @@ def main() -> None:
         "sla_fact_count": len(sla_facts),
         "sla_resume_immediate": True,
         "concurrent_replays": 7,
+        "approval_claim_statuses": sorted(response.status_code for response in claim_responses),
+        "approval_lease_versions": [1, 2, 3],
+        "approval_replacement_revoked": True,
     }))
 
 
