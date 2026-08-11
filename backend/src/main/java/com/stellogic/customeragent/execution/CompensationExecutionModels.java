@@ -6,7 +6,12 @@ import java.util.UUID;
 final class CompensationExecutionModels {
     private CompensationExecutionModels() {}
 
-    record Assignment(UUID executionId, CompensationMethod compensationMethod, BigDecimal amount, ExecutionStatus status) {}
+    record Assignment(
+            UUID executionId,
+            CompensationMethod compensationMethod,
+            BigDecimal amount,
+            ExecutionStatus status,
+            String idempotencyKey) {}
 
     record ClaimCommand(String executorId, UUID executionId, String requestId) {}
 
@@ -20,13 +25,13 @@ final class CompensationExecutionModels {
             BigDecimal amount,
             boolean replayed) {}
 
+    record BoundAttempt(UUID attemptId, String idempotencyKey, String parameterDigest) {}
+
     record SuccessCommand(
             String executorId,
             UUID executionId,
-            UUID attemptId,
             String requestId,
-            String idempotencyKey,
-            String parameterDigest) {}
+            BoundAttempt attempt) {}
 
     record SuccessResult(
             UUID executionId,
@@ -37,7 +42,36 @@ final class CompensationExecutionModels {
             String customerMessage,
             boolean replayed) {}
 
-    enum ExecutionStatus { READY, PROCESSING, SUCCEEDED }
+    record UnknownCommand(
+            String executorId,
+            UUID executionId,
+            String requestId,
+            BoundAttempt attempt) {}
+
+    record FailureCommand(
+            String executorId,
+            UUID executionId,
+            String requestId,
+            BoundAttempt attempt) {}
+
+    record ReconciliationCommand(
+            String executorId,
+            UUID executionId,
+            String requestId,
+            String queryId,
+            ReconciliationOutcome outcome,
+            String resultReference) {}
+
+    record TransitionResult(
+            UUID executionId,
+            UUID attemptId,
+            ExecutionStatus status,
+            String customerMessage,
+            boolean replayed) {}
+
+    enum ExecutionStatus { READY, PROCESSING, UNKNOWN, SUCCEEDED, FAILED }
+
+    enum ReconciliationOutcome { FOUND, NOT_FOUND, UNKNOWN }
 
     enum CompensationMethod { COUPON, SIMULATED_PARTIAL_REFUND }
 }

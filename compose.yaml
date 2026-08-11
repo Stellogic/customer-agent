@@ -22,7 +22,7 @@ services:
     networks: [data]
 
   spring-migrate:
-    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
+    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-issue24}
     build:
       context: ./backend
       args:
@@ -45,7 +45,7 @@ services:
     networks: [data, services]
 
   agent-migrate:
-    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue24}
     build:
       context: ./agent
       target: runtime
@@ -59,7 +59,7 @@ services:
     networks: [data]
 
   agent-server:
-    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue24}
     build:
       context: ./agent
       target: runtime
@@ -79,7 +79,7 @@ services:
     networks: [data, services]
 
   backend:
-    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
+    image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-issue24}
     build:
       context: ./backend
       args:
@@ -105,7 +105,7 @@ services:
     networks: [data, services, edge]
 
   compensation-executor:
-    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue24}
     entrypoint: ["python", "-m", "baseline_agent.compensation_executor"]
     environment:
       SPRING_INTERNAL_URL: http://backend:8080
@@ -118,7 +118,7 @@ services:
     networks: [services]
 
   frontend:
-    image: customer-agent/frontend:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
+    image: customer-agent/frontend:${CUSTOMER_AGENT_IMAGE_TAG:-issue24}
     build: ./frontend
     depends_on:
       backend:
@@ -133,7 +133,7 @@ services:
     networks: [edge]
 
   integration-smoke:
-    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue24}
     profiles: [smoke]
     entrypoint: ["python", "/smoke/smoke.py"]
     volumes:
@@ -153,7 +153,7 @@ services:
     networks: [data, services]
 
   frontend-acceptance:
-    image: customer-agent/frontend-test:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
+    image: customer-agent/frontend-test:${CUSTOMER_AGENT_IMAGE_TAG:-issue24}
     profiles: [smoke]
     entrypoint: ["npm", "test", "--", "src/App.integration.test.tsx"]
     environment:
