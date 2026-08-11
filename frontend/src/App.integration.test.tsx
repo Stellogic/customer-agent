@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { SupportWorkbench } from "./SupportWorkbench";
 
 const liveBaseUrl = import.meta.env.VITE_SMOKE_BASE_URL as string | undefined;
 
@@ -33,5 +34,18 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
     firstRender.unmount();
     render(<App />);
     expect(await screen.findByText(description)).toBeInTheDocument();
+  });
+
+  it("客服工作台从独立 Spring 快照恢复共享队列且不公开转人工理由详情", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const path = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      return nativeFetch(new URL(path, liveBaseUrl), init);
+    });
+
+    render(<SupportWorkbench />);
+
+    expect(await screen.findByRole("heading", { name: "客服共享队列" })).toBeInTheDocument();
+    expect(await screen.findByText("队列可发现不等于工单详情授权")).toBeInTheDocument();
+    expect(screen.queryByText(/CUSTOMER_REQUESTED_HANDOFF|AGENT_HUMAN_HANDOFF|调查摘要/)).not.toBeInTheDocument();
   });
 });
