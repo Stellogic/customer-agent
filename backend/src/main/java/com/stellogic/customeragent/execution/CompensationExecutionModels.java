@@ -6,17 +6,17 @@ import java.util.UUID;
 final class CompensationExecutionModels {
     private CompensationExecutionModels() {}
 
-    record Assignment(UUID executionId, String compensationMethod, BigDecimal amount, String status) {}
+    record Assignment(UUID executionId, CompensationMethod compensationMethod, BigDecimal amount, ExecutionStatus status) {}
 
     record ClaimCommand(String executorId, UUID executionId, String requestId) {}
 
     record ClaimResult(
             UUID executionId,
             UUID attemptId,
-            String status,
+            ExecutionStatus status,
             String idempotencyKey,
             String parameterDigest,
-            String compensationMethod,
+            CompensationMethod compensationMethod,
             BigDecimal amount,
             boolean replayed) {}
 
@@ -31,9 +31,13 @@ final class CompensationExecutionModels {
     record SuccessResult(
             UUID executionId,
             UUID attemptId,
-            String status,
-            String compensationMethod,
+            ExecutionStatus status,
+            CompensationMethod compensationMethod,
             BigDecimal amount,
             String customerMessage,
             boolean replayed) {}
+
+    enum ExecutionStatus { READY, PROCESSING, SUCCEEDED }
+
+    enum CompensationMethod { COUPON, SIMULATED_PARTIAL_REFUND }
 }

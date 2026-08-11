@@ -31,10 +31,12 @@ class CompensationExecutionControllerTest {
     void assignedExecutorReadsAndClaimsOnlyImmutableExecutionParameters() throws Exception {
         when(service.assignments("compensation-executor")).thenReturn(List.of(
                 new CompensationExecutionModels.Assignment(
-                        EXECUTION_ID, "COUPON", new BigDecimal("10.00"), "READY")));
+                        EXECUTION_ID, CompensationExecutionModels.CompensationMethod.COUPON,
+                        new BigDecimal("10.00"), CompensationExecutionModels.ExecutionStatus.READY)));
         when(service.claim(any())).thenReturn(new CompensationExecutionModels.ClaimResult(
-                EXECUTION_ID, ATTEMPT_ID, "PROCESSING", "compensation-execution:revision",
-                PARAMETER_DIGEST, "COUPON", new BigDecimal("10.00"), false));
+                EXECUTION_ID, ATTEMPT_ID, CompensationExecutionModels.ExecutionStatus.PROCESSING,
+                "compensation-execution:revision", PARAMETER_DIGEST,
+                CompensationExecutionModels.CompensationMethod.COUPON, new BigDecimal("10.00"), false));
 
         mvc.perform(get("/internal/compensation-executions")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer executor-secret"))
@@ -70,7 +72,8 @@ class CompensationExecutionControllerTest {
     @Test
     void executorConfirmsSuccessWithoutSupplyingBusinessParameters() throws Exception {
         when(service.succeed(any())).thenReturn(new CompensationExecutionModels.SuccessResult(
-                EXECUTION_ID, ATTEMPT_ID, "SUCCEEDED", "COUPON", new BigDecimal("10.00"),
+                EXECUTION_ID, ATTEMPT_ID, CompensationExecutionModels.ExecutionStatus.SUCCEEDED,
+                CompensationExecutionModels.CompensationMethod.COUPON, new BigDecimal("10.00"),
                 "已发放 10.00 CNY 优惠券。", false));
 
         mvc.perform(post("/internal/compensation-executions/{executionId}/success", EXECUTION_ID)

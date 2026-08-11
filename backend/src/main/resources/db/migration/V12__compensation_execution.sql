@@ -31,9 +31,24 @@ CREATE TABLE compensation_execution_attempt (
 CREATE UNIQUE INDEX one_processing_attempt_per_execution
     ON compensation_execution_attempt (execution_id);
 
+ALTER TABLE compensation_execution_attempt
+    ADD CONSTRAINT execution_attempt_identity UNIQUE (id, execution_id);
+
 ALTER TABLE compensation_execution
     ADD CONSTRAINT processing_attempt_belongs_to_execution
-    FOREIGN KEY (processing_attempt_id) REFERENCES compensation_execution_attempt(id);
+    FOREIGN KEY (processing_attempt_id, id) REFERENCES compensation_execution_attempt(id, execution_id);
+
+CREATE TABLE compensation_claim_request (
+    executor_id text NOT NULL,
+    request_id text NOT NULL,
+    parameter_digest char(64) NOT NULL,
+    execution_id uuid NOT NULL REFERENCES compensation_execution(id),
+    attempt_id uuid NOT NULL,
+    created_at timestamptz NOT NULL,
+    PRIMARY KEY (executor_id, request_id),
+    FOREIGN KEY (attempt_id, execution_id)
+        REFERENCES compensation_execution_attempt(id, execution_id)
+);
 
 CREATE TABLE compensation_execution_result (
     execution_id uuid PRIMARY KEY REFERENCES compensation_execution(id),
@@ -54,6 +69,21 @@ CREATE TABLE compensation_success_request (
     attempt_id uuid NOT NULL REFERENCES compensation_execution_attempt(id),
     created_at timestamptz NOT NULL,
     PRIMARY KEY (executor_id, request_id)
+);
+
+CREATE TABLE simulated_coupon (
+    execution_id uuid PRIMARY KEY REFERENCES compensation_execution(id),
+    coupon_id text NOT NULL UNIQUE,
+    amount numeric(12, 2) NOT NULL CHECK (amount IN (10.00, 20.00)),
+    issued_at timestamptz NOT NULL
+);
+
+CREATE TABLE simulated_partial_refund (
+    execution_id uuid PRIMARY KEY REFERENCES compensation_execution(id),
+    refund_id text NOT NULL UNIQUE,
+    amount numeric(12, 2) NOT NULL CHECK (amount > 0),
+    masked_destination text NOT NULL,
+    completed_at timestamptz NOT NULL
 );
 
 CREATE FUNCTION reject_compensation_execution_authority_mutation() RETURNS trigger
@@ -77,9 +107,11 @@ BEFORE UPDATE ON compensation_execution
 FOR EACH ROW EXECUTE FUNCTION reject_compensation_execution_authority_mutation();
 
 GRANT SELECT ON compensation_execution, compensation_execution_attempt,
-    compensation_execution_result, compensation_success_request TO spring_app;
+    compensation_claim_request, compensation_execution_result, compensation_success_request,
+    simulated_coupon, simulated_partial_refund TO spring_app;
 GRANT INSERT ON compensation_execution_attempt, compensation_execution_result,
-    compensation_success_request TO spring_app;
+    compensation_claim_request, compensation_success_request, simulated_coupon,
+    simulated_partial_refund TO spring_app;
 GRANT UPDATE (status, processing_attempt_id, succeeded_at) ON compensation_execution TO spring_app;
 GRANT UPDATE (status) ON compensation_reservation TO spring_app;
 GRANT UPDATE (existing_compensation) ON synthetic_order TO spring_app;
@@ -92,4 +124,6 @@ INSERT INTO synthetic_order (
     ('ORDER-DELAY-EXECUTION-10', 'customer-demo', 268.00, 'CNY', 24, 86400,
      true, false, false, false, 'delay-policy-v1', 268.00),
     ('ORDER-DELAY-EXECUTION-20', 'customer-demo', 268.00, 'CNY', 48, 172800,
+     true, false, false, false, 'delay-policy-v1', 268.00),
+    ('ORDER-DELAY-EXECUTOR-AUTO', 'customer-demo', 268.00, 'CNY', 24, 86400,
      true, false, false, false, 'delay-policy-v1', 268.00);

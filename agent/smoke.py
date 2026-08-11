@@ -404,17 +404,17 @@ def main() -> None:
             )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        claim_responses = list(executor.map(
+        approval_claim_responses = list(executor.map(
             claim_concurrently, ["approver-demo", "approver-other-demo"]
         ))
-    assert sorted(response.status_code for response in claim_responses) == [201, 409], [
-        (response.status_code, response.text) for response in claim_responses
+    assert sorted(response.status_code for response in approval_claim_responses) == [201, 409], [
+        (response.status_code, response.text) for response in approval_claim_responses
     ]
-    winner_index = next(index for index, response in enumerate(claim_responses) if response.status_code == 201)
+    winner_index = next(index for index, response in enumerate(approval_claim_responses) if response.status_code == 201)
     winner_id = ["approver-demo", "approver-other-demo"][winner_index]
     loser_id = "approver-other-demo" if winner_id == "approver-demo" else "approver-demo"
     winner_headers = {"X-Synthetic-Approver-Id": winner_id}
-    lease_one = claim_responses[winner_index].json()
+    lease_one = approval_claim_responses[winner_index].json()
     assert lease_one["leaseVersion"] == 1 and lease_one["replayed"] is False
 
     with httpx.Client(timeout=20.0) as client:
@@ -1033,12 +1033,12 @@ def main() -> None:
             )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        claim_responses = list(executor.map(claim_execution, claim_request_ids))
-    assert sorted(response.status_code for response in claim_responses) == [201, 409]
+        execution_claim_responses = list(executor.map(claim_execution, claim_request_ids))
+    assert sorted(response.status_code for response in execution_claim_responses) == [201, 409]
     winning_claim_index = next(
-        index for index, response in enumerate(claim_responses) if response.status_code == 201
+        index for index, response in enumerate(execution_claim_responses) if response.status_code == 201
     )
-    winning_claim = claim_responses[winning_claim_index].json()
+    winning_claim = execution_claim_responses[winning_claim_index].json()
     winning_claim_request_id = claim_request_ids[winning_claim_index]
     assert winning_claim["status"] == "PROCESSING"
     assert winning_claim["compensationMethod"] == "SIMULATED_PARTIAL_REFUND"
@@ -1101,6 +1101,18 @@ def main() -> None:
         )
         expect_status(redelivered_success, 200)
         assert redelivered_success.json() == {**succeeded_payload, "replayed": True}
+        terminal_claim_request_id = f"terminal-claim-{uuid.uuid4()}"
+        terminal_claim = client.post(
+            f"{spring_url}/internal/compensation-executions/{execution_id}/claims",
+            headers={**executor_headers, "Idempotency-Key": terminal_claim_request_id},
+        )
+        expect_status(terminal_claim, 200)
+        assert terminal_claim.json()["status"] == "SUCCEEDED"
+        terminal_claim_identity_conflict = client.post(
+            f"{spring_url}/internal/compensation-executions/{uuid.uuid4()}/claims",
+            headers={**executor_headers, "Idempotency-Key": terminal_claim_request_id},
+        )
+        expect_status(terminal_claim_identity_conflict, 409)
         execution_customer = client.get(
             f"{spring_url}/api/customer/tickets/{approval_ticket_id}",
             headers={"X-Synthetic-Customer-Id": "customer-demo"},
@@ -1128,6 +1140,10 @@ def main() -> None:
         ).fetchone()[0] == 1
         assert connection.execute(
             "select count(*) from compensation_execution_result where execution_id = %s",
+            (uuid.UUID(execution_id),),
+        ).fetchone()[0] == 1
+        assert connection.execute(
+            "select count(*) from simulated_partial_refund where execution_id = %s",
             (uuid.UUID(execution_id),),
         ).fetchone()[0] == 1
         assert connection.execute(
@@ -1197,6 +1213,38 @@ def main() -> None:
     coupon_20_execution_id, coupon_20_ticket_id = approve_and_execute_coupon(
         "ORDER-DELAY-EXECUTION-20", 48, 172800, Decimal("20.00")
     )
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select amount from simulated_coupon where execution_id in (%s, %s) order by amount",
+            (uuid.UUID(coupon_10_execution_id), uuid.UUID(coupon_20_execution_id)),
+        ).fetchall() == [(Decimal("10.00"),), (Decimal("20.00"),)]
+
+    auto_digest = uuid.uuid4().hex * 2
+    auto_ticket_id, _, auto_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-EXECUTOR-AUTO", auto_digest, "常驻执行器自动消费验收",
+        24, 86400, "COUPON", Decimal("10.00"),
+    )
+    with httpx.Client(timeout=20.0) as client:
+        auto_lease_response = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{auto_revision_id}/claims",
+            headers={**approver_headers, "Idempotency-Key": f"auto-claim-{uuid.uuid4()}"},
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(auto_lease_response, 201)
+        auto_lease = auto_lease_response.json()
+        auto_approval = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{auto_revision_id}/approve",
+            headers={
+                **approver_headers,
+                "X-Approval-Lease-Token": auto_lease["leaseToken"],
+                "X-Approval-Lease-Version": str(auto_lease["leaseVersion"]),
+                "Idempotency-Key": f"auto-approve-{uuid.uuid4()}",
+            },
+            json={"proposalRevision": 1, "contentDigest": auto_digest},
+        )
+        expect_status(auto_approval, 200)
+        auto_execution_id = auto_approval.json()["executionId"]
+        assert auto_approval.json()["executionStatus"] == "READY"
 
     drift_digest = "8" * 64
     drift_ticket_id, _, drift_revision_id = seed_pending_decision_fixture(
@@ -2588,7 +2636,7 @@ def main() -> None:
         "sla_fact_count": len(sla_facts),
         "sla_resume_immediate": True,
         "concurrent_replays": 7,
-        "approval_claim_statuses": sorted(response.status_code for response in claim_responses),
+        "approval_claim_statuses": sorted(response.status_code for response in approval_claim_responses),
         "approval_lease_versions": [1, 2, 3],
         "approval_replacement_revoked": True,
         "approval_rejection_ticket_id": str(rejection_ticket_id),
@@ -2597,13 +2645,15 @@ def main() -> None:
             response.status_code for response in rejection_responses
         ),
         "approval_execution_id": approved_payload["executionId"],
-        "execution_claim_statuses": sorted(response.status_code for response in claim_responses),
+        "execution_claim_statuses": sorted(response.status_code for response in execution_claim_responses),
         "execution_success_replayed": True,
         "coupon_10_execution_id": coupon_10_execution_id,
         "coupon_10_ticket_id": coupon_10_ticket_id,
         "coupon_20_execution_id": coupon_20_execution_id,
         "coupon_20_ticket_id": coupon_20_ticket_id,
         "partial_refund_ticket_id": str(approval_ticket_id),
+        "automatic_executor_execution_id": auto_execution_id,
+        "automatic_executor_ticket_id": str(auto_ticket_id),
         "approval_fact_drift_invalidated": str(drift_ticket_id),
         "concurrent_proposal_intent_results": sorted(proposal_race_results),
         "approve_reject_statuses": sorted(response.status_code for response in race_responses),

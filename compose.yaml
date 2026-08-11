@@ -104,6 +104,19 @@ services:
       retries: 30
     networks: [data, services, edge]
 
+  compensation-executor:
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
+    entrypoint: ["python", "-m", "baseline_agent.compensation_executor"]
+    environment:
+      SPRING_INTERNAL_URL: http://backend:8080
+      EXECUTOR_MACHINE_TOKEN: ${EXECUTOR_MACHINE_TOKEN:-local-executor-machine}
+      EXECUTOR_POLL_DELAY: ${EXECUTOR_POLL_DELAY:-0.25}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [services]
+
   frontend:
     image: customer-agent/frontend:${CUSTOMER_AGENT_IMAGE_TAG:-issue23}
     build: ./frontend
