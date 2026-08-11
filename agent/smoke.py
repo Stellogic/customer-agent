@@ -1056,51 +1056,82 @@ def main() -> None:
             headers={**executor_headers, "Idempotency-Key": winning_claim_request_id},
         )
         expect_status(claim_identity_conflict, 409)
-        success_url = (
-            f"{spring_url}/internal/compensation-executions/{execution_id}/success"
-        )
-        success_body = {
+        bound_result = {
             "attemptId": winning_claim["attemptId"],
             "idempotencyKey": winning_claim["idempotencyKey"],
             "parameterDigest": winning_claim["parameterDigest"],
         }
-        mismatched_result = client.post(
-            success_url,
-            headers={**executor_headers, "Idempotency-Key": f"result-{uuid.uuid4()}"},
-            json={**success_body, "parameterDigest": "0" * 64},
+        provider_execution = client.post(
+            f"{spring_url}/internal/compensation-simulator/{execution_id}/executions",
+            headers={**executor_headers, "Idempotency-Key": winning_claim["idempotencyKey"]},
+            json={"parameterDigest": winning_claim["parameterDigest"], "amount": 26.80},
         )
-        expect_status(mismatched_result, 409)
-        success_request_id = f"result-{uuid.uuid4()}"
-        succeeded = client.post(
-            success_url,
-            headers={**executor_headers, "Idempotency-Key": success_request_id},
-            json=success_body,
+        expect_status(provider_execution, 504)
+        unknown_request_id = f"unknown-{execution_id}"
+        unknown = client.post(
+            f"{spring_url}/internal/compensation-executions/{execution_id}/unknown",
+            headers={**executor_headers, "Idempotency-Key": unknown_request_id},
+            json=bound_result,
         )
-        expect_status(succeeded, 200)
-        succeeded_payload = succeeded.json()
-        assert succeeded_payload == {
-            "executionId": execution_id,
-            "attemptId": winning_claim["attemptId"],
-            "status": "SUCCEEDED",
-            "compensationMethod": "SIMULATED_PARTIAL_REFUND",
-            "amount": 26.80,
-            "customerMessage": "已完成 26.80 CNY 模拟部分退款，退回原支付方式（尾号 4242）。",
-            "replayed": False,
-        }
-        success_replay = client.post(
-            success_url,
-            headers={**executor_headers, "Idempotency-Key": success_request_id},
-            json=success_body,
+        expect_status(unknown, 200)
+        assert unknown.json()["status"] == "UNKNOWN"
+        assert unknown.json()["customerMessage"] == "补偿结果正在自动确认中，请勿重复提交。"
+        unknown_customer = client.get(
+            f"{spring_url}/api/customer/tickets/{approval_ticket_id}",
+            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
-        expect_status(success_replay, 200)
-        assert success_replay.json() == {**succeeded_payload, "replayed": True}
-        redelivered_success = client.post(
-            success_url,
+        expect_status(unknown_customer, 200)
+        assert unknown_customer.json()["messages"][-1]["body"] == "补偿结果正在自动确认中，请勿重复提交。"
+        ordinary_retry = client.post(
+            f"{spring_url}/internal/compensation-executions/{execution_id}/claims",
+            headers={**executor_headers, "Idempotency-Key": f"forbidden-retry-{uuid.uuid4()}"},
+        )
+        expect_status(ordinary_retry, 409)
+        provider_reconciliation = client.get(
+            f"{spring_url}/internal/compensation-simulator/{execution_id}/reconciliation",
+            headers=executor_headers,
+        )
+        expect_status(provider_reconciliation, 200)
+        provider_reconciliation_payload = provider_reconciliation.json()
+        assert provider_reconciliation_payload["outcome"] == "FOUND"
+        assert provider_reconciliation_payload["resultReference"] == f"simulated-refund:{execution_id}"
+        forged_reconciliation = client.post(
+            f"{spring_url}/internal/compensation-executions/{execution_id}/reconciliations",
+            headers={**executor_headers, "Idempotency-Key": f"forged-reconcile-{uuid.uuid4()}"},
+            json={
+                **provider_reconciliation_payload,
+                "queryId": "provider-query:forged",
+            },
+        )
+        expect_status(forged_reconciliation, 409)
+        reconciliation_request_id = (
+            f"reconcile:{execution_id}:{provider_reconciliation_payload['queryId']}"
+        )
+        reconciled = client.post(
+            f"{spring_url}/internal/compensation-executions/{execution_id}/reconciliations",
+            headers={**executor_headers, "Idempotency-Key": reconciliation_request_id},
+            json=provider_reconciliation_payload,
+        )
+        expect_status(reconciled, 200)
+        succeeded_payload = reconciled.json()
+        assert succeeded_payload["status"] == "SUCCEEDED"
+        assert succeeded_payload["customerMessage"] == (
+            "已完成 26.80 CNY 模拟部分退款，退回原支付方式（尾号 4242）。"
+        )
+        reconciliation_replay = client.post(
+            f"{spring_url}/internal/compensation-executions/{execution_id}/reconciliations",
+            headers={**executor_headers, "Idempotency-Key": reconciliation_request_id},
+            json=provider_reconciliation_payload,
+        )
+        expect_status(reconciliation_replay, 200)
+        assert reconciliation_replay.json() == {**succeeded_payload, "replayed": True}
+        reconciliation_redelivery = client.post(
+            f"{spring_url}/internal/compensation-executions/{execution_id}/reconciliations",
             headers={**executor_headers, "Idempotency-Key": f"redelivered-{uuid.uuid4()}"},
-            json=success_body,
+            json=provider_reconciliation_payload,
         )
-        expect_status(redelivered_success, 200)
-        assert redelivered_success.json() == {**succeeded_payload, "replayed": True}
+        expect_status(reconciliation_redelivery, 200)
+        assert reconciliation_redelivery.json() == {**succeeded_payload, "replayed": True}
         terminal_claim_request_id = f"terminal-claim-{uuid.uuid4()}"
         terminal_claim = client.post(
             f"{spring_url}/internal/compensation-executions/{execution_id}/claims",
@@ -1137,7 +1168,7 @@ def main() -> None:
         assert connection.execute(
             "select count(*) from compensation_execution_attempt where execution_id = %s",
             (uuid.UUID(execution_id),),
-        ).fetchone()[0] == 1
+        ).fetchone()[0] == 2
         assert connection.execute(
             "select count(*) from compensation_execution_result where execution_id = %s",
             (uuid.UUID(execution_id),),
@@ -1147,10 +1178,147 @@ def main() -> None:
             (uuid.UUID(execution_id),),
         ).fetchone()[0] == 1
         assert connection.execute(
+            "select count(*) from simulated_compensation_provider_operation where execution_id = %s",
+            (uuid.UUID(execution_id),),
+        ).fetchone()[0] == 1
+        assert connection.execute(
             "select count(*) from audit_event where ticket_id = %s and "
             "event_type in ('COMPENSATION_EXECUTION_SUCCEEDED', 'TICKET_RESOLVED')",
             (approval_ticket_id,),
         ).fetchone()[0] == 2
+
+    def approve_partial_execution(order_reference: str) -> tuple[str, str, dict[str, object]]:
+        digest = uuid.uuid4().hex * 2
+        ticket, _, revision = seed_pending_decision_fixture(
+            order_reference, digest, f"{order_reference} 对账验收",
+            80, 288000, "SIMULATED_PARTIAL_REFUND", Decimal("26.80"),
+        )
+        with httpx.Client(timeout=20.0) as client:
+            lease_response = client.post(
+                f"{spring_url}/api/approver/compensation-proposals/{revision}/claims",
+                headers={**approver_headers, "Idempotency-Key": f"reconcile-claim-{uuid.uuid4()}"},
+                json={"requestedLeaseSeconds": 900},
+            )
+            expect_status(lease_response, 201)
+            lease = lease_response.json()
+            approval_response = client.post(
+                f"{spring_url}/api/approver/compensation-proposals/{revision}/approve",
+                headers={
+                    **approver_headers,
+                    "X-Approval-Lease-Token": lease["leaseToken"],
+                    "X-Approval-Lease-Version": str(lease["leaseVersion"]),
+                    "Idempotency-Key": f"reconcile-approve-{uuid.uuid4()}",
+                },
+                json={"proposalRevision": 1, "contentDigest": digest},
+            )
+            expect_status(approval_response, 200)
+            scenario_execution_id = approval_response.json()["executionId"]
+            claim_response = client.post(
+                f"{spring_url}/internal/compensation-executions/{scenario_execution_id}/claims",
+                headers={**executor_headers, "Idempotency-Key": f"scenario-claim-{uuid.uuid4()}"},
+            )
+            expect_status(claim_response, 201)
+        return scenario_execution_id, str(ticket), claim_response.json()
+
+    def report_unknown(client: httpx.Client, scenario_execution_id: str, claim: dict[str, object]) -> None:
+        unknown_response = client.post(
+            f"{spring_url}/internal/compensation-executions/{scenario_execution_id}/unknown",
+            headers={**executor_headers, "Idempotency-Key": f"scenario-unknown-{scenario_execution_id}"},
+            json={
+                "attemptId": claim["attemptId"],
+                "idempotencyKey": claim["idempotencyKey"],
+                "parameterDigest": claim["parameterDigest"],
+            },
+        )
+        expect_status(unknown_response, 200)
+        assert unknown_response.json()["status"] == "UNKNOWN"
+
+    before_failure_id, _, before_failure_claim = approve_partial_execution(
+        "ORDER-DELAY-EXECUTION-BEFORE-FAILURE"
+    )
+    not_found_id, _, not_found_claim = approve_partial_execution(
+        "ORDER-DELAY-EXECUTION-NOT-FOUND"
+    )
+    persistent_unknown_id, _, persistent_unknown_claim = approve_partial_execution(
+        "ORDER-DELAY-EXECUTION-UNKNOWN"
+    )
+    with httpx.Client(timeout=20.0) as client:
+        before_failure_provider = client.post(
+            f"{spring_url}/internal/compensation-simulator/{before_failure_id}/executions",
+            headers={
+                **executor_headers,
+                "Idempotency-Key": before_failure_claim["idempotencyKey"],
+                "X-Simulation-Scenario": "BEFORE_EFFECT_FAILURE",
+            },
+            json={"parameterDigest": before_failure_claim["parameterDigest"], "amount": 26.80},
+        )
+        expect_status(before_failure_provider, 200)
+        assert before_failure_provider.json()["outcome"] == "CONFIRMED_NOT_OCCURRED"
+        before_failure = client.post(
+            f"{spring_url}/internal/compensation-executions/{before_failure_id}/failures",
+            headers={**executor_headers, "Idempotency-Key": f"failure-{before_failure_id}"},
+            json={
+                "attemptId": before_failure_claim["attemptId"],
+                "idempotencyKey": before_failure_claim["idempotencyKey"],
+                "parameterDigest": before_failure_claim["parameterDigest"],
+            },
+        )
+        expect_status(before_failure, 200)
+        assert before_failure.json()["status"] == "FAILED"
+
+        for scenario_execution_id, claim, scenario, expected in (
+            (not_found_id, not_found_claim, "RECONCILIATION_NOT_FOUND", "NOT_FOUND"),
+            (persistent_unknown_id, persistent_unknown_claim, "RECONCILIATION_UNKNOWN", "UNKNOWN"),
+        ):
+            provider = client.post(
+                f"{spring_url}/internal/compensation-simulator/{scenario_execution_id}/executions",
+                headers={
+                    **executor_headers,
+                    "Idempotency-Key": claim["idempotencyKey"],
+                    "X-Simulation-Scenario": scenario,
+                },
+                json={"parameterDigest": claim["parameterDigest"], "amount": 26.80},
+            )
+            expect_status(provider, 504)
+            report_unknown(client, scenario_execution_id, claim)
+            reconciliation_rounds = 3 if expected == "UNKNOWN" else 1
+            for _ in range(reconciliation_rounds):
+                query = client.get(
+                    f"{spring_url}/internal/compensation-simulator/{scenario_execution_id}/reconciliation",
+                    headers=executor_headers,
+                )
+                expect_status(query, 200)
+                assert query.json()["outcome"] == expected
+                reconciled_scenario = client.post(
+                    f"{spring_url}/internal/compensation-executions/{scenario_execution_id}/reconciliations",
+                    headers={**executor_headers, "Idempotency-Key": f"scenario-reconcile-{uuid.uuid4()}"},
+                    json=query.json(),
+                )
+                expect_status(reconciled_scenario, 200)
+                assert reconciled_scenario.json()["status"] == (
+                    "UNKNOWN" if expected == "UNKNOWN" else "FAILED"
+                )
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select e.status, r.status from compensation_execution e "
+            "join compensation_reservation r on r.id = e.reservation_id where e.id = %s",
+            (uuid.UUID(before_failure_id),),
+        ).fetchone() == ("FAILED", "RELEASED")
+        assert connection.execute(
+            "select e.status, r.status from compensation_execution e "
+            "join compensation_reservation r on r.id = e.reservation_id where e.id = %s",
+            (uuid.UUID(not_found_id),),
+        ).fetchone() == ("FAILED", "RELEASED")
+        assert connection.execute(
+            "select e.status, r.status, e.reconciliation_count from compensation_execution e "
+            "join compensation_reservation r on r.id = e.reservation_id where e.id = %s",
+            (uuid.UUID(persistent_unknown_id),),
+        ).fetchone() == ("UNKNOWN", "ACTIVE", 3)
+        assert connection.execute(
+            "select count(*) from domain_operation_alert where execution_id = %s",
+            (uuid.UUID(persistent_unknown_id),),
+        ).fetchone()[0] == 1
 
     def approve_and_execute_coupon(
         order_reference: str, delay_hours: int, delay_seconds: int, amount: Decimal

@@ -101,3 +101,112 @@ def test_executor_recovers_lost_claim_response_and_retries_the_same_success() ->
 
     assert claim_calls == 3
     assert success_calls == 2
+
+
+def test_executor_reconciles_same_refund_after_provider_response_is_lost() -> None:
+    execution_id = "30000000-0000-0000-0000-000000000005"
+    idempotency_key = "compensation-execution:lost-response"
+    parameter_digest = "c" * 64
+    provider_execute_calls = 0
+    spring_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal provider_execute_calls
+        path = request.url.path
+        if path == "/internal/compensation-executions":
+            status = "READY" if provider_execute_calls == 0 else "UNKNOWN"
+            return httpx.Response(200, json=[{
+                "executionId": execution_id,
+                "compensationMethod": "SIMULATED_PARTIAL_REFUND",
+                "amount": 26.80,
+                "status": status,
+            }])
+        if path.endswith("/claims"):
+            spring_paths.append(path)
+            return httpx.Response(201, json={
+                "executionId": execution_id,
+                "attemptId": "30000000-0000-0000-0000-000000000006",
+                "status": "PROCESSING",
+                "idempotencyKey": idempotency_key,
+                "parameterDigest": parameter_digest,
+                "compensationMethod": "SIMULATED_PARTIAL_REFUND",
+                "amount": 26.80,
+                "replayed": False,
+            })
+        if path == f"/internal/compensation-simulator/{execution_id}/executions":
+            provider_execute_calls += 1
+            raise httpx.ReadTimeout("provider response was lost", request=request)
+        if path.endswith("/unknown"):
+            spring_paths.append(path)
+            return httpx.Response(200, json={"status": "UNKNOWN"})
+        if path == f"/internal/compensation-simulator/{execution_id}/reconciliation":
+            return httpx.Response(200, json={
+                "queryId": "provider-query-1",
+                "outcome": "FOUND",
+                "resultReference": f"simulated-refund:{execution_id}",
+            })
+        if path.endswith("/reconciliations"):
+            spring_paths.append(path)
+            return httpx.Response(200, json={"status": "SUCCEEDED"})
+        raise AssertionError(f"unexpected request: {request.method} {path}")
+
+    with httpx.Client(
+        base_url="http://spring",
+        headers={"Authorization": "Bearer executor-secret"},
+        transport=httpx.MockTransport(handler),
+    ) as client:
+        assert execute_ready_once(client) == 0
+        assert execute_ready_once(client) == 1
+
+    assert provider_execute_calls == 1
+    assert spring_paths == [
+        f"/internal/compensation-executions/{execution_id}/claims",
+        f"/internal/compensation-executions/{execution_id}/unknown",
+        f"/internal/compensation-executions/{execution_id}/reconciliations",
+    ]
+
+
+def test_executor_releases_only_after_provider_confirms_no_side_effect() -> None:
+    execution_id = "30000000-0000-0000-0000-000000000008"
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        paths.append(path)
+        if request.method == "GET":
+            return httpx.Response(200, json=[{
+                "executionId": execution_id,
+                "compensationMethod": "SIMULATED_PARTIAL_REFUND",
+                "amount": 26.80,
+                "status": "READY",
+            }])
+        if path.endswith("/claims"):
+            return httpx.Response(201, json={
+                "executionId": execution_id,
+                "attemptId": "30000000-0000-0000-0000-000000000009",
+                "status": "PROCESSING",
+                "idempotencyKey": "compensation-execution:confirmed-failure",
+                "parameterDigest": "d" * 64,
+                "compensationMethod": "SIMULATED_PARTIAL_REFUND",
+                "amount": 26.80,
+                "replayed": False,
+            })
+        if path.endswith("/executions"):
+            return httpx.Response(200, json={
+                "outcome": "CONFIRMED_NOT_OCCURRED",
+                "resultReference": None,
+                "responseLost": False,
+            })
+        if path.endswith("/failures"):
+            return httpx.Response(200, json={"status": "FAILED"})
+        raise AssertionError(f"unexpected request: {request.method} {path}")
+
+    with httpx.Client(
+        base_url="http://spring",
+        headers={"Authorization": "Bearer executor-secret"},
+        transport=httpx.MockTransport(handler),
+    ) as client:
+        assert execute_ready_once(client) == 0
+
+    assert paths[-1] == f"/internal/compensation-executions/{execution_id}/failures"
+    assert not any(path.endswith("/success") for path in paths)

@@ -70,6 +70,66 @@ public final class CompensationExecutionController {
                 body.idempotencyKey(), body.parameterDigest()));
     }
 
+    @PostMapping("/{executionId}/unknown")
+    CompensationExecutionModels.TransitionResult markUnknown(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
+            @PathVariable UUID executionId,
+            @RequestBody(required = false) UnknownRequest body) {
+        requireExecutor(authorization);
+        requireRequestId(requestId);
+        if (body == null || body.attemptId() == null
+                || body.idempotencyKey() == null || body.idempotencyKey().isBlank()
+                || body.parameterDigest() == null || !body.parameterDigest().matches("[0-9a-f]{64}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bound unknown result required");
+        }
+        return service.markUnknown(new CompensationExecutionModels.UnknownCommand(
+                EXECUTOR_ID, executionId, body.attemptId(), requestId.trim(),
+                body.idempotencyKey(), body.parameterDigest()));
+    }
+
+    @PostMapping("/{executionId}/failures")
+    CompensationExecutionModels.TransitionResult markFailed(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
+            @PathVariable UUID executionId,
+            @RequestBody(required = false) UnknownRequest body) {
+        requireExecutor(authorization);
+        requireRequestId(requestId);
+        if (body == null || body.attemptId() == null
+                || body.idempotencyKey() == null || body.idempotencyKey().isBlank()
+                || body.parameterDigest() == null || !body.parameterDigest().matches("[0-9a-f]{64}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bound confirmed failure required");
+        }
+        return service.markFailed(new CompensationExecutionModels.FailureCommand(
+                EXECUTOR_ID, executionId, body.attemptId(), requestId.trim(),
+                body.idempotencyKey(), body.parameterDigest()));
+    }
+
+    @PostMapping("/{executionId}/reconciliations")
+    CompensationExecutionModels.TransitionResult reconcile(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
+            @PathVariable UUID executionId,
+            @RequestBody(required = false) ReconciliationRequest body) {
+        requireExecutor(authorization);
+        requireRequestId(requestId);
+        if (body == null || body.queryId() == null || body.queryId().isBlank() || body.outcome() == null
+                || (body.outcome() == CompensationExecutionModels.ReconciliationOutcome.FOUND
+                    && (body.resultReference() == null || body.resultReference().isBlank()))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "authoritative reconciliation required");
+        }
+        return service.reconcile(new CompensationExecutionModels.ReconciliationCommand(
+                EXECUTOR_ID, executionId, requestId.trim(), body.queryId().trim(),
+                body.outcome(), body.resultReference()));
+    }
+
+    private static void requireRequestId(String requestId) {
+        if (requestId == null || requestId.isBlank() || requestId.length() > 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "stable delivery identity required");
+        }
+    }
+
     private void requireExecutor(String authorization) {
         byte[] actual = authorization != null && authorization.startsWith("Bearer ")
                 ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
@@ -80,4 +140,11 @@ public final class CompensationExecutionController {
     }
 
     record SuccessRequest(UUID attemptId, String idempotencyKey, String parameterDigest) {}
+
+    record UnknownRequest(UUID attemptId, String idempotencyKey, String parameterDigest) {}
+
+    record ReconciliationRequest(
+            String queryId,
+            CompensationExecutionModels.ReconciliationOutcome outcome,
+            String resultReference) {}
 }
