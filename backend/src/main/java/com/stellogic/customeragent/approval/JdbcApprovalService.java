@@ -179,9 +179,9 @@ class JdbcApprovalService implements ApprovalService {
         }
         ViewRow row = rows.getFirst();
         Instant now = clock.instant();
-        requireCurrentLease(
+        requireCurrentLease(new CurrentLeaseScope(
                 row.ticketId(), command.revisionId(), command.leaseVersion(), row.proposalStatus(),
-                row.proposalExpiresAt(), row.leaseStatus(), row.leaseExpiresAt(), now);
+                row.proposalExpiresAt(), row.leaseStatus(), row.leaseExpiresAt(), now));
         DelayCompensationPolicy.Decision authoritative =
                 policy.evaluate(Duration.ofSeconds(row.delaySeconds()), row.paidAmount());
         if (!DelayCompensationPolicy.VERSION.equals(row.policyVersion())
@@ -246,9 +246,9 @@ class JdbcApprovalService implements ApprovalService {
         }
         LeaseScope lease = leases.getFirst();
         Instant now = clock.instant();
-        requireCurrentLease(
+        requireCurrentLease(new CurrentLeaseScope(
                 lease.ticketId(), command.revisionId(), command.leaseVersion(), lease.proposalStatus(),
-                lease.proposalExpiresAt(), lease.leaseStatus(), lease.leaseExpiresAt(), now);
+                lease.proposalExpiresAt(), lease.leaseStatus(), lease.leaseExpiresAt(), now));
         Timestamp at = Timestamp.from(now);
         jdbc.update(
                 "update approval_lease set status = 'RELEASED', released_at = ? "
@@ -323,9 +323,9 @@ class JdbcApprovalService implements ApprovalService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
         }
         DecisionLease lease = leases.getFirst();
-        requireCurrentLease(
+        requireCurrentLease(new CurrentLeaseScope(
                 ticketId, command.revisionId(), command.leaseVersion(), proposal.status(),
-                proposal.expiresAt(), lease.status(), lease.expiresAt(), now);
+                proposal.expiresAt(), lease.status(), lease.expiresAt(), now));
         if (proposal.revisionNumber() != command.proposalRevision()
                 || !proposal.contentDigest().equals(command.contentDigest())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "proposal revision content mismatch");
@@ -381,24 +381,19 @@ class JdbcApprovalService implements ApprovalService {
         }
     }
 
-    private void requireCurrentLease(
-            UUID ticketId,
-            UUID revisionId,
-            long leaseVersion,
-            String proposalStatus,
-            Instant proposalExpiresAt,
-            String leaseStatus,
-            Instant leaseExpiresAt,
-            Instant now) {
-        if ("PENDING_APPROVAL".equals(proposalStatus) && !proposalExpiresAt.isAfter(now)) {
-            proposalExpiry.expireIfDue(revisionId, now);
+    private void requireCurrentLease(CurrentLeaseScope scope) {
+        if ("PENDING_APPROVAL".equals(scope.proposalStatus())
+                && !scope.proposalExpiresAt().isAfter(scope.serverNow())) {
+            proposalExpiry.expireIfDue(scope.revisionId(), scope.serverNow());
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
         }
-        if (!"PENDING_APPROVAL".equals(proposalStatus)
-                || !"ACTIVE".equals(leaseStatus)
-                || !leaseExpiresAt.isAfter(now)) {
-            if ("ACTIVE".equals(leaseStatus) && !leaseExpiresAt.isAfter(now)) {
-                expireLease(ticketId, revisionId, leaseVersion, now);
+        if (!"PENDING_APPROVAL".equals(scope.proposalStatus())
+                || !"ACTIVE".equals(scope.leaseStatus())
+                || !scope.leaseExpiresAt().isAfter(scope.serverNow())) {
+            if ("ACTIVE".equals(scope.leaseStatus())
+                    && !scope.leaseExpiresAt().isAfter(scope.serverNow())) {
+                expireLease(
+                        scope.ticketId(), scope.revisionId(), scope.leaseVersion(), scope.serverNow());
             }
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current approval lease required");
         }
@@ -460,6 +455,15 @@ class JdbcApprovalService implements ApprovalService {
     private record DecisionProposal(
             UUID ticketId, int revisionNumber, String contentDigest, String status, Instant expiresAt) {}
     private record DecisionLease(String status, Instant expiresAt) {}
+    private record CurrentLeaseScope(
+            UUID ticketId,
+            UUID revisionId,
+            long leaseVersion,
+            String proposalStatus,
+            Instant proposalExpiresAt,
+            String leaseStatus,
+            Instant leaseExpiresAt,
+            Instant serverNow) {}
     private record LeaseScope(
             UUID ticketId, String proposalStatus, Instant proposalExpiresAt,
             String leaseStatus, Instant leaseExpiresAt) {}
