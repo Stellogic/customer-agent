@@ -1,14 +1,23 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 
+const CUSTOMER_PUBLIC_SCHEMA = "customer-public-v1" as const;
+
 type Snapshot = {
   view: "CUSTOMER_PUBLIC";
+  schema: typeof CUSTOMER_PUBLIC_SCHEMA;
   cursor: string;
-  ticket: { id: string; lifecycleState: string; handlingMode: string; firstRespondedAt: string };
+  ticket: { id: string; lifecycleState: string; handlingMode: string; agentGeneration: number; firstRespondedAt: string };
   messages: Array<{ author: string; body: string; sentAt: string }>;
   clarification: { id: string; promptCode: string; question: string } | null;
 };
 
 type PublicEvent = { id: string; type: string; data: string };
+type EventEnvelope = {
+  view: "CUSTOMER_PUBLIC";
+  schema: typeof CUSTOMER_PUBLIC_SCHEMA;
+  generation: number;
+  payload: unknown;
+};
 
 const customerHeaders = { "X-Synthetic-Customer-Id": "customer-demo" };
 
@@ -24,11 +33,16 @@ export function App() {
   const resumeRequestId = useRef(globalThis.crypto.randomUUID());
   const handoffRequestId = useRef(globalThis.crypto.randomUUID());
   const streamController = useRef<AbortController | null>(null);
+  const reconnectTimer = useRef<number | null>(null);
+  const snapshotRef = useRef<Snapshot | null>(null);
 
   useEffect(() => {
     const ticketId = new URLSearchParams(globalThis.location.search).get("ticket");
     if (ticketId && /^[0-9a-f-]{36}$/i.test(ticketId)) void loadTicket(ticketId);
-    return () => streamController.current?.abort();
+    return () => {
+      streamController.current?.abort();
+      if (reconnectTimer.current !== null) globalThis.clearTimeout(reconnectTimer.current);
+    };
   }, []);
 
   async function submit(event: FormEvent) {
@@ -56,7 +70,10 @@ export function App() {
     const loaded = await fetch(`/api/customer/tickets/${ticketId}`, { headers: customerHeaders, credentials: "same-origin" });
     if (!loaded.ok) throw new Error("snapshot request failed");
     const authoritative = await loaded.json() as Snapshot;
+    if (!isSnapshot(authoritative)) throw new Error("incompatible snapshot");
+    snapshotRef.current = authoritative;
     setSnapshot(authoritative);
+    setError("");
     globalThis.history.replaceState(null, "", `?ticket=${ticketId}`);
     void consumeEvents(ticketId, authoritative.cursor);
   }
@@ -137,6 +154,19 @@ export function App() {
     const markDisconnected = () => {
       if (!controller.signal.aborted) setError("实时更新已断开；当前内容可能过期，刷新后将从权威快照恢复。");
     };
+    const scheduleRecovery = () => {
+      if (controller.signal.aborted || streamController.current !== controller || reconnectTimer.current !== null) return;
+      reconnectTimer.current = globalThis.setTimeout(async () => {
+        reconnectTimer.current = null;
+        if (streamController.current !== controller) return;
+        try {
+          await loadTicket(ticketId);
+        } catch {
+          markDisconnected();
+          scheduleRecovery();
+        }
+      }, 1_000);
+    };
     try {
       const response = await fetch(`/api/customer/tickets/${ticketId}/events`, {
         headers: { ...customerHeaders, "Last-Event-ID": cursor, Accept: "text/event-stream" },
@@ -157,7 +187,11 @@ export function App() {
             const separator = buffer.slice(boundary).match(/^\r?\n\r?\n/)?.[0].length ?? 2;
             buffer = buffer.slice(boundary + separator);
             const event = parsePublicEvent(block);
-            if (event) applyPublicEvent(event);
+            if (event && !applyPublicEvent(event)) {
+              controller.abort();
+              await loadTicket(ticketId);
+              return;
+            }
             boundary = buffer.search(/\r?\n\r?\n/);
           }
           if (done) break;
@@ -167,50 +201,73 @@ export function App() {
       // The authoritative snapshot remains committed and readable after a stream failure.
     }
     markDisconnected();
+    scheduleRecovery();
   }
 
   function applyPublicEvent(event: PublicEvent) {
-    setSnapshot((current) => {
-      if (!current) return current;
-      if (event.type === "PUBLIC_MESSAGE_APPENDED") {
-        const message = JSON.parse(event.data) as Snapshot["messages"][number];
-        if (current.ticket.handlingMode === "HUMAN" && message.author === "AGENT") {
-          return { ...current, cursor: event.id };
-        }
+    const current = snapshotRef.current;
+    if (!current) return true;
+    const currentCursor = parseCursor(current.cursor);
+    const eventCursor = parseCursor(event.id);
+    if (!currentCursor || !eventCursor || eventCursor.epoch !== currentCursor.epoch) return false;
+    if (eventCursor.sequence <= currentCursor.sequence) return true;
+    if (eventCursor.sequence !== currentCursor.sequence + 1) return false;
+    let envelope: EventEnvelope;
+    try {
+      envelope = JSON.parse(event.data) as EventEnvelope;
+    } catch {
+      return false;
+    }
+    if (!isRecord(envelope) || !hasOnlyKeys(envelope, ["view", "schema", "generation", "payload"])
+      || envelope.view !== "CUSTOMER_PUBLIC" || envelope.schema !== CUSTOMER_PUBLIC_SCHEMA
+      || !Number.isSafeInteger(envelope.generation) || envelope.generation < 0) return false;
+    if (envelope.generation < current.ticket.agentGeneration) {
+      const next = { ...current, cursor: event.id };
+      snapshotRef.current = next;
+      setSnapshot(next);
+      return true;
+    }
+    if (envelope.generation > current.ticket.agentGeneration) return false;
+    const payload = envelope.payload;
+    let next: Snapshot;
+    if (event.type === "PUBLIC_MESSAGE_APPENDED") {
+      if (!isPublicMessage(payload)) return false;
+      const message = payload;
+      if (current.ticket.handlingMode === "HUMAN" && message.author === "AGENT") {
+        next = { ...current, cursor: event.id };
+      } else {
         const duplicate = current.messages.some((existing) =>
           existing.author === message.author && existing.body === message.body && existing.sentAt === message.sentAt);
-        return { ...current, cursor: event.id, messages: duplicate ? current.messages : [...current.messages, message] };
+        next = { ...current, cursor: event.id, messages: duplicate ? current.messages : [...current.messages, message] };
       }
-      if (event.type === "TICKET_ACCEPTED") {
-        const accepted = JSON.parse(event.data) as { lifecycleState: string; handlingMode: string };
-        return { ...current, cursor: event.id, ticket: { ...current.ticket, ...accepted } };
-      }
-      if (event.type === "CUSTOMER_CLARIFICATION_REQUESTED" || event.type === "TICKET_INVESTIGATION_RESUMED") {
-        const transition = JSON.parse(event.data) as {
-          lifecycleState: string;
-          clarification?: Snapshot["clarification"];
-        };
-        return {
+    } else if (event.type === "TICKET_ACCEPTED") {
+      if (!isTicketTransition(payload)) return false;
+      next = { ...current, cursor: event.id, ticket: { ...current.ticket, ...payload } };
+    } else if (event.type === "CUSTOMER_CLARIFICATION_REQUESTED" || event.type === "TICKET_INVESTIGATION_RESUMED") {
+      if (!isClarificationTransition(payload)) return false;
+      next = {
           ...current,
           cursor: event.id,
-          ticket: { ...current.ticket, lifecycleState: transition.lifecycleState },
-          clarification: transition.clarification === undefined ? current.clarification : transition.clarification,
+          ticket: { ...current.ticket, lifecycleState: payload.lifecycleState },
+          clarification: payload.clarification === undefined ? current.clarification : payload.clarification,
         };
-      }
-      if (event.type === "TICKET_HANDED_OFF") {
-        const transition = JSON.parse(event.data) as {
-          handlingMode: string;
-          clarification: null;
-        };
-        return {
+    } else if (event.type === "TICKET_HANDED_OFF") {
+      if (!isHandoffTransition(payload)) return false;
+      next = {
           ...current,
           cursor: event.id,
-          ticket: { ...current.ticket, handlingMode: transition.handlingMode },
+          ticket: { ...current.ticket, handlingMode: payload.handlingMode },
           clarification: null,
         };
-      }
-      return current;
-    });
+    } else if (event.type === "TICKET_RESOLVED") {
+      if (!isResolvedTransition(payload)) return false;
+      next = { ...current, cursor: event.id, ticket: { ...current.ticket, lifecycleState: payload.lifecycleState } };
+    } else {
+      return false;
+    }
+    snapshotRef.current = next;
+    setSnapshot(next);
+    return true;
   }
 
   return (
@@ -262,6 +319,60 @@ export function App() {
       )}
     </main>
   );
+}
+
+function isSnapshot(value: unknown): value is Snapshot {
+  if (!isRecord(value) || value.view !== "CUSTOMER_PUBLIC" || value.schema !== CUSTOMER_PUBLIC_SCHEMA) return false;
+  const cursor = typeof value.cursor === "string" ? parseCursor(value.cursor) : null;
+  return cursor?.epoch === value.schema && isRecord(value.ticket) && Array.isArray(value.messages)
+    && Number.isSafeInteger(value.ticket.agentGeneration) && Number(value.ticket.agentGeneration) >= 0
+    && value.messages.every(isPublicMessage);
+}
+
+function parseCursor(cursor: string) {
+  const separator = cursor.lastIndexOf(":");
+  if (separator < 1 || cursor.slice(0, separator) !== CUSTOMER_PUBLIC_SCHEMA) return null;
+  const sequence = cursor.slice(separator + 1);
+  return /^(0|[1-9]\d*)$/.test(sequence)
+    ? { epoch: CUSTOMER_PUBLIC_SCHEMA, sequence: Number(sequence) }
+    : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, keys: string[]) {
+  return Object.keys(value).every((key) => keys.includes(key));
+}
+
+function isPublicMessage(value: unknown): value is Snapshot["messages"][number] {
+  return isRecord(value) && hasOnlyKeys(value, ["author", "body", "sentAt"])
+    && ["CUSTOMER", "SUPPORT", "AGENT"].includes(String(value.author))
+    && typeof value.body === "string" && typeof value.sentAt === "string";
+}
+
+function isTicketTransition(value: unknown): value is { lifecycleState: string; handlingMode: string; ticketId?: string } {
+  return isRecord(value) && hasOnlyKeys(value, ["ticketId", "lifecycleState", "handlingMode"])
+    && typeof value.lifecycleState === "string" && typeof value.handlingMode === "string";
+}
+
+function isClarificationTransition(value: unknown): value is { lifecycleState: string; clarification?: Snapshot["clarification"] } {
+  if (!isRecord(value) || !hasOnlyKeys(value, ["lifecycleState", "clarification"]) || typeof value.lifecycleState !== "string") return false;
+  const clarification = value.clarification;
+  return clarification === undefined || clarification === null
+    || (isRecord(clarification) && hasOnlyKeys(clarification, ["id", "promptCode", "question"])
+      && typeof clarification.id === "string" && typeof clarification.promptCode === "string"
+      && typeof clarification.question === "string");
+}
+
+function isHandoffTransition(value: unknown): value is { handlingMode: string; clarification: null } {
+  return isRecord(value) && hasOnlyKeys(value, ["handlingMode", "clarification"])
+    && value.handlingMode === "HUMAN" && value.clarification === null;
+}
+
+function isResolvedTransition(value: unknown): value is { lifecycleState: string } {
+  return isRecord(value) && hasOnlyKeys(value, ["lifecycleState"]) && value.lifecycleState === "RESOLVED";
 }
 
 function parsePublicEvent(block: string): PublicEvent | null {

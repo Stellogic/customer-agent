@@ -95,7 +95,12 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, 'AGENT_GENERATION_CREATED', 'spring-system', ?)",
                 ticketId, databaseTime);
         jdbc.update(
-                "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) values (?, ?, 1, 'TICKET_ACCEPTED', jsonb_build_object('ticketId', ?::text, 'lifecycleState', 'INVESTIGATING', 'handlingMode', 'AGENT'), ?), (?, ?, 2, 'PUBLIC_MESSAGE_APPENDED', jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?)",
+                "insert into customer_public_event "
+                        + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
+                        + "values (?, ?, 1, 1, 'TICKET_ACCEPTED', "
+                        + "jsonb_build_object('ticketId', ?::text, 'lifecycleState', 'INVESTIGATING', 'handlingMode', 'AGENT'), ?), "
+                        + "(?, ?, 2, 1, 'PUBLIC_MESSAGE_APPENDED', "
+                        + "jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?)",
                 ticketId, EPOCH, ticketId.toString(), databaseTime,
                 ticketId, EPOCH, ACKNOWLEDGEMENT, now.toString(), databaseTime);
         return new TicketCreationResult(ticketId, false);
@@ -105,7 +110,10 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
     @Transactional(readOnly = true)
     public CustomerPublicSnapshot snapshot(String customerId, UUID ticketId) {
         List<CustomerPublicSnapshot> snapshots = jdbc.query(
-                "select id, lifecycle_state, handling_mode, created_at, first_responded_at, coalesce((select max(sequence) from customer_public_event e where e.ticket_id = t.id and e.epoch = ?), 0) from support_ticket t where id = ? and customer_id = ?",
+                "select id, lifecycle_state, handling_mode, created_at, first_responded_at, "
+                        + "coalesce((select max(sequence) from customer_public_event e where e.ticket_id = t.id and e.epoch = ?), 0), "
+                        + "coalesce((select max(generation_number) from agent_processing_generation g where g.ticket_id = t.id), 0) "
+                        + "from support_ticket t where id = ? and customer_id = ?",
                 (rs, row) -> new CustomerPublicSnapshot(
                         rs.getObject(1, UUID.class),
                         rs.getString(2),
@@ -114,6 +122,7 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                         rs.getTimestamp(5).toInstant(),
                         EPOCH,
                         rs.getLong(6),
+                        rs.getLong(7),
                         List.of(),
                         null),
                 EPOCH, ticketId, customerId);
@@ -131,14 +140,14 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 ticketId);
         return new CustomerPublicSnapshot(
                 ticket.ticketId(), ticket.lifecycleState(), ticket.handlingMode(), ticket.createdAt(),
-                ticket.firstRespondedAt(), ticket.epoch(), ticket.sequence(), messages,
+                ticket.firstRespondedAt(), ticket.epoch(), ticket.sequence(), ticket.agentGeneration(), messages,
                 clarifications.isEmpty() ? null : clarifications.getFirst());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CustomerPublicEvent> events(String customerId, UUID ticketId, String afterCursor) {
-        snapshot(customerId, ticketId);
+        CustomerPublicSnapshot authority = snapshot(customerId, ticketId);
         long after = 0;
         if (afterCursor != null && !afterCursor.isBlank()) {
             int separator = afterCursor.lastIndexOf(':');
@@ -151,9 +160,17 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 throw new ProjectionCursorException();
             }
         }
+        if (after < 0 || after > authority.sequence()) throw new ProjectionCursorException();
+        Long firstRetained = jdbc.queryForObject(
+                "select min(sequence) from customer_public_event where ticket_id = ? and epoch = ?",
+                Long.class, ticketId, EPOCH);
+        if (after < authority.sequence() && firstRetained != null && firstRetained > after + 1) {
+            throw new ProjectionCursorException();
+        }
         return jdbc.query(
-                "select epoch, sequence, event_type, payload::text from customer_public_event where ticket_id = ? and epoch = ? and sequence > ? order by sequence",
-                (rs, row) -> new CustomerPublicEvent(rs.getString(1), rs.getLong(2), rs.getString(3), rs.getString(4)),
+                "select epoch, sequence, agent_generation, event_type, payload::text from customer_public_event where ticket_id = ? and epoch = ? and sequence > ? order by sequence",
+                (rs, row) -> new CustomerPublicEvent(
+                        rs.getString(1), rs.getLong(2), rs.getLong(3), rs.getString(4), rs.getString(5)),
                 ticketId, EPOCH, after);
     }
 

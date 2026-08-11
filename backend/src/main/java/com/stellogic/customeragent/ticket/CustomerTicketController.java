@@ -62,7 +62,7 @@ public final class CustomerTicketController {
         SseEmitter emitter = new SseEmitter(60_000L);
         try {
             for (CustomerPublicEvent event : events) {
-                send(emitter, event);
+                sendAuthorized(emitter, owner, ticketId, event);
             }
             emitter.send(SseEmitter.event().comment("connected"));
         } catch (Exception exception) {
@@ -89,7 +89,7 @@ public final class CustomerTicketController {
                     Thread.sleep(250);
                     List<CustomerPublicEvent> incremental = service.events(customerId, ticketId, cursor);
                     for (CustomerPublicEvent event : incremental) {
-                        send(emitter, event);
+                        sendAuthorized(emitter, customerId, ticketId, event);
                         cursor = event.cursor();
                     }
                 }
@@ -106,7 +106,13 @@ public final class CustomerTicketController {
         emitter.send(SseEmitter.event()
                 .id(event.cursor())
                 .name(event.type())
-                .data(event.jsonPayload()));
+                .data(event.publicData()));
+    }
+
+    private void sendAuthorized(
+            SseEmitter emitter, String customerId, UUID ticketId, CustomerPublicEvent event) throws java.io.IOException {
+        service.snapshot(customerId, ticketId);
+        send(emitter, event);
     }
 
     private static void requireIdentity(String customerId) {
@@ -126,16 +132,18 @@ public final class CustomerTicketController {
     record CreateTicketResponse(UUID ticketId, boolean accepted, boolean replayed) {}
 
     record SnapshotResponse(
-            String view, String cursor, Ticket ticket, List<PublicMessage> messages,
+            String view, String schema, String cursor, Ticket ticket, List<PublicMessage> messages,
             CurrentClarification clarification) {
         static SnapshotResponse from(CustomerPublicSnapshot snapshot) {
             return new SnapshotResponse(
                     "CUSTOMER_PUBLIC",
+                    snapshot.epoch(),
                     snapshot.epoch() + ":" + snapshot.sequence(),
                     new Ticket(
                             snapshot.ticketId(),
                             snapshot.lifecycleState(),
                             snapshot.handlingMode(),
+                            snapshot.agentGeneration(),
                             snapshot.createdAt(),
                             snapshot.firstRespondedAt()),
                     snapshot.messages(),
@@ -143,5 +151,7 @@ public final class CustomerTicketController {
         }
     }
 
-    record Ticket(UUID id, String lifecycleState, String handlingMode, Instant createdAt, Instant firstRespondedAt) {}
+    record Ticket(
+            UUID id, String lifecycleState, String handlingMode, long agentGeneration,
+            Instant createdAt, Instant firstRespondedAt) {}
 }

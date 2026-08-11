@@ -3,6 +3,7 @@ package com.stellogic.customeragent.clarification;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import com.stellogic.customeragent.sla.SlaService;
+import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -17,20 +18,25 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 class JdbcClarificationService implements ClarificationService {
-    private static final String EPOCH = "customer-public-v1";
     private static final String PROMPT_CODE = "ORDER_CONFIRMATION_CODE";
     private static final String PUBLIC_QUESTION = "为确认需要调查的订单，请回复订单确认码（A 或 B）。";
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final SlaService slaService;
     private final TicketAuthorityLock authorityLock;
+    private final CustomerPublicProjectionAppender publicProjection;
 
     JdbcClarificationService(
-            JdbcTemplate jdbc, Clock clock, SlaService slaService, TicketAuthorityLock authorityLock) {
+            JdbcTemplate jdbc,
+            Clock clock,
+            SlaService slaService,
+            TicketAuthorityLock authorityLock,
+            CustomerPublicProjectionAppender publicProjection) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.slaService = slaService;
         this.authorityLock = authorityLock;
+        this.publicProjection = publicProjection;
     }
 
     @Override
@@ -88,7 +94,7 @@ class JdbcClarificationService implements ClarificationService {
                 at, command.ticketId());
         slaService.evaluateTicket(command.ticketId(), now);
         appendPublicMessage(
-                command.ticketId(), "AGENT", PUBLIC_QUESTION, now,
+                command.ticketId(), command.generationId(), "AGENT", PUBLIC_QUESTION, now,
                 "CUSTOMER_CLARIFICATION_REQUESTED", requestId);
         audit(command.ticketId(), "CUSTOMER_CLARIFICATION_REQUESTED", "agent-machine", at);
         return new ClarificationRequestResult(requestId, PROMPT_CODE, PUBLIC_QUESTION);
@@ -182,7 +188,7 @@ class JdbcClarificationService implements ClarificationService {
                 command.resumeRequestId(), command.customerMessageId(), command.clarificationRequestId(),
                 scope.generationId(), scope.threadId(), parameterDigest, answerDigest, normalizedAnswer, at, at);
         appendPublicMessage(
-                command.ticketId(), "CUSTOMER", command.answer().trim(), now,
+                command.ticketId(), scope.generationId(), "CUSTOMER", command.answer().trim(), now,
                 "TICKET_INVESTIGATION_RESUMED", null);
         audit(command.ticketId(), "CUSTOMER_CLARIFICATION_ANSWERED", command.customerId(), at);
         audit(command.ticketId(), "AGENT_RESUME_REQUESTED", "spring-system", at);
@@ -208,33 +214,11 @@ class JdbcClarificationService implements ClarificationService {
     }
 
     private void appendPublicMessage(
-            UUID ticketId, String author, String body, Instant now, String transitionType, UUID clarificationId) {
-        Long messageSequence = jdbc.queryForObject(
-                "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?", Long.class, ticketId);
-        Long eventSequence = jdbc.queryForObject(
-                "select coalesce(max(sequence), 0) + 1 from customer_public_event where ticket_id = ? and epoch = ?",
-                Long.class, ticketId, EPOCH);
-        Timestamp at = Timestamp.from(now);
-        jdbc.update(
-                "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) values (?, ?, ?, ?, ?, ?)",
-                UUID.randomUUID(), ticketId, messageSequence, author, body, at);
-        jdbc.update(
-                "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                        + "values (?, ?, ?, 'PUBLIC_MESSAGE_APPENDED', jsonb_build_object('author', ?, 'body', ?, 'sentAt', ?::text), ?)",
-                ticketId, EPOCH, eventSequence, author, body, now.toString(), at);
-        if (clarificationId != null) {
-            jdbc.update(
-                    "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                            + "values (?, ?, ?, ?, jsonb_build_object('lifecycleState', 'WAITING_FOR_CUSTOMER', "
-                            + "'clarification', jsonb_build_object('id', ?::text, 'promptCode', ?, 'question', ?)), ?)",
-                    ticketId, EPOCH, eventSequence + 1, transitionType,
-                    clarificationId.toString(), PROMPT_CODE, PUBLIC_QUESTION, at);
-        } else {
-            jdbc.update(
-                    "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                            + "values (?, ?, ?, ?, jsonb_build_object('lifecycleState', 'INVESTIGATING', 'clarification', null), ?)",
-                    ticketId, EPOCH, eventSequence + 1, transitionType, at);
-        }
+            UUID ticketId, UUID generationId, String author, String body, Instant now,
+            String transitionType, UUID clarificationId) {
+        publicProjection.appendClarificationMessage(
+                ticketId, generationId, author, body, now, transitionType,
+                clarificationId, PROMPT_CODE, PUBLIC_QUESTION);
     }
 
     private void reject(UUID ticketId, HttpStatus status, String reason) {

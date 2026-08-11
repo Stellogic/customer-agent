@@ -4,6 +4,7 @@ import com.stellogic.customeragent.compensation.DelayCompensationPolicy;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import com.stellogic.customeragent.sla.SlaService;
+import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -21,7 +22,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 class JdbcAgentInvestigationService implements AgentInvestigationService {
-    private static final String EPOCH = "customer-public-v1";
     private static final String PUBLIC_NO_COMPENSATION_CONCLUSION =
             "经核验，本次物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。";
     private static final String PUBLIC_WAITING_APPROVAL =
@@ -32,6 +32,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private final JdbcCompensationProposalStore proposalStore;
     private final SlaService slaService;
     private final TicketAuthorityLock authorityLock;
+    private final CustomerPublicProjectionAppender publicProjection;
     private final DelayCompensationPolicy policy = new DelayCompensationPolicy();
 
     @Autowired
@@ -41,13 +42,15 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             Clock clock,
             JdbcCompensationProposalStore proposalStore,
             SlaService slaService,
-            TicketAuthorityLock authorityLock) {
+            TicketAuthorityLock authorityLock,
+            CustomerPublicProjectionAppender publicProjection) {
         this.jdbc = jdbc;
         this.accessAudit = accessAudit;
         this.clock = clock;
         this.proposalStore = proposalStore;
         this.slaService = slaService;
         this.authorityLock = authorityLock;
+        this.publicProjection = publicProjection;
     }
 
     @Override
@@ -169,7 +172,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 databaseTime, ticketId);
         if (ticketUpdated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
         completeGeneration(generationId, databaseTime);
-        appendPublicMessage(ticketId, PUBLIC_NO_COMPENSATION_CONCLUSION, now, databaseTime, true);
+        publicProjection.appendAgentMessage(
+                ticketId, generationId, PUBLIC_NO_COMPENSATION_CONCLUSION, now, true);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values "
                         + "(?, 'AGENT_CONCLUSION_ACCEPTED', 'agent-machine', ?), (?, 'TICKET_RESOLVED', 'spring-system', ?)",
@@ -214,7 +218,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        appendPublicMessage(ticketId, PUBLIC_WAITING_APPROVAL, now, databaseTime, false);
+        publicProjection.appendAgentMessage(ticketId, generationId, PUBLIC_WAITING_APPROVAL, now, false);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, subject_type, subject_id) values "
                         + "(?, ?, 'spring-system', ?, 'COMPENSATION_PROPOSAL_REVISION', ?), "
@@ -266,29 +270,6 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         if (updated != 1) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "generation is no longer active");
         jdbc.update("update agent_submission set status = 'COMPLETED' where generation_id = ?", generationId);
         jdbc.update("update agent_resume_request set status = 'COMPLETED' where generation_id = ?", generationId);
-    }
-
-    private void appendPublicMessage(
-            UUID ticketId, String body, Instant now, Timestamp databaseTime, boolean resolved) {
-        Long messageSequence = jdbc.queryForObject(
-                "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?",
-                Long.class, ticketId);
-        Long eventSequence = jdbc.queryForObject(
-                "select coalesce(max(sequence), 0) + 1 from customer_public_event where ticket_id = ? and epoch = ?",
-                Long.class, ticketId, EPOCH);
-        jdbc.update(
-                "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) values (?, ?, ?, 'AGENT', ?, ?)",
-                UUID.randomUUID(), ticketId, messageSequence, body, databaseTime);
-        jdbc.update(
-                "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                        + "values (?, ?, ?, 'PUBLIC_MESSAGE_APPENDED', jsonb_build_object('author', 'AGENT', 'body', ?, 'sentAt', ?::text), ?)",
-                ticketId, EPOCH, eventSequence, body, now.toString(), databaseTime);
-        if (resolved) {
-            jdbc.update(
-                    "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                            + "values (?, ?, ?, 'TICKET_RESOLVED', jsonb_build_object('lifecycleState', 'RESOLVED'), ?)",
-                    ticketId, EPOCH, eventSequence + 1, databaseTime);
-        }
     }
 
     @Override
