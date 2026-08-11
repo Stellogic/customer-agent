@@ -31,11 +31,7 @@ final class CompensationExecutionModels {
             String executorId,
             UUID executionId,
             String requestId,
-            BoundAttempt attempt) {
-        UUID attemptId() { return attempt.attemptId(); }
-        String idempotencyKey() { return attempt.idempotencyKey(); }
-        String parameterDigest() { return attempt.parameterDigest(); }
-    }
+            BoundAttempt attempt) {}
 
     record SuccessResult(
             UUID executionId,
@@ -50,21 +46,13 @@ final class CompensationExecutionModels {
             String executorId,
             UUID executionId,
             String requestId,
-            BoundAttempt attempt) {
-        UUID attemptId() { return attempt.attemptId(); }
-        String idempotencyKey() { return attempt.idempotencyKey(); }
-        String parameterDigest() { return attempt.parameterDigest(); }
-    }
+            BoundAttempt attempt) {}
 
     record FailureCommand(
             String executorId,
             UUID executionId,
             String requestId,
-            BoundAttempt attempt) {
-        UUID attemptId() { return attempt.attemptId(); }
-        String idempotencyKey() { return attempt.idempotencyKey(); }
-        String parameterDigest() { return attempt.parameterDigest(); }
-    }
+            BoundAttempt attempt) {}
 
     record ReconciliationCommand(
             String executorId,

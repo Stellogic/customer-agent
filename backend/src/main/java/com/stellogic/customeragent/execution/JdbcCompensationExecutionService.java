@@ -107,9 +107,10 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
     @Override
     @Transactional
     public CompensationExecutionModels.SuccessResult succeed(CompensationExecutionModels.SuccessCommand command) {
+        CompensationExecutionModels.BoundAttempt attempt = command.attempt();
         String requestDigest = StableParameterDigest.sha256(
-                command.executionId().toString(), command.attemptId().toString(),
-                command.idempotencyKey(), command.parameterDigest());
+                command.executionId().toString(), attempt.attemptId().toString(),
+                attempt.idempotencyKey(), attempt.parameterDigest());
         lockRequest(command.executorId(), "SUCCESS", command.requestId());
         List<SuccessReplay> replays = successReplay(command.executorId(), command.requestId());
         if (!replays.isEmpty()) {
@@ -121,7 +122,7 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
         UUID ticketId = ticketId(command.executionId(), command.executorId());
         authorityLock.acquire(ticketId);
         ExecutionRow execution = lockExecution(command.executionId(), command.executorId());
-        requireBoundParameters(execution, command);
+        requireBoundParameters(execution, attempt);
         requireProviderSuccess(execution);
         if (execution.status() == CompensationExecutionModels.ExecutionStatus.SUCCEEDED) {
             SuccessReplay result = result(command.executionId(), requestDigest);
@@ -129,7 +130,7 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
             return result.result(true);
         }
         if (execution.status() != CompensationExecutionModels.ExecutionStatus.PROCESSING
-                || !command.attemptId().equals(execution.processingAttemptId())) {
+                || !attempt.attemptId().equals(execution.processingAttemptId())) {
             conflict("execution is not held by this attempt");
         }
         Instant now = clock.instant();
@@ -155,7 +156,7 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
                 "insert into compensation_execution_result (execution_id, attempt_id, result_reference, "
                         + "compensation_method, amount, masked_destination, customer_message, confirmed_at) "
                         + "values (?, ?, ?, ?, ?, ?, ?, ?)",
-                execution.id(), command.attemptId(), resultReference, execution.method().name(), execution.amount(),
+                execution.id(), attempt.attemptId(), resultReference, execution.method().name(), execution.amount(),
                 maskedDestination, customerMessage, at);
         jdbc.update(
                 "update compensation_execution set status = 'SUCCEEDED', succeeded_at = ? where id = ?",
@@ -178,9 +179,9 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
                         + "values (?, 'COMPENSATION_EXECUTION_SUCCEEDED', ?, ?, 'COMPENSATION_EXECUTION', ?), "
                         + "(?, 'TICKET_RESOLVED', 'spring-system', ?, 'COMPENSATION_EXECUTION', ?)",
                 ticketId, command.executorId(), at, execution.id(), ticketId, at, execution.id());
-        recordSuccessRequest(command, requestDigest, command.attemptId());
+        recordSuccessRequest(command, requestDigest, attempt.attemptId());
         return new CompensationExecutionModels.SuccessResult(
-                execution.id(), command.attemptId(), CompensationExecutionModels.ExecutionStatus.SUCCEEDED,
+                execution.id(), attempt.attemptId(), CompensationExecutionModels.ExecutionStatus.SUCCEEDED,
                 execution.method(), execution.amount(),
                 customerMessage, false);
     }
@@ -189,9 +190,10 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
     @Transactional
     public CompensationExecutionModels.TransitionResult markUnknown(
             CompensationExecutionModels.UnknownCommand command) {
+        CompensationExecutionModels.BoundAttempt attempt = command.attempt();
         String requestDigest = StableParameterDigest.sha256(
-                command.executionId().toString(), command.attemptId().toString(),
-                command.idempotencyKey(), command.parameterDigest());
+                command.executionId().toString(), attempt.attemptId().toString(),
+                attempt.idempotencyKey(), attempt.parameterDigest());
         lockRequest(command.executorId(), "UNKNOWN", command.requestId());
         List<TransitionReplay> replays = transitionReplay(
                 "compensation_unknown_request", command.executorId(), command.requestId());
@@ -204,29 +206,28 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
         UUID ticketId = ticketId(command.executionId(), command.executorId());
         authorityLock.acquire(ticketId);
         ExecutionRow execution = lockExecution(command.executionId(), command.executorId());
-        requireBoundParameters(execution, new CompensationExecutionModels.SuccessCommand(
-                command.executorId(), command.executionId(), command.requestId(), command.attempt()));
+        requireBoundParameters(execution, attempt);
         if (execution.status() != CompensationExecutionModels.ExecutionStatus.PROCESSING
-                || !command.attemptId().equals(execution.processingAttemptId())) {
+                || !attempt.attemptId().equals(execution.processingAttemptId())) {
             conflict("execution is not held by this attempt");
         }
         Timestamp at = Timestamp.from(clock.instant());
         jdbc.update("update compensation_execution set status = 'UNKNOWN', unknown_at = ? where id = ?",
                 at, execution.id());
         jdbc.update("update compensation_execution_attempt set outcome = 'UNKNOWN', completed_at = ? where id = ?",
-                at, command.attemptId());
+                at, attempt.attemptId());
         jdbc.update(
                 "insert into compensation_unknown_request "
                         + "(executor_id, request_id, parameter_digest, execution_id, attempt_id, created_at) "
                         + "values (?, ?, ?, ?, ?, ?)",
-                command.executorId(), command.requestId(), requestDigest, execution.id(), command.attemptId(), at);
+                command.executorId(), command.requestId(), requestDigest, execution.id(), attempt.attemptId(), at);
         publicProjection.appendSupportMessage(ticketId, CONFIRMING_MESSAGE, clock.instant());
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, subject_type, subject_id) "
                         + "values (?, 'COMPENSATION_EXECUTION_UNKNOWN', ?, ?, 'COMPENSATION_EXECUTION', ?)",
                 ticketId, command.executorId(), at, execution.id());
         return new CompensationExecutionModels.TransitionResult(
-                execution.id(), command.attemptId(), CompensationExecutionModels.ExecutionStatus.UNKNOWN,
+                execution.id(), attempt.attemptId(), CompensationExecutionModels.ExecutionStatus.UNKNOWN,
                 CONFIRMING_MESSAGE, false);
     }
 
@@ -234,9 +235,10 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
     @Transactional
     public CompensationExecutionModels.TransitionResult markFailed(
             CompensationExecutionModels.FailureCommand command) {
+        CompensationExecutionModels.BoundAttempt attempt = command.attempt();
         String requestDigest = StableParameterDigest.sha256(
-                command.executionId().toString(), command.attemptId().toString(),
-                command.idempotencyKey(), command.parameterDigest());
+                command.executionId().toString(), attempt.attemptId().toString(),
+                attempt.idempotencyKey(), attempt.parameterDigest());
         lockRequest(command.executorId(), "FAILURE", command.requestId());
         List<TransitionReplay> replays = transitionReplay(
                 "compensation_failure_request", command.executorId(), command.requestId());
@@ -249,10 +251,9 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
         UUID ticketId = ticketId(command.executionId(), command.executorId());
         authorityLock.acquire(ticketId);
         ExecutionRow execution = lockExecution(command.executionId(), command.executorId());
-        requireBoundParameters(execution, new CompensationExecutionModels.SuccessCommand(
-                command.executorId(), command.executionId(), command.requestId(), command.attempt()));
+        requireBoundParameters(execution, attempt);
         if (execution.status() != CompensationExecutionModels.ExecutionStatus.PROCESSING
-                || !command.attemptId().equals(execution.processingAttemptId())) {
+                || !attempt.attemptId().equals(execution.processingAttemptId())) {
             conflict("execution is not held by this attempt");
         }
         Integer confirmedNotOccurred = jdbc.queryForObject(
@@ -267,21 +268,21 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
         jdbc.update("update compensation_execution set status = 'FAILED', failed_at = ? where id = ?",
                 at, execution.id());
         jdbc.update("update compensation_execution_attempt set outcome = 'NOT_FOUND', completed_at = ? where id = ?",
-                at, command.attemptId());
+                at, attempt.attemptId());
         jdbc.update("update compensation_reservation set status = 'RELEASED' where id = ? and status = 'ACTIVE'",
                 execution.reservationId());
         jdbc.update(
                 "insert into compensation_failure_request "
                         + "(executor_id, request_id, parameter_digest, execution_id, attempt_id, created_at) "
                         + "values (?, ?, ?, ?, ?, ?)",
-                command.executorId(), command.requestId(), requestDigest, execution.id(), command.attemptId(), at);
+                command.executorId(), command.requestId(), requestDigest, execution.id(), attempt.attemptId(), at);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, subject_type, subject_id) "
                         + "values (?, 'COMPENSATION_EXECUTION_CONFIRMED_NOT_OCCURRED', ?, ?, "
                         + "'COMPENSATION_EXECUTION', ?)",
                 ticketId, command.executorId(), at, execution.id());
         return new CompensationExecutionModels.TransitionResult(
-                execution.id(), command.attemptId(), CompensationExecutionModels.ExecutionStatus.FAILED,
+                execution.id(), attempt.attemptId(), CompensationExecutionModels.ExecutionStatus.FAILED,
                 null, false);
     }
 
@@ -444,9 +445,9 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
                 ? "coupon:" : "simulated-refund:") + execution.id();
     }
 
-    private void requireBoundParameters(ExecutionRow execution, CompensationExecutionModels.SuccessCommand command) {
-        if (!execution.idempotencyKey().equals(command.idempotencyKey())
-                || !execution.parameterDigest().equals(command.parameterDigest())) {
+    private void requireBoundParameters(ExecutionRow execution, CompensationExecutionModels.BoundAttempt attempt) {
+        if (!execution.idempotencyKey().equals(attempt.idempotencyKey())
+                || !execution.parameterDigest().equals(attempt.parameterDigest())) {
             conflict("execution parameters do not match the approved intent");
         }
     }

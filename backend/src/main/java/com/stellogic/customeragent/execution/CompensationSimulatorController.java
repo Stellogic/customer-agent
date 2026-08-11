@@ -33,7 +33,7 @@ final class CompensationSimulatorController {
             @RequestHeader(value = "X-Simulation-Scenario", required = false) String scenario,
             @PathVariable UUID executionId,
             @RequestBody(required = false) ExecuteRequest body) {
-        requireExecutor(authorization);
+        executorIdentity.require(authorization);
         if (idempotencyKey == null || idempotencyKey.isBlank() || body == null
                 || body.parameterDigest() == null || !body.parameterDigest().matches("[0-9a-f]{64}")
                 || body.amount() == null || body.amount().signum() <= 0) {
@@ -60,15 +60,11 @@ final class CompensationSimulatorController {
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @PathVariable UUID executionId) {
-        requireExecutor(authorization);
+        executorIdentity.require(authorization);
         if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 200) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "original execution identity required");
         }
         return service.reconcile(executionId, idempotencyKey.trim());
-    }
-
-    private void requireExecutor(String authorization) {
-        executorIdentity.require(authorization);
     }
 
     record ExecuteRequest(String parameterDigest, BigDecimal amount) {}

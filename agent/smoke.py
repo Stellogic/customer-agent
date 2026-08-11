@@ -1186,15 +1186,6 @@ def main() -> None:
             "select count(*) from compensation_execution_result where execution_id = %s",
             (uuid.UUID(execution_id),),
         ).fetchone()[0] == 1
-        assignments_after_budget = httpx.get(
-            f"{spring_url}/internal/compensation-executions",
-            headers=executor_headers,
-            timeout=20.0,
-        )
-        expect_status(assignments_after_budget, 200)
-        assert not any(
-            item["executionId"] == persistent_unknown_id for item in assignments_after_budget.json()
-        )
         assert connection.execute(
             "select count(*) from simulated_partial_refund where execution_id = %s",
             (uuid.UUID(execution_id),),
@@ -1320,6 +1311,27 @@ def main() -> None:
                 assert reconciled_scenario.json()["status"] == (
                     "UNKNOWN" if expected == "UNKNOWN" else "FAILED"
                 )
+
+        exhausted_query = client.get(
+            f"{spring_url}/internal/compensation-simulator/{persistent_unknown_id}/reconciliation",
+            headers={**executor_headers, "Idempotency-Key": persistent_unknown_claim["idempotencyKey"]},
+        )
+        expect_status(exhausted_query, 200)
+        exhausted_reconciliation = client.post(
+            f"{spring_url}/internal/compensation-executions/{persistent_unknown_id}/reconciliations",
+            headers={**executor_headers, "Idempotency-Key": f"scenario-reconcile-{uuid.uuid4()}"},
+            json=exhausted_query.json(),
+        )
+        expect_status(exhausted_reconciliation, 409)
+
+        assignments_after_budget = client.get(
+            f"{spring_url}/internal/compensation-executions",
+            headers=executor_headers,
+        )
+        expect_status(assignments_after_budget, 200)
+        assert not any(
+            item["executionId"] == persistent_unknown_id for item in assignments_after_budget.json()
+        )
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert connection.execute(

@@ -31,7 +31,7 @@ public final class CompensationExecutionController {
     @GetMapping
     List<CompensationExecutionModels.Assignment> assignments(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
-        requireExecutor(authorization);
+        executorIdentity.require(authorization);
         return service.assignments(EXECUTOR_ID);
     }
 
@@ -40,7 +40,7 @@ public final class CompensationExecutionController {
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @PathVariable UUID executionId) {
-        requireExecutor(authorization);
+        executorIdentity.require(authorization);
         if (requestId == null || requestId.isBlank() || requestId.length() > 200) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "stable delivery identity required");
         }
@@ -55,7 +55,7 @@ public final class CompensationExecutionController {
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @PathVariable UUID executionId,
             @RequestBody(required = false) SuccessRequest body) {
-        requireExecutor(authorization);
+        executorIdentity.require(authorization);
         if (requestId == null || requestId.isBlank() || requestId.length() > 200
                 || body == null || body.attemptId() == null
                 || body.idempotencyKey() == null || body.idempotencyKey().isBlank()
@@ -73,7 +73,7 @@ public final class CompensationExecutionController {
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @PathVariable UUID executionId,
             @RequestBody(required = false) UnknownRequest body) {
-        requireExecutor(authorization);
+        executorIdentity.require(authorization);
         requireRequestId(requestId);
         if (body == null || body.attemptId() == null
                 || body.idempotencyKey() == null || body.idempotencyKey().isBlank()
@@ -91,7 +91,7 @@ public final class CompensationExecutionController {
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @PathVariable UUID executionId,
             @RequestBody(required = false) UnknownRequest body) {
-        requireExecutor(authorization);
+        executorIdentity.require(authorization);
         requireRequestId(requestId);
         if (body == null || body.attemptId() == null
                 || body.idempotencyKey() == null || body.idempotencyKey().isBlank()
@@ -109,7 +109,7 @@ public final class CompensationExecutionController {
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @PathVariable UUID executionId,
             @RequestBody(required = false) ReconciliationRequest body) {
-        requireExecutor(authorization);
+        executorIdentity.require(authorization);
         requireRequestId(requestId);
         if (body == null || body.queryId() == null || body.queryId().isBlank() || body.outcome() == null
                 || (body.outcome() == CompensationExecutionModels.ReconciliationOutcome.FOUND
@@ -125,10 +125,6 @@ public final class CompensationExecutionController {
         if (requestId == null || requestId.isBlank() || requestId.length() > 200) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "stable delivery identity required");
         }
-    }
-
-    private void requireExecutor(String authorization) {
-        executorIdentity.require(authorization);
     }
 
     record SuccessRequest(UUID attemptId, String idempotencyKey, String parameterDigest) {}
