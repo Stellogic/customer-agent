@@ -10,4 +10,6 @@ interface ApprovalService {
     ApprovalModels.ApprovalView view(ApprovalModels.ViewCommand command);
 
     ApprovalModels.ReleaseResult release(ApprovalModels.ReleaseCommand command);
+
+    ApprovalModels.RejectionResult reject(ApprovalModels.RejectionCommand command);
 }

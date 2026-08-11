@@ -20,6 +20,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class ApprovalControllerTest {
     private static final UUID REVISION_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
     private static final UUID LEASE_TOKEN = UUID.fromString("20000000-0000-0000-0000-000000000002");
+    private static final String CONTENT_DIGEST =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private final ApprovalService service = org.mockito.Mockito.mock(ApprovalService.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new ApprovalController(service)).build();
 
@@ -97,6 +99,42 @@ class ApprovalControllerTest {
                         .header("Idempotency-Key", "release-20"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.released").value(true));
+    }
+
+    @Test
+    void currentLeaseHolderRejectsTheBoundRevisionWithAnInternalReason() throws Exception {
+        when(service.reject(any())).thenReturn(new ApprovalModels.RejectionResult(
+                REVISION_ID, 1, "REJECTED", false));
+
+        mvc.perform(post("/api/approver/compensation-proposals/{revisionId}/reject", REVISION_ID)
+                        .header("X-Synthetic-Approver-Id", "approver-demo")
+                        .header("X-Approval-Lease-Token", LEASE_TOKEN)
+                        .header("X-Approval-Lease-Version", "1")
+                        .header("Idempotency-Key", "decision-21")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"proposalRevision":1,"contentDigest":"%s","internalReason":"政策证据需要人工复核"}
+                                """.formatted(CONTENT_DIGEST)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.proposalRevisionId").value(REVISION_ID.toString()))
+                .andExpect(jsonPath("$.proposalRevision").value(1))
+                .andExpect(jsonPath("$.decision").value("REJECTED"))
+                .andExpect(jsonPath("$.replayed").value(false))
+                .andExpect(jsonPath("$.internalReason").doesNotExist());
+    }
+
+    @Test
+    void rejectionRequiresANonEmptyInternalReasonBeforeCallingTheService() throws Exception {
+        mvc.perform(post("/api/approver/compensation-proposals/{revisionId}/reject", REVISION_ID)
+                        .header("X-Synthetic-Approver-Id", "approver-demo")
+                        .header("X-Approval-Lease-Token", LEASE_TOKEN)
+                        .header("X-Approval-Lease-Version", "1")
+                        .header("Idempotency-Key", "decision-21-empty")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"proposalRevision":1,"contentDigest":"%s","internalReason":"   "}
+                                """.formatted(CONTENT_DIGEST)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

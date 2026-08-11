@@ -57,4 +57,20 @@ final class ApprovalModels {
             String approverId, UUID revisionId, UUID leaseToken, long leaseVersion, String requestId) {}
 
     record ReleaseResult(UUID proposalRevisionId, boolean released, boolean replayed) {}
+
+    record RejectionCommand(
+            String approverId,
+            UUID revisionId,
+            int proposalRevision,
+            String contentDigest,
+            UUID leaseToken,
+            long leaseVersion,
+            String requestId,
+            String internalReason) {}
+
+    record RejectionResult(
+            UUID proposalRevisionId,
+            int proposalRevision,
+            String decision,
+            boolean replayed) {}
 }

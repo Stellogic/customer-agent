@@ -72,6 +72,28 @@ public final class ApprovalController {
                 requireRequestId(requestId)));
     }
 
+    @PostMapping("/{revisionId}/reject")
+    ApprovalModels.RejectionResult reject(
+            @RequestHeader(value = "X-Synthetic-Approver-Id", required = false) String approverId,
+            @RequestHeader(value = "X-Approval-Lease-Token", required = false) UUID leaseToken,
+            @RequestHeader(value = "X-Approval-Lease-Version", required = false) Long leaseVersion,
+            @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
+            @PathVariable UUID revisionId,
+            @RequestBody(required = false) RejectionRequest body) {
+        if (leaseToken == null || leaseVersion == null || leaseVersion < 1) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "current approval lease required");
+        }
+        if (body == null || body.proposalRevision() == null || body.proposalRevision() < 1
+                || body.contentDigest() == null || !body.contentDigest().matches("[0-9a-f]{64}")
+                || body.internalReason() == null || body.internalReason().isBlank()
+                || body.internalReason().trim().length() > 1000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "valid rejection decision required");
+        }
+        return service.reject(new ApprovalModels.RejectionCommand(
+                requireApprover(approverId), revisionId, body.proposalRevision(), body.contentDigest(),
+                leaseToken, leaseVersion, requireRequestId(requestId), body.internalReason().trim()));
+    }
+
     private static String requireApprover(String approverId) {
         if (approverId == null || !SyntheticApprovers.contains(approverId.trim())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "approver identity required");
@@ -87,4 +109,6 @@ public final class ApprovalController {
     }
 
     record ClaimRequest(Integer requestedLeaseSeconds) {}
+
+    record RejectionRequest(Integer proposalRevision, String contentDigest, String internalReason) {}
 }
