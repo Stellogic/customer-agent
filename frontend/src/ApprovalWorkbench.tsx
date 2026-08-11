@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { hasOnlyKeys, isRecord, parseSseEvent, parseViewCursor, type SseEvent } from "./streamProtocol";
 
 const APPROVAL_SCHEMA = "approval-view-v1" as const;
 
@@ -32,20 +33,23 @@ type ApprovalSnapshot = {
   leaseExpiresAt: string;
   proposalExpiresAt: string;
 };
-type StreamEvent = { id: string; type: string; data: string };
 
 export function ApprovalWorkbench({ approverId }: { approverId: string }) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [snapshot, setSnapshot] = useState<ApprovalSnapshot | null>(null);
   const [status, setStatus] = useState("正在读取待审批队列…");
   const streamController = useRef<AbortController | null>(null);
+  const reconnectTimer = useRef<number | null>(null);
   const activeLease = useRef<Lease | null>(null);
   const headers = { "X-Synthetic-Approver-Id": approverId };
 
   useEffect(() => {
     globalThis.history.replaceState(null, "", "/approver");
     void loadQueue();
-    return () => streamController.current?.abort();
+    return () => {
+      streamController.current?.abort();
+      if (reconnectTimer.current !== null) globalThis.clearTimeout(reconnectTimer.current);
+    };
   }, []);
 
   async function loadQueue() {
@@ -88,7 +92,10 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
       const response = await fetch(`/api/approver/compensation-proposals/${lease.proposalRevisionId}/approval-view`, {
         headers: leaseHeaders(lease), credentials: "same-origin", cache: "no-store",
       });
-      if (!response.ok) throw new Error("approval authority ended");
+      if (!response.ok) {
+        revokeLocalAuthority("审批责任已结束，证据和操作已移除。");
+        return;
+      }
       const value = await response.json() as unknown;
       if (!isApprovalSnapshot(value) || value.leaseToken !== lease.leaseToken
         || value.leaseVersion !== lease.leaseVersion || value.proposalRevisionId !== lease.proposalRevisionId) {
@@ -98,7 +105,7 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
       setStatus("审批证据已与 Spring 权威状态同步");
       void consumeEvents(lease, value.cursor);
     } catch {
-      revokeLocalAuthority("审批责任已结束，证据和操作已移除。");
+      scheduleRecovery(lease);
     }
   }
 
@@ -127,7 +134,7 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
           const block = buffer.slice(0, boundary);
           const separator = buffer.slice(boundary).match(/^\r?\n\r?\n/)?.[0].length ?? 2;
           buffer = buffer.slice(boundary + separator);
-          const event = parseEvent(block);
+          const event = parseSseEvent(block);
           if (event && !validEvent(event, lease, cursor)) {
             controller.abort();
             await loadApprovalView(lease);
@@ -138,10 +145,19 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
         }
         if (done) break;
       }
-      revokeLocalAuthority("审批连接已结束，证据和操作已移除。");
+      scheduleRecovery(lease);
     } catch {
-      if (!controller.signal.aborted) revokeLocalAuthority("审批连接已断开，证据和操作已移除。");
+      if (!controller.signal.aborted) scheduleRecovery(lease);
     }
+  }
+
+  function scheduleRecovery(lease: Lease) {
+    if (activeLease.current?.leaseToken !== lease.leaseToken || reconnectTimer.current !== null) return;
+    setStatus("审批连接已断开；正在按当前租约重新校验权威快照…");
+    reconnectTimer.current = globalThis.setTimeout(() => {
+      reconnectTimer.current = null;
+      if (activeLease.current?.leaseToken === lease.leaseToken) void loadApprovalView(lease);
+    }, 250);
   }
 
   async function decide(decision: "approve" | "reject") {
@@ -167,6 +183,8 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
   function revokeLocalAuthority(message: string) {
     streamController.current?.abort();
     streamController.current = null;
+    if (reconnectTimer.current !== null) globalThis.clearTimeout(reconnectTimer.current);
+    reconnectTimer.current = null;
     activeLease.current = null;
     setSnapshot(null);
     setStatus(message);
@@ -236,7 +254,7 @@ function isApprovalSnapshot(value: unknown): value is ApprovalSnapshot {
     && typeof value.compensationMethod === "string" && typeof value.authoritativeAmount === "number"
     && Number.isSafeInteger(value.proposalRevision) && typeof value.contentDigest === "string";
 }
-function validEvent(event: StreamEvent, lease: Lease, cursor: string) {
+function validEvent(event: SseEvent, lease: Lease, cursor: string) {
   const current = parseCursor(cursor); const next = parseCursor(event.id);
   if (!current || !next) return false;
   if (next.sequence <= current.sequence) return true;
@@ -252,28 +270,8 @@ function validEvent(event: StreamEvent, lease: Lease, cursor: string) {
   } catch { return false; }
 }
 function parseCursor(value: string) {
-  const separator = value.lastIndexOf(":");
-  if (separator < 1 || value.slice(0, separator) !== APPROVAL_SCHEMA) return null;
-  const sequence = value.slice(separator + 1);
-  return /^(0|[1-9]\d*)$/.test(sequence) && Number.isSafeInteger(Number(sequence))
-    ? { sequence: Number(sequence) } : null;
-}
-function parseEvent(block: string): StreamEvent | null {
-  let id = ""; let type = "message"; const data: string[] = [];
-  for (const line of block.split(/\r?\n/)) {
-    if (line.startsWith(":")) continue;
-    if (line.startsWith("id:")) id = line.slice(3).trimStart();
-    else if (line.startsWith("event:")) type = line.slice(6).trimStart();
-    else if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
-  }
-  return id && data.length ? { id, type, data: data.join("\n") } : null;
+  return parseViewCursor(value, APPROVAL_SCHEMA);
 }
 function isUuid(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
-}
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function hasOnlyKeys(value: Record<string, unknown>, keys: string[]) {
-  return Object.keys(value).every((key) => keys.includes(key));
 }

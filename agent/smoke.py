@@ -485,12 +485,31 @@ def main() -> None:
         )
         expect_status(incompatible_cursor, 409)
 
+        connected_approval_stream = threading.Event()
+
+        def observe_approval_stream_until_revoked() -> bool:
+            with httpx.Client(timeout=20.0) as stream_client:
+                with stream_client.stream(
+                    "GET",
+                    f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view/events",
+                    headers={**lease_headers, "Last-Event-ID": approval_projection["cursor"]},
+                ) as response:
+                    expect_status(response, 200)
+                    for line in response.iter_lines():
+                        if line == ":connected":
+                            connected_approval_stream.set()
+                return True
+
         release_request = f"issue-20-release-{uuid.uuid4()}"
-        released = client.post(
-            f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/release",
-            headers={**lease_headers, "Idempotency-Key": release_request},
-        )
-        expect_status(released, 200)
+        with ThreadPoolExecutor(max_workers=1) as stream_executor:
+            stream_closed = stream_executor.submit(observe_approval_stream_until_revoked)
+            assert connected_approval_stream.wait(timeout=5), "approval SSE did not establish"
+            released = client.post(
+                f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/release",
+                headers={**lease_headers, "Idempotency-Key": release_request},
+            )
+            expect_status(released, 200)
+            assert stream_closed.result(timeout=5) is True
         assert released.json() == {
             "proposalRevisionId": str(first_revision_id), "released": True, "replayed": False
         }

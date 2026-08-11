@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { hasOnlyKeys, isRecord, parseSseEvent, parseViewCursor, type SseEvent } from "./streamProtocol";
 
 const SUPPORT_SCHEMA = "support-workbench-v1" as const;
 const lifecycleStates = ["NEW", "INVESTIGATING", "WAITING_FOR_CUSTOMER", "WAITING_FOR_EXTERNAL", "RESOLVED", "CLOSED"] as const;
@@ -21,7 +22,6 @@ type WorkbenchSnapshot = {
   escalationQueue: QueueItem[];
 };
 
-type StreamEvent = { id: string; type: string; data: string };
 type EventEnvelope = {
   view: "SUPPORT_WORKBENCH";
   schema: typeof SUPPORT_SCHEMA;
@@ -89,7 +89,7 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
           const block = buffer.slice(0, boundary);
           const separator = buffer.slice(boundary).match(/^\r?\n\r?\n/)?.[0].length ?? 2;
           buffer = buffer.slice(boundary + separator);
-          const event = parseEvent(block);
+          const event = parseSseEvent(block);
           if (event && !applyEvent(event)) {
             await recoverFromSnapshot(controller);
             return;
@@ -112,7 +112,7 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
     await loadSnapshot("resetting");
   }
 
-  function applyEvent(event: StreamEvent) {
+  function applyEvent(event: SseEvent) {
     const current = snapshotRef.current;
     if (!current) return false;
     const currentCursor = parseCursor(current.cursor);
@@ -282,25 +282,7 @@ function isHandlingMode(value: unknown): value is HandlingMode {
 }
 
 function parseCursor(cursor: string) {
-  const separator = cursor.lastIndexOf(":");
-  if (separator < 1 || cursor.slice(0, separator) !== SUPPORT_SCHEMA) return null;
-  const sequence = cursor.slice(separator + 1);
-  return /^(0|[1-9]\d*)$/.test(sequence) && Number.isSafeInteger(Number(sequence))
-    ? { epoch: SUPPORT_SCHEMA, sequence: Number(sequence) }
-    : null;
-}
-
-function parseEvent(block: string): StreamEvent | null {
-  let id = "";
-  let type = "message";
-  const data: string[] = [];
-  for (const line of block.split(/\r?\n/)) {
-    if (line.startsWith(":")) continue;
-    if (line.startsWith("id:")) id = line.slice(3).trimStart();
-    else if (line.startsWith("event:")) type = line.slice(6).trimStart();
-    else if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
-  }
-  return id && data.length ? { id, type, data: data.join("\n") } : null;
+  return parseViewCursor(cursor, SUPPORT_SCHEMA);
 }
 
 function upsertAndSort(items: QueueItem[], item: QueueItem) {
@@ -328,12 +310,4 @@ function formatTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(instant);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function hasOnlyKeys(value: Record<string, unknown>, keys: string[]) {
-  return Object.keys(value).every((key) => keys.includes(key));
 }
