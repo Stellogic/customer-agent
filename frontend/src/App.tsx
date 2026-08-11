@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { hasOnlyKeys, isRecord, parseSseEvent, parseViewCursor, type SseEvent } from "./streamProtocol";
+import { consumeSseEvents, hasOnlyKeys, isRecord, parseViewCursor, type SseEvent } from "./streamProtocol";
 
 const CUSTOMER_PUBLIC_SCHEMA = "customer-public-v1" as const;
 
@@ -174,28 +174,11 @@ export function App() {
         signal: controller.signal,
       });
       if (!response.ok) throw new Error("event stream failed");
-      const reader = response.body?.getReader();
-      if (reader) {
-        const decoder = new TextDecoder();
-        let buffer = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          buffer += decoder.decode(value, { stream: !done });
-          let boundary = buffer.search(/\r?\n\r?\n/);
-          while (boundary >= 0) {
-            const block = buffer.slice(0, boundary);
-            const separator = buffer.slice(boundary).match(/^\r?\n\r?\n/)?.[0].length ?? 2;
-            buffer = buffer.slice(boundary + separator);
-            const event = parseSseEvent(block);
-            if (event && !applyPublicEvent(event)) {
-              controller.abort();
-              await loadTicket(ticketId);
-              return;
-            }
-            boundary = buffer.search(/\r?\n\r?\n/);
-          }
-          if (done) break;
-        }
+      const compatible = await consumeSseEvents(response.body, applyPublicEvent);
+      if (!compatible) {
+        controller.abort();
+        await loadTicket(ticketId);
+        return;
       }
     } catch {
       // The authoritative snapshot remains committed and readable after a stream failure.

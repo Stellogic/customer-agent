@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { hasOnlyKeys, isRecord, parseSseEvent, parseViewCursor, type SseEvent } from "./streamProtocol";
+import { consumeSseEvents, hasOnlyKeys, isRecord, parseViewCursor, type SseEvent } from "./streamProtocol";
 
 const SUPPORT_SCHEMA = "support-workbench-v1" as const;
 const lifecycleStates = ["NEW", "INVESTIGATING", "WAITING_FOR_CUSTOMER", "WAITING_FOR_EXTERNAL", "RESOLVED", "CLOSED"] as const;
@@ -77,26 +77,10 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
         return;
       }
       if (!response.ok) throw new Error("event stream failed");
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("event stream body missing");
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        buffer += decoder.decode(value, { stream: !done });
-        let boundary = buffer.search(/\r?\n\r?\n/);
-        while (boundary >= 0) {
-          const block = buffer.slice(0, boundary);
-          const separator = buffer.slice(boundary).match(/^\r?\n\r?\n/)?.[0].length ?? 2;
-          buffer = buffer.slice(boundary + separator);
-          const event = parseSseEvent(block);
-          if (event && !applyEvent(event)) {
-            await recoverFromSnapshot(controller);
-            return;
-          }
-          boundary = buffer.search(/\r?\n\r?\n/);
-        }
-        if (done) break;
+      const compatible = await consumeSseEvents(response.body, applyEvent);
+      if (!compatible) {
+        await recoverFromSnapshot(controller);
+        return;
       }
     } catch {
       // The last snapshot stays visible but is explicitly marked stale.

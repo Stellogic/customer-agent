@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { hasOnlyKeys, isRecord, parseSseEvent, parseViewCursor, type SseEvent } from "./streamProtocol";
+import { consumeSseEvents, hasOnlyKeys, isRecord, parseViewCursor, type SseEvent } from "./streamProtocol";
 
 const APPROVAL_SCHEMA = "approval-view-v1" as const;
 
@@ -122,28 +122,16 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
         return;
       }
       if (response.status === 409) { await loadApprovalView(lease); return; }
-      if (!response.ok || !response.body) throw new Error("stream unavailable");
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        buffer += decoder.decode(value, { stream: !done });
-        let boundary = buffer.search(/\r?\n\r?\n/);
-        while (boundary >= 0) {
-          const block = buffer.slice(0, boundary);
-          const separator = buffer.slice(boundary).match(/^\r?\n\r?\n/)?.[0].length ?? 2;
-          buffer = buffer.slice(boundary + separator);
-          const event = parseSseEvent(block);
-          if (event && !validEvent(event, lease, cursor)) {
-            controller.abort();
-            await loadApprovalView(lease);
-            return;
-          }
-          if (event) cursor = event.id;
-          boundary = buffer.search(/\r?\n\r?\n/);
-        }
-        if (done) break;
+      if (!response.ok) throw new Error("stream unavailable");
+      const compatible = await consumeSseEvents(response.body, (event) => {
+        if (!validEvent(event, lease, cursor)) return false;
+        cursor = event.id;
+        return true;
+      });
+      if (!compatible) {
+        controller.abort();
+        await loadApprovalView(lease);
+        return;
       }
       scheduleRecovery(lease);
     } catch {
@@ -153,6 +141,8 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
 
   function scheduleRecovery(lease: Lease) {
     if (activeLease.current?.leaseToken !== lease.leaseToken || reconnectTimer.current !== null) return;
+    setSnapshot(null);
+    globalThis.history.replaceState(null, "", "/approver");
     setStatus("审批连接已断开；正在按当前租约重新校验权威快照…");
     reconnectTimer.current = globalThis.setTimeout(() => {
       reconnectTimer.current = null;

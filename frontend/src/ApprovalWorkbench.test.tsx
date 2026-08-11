@@ -30,6 +30,8 @@ describe("审批视图授权撤销", () => {
     expect(await screen.findByText("order:ORDER-DELAY-001")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "批准补偿" })).toBeInTheDocument();
     closeStream?.();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "批准补偿" })).not.toBeInTheDocument());
+    expect(screen.queryByText("order:ORDER-DELAY-001")).not.toBeInTheDocument();
     expect(await screen.findByRole("heading", { level: 1, name: "待审批补偿" })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("order:ORDER-DELAY-001")).not.toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "批准补偿" })).not.toBeInTheDocument();
@@ -54,6 +56,7 @@ describe("审批视图授权撤销", () => {
     expect(await screen.findByText("order:ORDER-DELAY-001")).toBeInTheDocument();
     closeStream?.();
     expect(await screen.findByText("审批连接已断开；正在按当前租约重新校验权威快照…")).toBeInTheDocument();
+    expect(screen.queryByText("order:ORDER-DELAY-001")).not.toBeInTheDocument();
     await waitFor(() => expect(vi.mocked(globalThis.fetch).mock.calls.filter(([input]) =>
       String(input).endsWith("/approval-view"))).toHaveLength(2));
     expect(screen.getByText("order:ORDER-DELAY-001")).toBeInTheDocument();
