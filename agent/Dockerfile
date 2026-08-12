@@ -13,6 +13,7 @@ COPY src ./src
 COPY tests ./tests
 
 FROM base AS test
+COPY smoke.py ./
 RUN uv run ruff format --check . \
     && uv run ruff check . \
     && uv run pyright \
