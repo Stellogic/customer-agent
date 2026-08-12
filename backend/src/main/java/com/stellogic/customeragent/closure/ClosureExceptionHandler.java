@@ -16,7 +16,8 @@ final class ClosureExceptionHandler {
 
     @ExceptionHandler(InvalidClosureRequestException.class)
     ResponseEntity<Map<String, String>> invalid(InvalidClosureRequestException exception) {
-        return ResponseEntity.badRequest().body(Map.of("code", "INVALID_REQUEST", "message", exception.getMessage()));
+        return ResponseEntity.badRequest()
+                .body(Map.of("code", "INVALID_REQUEST", "message", exception.getMessage()));
     }
 
     @ExceptionHandler(ClosureTicketNotFoundException.class)

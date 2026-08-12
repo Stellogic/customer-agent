@@ -16,9 +16,10 @@ final class ExecutorMachineIdentity {
     }
 
     void require(String authorization) {
-        byte[] actual = authorization != null && authorization.startsWith("Bearer ")
-                ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
-                : new byte[0];
+        byte[] actual =
+                authorization != null && authorization.startsWith("Bearer ")
+                        ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
+                        : new byte[0];
         if (!MessageDigest.isEqual(actual, token)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "executor identity required");
         }

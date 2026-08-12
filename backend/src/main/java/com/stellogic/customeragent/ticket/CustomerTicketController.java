@@ -21,7 +21,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RequestMapping("/api/customer/tickets")
 public final class CustomerTicketController {
     static final String CUSTOMER_HEADER = "X-Synthetic-Customer-Id";
-    private static final Set<String> SYNTHETIC_CUSTOMERS = Set.of("customer-demo", "customer-other-demo");
+    private static final Set<String> SYNTHETIC_CUSTOMERS =
+            Set.of("customer-demo", "customer-other-demo");
     private final CustomerTicketService service;
 
     public CustomerTicketController(CustomerTicketService service) {
@@ -37,9 +38,14 @@ public final class CustomerTicketController {
         requireText(requestId, "缺少稳定请求身份");
         requireText(request.orderReference(), "缺少订单编号");
         requireText(request.description(), "缺少问题描述");
-        var result = service.create(new CreateCustomerTicket(
-                customerId.trim(), requestId.trim(), request.orderReference().trim(), request.description().trim(),
-                "LOGISTICS_DELAY"));
+        var result =
+                service.create(
+                        new CreateCustomerTicket(
+                                customerId.trim(),
+                                requestId.trim(),
+                                request.orderReference().trim(),
+                                request.description().trim(),
+                                "LOGISTICS_DELAY"));
         return ResponseEntity.status(result.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .body(new CreateTicketResponse(result.ticketId(), true, result.replayed()));
     }
@@ -60,7 +66,10 @@ public final class CustomerTicketController {
         requireIdentity(customerId);
         String owner = customerId.trim();
         return AuthorizedSsePollingStream.open(
-                "customer-ticket-events-" + ticketId, 250, 60_000L, cursor,
+                "customer-ticket-events-" + ticketId,
+                250,
+                60_000L,
+                cursor,
                 new AuthorizedSsePollingStream.Source<CustomerPublicEvent>() {
                     @Override
                     public List<CustomerPublicEvent> events(String afterCursor) {
@@ -79,7 +88,10 @@ public final class CustomerTicketController {
 
                     @Override
                     public SseEmitter.SseEventBuilder render(CustomerPublicEvent event) {
-                        return SseEmitter.event().id(event.cursor()).name(event.type()).data(event.publicData());
+                        return SseEmitter.event()
+                                .id(event.cursor())
+                                .name(event.type())
+                                .data(event.publicData());
                     }
                 });
     }
@@ -101,7 +113,11 @@ public final class CustomerTicketController {
     record CreateTicketResponse(UUID ticketId, boolean accepted, boolean replayed) {}
 
     record SnapshotResponse(
-            String view, String schema, String cursor, Ticket ticket, List<PublicMessage> messages,
+            String view,
+            String schema,
+            String cursor,
+            Ticket ticket,
+            List<PublicMessage> messages,
             CurrentClarification clarification) {
         static SnapshotResponse from(CustomerPublicSnapshot snapshot) {
             return new SnapshotResponse(
@@ -121,6 +137,10 @@ public final class CustomerTicketController {
     }
 
     record Ticket(
-            UUID id, String lifecycleState, String handlingMode, long agentGeneration,
-            Instant createdAt, Instant firstRespondedAt) {}
+            UUID id,
+            String lifecycleState,
+            String handlingMode,
+            long agentGeneration,
+            Instant createdAt,
+            Instant firstRespondedAt) {}
 }

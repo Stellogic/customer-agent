@@ -17,15 +17,17 @@ class AgentSubmissionStore {
 
     @Transactional
     Optional<PendingSubmission> claim() {
-        List<PendingSubmission> pending = jdbc.query(
-                "select s.submission_request_id, s.generation_id, g.ticket_id, s.thread_id "
-                        + "from agent_submission s join agent_processing_generation g on g.id = s.generation_id "
-                        + "where s.status in ('PENDING', 'RETRY', 'SUBMITTING', 'SUBMITTED') "
-                        + "and s.next_attempt_at <= current_timestamp "
-                        + "and g.status = 'ACTIVE' order by s.created_at for update skip locked limit 1",
-                (rs, row) -> new PendingSubmission(
-                        rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
-                        rs.getObject(3, UUID.class), rs.getObject(4, UUID.class)));
+        List<PendingSubmission> pending =
+                jdbc.query(
+                        "select s.submission_request_id, s.generation_id, g.ticket_id, s.thread_id "
+                                + "from agent_submission s join agent_processing_generation g on g.id = s.generation_id "
+                                + "where s.status in ('PENDING', 'RETRY', 'SUBMITTING', 'SUBMITTED') "
+                                + "and s.next_attempt_at <= current_timestamp "
+                                + "and g.status = 'ACTIVE' order by s.created_at for update skip locked limit 1",
+                        (rs, row) ->
+                                new PendingSubmission(
+                                        rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
+                                        rs.getObject(3, UUID.class), rs.getObject(4, UUID.class)));
         if (pending.isEmpty()) return Optional.empty();
         PendingSubmission submission = pending.getFirst();
         jdbc.update(
@@ -46,16 +48,17 @@ class AgentSubmissionStore {
 
     @Transactional
     void retry(UUID submissionRequestId, String error) {
-        String bounded = error == null ? "unknown submission response" : error.substring(0, Math.min(error.length(), 500));
+        String bounded =
+                error == null
+                        ? "unknown submission response"
+                        : error.substring(0, Math.min(error.length(), 500));
         jdbc.update(
                 "update agent_submission set status = 'RETRY', next_attempt_at = current_timestamp + interval '1 second', "
                         + "last_error = ? where submission_request_id = ? and status <> 'COMPLETED'",
-                bounded, submissionRequestId);
+                bounded,
+                submissionRequestId);
     }
 
     record PendingSubmission(
-            UUID submissionRequestId,
-            UUID generationId,
-            UUID ticketId,
-            UUID threadId) {}
+            UUID submissionRequestId, UUID generationId, UUID ticketId, UUID threadId) {}
 }

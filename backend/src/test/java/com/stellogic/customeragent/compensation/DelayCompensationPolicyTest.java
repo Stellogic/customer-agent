@@ -16,8 +16,12 @@ class DelayCompensationPolicyTest {
     @ParameterizedTest
     @MethodSource("tiers")
     void policyTiersAreMutuallyExclusiveAtEveryBoundary(
-            Duration delay, boolean eligible, DelayCompensationPolicy.Method method, String amount) {
-        DelayCompensationPolicy.Decision decision = policy.evaluate(delay, new BigDecimal("268.00"));
+            Duration delay,
+            boolean eligible,
+            DelayCompensationPolicy.Method method,
+            String amount) {
+        DelayCompensationPolicy.Decision decision =
+                policy.evaluate(delay, new BigDecimal("268.00"));
 
         assertThat(decision.eligible()).isEqualTo(eligible);
         assertThat(decision.method()).isEqualTo(method);
@@ -26,16 +30,42 @@ class DelayCompensationPolicyTest {
 
     static Stream<Arguments> tiers() {
         return Stream.of(
-                Arguments.of(Duration.ofHours(24).minusNanos(1), false, DelayCompensationPolicy.Method.NONE, "0.00"),
-                Arguments.of(Duration.ofHours(24), true, DelayCompensationPolicy.Method.COUPON, "10.00"),
-                Arguments.of(Duration.ofHours(24).plusNanos(1), true, DelayCompensationPolicy.Method.COUPON, "10.00"),
-                Arguments.of(Duration.ofHours(48).minusNanos(1), true, DelayCompensationPolicy.Method.COUPON, "10.00"),
-                Arguments.of(Duration.ofHours(48), true, DelayCompensationPolicy.Method.COUPON, "20.00"),
-                Arguments.of(Duration.ofHours(48).plusNanos(1), true, DelayCompensationPolicy.Method.COUPON, "20.00"),
-                Arguments.of(Duration.ofHours(72).minusNanos(1), true, DelayCompensationPolicy.Method.COUPON, "20.00"),
-                Arguments.of(Duration.ofHours(72), true, DelayCompensationPolicy.Method.COUPON, "20.00"),
-                Arguments.of(Duration.ofHours(72).plusNanos(1), true,
-                        DelayCompensationPolicy.Method.SIMULATED_PARTIAL_REFUND, "26.80"));
+                Arguments.of(
+                        Duration.ofHours(24).minusNanos(1),
+                        false,
+                        DelayCompensationPolicy.Method.NONE,
+                        "0.00"),
+                Arguments.of(
+                        Duration.ofHours(24), true, DelayCompensationPolicy.Method.COUPON, "10.00"),
+                Arguments.of(
+                        Duration.ofHours(24).plusNanos(1),
+                        true,
+                        DelayCompensationPolicy.Method.COUPON,
+                        "10.00"),
+                Arguments.of(
+                        Duration.ofHours(48).minusNanos(1),
+                        true,
+                        DelayCompensationPolicy.Method.COUPON,
+                        "10.00"),
+                Arguments.of(
+                        Duration.ofHours(48), true, DelayCompensationPolicy.Method.COUPON, "20.00"),
+                Arguments.of(
+                        Duration.ofHours(48).plusNanos(1),
+                        true,
+                        DelayCompensationPolicy.Method.COUPON,
+                        "20.00"),
+                Arguments.of(
+                        Duration.ofHours(72).minusNanos(1),
+                        true,
+                        DelayCompensationPolicy.Method.COUPON,
+                        "20.00"),
+                Arguments.of(
+                        Duration.ofHours(72), true, DelayCompensationPolicy.Method.COUPON, "20.00"),
+                Arguments.of(
+                        Duration.ofHours(72).plusNanos(1),
+                        true,
+                        DelayCompensationPolicy.Method.SIMULATED_PARTIAL_REFUND,
+                        "26.80"));
     }
 
     @Test

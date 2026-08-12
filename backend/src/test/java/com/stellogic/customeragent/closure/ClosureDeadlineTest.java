@@ -10,7 +10,9 @@ class ClosureDeadlineTest {
 
     @Test
     void sameIssueReplyOneInstantBeforeDeadlineCanReopen() {
-        assertThat(ClosureDeadline.isOpen(RESOLVED_AT, Instant.parse("2026-08-11T23:59:59.999999999Z")))
+        assertThat(
+                        ClosureDeadline.isOpen(
+                                RESOLVED_AT, Instant.parse("2026-08-11T23:59:59.999999999Z")))
                 .isTrue();
     }
 
@@ -18,7 +20,9 @@ class ClosureDeadlineTest {
     void deadlineIsClosedAtExactlySeventyTwoHoursAndAfterwards() {
         assertThat(ClosureDeadline.isOpen(RESOLVED_AT, Instant.parse("2026-08-12T00:00:00Z")))
                 .isFalse();
-        assertThat(ClosureDeadline.isOpen(RESOLVED_AT, Instant.parse("2026-08-12T00:00:00.000000001Z")))
+        assertThat(
+                        ClosureDeadline.isOpen(
+                                RESOLVED_AT, Instant.parse("2026-08-12T00:00:00.000000001Z")))
                 .isFalse();
     }
 }

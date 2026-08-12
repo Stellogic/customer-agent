@@ -7,7 +7,8 @@ interface CompensationExecutionService {
 
     CompensationExecutionModels.ClaimResult claim(CompensationExecutionModels.ClaimCommand command);
 
-    CompensationExecutionModels.SuccessResult succeed(CompensationExecutionModels.SuccessCommand command);
+    CompensationExecutionModels.SuccessResult succeed(
+            CompensationExecutionModels.SuccessCommand command);
 
     CompensationExecutionModels.TransitionResult markUnknown(
             CompensationExecutionModels.UnknownCommand command);

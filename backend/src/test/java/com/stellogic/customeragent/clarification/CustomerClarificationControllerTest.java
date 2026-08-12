@@ -17,19 +17,27 @@ class CustomerClarificationControllerTest {
     private static final UUID TICKET_ID = UUID.fromString("16000000-0000-0000-0000-000000000001");
     private static final UUID REQUEST_ID = UUID.fromString("16000000-0000-0000-0000-000000000002");
     private static final UUID RESUME_ID = UUID.fromString("16000000-0000-0000-0000-000000000003");
-    private final ClarificationService service = org.mockito.Mockito.mock(ClarificationService.class);
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new CustomerClarificationController(service)).build();
+    private final ClarificationService service =
+            org.mockito.Mockito.mock(ClarificationService.class);
+    private final MockMvc mvc =
+            MockMvcBuilders.standaloneSetup(new CustomerClarificationController(service)).build();
 
     @Test
     void currentReplyUsesStableMessageAndResumeIdentities() throws Exception {
-        when(service.reply(any())).thenReturn(new ClarificationReplyResult(RESUME_ID, AgentResumeStatus.PENDING, false));
+        when(service.reply(any()))
+                .thenReturn(
+                        new ClarificationReplyResult(RESUME_ID, AgentResumeStatus.PENDING, false));
 
-        mvc.perform(post("/api/customer/tickets/{ticketId}/clarifications/{requestId}/replies", TICKET_ID, REQUEST_ID)
-                        .header("X-Synthetic-Customer-Id", "customer-demo")
-                        .header("Idempotency-Key", "message-16")
-                        .header("X-Resume-Request-Id", RESUME_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"answer\":\"A\"}"))
+        mvc.perform(
+                        post(
+                                        "/api/customer/tickets/{ticketId}/clarifications/{requestId}/replies",
+                                        TICKET_ID,
+                                        REQUEST_ID)
+                                .header("X-Synthetic-Customer-Id", "customer-demo")
+                                .header("Idempotency-Key", "message-16")
+                                .header("X-Resume-Request-Id", RESUME_ID)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"answer\":\"A\"}"))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.resumeRequestId").value(RESUME_ID.toString()))
                 .andExpect(jsonPath("$.status").value("PENDING"))
@@ -39,10 +47,15 @@ class CustomerClarificationControllerTest {
     @Test
     void browserCanQueryAnUnknownResumeResponseByStableIdentity() throws Exception {
         when(service.status("customer-demo", TICKET_ID, RESUME_ID))
-                .thenReturn(new ClarificationReplyResult(RESUME_ID, AgentResumeStatus.SUBMITTED, true));
+                .thenReturn(
+                        new ClarificationReplyResult(RESUME_ID, AgentResumeStatus.SUBMITTED, true));
 
-        mvc.perform(get("/api/customer/tickets/{ticketId}/clarification-resumes/{resumeId}", TICKET_ID, RESUME_ID)
-                        .header("X-Synthetic-Customer-Id", "customer-demo"))
+        mvc.perform(
+                        get(
+                                        "/api/customer/tickets/{ticketId}/clarification-resumes/{resumeId}",
+                                        TICKET_ID,
+                                        RESUME_ID)
+                                .header("X-Synthetic-Customer-Id", "customer-demo"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUBMITTED"));
     }

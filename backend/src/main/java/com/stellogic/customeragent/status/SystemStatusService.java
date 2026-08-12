@@ -31,4 +31,3 @@ public final class SystemStatusService {
 
     public record SystemStatus(String status, Map<String, String> services) {}
 }
-

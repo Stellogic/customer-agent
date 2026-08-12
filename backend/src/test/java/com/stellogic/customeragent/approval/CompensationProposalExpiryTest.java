@@ -2,8 +2,8 @@ package com.stellogic.customeragent.approval;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.when;
 
@@ -31,8 +31,8 @@ class CompensationProposalExpiryTest {
                 .isEqualTo(now);
 
         InOrder order = inOrder(jdbc, clock);
-        order.verify(jdbc).query(
-                contains("for update"), any(RowMapper.class), eq("ORDER-DELAY-001"));
+        order.verify(jdbc)
+                .query(contains("for update"), any(RowMapper.class), eq("ORDER-DELAY-001"));
         order.verify(clock).instant();
     }
 }

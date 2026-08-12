@@ -31,29 +31,39 @@ final class AgentClarificationController {
     ClarificationRequestResult create(
             @PathVariable UUID ticketId,
             @PathVariable UUID generationId,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @RequestHeader(value = "X-Agent-Generation-Id", required = false) UUID scopedGenerationId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
+                    String authorization,
+            @RequestHeader(value = "X-Agent-Generation-Id", required = false)
+                    UUID scopedGenerationId,
             @RequestHeader(value = "X-Agent-Operation", required = false) String operation,
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @RequestBody CreateBody body) {
         requireScope(ticketId, generationId, scopedGenerationId, operation, authorization);
         if (requestId == null || requestId.isBlank() || requestId.length() > 200) {
             service.auditRejected(ticketId, "MISSING_CLARIFICATION_IDENTITY");
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing stable clarification identity");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "missing stable clarification identity");
         }
-        return service.create(new CreateClarification(ticketId, generationId, requestId, body.reasonCode()));
+        return service.create(
+                new CreateClarification(ticketId, generationId, requestId, body.reasonCode()));
     }
 
     private void requireScope(
-            UUID ticketId, UUID generationId, UUID scopedGenerationId, String operation, String authorization) {
-        byte[] actual = authorization != null && authorization.startsWith("Bearer ")
-                ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
-                : new byte[0];
+            UUID ticketId,
+            UUID generationId,
+            UUID scopedGenerationId,
+            String operation,
+            String authorization) {
+        byte[] actual =
+                authorization != null && authorization.startsWith("Bearer ")
+                        ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
+                        : new byte[0];
         if (!MessageDigest.isEqual(actual, agentToken)
                 || !generationId.equals(scopedGenerationId)
                 || !"CREATE_CUSTOMER_CLARIFICATION".equals(operation)) {
             service.auditRejected(ticketId, "CAPABILITY_SCOPE_REJECTED");
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "agent capability is outside the current scope");
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "agent capability is outside the current scope");
         }
     }
 

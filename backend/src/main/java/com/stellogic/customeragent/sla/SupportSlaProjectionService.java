@@ -20,8 +20,11 @@ class SupportSlaProjectionService {
         return jdbc.query(
                 "select ticket_id, objective, notified_at from support_sla_notification "
                         + "where support_id = ? order by notified_at, ticket_id, objective",
-                (rs, row) -> new SlaWarningNotification(
-                        rs.getObject(1, UUID.class), rs.getString(2), rs.getTimestamp(3).toInstant()),
+                (rs, row) ->
+                        new SlaWarningNotification(
+                                rs.getObject(1, UUID.class),
+                                rs.getString(2),
+                                rs.getTimestamp(3).toInstant()),
                 supportId);
     }
 
@@ -35,11 +38,15 @@ class SupportSlaProjectionService {
                         + "where q.reason_code = 'SLA_BREACH' "
                         + "group by q.ticket_id, t.lifecycle_state, t.handling_mode, q.reason_code, q.entered_at "
                         + "order by q.entered_at, q.ticket_id",
-                (rs, row) -> new SharedEscalationSummary(
-                        rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4),
-                        List.of((String[]) rs.getArray(6).getArray()), rs.getTimestamp(5).toInstant()));
+                (rs, row) ->
+                        new SharedEscalationSummary(
+                                rs.getObject(1, UUID.class),
+                                rs.getString(2),
+                                rs.getString(3),
+                                rs.getString(4),
+                                List.of((String[]) rs.getArray(6).getArray()),
+                                rs.getTimestamp(5).toInstant()));
     }
-
 }
 
 record SlaWarningNotification(UUID ticketId, String objective, Instant warnedAt) {}

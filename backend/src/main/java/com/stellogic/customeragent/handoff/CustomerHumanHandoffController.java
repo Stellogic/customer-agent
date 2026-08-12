@@ -16,7 +16,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/customer/tickets/{ticketId}")
 public final class CustomerHumanHandoffController {
-    private static final Set<String> SYNTHETIC_CUSTOMERS = Set.of("customer-demo", "customer-other-demo");
+    private static final Set<String> SYNTHETIC_CUSTOMERS =
+            Set.of("customer-demo", "customer-other-demo");
     private final HumanHandoffService service;
 
     CustomerHumanHandoffController(HumanHandoffService service) {
@@ -32,9 +33,12 @@ public final class CustomerHumanHandoffController {
         String owner = requireCustomer(customerId);
         requireText(requestId, "missing stable handoff identity");
         requireText(body.reasonCode(), "missing handoff reason");
-        HumanHandoffResult result = service.request(new RequestHumanHandoff(
-                owner, ticketId, requestId.trim(), body.reasonCode().trim()));
-        return ResponseEntity.status(result.replayed() ? HttpStatus.OK : HttpStatus.ACCEPTED).body(result);
+        HumanHandoffResult result =
+                service.request(
+                        new RequestHumanHandoff(
+                                owner, ticketId, requestId.trim(), body.reasonCode().trim()));
+        return ResponseEntity.status(result.replayed() ? HttpStatus.OK : HttpStatus.ACCEPTED)
+                .body(result);
     }
 
     @GetMapping("/human-handoff-requests/{requestId}")
@@ -48,7 +52,8 @@ public final class CustomerHumanHandoffController {
 
     private static String requireCustomer(String customerId) {
         if (customerId == null || !SYNTHETIC_CUSTOMERS.contains(customerId.trim())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "customer identity required");
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "customer identity required");
         }
         return customerId.trim();
     }

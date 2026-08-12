@@ -5,7 +5,11 @@ import java.util.List;
 import java.util.UUID;
 
 record CreateCustomerTicket(
-        String customerId, String requestId, String orderReference, String description, String issueKind) {}
+        String customerId,
+        String requestId,
+        String orderReference,
+        String description,
+        String issueKind) {}
 
 record TicketCreationResult(UUID ticketId, boolean replayed) {}
 
@@ -25,13 +29,19 @@ record CustomerPublicSnapshot(
         List<PublicMessage> messages,
         CurrentClarification clarification) {}
 
-record CustomerPublicEvent(String epoch, long sequence, long agentGeneration, String type, String jsonPayload) {
+record CustomerPublicEvent(
+        String epoch, long sequence, long agentGeneration, String type, String jsonPayload) {
     String cursor() {
         return epoch + ":" + sequence;
     }
 
     String publicData() {
-        return "{\"view\":\"CUSTOMER_PUBLIC\",\"schema\":\"" + epoch + "\",\"generation\":"
-                + agentGeneration + ",\"payload\":" + jsonPayload + "}";
+        return "{\"view\":\"CUSTOMER_PUBLIC\",\"schema\":\""
+                + epoch
+                + "\",\"generation\":"
+                + agentGeneration
+                + ",\"payload\":"
+                + jsonPayload
+                + "}";
     }
 }

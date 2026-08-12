@@ -20,4 +20,3 @@ public final class MigrationExit implements ApplicationRunner {
         context.close();
     }
 }
-

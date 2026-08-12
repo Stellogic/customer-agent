@@ -29,8 +29,12 @@ class AgentResumeDispatcher {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(3));
         factory.setReadTimeout(Duration.ofSeconds(5));
-        this.agent = RestClient.builder().baseUrl(baseUrl)
-                .defaultHeader("Authorization", "Bearer " + token).requestFactory(factory).build();
+        this.agent =
+                RestClient.builder()
+                        .baseUrl(baseUrl)
+                        .defaultHeader("Authorization", "Bearer " + token)
+                        .requestFactory(factory)
+                        .build();
     }
 
     @Scheduled(fixedDelayString = "${baseline.agent.resume-poll-delay:250}")
@@ -45,20 +49,37 @@ class AgentResumeDispatcher {
                 store.submitted(resume.resumeRequestId(), existing.runId());
                 return;
             }
-            String body = agent.post().uri("/threads/{threadId}/runs", resume.threadId())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of(
-                            "assistant_id", "baseline_agent",
-                            "if_not_exists", "reject",
-                            "metadata", Map.of(
-                                    "resume_request_id", resume.resumeRequestId().toString(),
-                                    "generation_id", resume.generationId().toString(),
-                                    "clarification_request_id", resume.clarificationRequestId().toString()),
-                            "command", Map.of("resume", Map.of(
-                                    "clarificationRequestId", resume.clarificationRequestId().toString(),
-                                    "answerDigest", resume.answerDigest(),
-                                    "answerSummary", resume.answerSummary()))))
-                    .retrieve().body(String.class);
+            String body =
+                    agent.post()
+                            .uri("/threads/{threadId}/runs", resume.threadId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(
+                                    Map.of(
+                                            "assistant_id",
+                                            "baseline_agent",
+                                            "if_not_exists",
+                                            "reject",
+                                            "metadata",
+                                            Map.of(
+                                                    "resume_request_id",
+                                                            resume.resumeRequestId().toString(),
+                                                    "generation_id",
+                                                            resume.generationId().toString(),
+                                                    "clarification_request_id",
+                                                            resume.clarificationRequestId()
+                                                                    .toString()),
+                                            "command",
+                                            Map.of(
+                                                    "resume",
+                                                    Map.of(
+                                                            "clarificationRequestId",
+                                                                    resume.clarificationRequestId()
+                                                                            .toString(),
+                                                            "answerDigest", resume.answerDigest(),
+                                                            "answerSummary",
+                                                                    resume.answerSummary()))))
+                            .retrieve()
+                            .body(String.class);
             JsonNode response = json.readTree(body == null ? "{}" : body);
             store.submitted(resume.resumeRequestId(), response.path("run_id").asText(null));
         } catch (RuntimeException exception) {
@@ -67,12 +88,18 @@ class AgentResumeDispatcher {
     }
 
     private ExistingRun findRun(AgentResumeStore.PendingResume resume) {
-        String body = agent.get()
-                .uri("/threads/{threadId}/runs?limit=100&select=metadata&select=run_id", resume.threadId())
-                .retrieve().body(String.class);
+        String body =
+                agent.get()
+                        .uri(
+                                "/threads/{threadId}/runs?limit=100&select=metadata&select=run_id",
+                                resume.threadId())
+                        .retrieve()
+                        .body(String.class);
         try {
             for (JsonNode run : json.readTree(body == null ? "[]" : body)) {
-                if (resume.resumeRequestId().toString().equals(run.path("metadata").path("resume_request_id").asText())) {
+                if (resume.resumeRequestId()
+                        .toString()
+                        .equals(run.path("metadata").path("resume_request_id").asText())) {
                     return new ExistingRun(run.path("run_id").asText(null));
                 }
             }

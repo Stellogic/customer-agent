@@ -21,12 +21,18 @@ public final class SyntheticIdentityController {
 
     @GetMapping("/identities")
     public List<SyntheticIdentity> identities() {
-        List<SyntheticIdentity> identities = new java.util.ArrayList<>(List.of(
-                new SyntheticIdentity("customer-demo", "CUSTOMER", "客户演示入口"),
-                new SyntheticIdentity("customer-other-demo", "CUSTOMER", "另一客户授权边界入口"),
-                new SyntheticIdentity("support-demo", "SUPPORT", "客服演示入口"),
-                new SyntheticIdentity("agent-machine", "AGENT", "受限 Agent 机器身份"),
-                new SyntheticIdentity("executor-machine", "COMPENSATION_EXECUTOR", "受限补偿执行器机器身份")));
+        List<SyntheticIdentity> identities =
+                new java.util.ArrayList<>(
+                        List.of(
+                                new SyntheticIdentity("customer-demo", "CUSTOMER", "客户演示入口"),
+                                new SyntheticIdentity(
+                                        "customer-other-demo", "CUSTOMER", "另一客户授权边界入口"),
+                                new SyntheticIdentity("support-demo", "SUPPORT", "客服演示入口"),
+                                new SyntheticIdentity("agent-machine", "AGENT", "受限 Agent 机器身份"),
+                                new SyntheticIdentity(
+                                        "executor-machine",
+                                        "COMPENSATION_EXECUTOR",
+                                        "受限补偿执行器机器身份")));
         SyntheticApprovers.entries().stream()
                 .map(entry -> new SyntheticIdentity(entry.id(), "APPROVER", entry.label()))
                 .forEach(identities::add);
@@ -35,11 +41,12 @@ public final class SyntheticIdentityController {
 
     @GetMapping("/enter/support")
     public ResponseEntity<Void> enterSupport() {
-        ResponseCookie cookie = ResponseCookie.from(SESSION_COOKIE, "support-demo")
-                .httpOnly(true)
-                .sameSite("Strict")
-                .path("/")
-                .build();
+        ResponseCookie cookie =
+                ResponseCookie.from(SESSION_COOKIE, "support-demo")
+                        .httpOnly(true)
+                        .sameSite("Strict")
+                        .path("/")
+                        .build();
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create("/support"))
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
@@ -51,11 +58,12 @@ public final class SyntheticIdentityController {
         if (!SyntheticApprovers.contains(approverId)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
-        ResponseCookie cookie = ResponseCookie.from(SESSION_COOKIE, approverId)
-                .httpOnly(true)
-                .sameSite("Strict")
-                .path("/")
-                .build();
+        ResponseCookie cookie =
+                ResponseCookie.from(SESSION_COOKIE, approverId)
+                        .httpOnly(true)
+                        .sameSite("Strict")
+                        .path("/")
+                        .build();
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create("/approver"))
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
@@ -71,8 +79,11 @@ public final class SyntheticIdentityController {
         return SyntheticApprovers.entries().stream()
                 .filter(entry -> entry.id().equals(sessionId))
                 .findFirst()
-                .<ResponseEntity<SyntheticIdentity>>map(entry -> ResponseEntity.ok(
-                        new SyntheticIdentity(entry.id(), "APPROVER", entry.label())))
+                .<ResponseEntity<SyntheticIdentity>>map(
+                        entry ->
+                                ResponseEntity.ok(
+                                        new SyntheticIdentity(
+                                                entry.id(), "APPROVER", entry.label())))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 

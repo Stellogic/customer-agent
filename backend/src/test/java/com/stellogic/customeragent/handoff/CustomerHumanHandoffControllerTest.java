@@ -16,17 +16,20 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class CustomerHumanHandoffControllerTest {
     private static final UUID TICKET_ID = UUID.fromString("18000000-0000-0000-0000-000000000001");
     private final HumanHandoffService service = org.mockito.Mockito.mock(HumanHandoffService.class);
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new CustomerHumanHandoffController(service)).build();
+    private final MockMvc mvc =
+            MockMvcBuilders.standaloneSetup(new CustomerHumanHandoffController(service)).build();
 
     @Test
     void customerRequestsHumanHandlingWithAStableIdentity() throws Exception {
-        when(service.request(any())).thenReturn(new HumanHandoffResult("handoff-18", "HUMAN", false));
+        when(service.request(any()))
+                .thenReturn(new HumanHandoffResult("handoff-18", "HUMAN", false));
 
-        mvc.perform(post("/api/customer/tickets/{ticketId}/human-handoff", TICKET_ID)
-                        .header("X-Synthetic-Customer-Id", "customer-demo")
-                        .header("Idempotency-Key", "handoff-18")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reasonCode\":\"CUSTOMER_REQUESTED\"}"))
+        mvc.perform(
+                        post("/api/customer/tickets/{ticketId}/human-handoff", TICKET_ID)
+                                .header("X-Synthetic-Customer-Id", "customer-demo")
+                                .header("Idempotency-Key", "handoff-18")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"reasonCode\":\"CUSTOMER_REQUESTED\"}"))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.requestId").value("handoff-18"))
                 .andExpect(jsonPath("$.handlingMode").value("HUMAN"))
@@ -39,9 +42,12 @@ class CustomerHumanHandoffControllerTest {
         when(service.status("customer-demo", TICKET_ID, "handoff-18"))
                 .thenReturn(new HumanHandoffResult("handoff-18", "HUMAN", true));
 
-        mvc.perform(get("/api/customer/tickets/{ticketId}/human-handoff-requests/{requestId}",
-                        TICKET_ID, "handoff-18")
-                        .header("X-Synthetic-Customer-Id", "customer-demo"))
+        mvc.perform(
+                        get(
+                                        "/api/customer/tickets/{ticketId}/human-handoff-requests/{requestId}",
+                                        TICKET_ID,
+                                        "handoff-18")
+                                .header("X-Synthetic-Customer-Id", "customer-demo"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.handlingMode").value("HUMAN"))
                 .andExpect(jsonPath("$.replayed").value(true));

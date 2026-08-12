@@ -28,10 +28,7 @@ final class CompensationExecutionModels {
     record BoundAttempt(UUID attemptId, String idempotencyKey, String parameterDigest) {}
 
     record SuccessCommand(
-            String executorId,
-            UUID executionId,
-            String requestId,
-            BoundAttempt attempt) {}
+            String executorId, UUID executionId, String requestId, BoundAttempt attempt) {}
 
     record SuccessResult(
             UUID executionId,
@@ -43,16 +40,10 @@ final class CompensationExecutionModels {
             boolean replayed) {}
 
     record UnknownCommand(
-            String executorId,
-            UUID executionId,
-            String requestId,
-            BoundAttempt attempt) {}
+            String executorId, UUID executionId, String requestId, BoundAttempt attempt) {}
 
     record FailureCommand(
-            String executorId,
-            UUID executionId,
-            String requestId,
-            BoundAttempt attempt) {}
+            String executorId, UUID executionId, String requestId, BoundAttempt attempt) {}
 
     record ReconciliationCommand(
             String executorId,
@@ -69,9 +60,22 @@ final class CompensationExecutionModels {
             String customerMessage,
             boolean replayed) {}
 
-    enum ExecutionStatus { READY, PROCESSING, UNKNOWN, SUCCEEDED, FAILED }
+    enum ExecutionStatus {
+        READY,
+        PROCESSING,
+        UNKNOWN,
+        SUCCEEDED,
+        FAILED
+    }
 
-    enum ReconciliationOutcome { FOUND, NOT_FOUND, UNKNOWN }
+    enum ReconciliationOutcome {
+        FOUND,
+        NOT_FOUND,
+        UNKNOWN
+    }
 
-    enum CompensationMethod { COUPON, SIMULATED_PARTIAL_REFUND }
+    enum CompensationMethod {
+        COUPON,
+        SIMULATED_PARTIAL_REFUND
+    }
 }

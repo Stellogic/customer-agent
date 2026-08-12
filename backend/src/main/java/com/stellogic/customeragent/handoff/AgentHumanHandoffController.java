@@ -33,18 +33,22 @@ final class AgentHumanHandoffController {
     AgentHumanHandoffResult request(
             @PathVariable UUID ticketId,
             @PathVariable UUID generationId,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @RequestHeader(value = "X-Agent-Generation-Id", required = false) UUID scopedGenerationId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
+                    String authorization,
+            @RequestHeader(value = "X-Agent-Generation-Id", required = false)
+                    UUID scopedGenerationId,
             @RequestHeader(value = "X-Agent-Operation", required = false) String operation,
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @RequestBody AgentHumanHandoffBody body) {
         requireScope(ticketId, generationId, scopedGenerationId, operation, authorization);
         if (requestId == null || requestId.isBlank() || requestId.length() > 200) {
             service.auditAgentRejected(ticketId, "MISSING_IDEMPOTENCY_IDENTITY");
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing stable command identity");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "missing stable command identity");
         }
-        return service.requestAgentHumanHandoff(new RequestAgentHumanHandoff(
-                ticketId, generationId, requestId, body.reasonCode(), body.summary()));
+        return service.requestAgentHumanHandoff(
+                new RequestAgentHumanHandoff(
+                        ticketId, generationId, requestId, body.reasonCode(), body.summary()));
     }
 
     private void requireScope(
@@ -53,17 +57,21 @@ final class AgentHumanHandoffController {
             UUID scopedGenerationId,
             String operation,
             String authorization) {
-        byte[] actual = authorization != null && authorization.startsWith("Bearer ")
-                ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
-                : new byte[0];
-        boolean allowed = MessageDigest.isEqual(actual, agentToken)
-                && generationId.equals(scopedGenerationId)
-                && "REQUEST_HUMAN_HANDOFF".equals(operation);
+        byte[] actual =
+                authorization != null && authorization.startsWith("Bearer ")
+                        ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
+                        : new byte[0];
+        boolean allowed =
+                MessageDigest.isEqual(actual, agentToken)
+                        && generationId.equals(scopedGenerationId)
+                        && "REQUEST_HUMAN_HANDOFF".equals(operation);
         if (!allowed) {
             service.auditAgentRejected(ticketId, "CAPABILITY_SCOPE_REJECTED");
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "agent capability is outside the current scope");
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "agent capability is outside the current scope");
         }
     }
 
-    record AgentHumanHandoffBody(AgentHumanHandoffReason reasonCode, AgentHumanHandoffSummary summary) {}
+    record AgentHumanHandoffBody(
+            AgentHumanHandoffReason reasonCode, AgentHumanHandoffSummary summary) {}
 }

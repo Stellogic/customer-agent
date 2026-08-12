@@ -7,8 +7,8 @@ import java.util.UUID;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,7 +28,8 @@ public final class SupportWorkbenchController {
     @GetMapping("/snapshot")
     ResponseEntity<SnapshotResponse> snapshot(
             @RequestHeader(value = SUPPORT_HEADER, required = false) String supportHeader,
-            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false) String sessionId) {
+            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false)
+                    String sessionId) {
         String supportId = resolveSupportId(supportHeader, sessionId);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
@@ -38,7 +39,8 @@ public final class SupportWorkbenchController {
     @GetMapping("/tickets/{ticketId}")
     ResponseEntity<SupportTicketDetails> details(
             @RequestHeader(value = SUPPORT_HEADER, required = false) String supportHeader,
-            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false) String sessionId,
+            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false)
+                    String sessionId,
             @PathVariable UUID ticketId) {
         String supportId = resolveSupportId(supportHeader, sessionId);
         return ResponseEntity.ok()
@@ -49,11 +51,15 @@ public final class SupportWorkbenchController {
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     SseEmitter events(
             @RequestHeader(value = SUPPORT_HEADER, required = false) String supportHeader,
-            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false) String sessionId,
+            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false)
+                    String sessionId,
             @RequestHeader(value = "Last-Event-ID", required = false) String cursor) {
         String support = resolveSupportId(supportHeader, sessionId);
         return AuthorizedSsePollingStream.open(
-                "support-workbench-events", 250, 60_000L, cursor,
+                "support-workbench-events",
+                250,
+                60_000L,
+                cursor,
                 new AuthorizedSsePollingStream.Source<SupportWorkbenchEvent>() {
                     @Override
                     public List<SupportWorkbenchEvent> events(String afterCursor) {
@@ -72,13 +78,17 @@ public final class SupportWorkbenchController {
 
                     @Override
                     public SseEmitter.SseEventBuilder render(SupportWorkbenchEvent event) {
-                        return SseEmitter.event().id(event.cursor()).name(event.type()).data(event.publicData());
+                        return SseEmitter.event()
+                                .id(event.cursor())
+                                .name(event.type())
+                                .data(event.publicData());
                     }
                 });
     }
 
     private static String resolveSupportId(String supportHeader, String sessionId) {
-        String supportId = supportHeader == null || supportHeader.isBlank() ? sessionId : supportHeader.trim();
+        String supportId =
+                supportHeader == null || supportHeader.isBlank() ? sessionId : supportHeader.trim();
         SupportWorkbenchProjectionService.requireSupport(supportId);
         return supportId;
     }

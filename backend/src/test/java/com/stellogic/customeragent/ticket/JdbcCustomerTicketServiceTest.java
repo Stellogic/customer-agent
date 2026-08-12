@@ -22,14 +22,27 @@ class JdbcCustomerTicketServiceTest {
     @Test
     void trimmedReplayHistoryRequiresAnAuthoritativeSnapshot() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        JdbcCustomerTicketService service = spy(new JdbcCustomerTicketService(
-                jdbc, Clock.fixed(Instant.parse("2026-08-11T00:00:00Z"), ZoneOffset.UTC)));
-        var snapshot = new CustomerPublicSnapshot(
-                TICKET_ID, "INVESTIGATING", "AGENT",
-                Instant.parse("2026-08-11T00:00:00Z"), Instant.parse("2026-08-11T00:00:00Z"),
-                "customer-public-v1", 8, 1, List.of(), null);
+        JdbcCustomerTicketService service =
+                spy(
+                        new JdbcCustomerTicketService(
+                                jdbc,
+                                Clock.fixed(
+                                        Instant.parse("2026-08-11T00:00:00Z"), ZoneOffset.UTC)));
+        var snapshot =
+                new CustomerPublicSnapshot(
+                        TICKET_ID,
+                        "INVESTIGATING",
+                        "AGENT",
+                        Instant.parse("2026-08-11T00:00:00Z"),
+                        Instant.parse("2026-08-11T00:00:00Z"),
+                        "customer-public-v1",
+                        8,
+                        1,
+                        List.of(),
+                        null);
         doReturn(snapshot).when(service).snapshot("customer-demo", TICKET_ID);
-        when(jdbc.queryForObject(anyString(), eq(Long.class), eq(TICKET_ID), eq("customer-public-v1")))
+        when(jdbc.queryForObject(
+                        anyString(), eq(Long.class), eq(TICKET_ID), eq("customer-public-v1")))
                 .thenReturn(5L);
 
         assertThatThrownBy(() -> service.events("customer-demo", TICKET_ID, "customer-public-v1:2"))
