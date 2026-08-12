@@ -42,7 +42,7 @@ ignore = ["E501", "RUF001"]
 "tests/**" = ["SIM105"]
 
 [tool.pyright]
-include = ["src"]
+include = ["src", "smoke.py"]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 reportTypedDictNotRequiredAccess = false
