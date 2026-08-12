@@ -26,12 +26,12 @@ Architecture and implementation details have not yet been designed or approved. 
 
 Resolve consequential decisions through the configured engineering workflow and record the evidence and trade-offs before implementation. Add detailed project rules to this file only after the user has confirmed them or they have been accepted through that workflow.
 
-## Canonical verification
+## 规范化验证
 
-- Before completing any implementation task, run `pwsh ./scripts/check.ps1` from the repository root.
-- Use `-Component backend|agent|frontend -SkipAcceptance` only for fast, focused iteration.
-- The canonical check is a hard requirement: do not submit changes while it is failing.
-- CI invokes the same component checks and runs full-stack acceptance separately.
+- 完成任何实现任务前，必须从仓库根目录运行 `pwsh ./scripts/check.ps1`。
+- 仅在快速、聚焦的迭代中使用 `-Component backend|agent|frontend -SkipAcceptance`。
+- 规范化检查属于硬性要求：检查未通过时不得提交变更。
+- CI 会调用相同的组件检查，并单独运行全栈验收。
 
 ## Agent skills
 

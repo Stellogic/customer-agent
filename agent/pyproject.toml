@@ -31,7 +31,6 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.ruff]
-extend-exclude = ["src/baseline_agent/migrate.py"]
 line-length = 100
 target-version = "py313"
 
