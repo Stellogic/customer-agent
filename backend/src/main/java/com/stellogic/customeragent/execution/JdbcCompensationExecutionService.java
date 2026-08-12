@@ -2,6 +2,7 @@ package com.stellogic.customeragent.execution;
 
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
+import com.stellogic.customeragent.sla.SlaService;
 import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
 import com.stellogic.customeragent.ticket.TicketResolutionTransition;
 import java.math.BigDecimal;
@@ -24,6 +25,7 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
     private final Clock clock;
     private final TicketAuthorityLock authorityLock;
     private final CustomerPublicProjectionAppender publicProjection;
+    private final SlaService slaService;
     private final TicketResolutionTransition ticketResolution;
 
     JdbcCompensationExecutionService(
@@ -31,11 +33,13 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
             Clock clock,
             TicketAuthorityLock authorityLock,
             CustomerPublicProjectionAppender publicProjection,
+            SlaService slaService,
             TicketResolutionTransition ticketResolution) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.authorityLock = authorityLock;
         this.publicProjection = publicProjection;
+        this.slaService = slaService;
         this.ticketResolution = ticketResolution;
     }
 
@@ -165,6 +169,9 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
         requireProviderSuccess(execution);
         if (execution.status() == CompensationExecutionModels.ExecutionStatus.SUCCEEDED) {
             SuccessReplay result = result(command.executionId(), requestDigest);
+            if (!attempt.attemptId().equals(result.attemptId())) {
+                conflict("execution result belongs to a different attempt");
+            }
             recordSuccessRequest(command, requestDigest, result.attemptId());
             return result.result(true);
         }
@@ -227,6 +234,7 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
         jdbc.update(
                 "update synthetic_order set existing_compensation = true where order_reference = ?",
                 execution.orderReference());
+        slaService.evaluateTicket(ticketId, now);
         int resolved = ticketResolution.afterCompensationExecution(ticketId, now);
         if (resolved != 1) conflict("ticket is no longer resolvable");
         publicProjection.appendSupportMessageAndResolutionEvent(ticketId, customerMessage, now);
