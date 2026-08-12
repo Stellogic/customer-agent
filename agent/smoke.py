@@ -1489,7 +1489,7 @@ def main() -> None:
             f"{spring_url}/internal/compensation-simulator/{before_failure_id}/executions",
             headers={
                 **executor_headers,
-                "Idempotency-Key": before_failure_claim["idempotencyKey"],
+                "Idempotency-Key": str(before_failure_claim["idempotencyKey"]),
                 "X-Simulation-Scenario": "BEFORE_EFFECT_FAILURE",
             },
             json={"parameterDigest": before_failure_claim["parameterDigest"], "amount": 26.80},
@@ -1516,7 +1516,7 @@ def main() -> None:
                 f"{spring_url}/internal/compensation-simulator/{scenario_execution_id}/executions",
                 headers={
                     **executor_headers,
-                    "Idempotency-Key": claim["idempotencyKey"],
+                    "Idempotency-Key": str(claim["idempotencyKey"]),
                     "X-Simulation-Scenario": scenario,
                 },
                 json={"parameterDigest": claim["parameterDigest"], "amount": 26.80},
@@ -1527,7 +1527,7 @@ def main() -> None:
             for _ in range(reconciliation_rounds):
                 query = client.get(
                     f"{spring_url}/internal/compensation-simulator/{scenario_execution_id}/reconciliation",
-                    headers={**executor_headers, "Idempotency-Key": claim["idempotencyKey"]},
+                    headers={**executor_headers, "Idempotency-Key": str(claim["idempotencyKey"])},
                 )
                 expect_status(query, 200)
                 assert query.json()["outcome"] == expected
@@ -1548,7 +1548,7 @@ def main() -> None:
             f"{spring_url}/internal/compensation-simulator/{persistent_unknown_id}/reconciliation",
             headers={
                 **executor_headers,
-                "Idempotency-Key": persistent_unknown_claim["idempotencyKey"],
+                "Idempotency-Key": str(persistent_unknown_claim["idempotencyKey"]),
             },
         )
         expect_status(exhausted_query, 200)
@@ -1807,7 +1807,9 @@ def main() -> None:
                 )
             return "accepted"
         except psycopg.errors.UniqueViolation as error:
-            return error.diag.constraint_name
+            constraint_name = error.diag.constraint_name
+            assert constraint_name is not None
+            return constraint_name
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         proposal_race_results = list(executor.map(create_competing_proposal, proposal_race_scopes))
@@ -2130,7 +2132,9 @@ def main() -> None:
                 )
             return "accepted"
         except psycopg.errors.CheckViolation as error:
-            return error.diag.constraint_name
+            constraint_name = error.diag.constraint_name
+            assert constraint_name is not None
+            return constraint_name
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         reservation_results = list(executor.map(lambda _: reserve_concurrently(), range(2)))
@@ -2159,6 +2163,7 @@ def main() -> None:
             rejected_id = uuid.UUID(response.json()["ticketId"])
             rejected_ticket_ids.append(rejected_id)
             observed = False
+            proposal_count = 0
             for _ in range(40):
                 with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
                     observed = connection.execute(
@@ -2337,12 +2342,14 @@ def main() -> None:
     handoff_ticket_id, handoff_projection = create_ambiguous_ticket("human-handoff")
     handoff_clarification_id = handoff_projection["clarification"]["id"]
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        handoff_generation_id, handoff_clarification_request_key = connection.execute(
+        handoff_generation_row = connection.execute(
             "select g.id, c.request_key from agent_processing_generation g "
             "join customer_clarification_request c on c.generation_id = g.id "
             "where g.ticket_id = %s and g.status = 'ACTIVE'",
             (uuid.UUID(handoff_ticket_id),),
         ).fetchone()
+        assert handoff_generation_row is not None
+        handoff_generation_id, handoff_clarification_request_key = handoff_generation_row
         lifecycle_before_handoff = connection.execute(
             "select lifecycle_state from support_ticket where id = %s",
             (uuid.UUID(handoff_ticket_id),),
@@ -2660,11 +2667,13 @@ def main() -> None:
             ).fetchone()[0]
             == "HANDED_OFF"
         )
-        stored_reason, stored_summary = connection.execute(
+        stored_handoff = connection.execute(
             "select reason_code, investigation_summary from agent_human_handoff_request "
             "where generation_id = %s and request_id = %s",
             (agent_handoff_generation_id, agent_handoff_request_id),
         ).fetchone()
+        assert stored_handoff is not None
+        stored_reason, stored_summary = stored_handoff
         assert stored_reason == "FACT_CONFLICT"
         assert stored_summary == agent_handoff_body["summary"]
         serialized_summary = json.dumps(stored_summary)
@@ -2951,6 +2960,9 @@ def main() -> None:
             (fixed_now, fixed_now, first_warning_ticket_id),
         )
 
+    first_warning_facts = []
+    resolution_warning_facts = []
+    paused_resolution_breach = -1
     for _ in range(40):
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
             first_warning_facts = connection.execute(
@@ -2980,6 +2992,7 @@ def main() -> None:
             (fixed_now, ticket_uuid),
         )
 
+    sla_facts = []
     for _ in range(40):
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
             sla_facts = connection.execute(
