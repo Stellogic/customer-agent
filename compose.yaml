@@ -165,6 +165,7 @@ services:
     environment:
       VITE_SMOKE_BASE_URL: http://frontend:8080
       VITE_E2E_SCENARIO: ${VITE_E2E_SCENARIO:-}
+      VITE_E2E_ORDER_REFERENCE: ${VITE_E2E_ORDER_REFERENCE:-}
     depends_on:
       frontend:
         condition: service_healthy

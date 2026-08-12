@@ -2,8 +2,8 @@
 
 ## 演示前准备
 
-1. 只使用仓库内的 `customer-demo`、`approver-demo` 和 `ORDER-DELAY-E2E-RECONCILIATION` 合成数据。
-2. 执行 `pwsh -File scripts/smoke.ps1 -Reset`，确认两条命名验收、V1→V18 迁移和敏感串扫描均通过。
+1. 只使用仓库内的 `customer-demo`、`approver-demo` 和 smoke 基于 `ORDER-DELAY-E2E-*` 模板生成的唯一 namespace 合成数据。
+2. 首次执行 `pwsh -File scripts/smoke.ps1 -Reset`，确认两条命名验收、广域集成 smoke、V1→V19 迁移和敏感串扫描均通过；日常复测可直接执行 `pwsh -File scripts/smoke.ps1`。无 `-Reset` 复测只追加本轮唯一场景数据，不清空数据库，也保留先前的幂等与持久化证据；它会明确跳过要求空 fixture 的广域 `integration-smoke`，不能替代正式全量检查。
 3. 打开客户帮助中心和审批工作台；浏览器始终只访问 Spring 同源 `/api`。
 4. 录屏只包含浏览器产品页面和终端最终摘要，不录制 `.env`、容器环境、请求头、数据库控制台或真实模型密钥。
 
