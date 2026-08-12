@@ -7,6 +7,8 @@ param(
 $ErrorActionPreference = "Stop"
 $components = if ($Component -eq "all") { @("backend", "agent", "frontend") } else { @($Component) }
 
+& "$PSScriptRoot/test-runtime-log-policy.ps1"
+
 foreach ($current in $components) {
     docker build --target test --tag "customer-agent/${current}-test:local" $current
     if ($LASTEXITCODE -ne 0) {

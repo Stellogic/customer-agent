@@ -36,6 +36,7 @@ services:
       SPRING_MIGRATION_DATABASE_URL: jdbc:postgresql://postgres:5432/customer_agent
       SPRING_MIGRATION_DATABASE_USER: spring_migrator
       SPRING_MIGRATION_DATABASE_PASSWORD: local-spring-migrator
+      LOGGING_LEVEL_ORG_FLYWAYDB: WARN
       AGENT_SERVER_URL: http://agent-server:2024
       <<: *local-secrets
     depends_on:
