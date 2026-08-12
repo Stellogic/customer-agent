@@ -75,6 +75,8 @@ describe("客户帮助中心", () => {
     let snapshotReads = 0;
     let replyPosts = 0;
     let statusQueries = 0;
+    let submittedResumeId = "";
+    let queriedResumeId = "";
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (url.endsWith(`/api/customer/tickets/${ticketId}`)) {
@@ -106,10 +108,12 @@ describe("客户帮助中心", () => {
       }
       if (url.includes("/clarifications/") && init?.method === "POST") {
         replyPosts += 1;
+        submittedResumeId = new Headers(init.headers).get("X-Resume-Request-Id") ?? "";
         throw new TypeError("response lost after commit");
       }
       if (url.includes("/clarification-resumes/")) {
         statusQueries += 1;
+        queriedResumeId = url.split("/").at(-1) ?? "";
         return new Response(JSON.stringify({ status: "PENDING", replayed: true }), { status: 200 });
       }
       if (url.endsWith("/events")) {
@@ -127,6 +131,346 @@ describe("客户帮助中心", () => {
     expect(replyPosts).toBe(1);
     expect(statusQueries).toBe(1);
     expect(snapshotReads).toBe(2);
+    expect(queriedResumeId).toBe(submittedResumeId);
+  });
+
+  it("澄清恢复记录已找到但快照连接中断时保留稳定身份并提示手动刷新", async () => {
+    const ticketId = "60000000-0000-0000-0000-000000000007";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    let snapshotReads = 0;
+    let submittedResumeId = "";
+    let queriedResumeId = "";
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/tickets/${ticketId}`)) {
+        snapshotReads += 1;
+        if (snapshotReads === 1) return clarificationSnapshotResponse(ticketId);
+        throw new TypeError("snapshot connection interrupted");
+      }
+      if (url.includes("/clarifications/") && init?.method === "POST") {
+        submittedResumeId = new Headers(init.headers).get("X-Resume-Request-Id") ?? "";
+        throw new TypeError("reply response lost");
+      }
+      if (url.includes("/clarification-resumes/")) {
+        queriedResumeId = url.split("/").at(-1) ?? "";
+        return new Response(JSON.stringify({ status: "PENDING", replayed: true }), { status: 200 });
+      }
+      if (url.endsWith("/events")) return openEventResponse();
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+    expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "A" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+
+    expect(
+      await screen.findByText("已找到原回复的恢复记录，但最新工单状态刷新失败，请手动刷新。"),
+    ).toBeInTheDocument();
+    expect(queriedResumeId).toBe(submittedResumeId);
+  });
+
+  it("澄清回复网络中断且恢复结果未知时重试复用两种稳定身份", async () => {
+    const ticketId = "60000000-0000-0000-0000-000000000010";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    const submittedHeaders: Headers[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/tickets/${ticketId}`))
+        return clarificationSnapshotResponse(ticketId);
+      if (url.includes("/clarifications/") && init?.method === "POST") {
+        submittedHeaders.push(new Headers(init.headers));
+        throw new TypeError("connection interrupted after sending request");
+      }
+      if (url.includes("/clarification-resumes/")) return new Response(null, { status: 404 });
+      if (url.endsWith("/events")) return openEventResponse();
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+    expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "A" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+    expect(
+      await screen.findByText("回复状态暂时未知；请保留本页重试，稳定恢复身份不会启动第二次调查。"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+    await waitFor(() => expect(submittedHeaders).toHaveLength(2));
+
+    expectClarificationRequestIdsToMatch(submittedHeaders[0], submittedHeaders[1]);
+  });
+
+  it("澄清回复 422 显示输入校验错误且不用恢复端点，修正后使用新的幂等身份", async () => {
+    const ticketId = "60000000-0000-0000-0000-000000000001";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    const replyHeaders: HeadersInit[] = [];
+    let replyPosts = 0;
+    let statusQueries = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/tickets/${ticketId}`)) {
+        return clarificationSnapshotResponse(ticketId);
+      }
+      if (url.includes("/clarifications/") && init?.method === "POST") {
+        replyPosts += 1;
+        replyHeaders.push(init.headers ?? {});
+        return replyPosts === 1
+          ? new Response(JSON.stringify({ detail: "answer is invalid" }), { status: 422 })
+          : new Response(null, { status: 202 });
+      }
+      if (url.includes("/clarification-resumes/")) {
+        statusQueries += 1;
+        return new Response(null, { status: 404 });
+      }
+      if (url.endsWith("/events")) return openEventResponse();
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+    expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "无效输入" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+
+    expect(await screen.findByText("回复内容未通过校验，请检查后重新提交。")).toBeInTheDocument();
+    expect(statusQueries).toBe(0);
+
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "A" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+    await waitFor(() => expect(replyPosts).toBe(2));
+    expect(new Headers(replyHeaders[1]).get("Idempotency-Key")).not.toBe(
+      new Headers(replyHeaders[0]).get("Idempotency-Key"),
+    );
+    expect(new Headers(replyHeaders[1]).get("X-Resume-Request-Id")).not.toBe(
+      new Headers(replyHeaders[0]).get("X-Resume-Request-Id"),
+    );
+  });
+
+  it("澄清回复 409 刷新 Spring 权威快照并说明原澄清已失效", async () => {
+    const ticketId = "60000000-0000-0000-0000-000000000003";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    let snapshotReads = 0;
+    let statusQueries = 0;
+    const submittedHeaders: Headers[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/tickets/${ticketId}`)) {
+        snapshotReads += 1;
+        return snapshotReads === 1
+          ? clarificationSnapshotResponse(ticketId)
+          : clarificationSnapshotResponse(ticketId, "60000000-0000-0000-0000-000000000003", [
+              message("工单状态已更新"),
+            ]);
+      }
+      if (url.includes("/clarifications/") && init?.method === "POST") {
+        submittedHeaders.push(new Headers(init.headers));
+        return new Response(null, { status: submittedHeaders.length === 1 ? 409 : 202 });
+      }
+      if (url.includes("/clarification-resumes/")) {
+        statusQueries += 1;
+        return new Response(null, { status: 404 });
+      }
+      if (url.endsWith("/events")) return openEventResponse();
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+    expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "A" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+
+    expect(
+      await screen.findByText("该澄清已失效或工单状态已变化，已刷新最新状态。"),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("工单状态已更新")).toBeInTheDocument();
+    expect(snapshotReads).toBe(2);
+    expect(statusQueries).toBe(0);
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "B" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+    await waitFor(() => expect(submittedHeaders).toHaveLength(2));
+    expectClarificationRequestIdsToDiffer(submittedHeaders[0], submittedHeaders[1]);
+  });
+
+  it("澄清回复 409 即使快照刷新失败也不把确定性拒绝送入恢复对账", async () => {
+    const ticketId = "60000000-0000-0000-0000-000000000004";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    let snapshotReads = 0;
+    let statusQueries = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/tickets/${ticketId}`)) {
+        snapshotReads += 1;
+        if (snapshotReads === 1) return clarificationSnapshotResponse(ticketId);
+        throw new TypeError("snapshot connection interrupted");
+      }
+      if (url.includes("/clarifications/") && init?.method === "POST") {
+        return new Response(null, { status: 409 });
+      }
+      if (url.includes("/clarification-resumes/")) {
+        statusQueries += 1;
+        return new Response(null, { status: 404 });
+      }
+      if (url.endsWith("/events")) return openEventResponse();
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+    expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "A" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+
+    expect(
+      await screen.findByText("该澄清已失效或工单状态已变化；最新状态刷新失败，请手动刷新。"),
+    ).toBeInTheDocument();
+    expect(statusQueries).toBe(0);
+  });
+
+  it.each([
+    [401, "60000000-0000-0000-0000-000000000041", "登录状态已失效，请重新登录后再试。"],
+    [403, "60000000-0000-0000-0000-000000000043", "你当前无权回复这张工单。"],
+    [404, "60000000-0000-0000-0000-000000000044", "未找到该工单或澄清请求，请返回工单列表确认。"],
+  ])("澄清回复 %s 按授权或资源状态处理且不进入恢复对账", async (httpStatus, ticketId, text) => {
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    let statusQueries = 0;
+    const submittedHeaders: Headers[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/tickets/${ticketId}`))
+        return clarificationSnapshotResponse(ticketId);
+      if (url.includes("/clarifications/") && init?.method === "POST") {
+        submittedHeaders.push(new Headers(init.headers));
+        return new Response(null, { status: submittedHeaders.length === 1 ? httpStatus : 202 });
+      }
+      if (url.includes("/clarification-resumes/")) {
+        statusQueries += 1;
+        return new Response(null, { status: 404 });
+      }
+      if (url.endsWith("/events")) return openEventResponse();
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+    expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "A" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(statusQueries).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+    await waitFor(() => expect(submittedHeaders).toHaveLength(2));
+    expectClarificationRequestIdsToDiffer(submittedHeaders[0], submittedHeaders[1]);
+  });
+
+  it("澄清回复 5xx 使用提交时的稳定 resumeRequestId 对账", async () => {
+    const ticketId = "60000000-0000-0000-0000-000000000005";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    let submittedResumeId = "";
+    let queriedResumeId = "";
+    const submittedHeaders: Headers[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/tickets/${ticketId}`))
+        return clarificationSnapshotResponse(ticketId);
+      if (url.includes("/clarifications/") && init?.method === "POST") {
+        const headers = new Headers(init.headers);
+        submittedHeaders.push(headers);
+        submittedResumeId = headers.get("X-Resume-Request-Id") ?? "";
+        return new Response(null, { status: 503 });
+      }
+      if (url.includes("/clarification-resumes/")) {
+        queriedResumeId = url.split("/").at(-1) ?? "";
+        return new Response(null, { status: 404 });
+      }
+      if (url.endsWith("/events")) return openEventResponse();
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+    expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "A" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+
+    expect(
+      await screen.findByText("回复状态暂时未知；请保留本页重试，稳定恢复身份不会启动第二次调查。"),
+    ).toBeInTheDocument();
+    expect(queriedResumeId).toBe(submittedResumeId);
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+    await waitFor(() => expect(submittedHeaders).toHaveLength(2));
+    expectClarificationRequestIdsToMatch(submittedHeaders[0], submittedHeaders[1]);
+  });
+
+  it("澄清回复成功后清理本次幂等身份", async () => {
+    const ticketId = "60000000-0000-0000-0000-000000000006";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    const submittedHeaders: Headers[] = [];
+    let snapshotReads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/tickets/${ticketId}`)) {
+        snapshotReads += 1;
+        return clarificationSnapshotResponse(
+          ticketId,
+          snapshotReads === 1
+            ? "60000000-0000-0000-0000-000000000002"
+            : "60000000-0000-0000-0000-000000000008",
+        );
+      }
+      if (url.includes("/clarifications/") && init?.method === "POST") {
+        submittedHeaders.push(new Headers(init.headers));
+        return new Response(null, { status: 202 });
+      }
+      if (url.endsWith("/events")) return openEventResponse();
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+    expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "A" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+    await waitFor(() => expect(snapshotReads).toBe(2));
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "B" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+    await waitFor(() => expect(submittedHeaders).toHaveLength(2));
+
+    expect(submittedHeaders[1].get("Idempotency-Key")).not.toBe(
+      submittedHeaders[0].get("Idempotency-Key"),
+    );
+    expect(submittedHeaders[1].get("X-Resume-Request-Id")).not.toBe(
+      submittedHeaders[0].get("X-Resume-Request-Id"),
+    );
+  });
+
+  it("澄清回复已成功但快照刷新失败时不进入 resume 对账", async () => {
+    const ticketId = "60000000-0000-0000-0000-000000000009";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    let snapshotReads = 0;
+    let statusQueries = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/tickets/${ticketId}`)) {
+        snapshotReads += 1;
+        if (snapshotReads === 1) return clarificationSnapshotResponse(ticketId);
+        throw new TypeError("snapshot connection interrupted");
+      }
+      if (url.includes("/clarifications/") && init?.method === "POST") {
+        return new Response(null, { status: 202 });
+      }
+      if (url.includes("/clarification-resumes/")) {
+        statusQueries += 1;
+        return new Response(null, { status: 404 });
+      }
+      if (url.endsWith("/events")) return openEventResponse();
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+    expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("订单确认码"), { target: { value: "A" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复并继续调查" }));
+
+    expect(
+      await screen.findByText("回复已提交，但最新工单状态刷新失败，请手动刷新。"),
+    ).toBeInTheDocument();
+    expect(statusQueries).toBe(0);
   });
 
   it("转人工响应丢失时按稳定请求身份对账并从权威快照恢复", async () => {
@@ -570,6 +914,44 @@ function snapshotResponse(
     }),
     { status: 200 },
   );
+}
+
+function clarificationSnapshotResponse(
+  ticketId: string,
+  clarificationId = "60000000-0000-0000-0000-000000000002",
+  messages: ReturnType<typeof message>[] = [],
+) {
+  return new Response(
+    JSON.stringify({
+      view: "CUSTOMER_PUBLIC",
+      schema: "customer-public-v1",
+      cursor: "customer-public-v1:4",
+      ticket: {
+        id: ticketId,
+        lifecycleState: "WAITING_FOR_CUSTOMER",
+        handlingMode: "AGENT",
+        agentGeneration: 1,
+        firstRespondedAt: "2026-08-09T00:00:00Z",
+      },
+      messages,
+      clarification: {
+        id: clarificationId,
+        promptCode: "ORDER_CONFIRMATION_CODE",
+        question: "为确认需要调查的订单，请回复订单确认码（A 或 B）。",
+      },
+    }),
+    { status: 200 },
+  );
+}
+
+function expectClarificationRequestIdsToDiffer(first: Headers, second: Headers) {
+  expect(second.get("Idempotency-Key")).not.toBe(first.get("Idempotency-Key"));
+  expect(second.get("X-Resume-Request-Id")).not.toBe(first.get("X-Resume-Request-Id"));
+}
+
+function expectClarificationRequestIdsToMatch(first: Headers, second: Headers) {
+  expect(second.get("Idempotency-Key")).toBe(first.get("Idempotency-Key"));
+  expect(second.get("X-Resume-Request-Id")).toBe(first.get("X-Resume-Request-Id"));
 }
 
 function publicEvent(id: string, type: string, payload: unknown, generation = 1) {
