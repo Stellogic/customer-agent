@@ -11,26 +11,35 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class SyntheticIdentityControllerTest {
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new SyntheticIdentityController()).build();
+    private final MockMvc mvc =
+            MockMvcBuilders.standaloneSetup(new SyntheticIdentityController()).build();
 
     @Test
-    void supportDemoEntryCreatesAnHttpOnlySessionBeforeRedirectingToTheRegisteredRoute() throws Exception {
+    void supportDemoEntryCreatesAnHttpOnlySessionBeforeRedirectingToTheRegisteredRoute()
+            throws Exception {
         mvc.perform(get("/api/demo/enter/support"))
                 .andExpect(status().isFound())
                 .andExpect(redirectedUrl("/support"))
-                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.allOf(
-                        org.hamcrest.Matchers.containsString("synthetic-demo-session=support-demo"),
-                        org.hamcrest.Matchers.containsString("HttpOnly"),
-                        org.hamcrest.Matchers.containsString("SameSite=Strict"))));
+                .andExpect(
+                        header().string(
+                                        "Set-Cookie",
+                                        org.hamcrest.Matchers.allOf(
+                                                org.hamcrest.Matchers.containsString(
+                                                        "synthetic-demo-session=support-demo"),
+                                                org.hamcrest.Matchers.containsString("HttpOnly"),
+                                                org.hamcrest.Matchers.containsString(
+                                                        "SameSite=Strict"))));
     }
 
     @Test
     void directRouteHasNoSupportSessionButTheIssuedCookieRegistersSupport() throws Exception {
-        mvc.perform(get("/api/demo/session"))
-                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/demo/session")).andExpect(status().isUnauthorized());
 
-        mvc.perform(get("/api/demo/session")
-                        .cookie(new jakarta.servlet.http.Cookie("synthetic-demo-session", "support-demo")))
+        mvc.perform(
+                        get("/api/demo/session")
+                                .cookie(
+                                        new jakarta.servlet.http.Cookie(
+                                                "synthetic-demo-session", "support-demo")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("support-demo"))
                 .andExpect(jsonPath("$.role").value("SUPPORT"));

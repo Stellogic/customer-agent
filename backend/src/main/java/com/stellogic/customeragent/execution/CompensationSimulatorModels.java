@@ -20,7 +20,11 @@ final class CompensationSimulatorModels {
             CompensationExecutionModels.ReconciliationOutcome outcome,
             String resultReference) {}
 
-    enum ProviderOutcome { SUCCEEDED, CONFIRMED_NOT_OCCURRED, UNKNOWN }
+    enum ProviderOutcome {
+        SUCCEEDED,
+        CONFIRMED_NOT_OCCURRED,
+        UNKNOWN
+    }
 
     enum Scenario {
         SUCCESS,

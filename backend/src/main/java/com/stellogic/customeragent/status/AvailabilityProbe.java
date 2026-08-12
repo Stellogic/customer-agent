@@ -4,4 +4,3 @@ package com.stellogic.customeragent.status;
 public interface AvailabilityProbe {
     boolean isAvailable();
 }
-

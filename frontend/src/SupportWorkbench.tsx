@@ -1,11 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { consumeSseEvents, hasOnlyKeys, isRecord, parseViewCursor, type SseEvent } from "./streamProtocol";
+import {
+  consumeSseEvents,
+  hasOnlyKeys,
+  isRecord,
+  parseViewCursor,
+  type SseEvent,
+} from "./streamProtocol";
 
 const SUPPORT_SCHEMA = "support-workbench-v1" as const;
-const lifecycleStates = ["NEW", "INVESTIGATING", "WAITING_FOR_CUSTOMER", "WAITING_FOR_EXTERNAL", "RESOLVED", "CLOSED"] as const;
+const lifecycleStates = [
+  "NEW",
+  "INVESTIGATING",
+  "WAITING_FOR_CUSTOMER",
+  "WAITING_FOR_EXTERNAL",
+  "RESOLVED",
+  "CLOSED",
+] as const;
 const handlingModes = ["AGENT", "HUMAN"] as const;
-type LifecycleState = typeof lifecycleStates[number];
-type HandlingMode = typeof handlingModes[number];
+type LifecycleState = (typeof lifecycleStates)[number];
+type HandlingMode = (typeof handlingModes)[number];
 
 type QueueItem = {
   ticketId: string;
@@ -31,7 +44,9 @@ type QueueUpsert = QueueItem & { sharedEnteredAt: string; escalationEnteredAt: s
 
 export function SupportWorkbench({ supportId }: { supportId: string }) {
   const [snapshot, setSnapshot] = useState<WorkbenchSnapshot | null>(null);
-  const [connection, setConnection] = useState<"loading" | "syncing" | "resetting" | "live" | "stale">("loading");
+  const [connection, setConnection] = useState<
+    "loading" | "syncing" | "resetting" | "live" | "stale"
+  >("loading");
   const snapshotRef = useRef<WorkbenchSnapshot | null>(null);
   const streamController = useRef<AbortController | null>(null);
   const supportHeaders = { "X-Synthetic-Support-Id": supportId };
@@ -51,7 +66,7 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
         cache: "no-store",
       });
       if (!response.ok) throw new Error("snapshot request failed");
-      const authoritative = await response.json() as unknown;
+      const authoritative = (await response.json()) as unknown;
       if (!isSnapshot(authoritative)) throw new Error("incompatible snapshot");
       snapshotRef.current = authoritative;
       setSnapshot(authoritative);
@@ -85,7 +100,8 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
     } catch {
       // The last snapshot stays visible but is explicitly marked stale.
     }
-    if (!controller.signal.aborted && streamController.current === controller) setConnection("stale");
+    if (!controller.signal.aborted && streamController.current === controller)
+      setConnection("stale");
   }
 
   async function recoverFromSnapshot(controller: AbortController) {
@@ -111,8 +127,13 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
     } catch {
       return false;
     }
-    if (!isRecord(envelope) || !hasOnlyKeys(envelope, ["view", "schema", "payload"])
-      || envelope.view !== "SUPPORT_WORKBENCH" || envelope.schema !== SUPPORT_SCHEMA) return false;
+    if (
+      !isRecord(envelope) ||
+      !hasOnlyKeys(envelope, ["view", "schema", "payload"]) ||
+      envelope.view !== "SUPPORT_WORKBENCH" ||
+      envelope.schema !== SUPPORT_SCHEMA
+    )
+      return false;
 
     let next: WorkbenchSnapshot;
     if (event.type === "QUEUE_TICKET_REMOVED") {
@@ -122,7 +143,9 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
         ...current,
         cursor: event.id,
         sharedQueue: current.sharedQueue.filter((item) => item.ticketId !== payload.ticketId),
-        escalationQueue: current.escalationQueue.filter((item) => item.ticketId !== payload.ticketId),
+        escalationQueue: current.escalationQueue.filter(
+          (item) => item.ticketId !== payload.ticketId,
+        ),
       };
     } else if (event.type === "QUEUE_TICKET_UPSERTED") {
       if (!isUpsert(envelope.payload)) return false;
@@ -136,9 +159,13 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
         ...current,
         cursor: event.id,
         sharedQueue: upsertAndSort(current.sharedQueue, item),
-        escalationQueue: envelope.payload.escalationEnteredAt === null
-          ? current.escalationQueue.filter((entry) => entry.ticketId !== item.ticketId)
-          : upsertAndSort(current.escalationQueue, { ...item, enteredAt: envelope.payload.escalationEnteredAt }),
+        escalationQueue:
+          envelope.payload.escalationEnteredAt === null
+            ? current.escalationQueue.filter((entry) => entry.ticketId !== item.ticketId)
+            : upsertAndSort(current.escalationQueue, {
+                ...item,
+                enteredAt: envelope.payload.escalationEnteredAt,
+              }),
       };
     } else {
       return false;
@@ -156,7 +183,11 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
           <h1>客服共享队列</h1>
           <p className="lede">发现需要人工关注的客服工单；领取与完整人工处理不在当前切片中。</p>
         </div>
-        <div className={`connection-state ${connection}`} role={connection === "stale" || connection === "resetting" ? "alert" : "status"} aria-live="polite">
+        <div
+          className={`connection-state ${connection}`}
+          role={connection === "stale" || connection === "resetting" ? "alert" : "status"}
+          aria-live="polite"
+        >
           {connection === "loading" && "正在读取权威快照…"}
           {connection === "syncing" && "正在从 Spring 权威快照重新同步…"}
           {connection === "resetting" && "事件流已失效；当前队列可能过期，正在重新读取权威快照…"}
@@ -167,7 +198,12 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
 
       <p className="authorization-note">队列可发现不等于工单详情授权</p>
 
-      <div className="queue-grid" aria-busy={connection === "loading" || connection === "syncing" || connection === "resetting"}>
+      <div
+        className="queue-grid"
+        aria-busy={
+          connection === "loading" || connection === "syncing" || connection === "resetting"
+        }
+      >
         <QueueSection
           title="待接手工单"
           description="转人工与其他共享队列条目"
@@ -183,7 +219,13 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
 
       <footer className="workbench-footer">
         <p>快照游标与客户、审批视图相互独立；刷新不会沿用旧本地队列。</p>
-        <button type="button" onClick={() => void loadSnapshot()} disabled={connection === "loading" || connection === "syncing" || connection === "resetting"}>
+        <button
+          type="button"
+          onClick={() => void loadSnapshot()}
+          disabled={
+            connection === "loading" || connection === "syncing" || connection === "resetting"
+          }
+        >
           重新同步队列
         </button>
       </footer>
@@ -191,14 +233,22 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
   );
 }
 
-function QueueSection({ title, description, items, accent = false }: {
+function QueueSection({
+  title,
+  description,
+  items,
+  accent = false,
+}: {
   title: string;
   description: string;
   items: QueueItem[];
   accent?: boolean;
 }) {
   return (
-    <section className={`queue-panel${accent ? " escalation" : ""}`} aria-labelledby={`${title}-title`}>
+    <section
+      className={`queue-panel${accent ? " escalation" : ""}`}
+      aria-labelledby={`${title}-title`}
+    >
       <header>
         <div>
           <p className="queue-kicker">{accent ? "ESCALATION" : "SHARED"}</p>
@@ -213,7 +263,10 @@ function QueueSection({ title, description, items, accent = false }: {
             <li key={item.ticketId}>
               <div>
                 <span className="ticket-number">{item.ticketId}</span>
-                <span>{stateLabel(item.lifecycleState)} · {item.handlingMode === "HUMAN" ? "人工处理" : "Agent 处理"}</span>
+                <span>
+                  {stateLabel(item.lifecycleState)} ·{" "}
+                  {item.handlingMode === "HUMAN" ? "人工处理" : "Agent 处理"}
+                </span>
               </div>
               <time dateTime={item.enteredAt}>{formatTime(item.enteredAt)}</time>
             </li>
@@ -227,30 +280,51 @@ function QueueSection({ title, description, items, accent = false }: {
 }
 
 function isSnapshot(value: unknown): value is WorkbenchSnapshot {
-  if (!isRecord(value) || !hasOnlyKeys(value, ["view", "schema", "cursor", "sharedQueue", "escalationQueue"])
-    || value.view !== "SUPPORT_WORKBENCH" || value.schema !== SUPPORT_SCHEMA
-    || typeof value.cursor !== "string" || parseCursor(value.cursor) === null
-    || !Array.isArray(value.sharedQueue) || !Array.isArray(value.escalationQueue)) return false;
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["view", "schema", "cursor", "sharedQueue", "escalationQueue"]) ||
+    value.view !== "SUPPORT_WORKBENCH" ||
+    value.schema !== SUPPORT_SCHEMA ||
+    typeof value.cursor !== "string" ||
+    parseCursor(value.cursor) === null ||
+    !Array.isArray(value.sharedQueue) ||
+    !Array.isArray(value.escalationQueue)
+  )
+    return false;
   return value.sharedQueue.every(isQueueItem) && value.escalationQueue.every(isQueueItem);
 }
 
 function isQueueItem(value: unknown): value is QueueItem {
-  return isRecord(value) && hasOnlyKeys(value, ["ticketId", "lifecycleState", "handlingMode", "enteredAt"])
-    && isTicketId(value.ticketId) && isLifecycleState(value.lifecycleState) && isHandlingMode(value.handlingMode)
-    && typeof value.enteredAt === "string";
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["ticketId", "lifecycleState", "handlingMode", "enteredAt"]) &&
+    isTicketId(value.ticketId) &&
+    isLifecycleState(value.lifecycleState) &&
+    isHandlingMode(value.handlingMode) &&
+    typeof value.enteredAt === "string"
+  );
 }
 
 function isRemoval(value: unknown): value is { ticketId: string } {
-  return isRecord(value) && hasOnlyKeys(value, ["ticketId"])
-    && isTicketId(value.ticketId);
+  return isRecord(value) && hasOnlyKeys(value, ["ticketId"]) && isTicketId(value.ticketId);
 }
 
 function isUpsert(value: unknown): value is QueueUpsert {
-  return isRecord(value)
-    && hasOnlyKeys(value, ["ticketId", "lifecycleState", "handlingMode", "sharedEnteredAt", "escalationEnteredAt"])
-    && isTicketId(value.ticketId) && isLifecycleState(value.lifecycleState) && isHandlingMode(value.handlingMode)
-    && typeof value.sharedEnteredAt === "string"
-    && (value.escalationEnteredAt === null || typeof value.escalationEnteredAt === "string");
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "ticketId",
+      "lifecycleState",
+      "handlingMode",
+      "sharedEnteredAt",
+      "escalationEnteredAt",
+    ]) &&
+    isTicketId(value.ticketId) &&
+    isLifecycleState(value.lifecycleState) &&
+    isHandlingMode(value.handlingMode) &&
+    typeof value.sharedEnteredAt === "string" &&
+    (value.escalationEnteredAt === null || typeof value.escalationEnteredAt === "string")
+  );
 }
 
 function isTicketId(value: unknown): value is string {
@@ -270,8 +344,10 @@ function parseCursor(cursor: string) {
 }
 
 function upsertAndSort(items: QueueItem[], item: QueueItem) {
-  return [...items.filter((existing) => existing.ticketId !== item.ticketId), item]
-    .sort((left, right) => left.enteredAt.localeCompare(right.enteredAt) || left.ticketId.localeCompare(right.ticketId));
+  return [...items.filter((existing) => existing.ticketId !== item.ticketId), item].sort(
+    (left, right) =>
+      left.enteredAt.localeCompare(right.enteredAt) || left.ticketId.localeCompare(right.ticketId),
+  );
 }
 
 function stateLabel(state: LifecycleState) {
@@ -288,10 +364,12 @@ function stateLabel(state: LifecycleState) {
 
 function formatTime(value: string) {
   const instant = new Date(value);
-  return Number.isNaN(instant.getTime()) ? value : new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(instant);
+  return Number.isNaN(instant.getTime())
+    ? value
+    : new Intl.DateTimeFormat("zh-CN", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(instant);
 }

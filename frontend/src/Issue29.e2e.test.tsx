@@ -27,7 +27,8 @@ describe.skipIf(!liveBaseUrl || !scenario)("Issue #29 两条 React 全栈验收"
     const browserNetworkPayloads: string[] = [];
     const streamAudits: Array<{ payload: string }> = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      const path = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const path =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (typeof init?.body === "string") {
         browserNetworkPayloads.push(init.body);
       }
@@ -36,15 +37,17 @@ describe.skipIf(!liveBaseUrl || !scenario)("Issue #29 两条 React 全栈验收"
         const audit = { payload: "" };
         streamAudits.push(audit);
         const decoder = new TextDecoder();
-        const auditedBody = response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-          transform(chunk, controller) {
-            audit.payload += decoder.decode(chunk, { stream: true });
-            controller.enqueue(chunk);
-          },
-          flush() {
-            audit.payload += decoder.decode();
-          },
-        }));
+        const auditedBody = response.body.pipeThrough(
+          new TransformStream<Uint8Array, Uint8Array>({
+            transform(chunk, controller) {
+              audit.payload += decoder.decode(chunk, { stream: true });
+              controller.enqueue(chunk);
+            },
+            flush() {
+              audit.payload += decoder.decode();
+            },
+          }),
+        );
         return new Response(auditedBody, {
           status: response.status,
           statusText: response.statusText,
@@ -56,8 +59,8 @@ describe.skipIf(!liveBaseUrl || !scenario)("Issue #29 两条 React 全栈验收"
       return response;
     });
 
-    const orderReference = scenario === "normal"
-      ? "ORDER-DELAY-E2E-NORMAL" : "ORDER-DELAY-E2E-RECONCILIATION";
+    const orderReference =
+      scenario === "normal" ? "ORDER-DELAY-E2E-NORMAL" : "ORDER-DELAY-E2E-RECONCILIATION";
     const customer = render(<App />);
     fireEvent.change(screen.getByLabelText("订单编号"), { target: { value: orderReference } });
     fireEvent.change(screen.getByLabelText("问题描述"), {
@@ -65,9 +68,9 @@ describe.skipIf(!liveBaseUrl || !scenario)("Issue #29 两条 React 全栈验收"
     });
     fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
 
-    expect(await screen.findByText(
-      /补偿建议正在等待人工审批/, {}, { timeout: asyncFlowTimeout },
-    )).toBeInTheDocument();
+    expect(
+      await screen.findByText(/补偿建议正在等待人工审批/, {}, { timeout: asyncFlowTimeout }),
+    ).toBeInTheDocument();
     const ticketUrl = globalThis.location.href;
     customer.unmount();
 
@@ -75,39 +78,55 @@ describe.skipIf(!liveBaseUrl || !scenario)("Issue #29 两条 React 全栈验收"
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }, { timeout: 10_000 }));
     expect(await screen.findByRole("heading", { name: orderReference })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "批准补偿" }));
-    expect(await screen.findByText("审批责任已结束，已返回队列。", {}, { timeout: 10_000 })).toBeInTheDocument();
+    expect(
+      await screen.findByText("审批责任已结束，已返回队列。", {}, { timeout: 10_000 }),
+    ).toBeInTheDocument();
     approver.unmount();
 
     globalThis.history.replaceState(null, "", ticketUrl);
     render(<App />);
     if (scenario === "reconciliation") {
-      expect(await screen.findByText(
-        "补偿结果正在自动确认中，请勿重复提交。", {}, { timeout: 10_000 },
-      )).toBeInTheDocument();
+      expect(
+        await screen.findByText("补偿结果正在自动确认中，请勿重复提交。", {}, { timeout: 10_000 }),
+      ).toBeInTheDocument();
     }
-    expect(await screen.findByText(
-      "已完成 26.80 CNY 模拟部分退款，退回原支付方式（尾号 4242）。",
-      {}, { timeout: asyncFlowTimeout },
-    )).toBeInTheDocument();
-    expect(screen.getByText("RESOLVED")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "已完成 26.80 CNY 模拟部分退款，退回原支付方式（尾号 4242）。",
+        {},
+        { timeout: asyncFlowTimeout },
+      ),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("RESOLVED", {}, { timeout: 10_000 })).toBeInTheDocument();
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    const browserRequests = vi.mocked(globalThis.fetch).mock.calls.map(([input]) =>
-      typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+    const browserRequests = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.map(([input]) =>
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+      );
     expect(browserRequests.length).toBeGreaterThan(0);
-    expect(browserRequests.every((request) => {
-      const url = new URL(request, liveBaseUrl);
-      return url.origin === new URL(liveBaseUrl ?? "http://invalid").origin
-        && url.pathname.startsWith("/api/");
-    })).toBe(true);
-    await waitFor(() => {
-      expect(streamAudits.some((audit) =>
-        completedSsePayload(audit.payload).includes("RESOLVED"))).toBe(true);
-    }, { timeout: 5_000 });
-    const forbiddenNetworkContent = new RegExp([
-      ...sensitiveContent.contentPatterns,
-      ...sensitiveContent.internalAddressPatterns,
-    ].join("|"), "i");
+    expect(
+      browserRequests.every((request) => {
+        const url = new URL(request, liveBaseUrl);
+        return (
+          url.origin === new URL(liveBaseUrl ?? "http://invalid").origin &&
+          url.pathname.startsWith("/api/")
+        );
+      }),
+    ).toBe(true);
+    await waitFor(
+      () => {
+        expect(
+          streamAudits.some((audit) => completedSsePayload(audit.payload).includes("RESOLVED")),
+        ).toBe(true);
+      },
+      { timeout: 5_000 },
+    );
+    const forbiddenNetworkContent = new RegExp(
+      [...sensitiveContent.contentPatterns, ...sensitiveContent.internalAddressPatterns].join("|"),
+      "i",
+    );
     const auditedNetworkContent = [
       ...browserNetworkPayloads,
       ...streamAudits.map((audit) => completedSsePayload(audit.payload)),

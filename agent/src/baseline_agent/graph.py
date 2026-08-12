@@ -21,8 +21,17 @@ class BaselineState(TypedDict, total=False):
 
 
 REQUIRED_FACT_FIELDS = {
-    "matchStatus", "orderReference", "delayHours", "delaySeconds", "paid", "cancelled",
-    "fullyRefunded", "existingCompensation", "pendingActionCount", "policyVersion", "evidenceRefs",
+    "matchStatus",
+    "orderReference",
+    "delayHours",
+    "delaySeconds",
+    "paid",
+    "cancelled",
+    "fullyRefunded",
+    "existingCompensation",
+    "pendingActionCount",
+    "policyVersion",
+    "evidenceRefs",
 }
 
 
@@ -53,25 +62,36 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
     async with httpx.AsyncClient(timeout=5.0) as client:
         facts_response = await _request_with_retries(
             lambda: client.get(
-                    f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/facts",
-                    headers={**scope_headers, "X-Agent-Operation": "READ_INVESTIGATION_FACTS"},
+                f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/facts",
+                headers={**scope_headers, "X-Agent-Operation": "READ_INVESTIGATION_FACTS"},
             )
         )
         if facts_response is None:
             return await _human_handoff(
-                client, base_url, ticket_id, generation_id, scope_headers,
-                "TOOL_RETRY_EXHAUSTED", [],
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "TOOL_RETRY_EXHAUSTED",
+                [],
             )
         try:
-            facts = facts_response.json()
+            facts: object = facts_response.json()
         except ValueError:
             facts = "INVALID_JSON_RESPONSE"
         unsafe_reason = _unsafe_facts_reason(facts)
         if unsafe_reason is not None:
             return await _human_handoff(
-                client, base_url, ticket_id, generation_id, scope_headers,
-                unsafe_reason, _controlled_summary_facts(facts),
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                unsafe_reason,
+                _controlled_summary_facts(facts),
             )
+        assert isinstance(facts, dict)
         if facts.get("matchStatus") == "AMBIGUOUS":
             return {"facts": facts, "model_mode": "fixed-fake-model-v1"}
         conclusion = fixed_fake_model(facts)
@@ -90,14 +110,24 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
         except httpx.HTTPStatusError as error:
             if error.response.status_code == 422:
                 return await _human_handoff(
-                    client, base_url, ticket_id, generation_id, scope_headers,
-                    "FACT_CONFLICT", _controlled_summary_facts(facts),
+                    client,
+                    base_url,
+                    ticket_id,
+                    generation_id,
+                    scope_headers,
+                    "FACT_CONFLICT",
+                    _controlled_summary_facts(facts),
                 )
             raise
         if conclusion_response is None:
             return await _human_handoff(
-                client, base_url, ticket_id, generation_id, scope_headers,
-                "TOOL_RETRY_EXHAUSTED", _controlled_summary_facts(facts),
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "TOOL_RETRY_EXHAUSTED",
+                _controlled_summary_facts(facts),
             )
         return {"facts": facts, "conclusion": conclusion, "model_mode": "fixed-fake-model-v1"}
 
@@ -137,12 +167,20 @@ def _unsafe_facts_reason(facts: object) -> str | None:
         if present != REQUIRED_FACT_FIELDS:
             return "INVALID_TOOL_RESPONSE"
         nullable_fields = (
-            "delayHours", "delaySeconds", "paid", "cancelled", "fullyRefunded",
-            "existingCompensation", "pendingActionCount", "policyVersion",
+            "delayHours",
+            "delaySeconds",
+            "paid",
+            "cancelled",
+            "fullyRefunded",
+            "existingCompensation",
+            "pendingActionCount",
+            "policyVersion",
         )
-        valid_ambiguity = isinstance(facts["orderReference"], str) \
-            and all(facts[name] is None for name in nullable_fields) \
+        valid_ambiguity = (
+            isinstance(facts["orderReference"], str)
+            and all(facts[name] is None for name in nullable_fields)
             and facts["evidenceRefs"] == []
+        )
         return None if valid_ambiguity else "INVALID_TOOL_RESPONSE"
     typed_values = {
         "orderReference": str,
@@ -180,8 +218,11 @@ def _unsafe_facts_reason(facts: object) -> str | None:
     if facts["delaySeconds"] != facts["delayHours"] * 60 * 60:
         return "FACT_CONFLICT"
     if (
-        not facts["paid"] or facts["cancelled"] or facts["fullyRefunded"]
-        or facts["existingCompensation"] or facts["pendingActionCount"] != 0
+        not facts["paid"]
+        or facts["cancelled"]
+        or facts["fullyRefunded"]
+        or facts["existingCompensation"]
+        or facts["pendingActionCount"] != 0
         or facts["policyVersion"] != "delay-policy-v1"
     ):
         return "UNSUPPORTED_SCENARIO"
@@ -200,12 +241,16 @@ def _controlled_summary_facts(facts: object) -> list[dict[str, str]]:
     if evidence != [f"order:{order_reference}", f"logistics:{order_reference}"]:
         return []
     allowed = [{"type": "ORDER", "value": order_reference, "evidenceReference": evidence[0]}]
-    if isinstance(facts.get("delaySeconds"), int) and not isinstance(facts.get("delaySeconds"), bool):
-        allowed.append({
-            "type": "LOGISTICS_DELAY_SECONDS",
-            "value": str(facts["delaySeconds"]),
-            "evidenceReference": evidence[1],
-        })
+    if isinstance(facts.get("delaySeconds"), int) and not isinstance(
+        facts.get("delaySeconds"), bool
+    ):
+        allowed.append(
+            {
+                "type": "LOGISTICS_DELAY_SECONDS",
+                "value": str(facts["delaySeconds"]),
+                "evidenceReference": evidence[1],
+            }
+        )
     return allowed
 
 
@@ -235,7 +280,10 @@ async def _human_handoff(
 
 
 async def request_clarification(state: BaselineState) -> BaselineState:
-    if state.get("requested_by") != "spring" or state.get("facts", {}).get("matchStatus") != "AMBIGUOUS":
+    if (
+        state.get("requested_by") != "spring"
+        or state.get("facts", {}).get("matchStatus") != "AMBIGUOUS"
+    ):
         raise ValueError("clarification requires a Spring-owned ambiguous investigation")
     ticket_id = state["ticket_id"]
     generation_id = state["generation_id"]
@@ -293,7 +341,9 @@ def select_work(state: BaselineState) -> str:
 
 
 def after_investigation(state: BaselineState) -> str:
-    return "request_clarification" if state.get("facts", {}).get("matchStatus") == "AMBIGUOUS" else END
+    return (
+        "request_clarification" if state.get("facts", {}).get("matchStatus") == "AMBIGUOUS" else END
+    )
 
 
 builder = StateGraph(BaselineState)

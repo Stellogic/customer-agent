@@ -22,7 +22,10 @@ public final class TicketResolutionTransition {
     }
 
     public int fromAgentInvestigation(UUID ticketId, Instant resolvedAt) {
-        return update(ticketId, resolvedAt, "lifecycle_state = 'INVESTIGATING' and handling_mode = 'AGENT'");
+        return update(
+                ticketId,
+                resolvedAt,
+                "lifecycle_state = 'INVESTIGATING' and handling_mode = 'AGENT'");
     }
 
     public int afterCompensationExecution(UUID ticketId, Instant resolvedAt) {

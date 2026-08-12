@@ -16,16 +16,22 @@ class SharedSupportQueueControllerTest {
     private static final UUID TICKET_ID = UUID.fromString("18000000-0000-0000-0000-000000000004");
     private final SharedSupportQueueProjectionService service =
             org.mockito.Mockito.mock(SharedSupportQueueProjectionService.class);
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new SharedSupportQueueController(service)).build();
+    private final MockMvc mvc =
+            MockMvcBuilders.standaloneSetup(new SharedSupportQueueController(service)).build();
 
     @Test
     void queueCarriesCustomerRequestedHandoffsWithoutLeakingDetails() throws Exception {
-        when(service.queue()).thenReturn(List.of(new SharedQueueSummary(
-                TICKET_ID, "WAITING_FOR_CUSTOMER", "HUMAN", List.of("CUSTOMER_REQUESTED_HANDOFF"),
-                Instant.parse("2026-08-09T14:00:00Z"))));
+        when(service.queue())
+                .thenReturn(
+                        List.of(
+                                new SharedQueueSummary(
+                                        TICKET_ID,
+                                        "WAITING_FOR_CUSTOMER",
+                                        "HUMAN",
+                                        List.of("CUSTOMER_REQUESTED_HANDOFF"),
+                                        Instant.parse("2026-08-09T14:00:00Z"))));
 
-        mvc.perform(get("/api/support/queue")
-                        .header("X-Synthetic-Support-Id", "support-demo"))
+        mvc.perform(get("/api/support/queue").header("X-Synthetic-Support-Id", "support-demo"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].ticketId").value(TICKET_ID.toString()))
                 .andExpect(jsonPath("$[0].lifecycleState").value("WAITING_FOR_CUSTOMER"))
@@ -38,8 +44,7 @@ class SharedSupportQueueControllerTest {
 
     @Test
     void customerCannotReadTheSharedSupportQueue() throws Exception {
-        mvc.perform(get("/api/support/queue")
-                        .header("X-Synthetic-Support-Id", "customer-demo"))
+        mvc.perform(get("/api/support/queue").header("X-Synthetic-Support-Id", "customer-demo"))
                 .andExpect(status().isForbidden());
     }
 }

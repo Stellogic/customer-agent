@@ -16,7 +16,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/customer/tickets/{ticketId}")
 final class CustomerClarificationController {
-    private static final Set<String> SYNTHETIC_CUSTOMERS = Set.of("customer-demo", "customer-other-demo");
+    private static final Set<String> SYNTHETIC_CUSTOMERS =
+            Set.of("customer-demo", "customer-other-demo");
     private final ClarificationService service;
 
     CustomerClarificationController(ClarificationService service) {
@@ -33,11 +34,21 @@ final class CustomerClarificationController {
             @RequestBody ReplyBody body) {
         String owner = requireIdentity(customerId);
         requireText(customerMessageId, "missing stable customer message identity");
-        if (resumeRequestId == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing resume request identity");
+        if (resumeRequestId == null)
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "missing resume request identity");
         requireText(body.answer(), "missing clarification answer");
-        ClarificationReplyResult result = service.reply(new ReplyToClarification(
-                owner, ticketId, clarificationRequestId, customerMessageId.trim(), resumeRequestId, body.answer().trim()));
-        return ResponseEntity.status(result.replayed() ? HttpStatus.OK : HttpStatus.ACCEPTED).body(result);
+        ClarificationReplyResult result =
+                service.reply(
+                        new ReplyToClarification(
+                                owner,
+                                ticketId,
+                                clarificationRequestId,
+                                customerMessageId.trim(),
+                                resumeRequestId,
+                                body.answer().trim()));
+        return ResponseEntity.status(result.replayed() ? HttpStatus.OK : HttpStatus.ACCEPTED)
+                .body(result);
     }
 
     @GetMapping("/clarification-resumes/{resumeRequestId}")
@@ -50,7 +61,8 @@ final class CustomerClarificationController {
 
     private static String requireIdentity(String customerId) {
         if (customerId == null || !SYNTHETIC_CUSTOMERS.contains(customerId.trim())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "customer identity required");
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "customer identity required");
         }
         return customerId.trim();
     }

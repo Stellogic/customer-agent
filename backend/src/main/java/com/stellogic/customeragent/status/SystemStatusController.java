@@ -18,4 +18,3 @@ public final class SystemStatusController {
         return service.current();
     }
 }
-

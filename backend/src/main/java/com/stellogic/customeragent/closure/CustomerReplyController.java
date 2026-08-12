@@ -14,7 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/customer/tickets")
 public final class CustomerReplyController {
-    private static final Set<String> SYNTHETIC_CUSTOMERS = Set.of("customer-demo", "customer-other-demo");
+    private static final Set<String> SYNTHETIC_CUSTOMERS =
+            Set.of("customer-demo", "customer-other-demo");
     private static final Set<String> ISSUE_KINDS = Set.of("LOGISTICS_DELAY", "OTHER");
     private final ClosureService service;
 
@@ -38,11 +39,19 @@ public final class CustomerReplyController {
             throw new InvalidClosureRequestException("不支持的问题类型");
         }
         requireText(request.message(), "缺少客户回复");
-        CustomerReplyResult result = service.reply(new CustomerReplyCommand(
-                customerId.trim(), ticketId, messageId.trim(),
-                request.orderReference().trim(), request.issueKind().trim(), request.message().trim()));
-        HttpStatus status = "LINKED_TICKET_CREATED".equals(result.outcome()) && !result.replayed()
-                ? HttpStatus.CREATED : HttpStatus.OK;
+        CustomerReplyResult result =
+                service.reply(
+                        new CustomerReplyCommand(
+                                customerId.trim(),
+                                ticketId,
+                                messageId.trim(),
+                                request.orderReference().trim(),
+                                request.issueKind().trim(),
+                                request.message().trim()));
+        HttpStatus status =
+                "LINKED_TICKET_CREATED".equals(result.outcome()) && !result.replayed()
+                        ? HttpStatus.CREATED
+                        : HttpStatus.OK;
         return ResponseEntity.status(status)
                 .body(new ReplyResponse(result.ticketId(), result.outcome(), result.replayed()));
     }

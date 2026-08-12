@@ -32,10 +32,18 @@ public final class AgentInvestigationController {
     InvestigationFacts facts(
             @PathVariable UUID ticketId,
             @PathVariable UUID generationId,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @RequestHeader(value = "X-Agent-Generation-Id", required = false) UUID scopedGenerationId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
+                    String authorization,
+            @RequestHeader(value = "X-Agent-Generation-Id", required = false)
+                    UUID scopedGenerationId,
             @RequestHeader(value = "X-Agent-Operation", required = false) String operation) {
-        requireScope(ticketId, generationId, scopedGenerationId, operation, "READ_INVESTIGATION_FACTS", authorization);
+        requireScope(
+                ticketId,
+                generationId,
+                scopedGenerationId,
+                operation,
+                "READ_INVESTIGATION_FACTS",
+                authorization);
         return service.facts(ticketId, generationId);
     }
 
@@ -43,15 +51,24 @@ public final class AgentInvestigationController {
     ConclusionAcceptance submit(
             @PathVariable UUID ticketId,
             @PathVariable UUID generationId,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @RequestHeader(value = "X-Agent-Generation-Id", required = false) UUID scopedGenerationId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
+                    String authorization,
+            @RequestHeader(value = "X-Agent-Generation-Id", required = false)
+                    UUID scopedGenerationId,
             @RequestHeader(value = "X-Agent-Operation", required = false) String operation,
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @RequestBody InvestigationConclusion conclusion) {
-        requireScope(ticketId, generationId, scopedGenerationId, operation, "SUBMIT_INVESTIGATION_CONCLUSION", authorization);
+        requireScope(
+                ticketId,
+                generationId,
+                scopedGenerationId,
+                operation,
+                "SUBMIT_INVESTIGATION_CONCLUSION",
+                authorization);
         if (requestId == null || requestId.isBlank() || requestId.length() > 200) {
             service.auditRejected(ticketId, "MISSING_IDEMPOTENCY_IDENTITY");
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing stable command identity");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "missing stable command identity");
         }
         return service.submit(ticketId, generationId, requestId, conclusion);
     }
@@ -63,15 +80,18 @@ public final class AgentInvestigationController {
             String operation,
             String expectedOperation,
             String authorization) {
-        byte[] actual = authorization != null && authorization.startsWith("Bearer ")
-                ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
-                : new byte[0];
-        boolean allowed = MessageDigest.isEqual(actual, agentToken)
-                && generationId.equals(scopedGenerationId)
-                && expectedOperation.equals(operation);
+        byte[] actual =
+                authorization != null && authorization.startsWith("Bearer ")
+                        ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
+                        : new byte[0];
+        boolean allowed =
+                MessageDigest.isEqual(actual, agentToken)
+                        && generationId.equals(scopedGenerationId)
+                        && expectedOperation.equals(operation);
         if (!allowed) {
             service.auditRejected(ticketId, "CAPABILITY_SCOPE_REJECTED");
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "agent capability is outside the current scope");
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "agent capability is outside the current scope");
         }
     }
 }

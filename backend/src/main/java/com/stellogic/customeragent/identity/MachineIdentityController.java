@@ -26,24 +26,28 @@ public final class MachineIdentityController {
     }
 
     @GetMapping("/agent/probe")
-    public Map<String, String> agent(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+    public Map<String, String> agent(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
         require(authorization, agentToken);
         return Map.of("identity", "agent", "capability", "ticket-investigation-probe");
     }
 
     @GetMapping("/executor/probe")
-    public Map<String, String> executor(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+    public Map<String, String> executor(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
         require(authorization, executorToken);
-        return Map.of("identity", "compensation-executor", "capability", "compensation-execution-probe");
+        return Map.of(
+                "identity", "compensation-executor", "capability", "compensation-execution-probe");
     }
 
     private static void require(String authorization, byte[] expected) {
-        byte[] actual = authorization.startsWith("Bearer ")
-                ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
-                : new byte[0];
+        byte[] actual =
+                authorization.startsWith("Bearer ")
+                        ? authorization.substring(7).getBytes(StandardCharsets.UTF_8)
+                        : new byte[0];
         if (!MessageDigest.isEqual(actual, expected)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "machine identity cannot use this capability");
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "machine identity cannot use this capability");
         }
     }
 }
-

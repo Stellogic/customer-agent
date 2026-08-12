@@ -16,7 +16,8 @@ final class ApprovalModels {
             Instant submittedAt,
             Instant expiresAt) {}
 
-    record ClaimCommand(String approverId, UUID revisionId, String requestId, Integer requestedLeaseSeconds) {}
+    record ClaimCommand(
+            String approverId, UUID revisionId, String requestId, Integer requestedLeaseSeconds) {}
 
     record LeaseResult(
             UUID proposalRevisionId,
@@ -54,22 +55,38 @@ final class ApprovalModels {
             Instant proposalExpiresAt) {}
 
     record ApprovalViewEvent(
-            String epoch, long sequence, String eventType, UUID proposalRevisionId,
-            long leaseVersion, String authorityState) {
-        String cursor() { return epoch + ":" + sequence; }
+            String epoch,
+            long sequence,
+            String eventType,
+            UUID proposalRevisionId,
+            long leaseVersion,
+            String authorityState) {
+        String cursor() {
+            return epoch + ":" + sequence;
+        }
 
         String publicData() {
-            return "{\"view\":\"APPROVAL_VIEW\",\"schema\":\"" + epoch
-                    + "\",\"payload\":{\"proposalRevisionId\":\"" + proposalRevisionId
-                    + "\",\"leaseVersion\":" + leaseVersion + ",\"authorityState\":\""
-                    + authorityState + "\"}}";
+            return "{\"view\":\"APPROVAL_VIEW\",\"schema\":\""
+                    + epoch
+                    + "\",\"payload\":{\"proposalRevisionId\":\""
+                    + proposalRevisionId
+                    + "\",\"leaseVersion\":"
+                    + leaseVersion
+                    + ",\"authorityState\":\""
+                    + authorityState
+                    + "\"}}";
         }
     }
 
-    record ResponsibilityEvent(String eventType, String actorId, Instant occurredAt, Long leaseVersion) {}
+    record ResponsibilityEvent(
+            String eventType, String actorId, Instant occurredAt, Long leaseVersion) {}
 
     record ReleaseCommand(
-            String approverId, UUID revisionId, UUID leaseToken, long leaseVersion, String requestId) {}
+            String approverId,
+            UUID revisionId,
+            UUID leaseToken,
+            long leaseVersion,
+            String requestId) {}
 
     record ReleaseResult(UUID proposalRevisionId, boolean released, boolean replayed) {}
 
@@ -107,7 +124,16 @@ final class ApprovalModels {
             CompensationExecutionStatus executionStatus,
             boolean replayed) {}
 
-    enum ProposalDecision { APPROVED, REJECTED }
+    enum ProposalDecision {
+        APPROVED,
+        REJECTED
+    }
 
-    enum CompensationExecutionStatus { READY, PROCESSING, UNKNOWN, SUCCEEDED, FAILED }
+    enum CompensationExecutionStatus {
+        READY,
+        PROCESSING,
+        UNKNOWN,
+        SUCCEEDED,
+        FAILED
+    }
 }

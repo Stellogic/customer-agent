@@ -36,8 +36,11 @@ record SupportWorkbenchEvent(String epoch, long sequence, String type, String js
     }
 
     String publicData() {
-        return "{\"view\":\"SUPPORT_WORKBENCH\",\"schema\":\"" + epoch + "\",\"payload\":"
-                + jsonPayload + "}";
+        return "{\"view\":\"SUPPORT_WORKBENCH\",\"schema\":\""
+                + epoch
+                + "\",\"payload\":"
+                + jsonPayload
+                + "}";
     }
 }
 
@@ -54,7 +57,8 @@ record SupportTicketDetails(
 
 record SupportConversationMessage(String author, String body, Instant sentAt) {}
 
-record SupportInvestigationFact(String factType, String factValue, String evidenceReference, Instant recordedAt) {}
+record SupportInvestigationFact(
+        String factType, String factValue, String evidenceReference, Instant recordedAt) {}
 
 record SupportTimelineEvent(String eventType, String actorId, Instant occurredAt) {}
 

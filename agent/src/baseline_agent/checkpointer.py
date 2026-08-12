@@ -10,4 +10,3 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 async def generate_checkpointer() -> AsyncIterator[BaseCheckpointSaver]:
     async with AsyncPostgresSaver.from_conn_string(os.environ["AGENT_DATABASE_URI"]) as saver:
         yield saver
-

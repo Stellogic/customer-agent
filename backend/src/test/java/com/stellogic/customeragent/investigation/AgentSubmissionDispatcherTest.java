@@ -22,34 +22,46 @@ class AgentSubmissionDispatcherTest {
         UUID generationId = UUID.fromString("14000000-0000-0000-0000-000000000002");
         UUID ticketId = UUID.fromString("14000000-0000-0000-0000-000000000003");
         UUID threadId = UUID.fromString("14000000-0000-0000-0000-000000000004");
-        var submission = new AgentSubmissionStore.PendingSubmission(
-                submissionId, generationId, ticketId, threadId);
+        var submission =
+                new AgentSubmissionStore.PendingSubmission(
+                        submissionId, generationId, ticketId, threadId);
         AgentSubmissionStore store = org.mockito.Mockito.mock(AgentSubmissionStore.class);
         when(store.claim()).thenReturn(Optional.of(submission));
         AtomicInteger runPosts = new AtomicInteger();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/threads/" + threadId, exchange -> {
-            if (exchange.getRequestURI().getPath().endsWith("/runs")) {
-                if ("GET".equals(exchange.getRequestMethod())) {
-                    respond(exchange, 200, "[{\"run_id\":\"server-run\",\"metadata\":{\"submission_request_id\":\""
-                            + submissionId + "\"}}]");
-                } else {
-                    runPosts.incrementAndGet();
-                    respond(exchange, 200, "{}");
-                }
-            } else {
-                respond(exchange, 200, "{}");
-            }
-        });
+        server.createContext(
+                "/threads/" + threadId,
+                exchange -> {
+                    if (exchange.getRequestURI().getPath().endsWith("/runs")) {
+                        if ("GET".equals(exchange.getRequestMethod())) {
+                            respond(
+                                    exchange,
+                                    200,
+                                    "[{\"run_id\":\"server-run\",\"metadata\":{\"submission_request_id\":\""
+                                            + submissionId
+                                            + "\"}}]");
+                        } else {
+                            runPosts.incrementAndGet();
+                            respond(exchange, 200, "{}");
+                        }
+                    } else {
+                        respond(exchange, 200, "{}");
+                    }
+                });
         server.start();
         try {
-            var dispatcher = new AgentSubmissionDispatcher(
-                    store, "http://127.0.0.1:" + server.getAddress().getPort(), "service-token", new ObjectMapper());
+            var dispatcher =
+                    new AgentSubmissionDispatcher(
+                            store,
+                            "http://127.0.0.1:" + server.getAddress().getPort(),
+                            "service-token",
+                            new ObjectMapper());
 
             dispatcher.dispatchNext();
 
             verify(store).submitted(submissionId);
-            verify(store, never()).retry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+            verify(store, never())
+                    .retry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
             org.junit.jupiter.api.Assertions.assertEquals(0, runPosts.get());
         } finally {
             server.stop(0);
@@ -62,29 +74,40 @@ class AgentSubmissionDispatcherTest {
         UUID generationId = UUID.fromString("14000000-0000-0000-0000-000000000012");
         UUID ticketId = UUID.fromString("14000000-0000-0000-0000-000000000013");
         UUID threadId = UUID.fromString("14000000-0000-0000-0000-000000000014");
-        var submission = new AgentSubmissionStore.PendingSubmission(
-                submissionId, generationId, ticketId, threadId);
+        var submission =
+                new AgentSubmissionStore.PendingSubmission(
+                        submissionId, generationId, ticketId, threadId);
         AgentSubmissionStore store = org.mockito.Mockito.mock(AgentSubmissionStore.class);
         when(store.claim()).thenReturn(Optional.of(submission));
         AtomicInteger runPosts = new AtomicInteger();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/threads/" + threadId, exchange -> {
-            if (exchange.getRequestURI().getPath().endsWith("/runs")) {
-                if ("GET".equals(exchange.getRequestMethod())) {
-                    respond(exchange, 200, "[{\"run_id\":\"failed-run\",\"status\":\"error\",\"metadata\":{\"submission_request_id\":\""
-                            + submissionId + "\"}}]");
-                } else {
-                    runPosts.incrementAndGet();
-                    respond(exchange, 200, "{}");
-                }
-            } else {
-                respond(exchange, 200, "{}");
-            }
-        });
+        server.createContext(
+                "/threads/" + threadId,
+                exchange -> {
+                    if (exchange.getRequestURI().getPath().endsWith("/runs")) {
+                        if ("GET".equals(exchange.getRequestMethod())) {
+                            respond(
+                                    exchange,
+                                    200,
+                                    "[{\"run_id\":\"failed-run\",\"status\":\"error\",\"metadata\":{\"submission_request_id\":\""
+                                            + submissionId
+                                            + "\"}}]");
+                        } else {
+                            runPosts.incrementAndGet();
+                            respond(exchange, 200, "{}");
+                        }
+                    } else {
+                        respond(exchange, 200, "{}");
+                    }
+                });
         server.start();
         try {
-            var dispatcher = new AgentSubmissionDispatcher(
-                    store, "http://127.0.0.1:" + server.getAddress().getPort(), "service-token", new ObjectMapper());
+            var dispatcher =
+                    new AgentSubmissionDispatcher(
+                            store,
+                            "http://127.0.0.1:" + server.getAddress().getPort(),
+                            "service-token",
+                            new ObjectMapper());
 
             dispatcher.dispatchNext();
 

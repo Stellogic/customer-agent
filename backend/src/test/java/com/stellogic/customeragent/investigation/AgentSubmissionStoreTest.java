@@ -16,14 +16,17 @@ class AgentSubmissionStoreTest {
         JdbcTemplate jdbc = org.mockito.Mockito.mock(JdbcTemplate.class);
         when(jdbc.query(
                         any(String.class),
-                        org.mockito.ArgumentMatchers.<RowMapper<AgentSubmissionStore.PendingSubmission>>any()))
+                        org.mockito.ArgumentMatchers
+                                .<RowMapper<AgentSubmissionStore.PendingSubmission>>any()))
                 .thenReturn(List.of());
         var store = new AgentSubmissionStore(jdbc);
 
         store.claim();
 
-        verify(jdbc).query(
-                contains("next_attempt_at <= current_timestamp"),
-                org.mockito.ArgumentMatchers.<RowMapper<AgentSubmissionStore.PendingSubmission>>any());
+        verify(jdbc)
+                .query(
+                        contains("next_attempt_at <= current_timestamp"),
+                        org.mockito.ArgumentMatchers
+                                .<RowMapper<AgentSubmissionStore.PendingSubmission>>any());
     }
 }

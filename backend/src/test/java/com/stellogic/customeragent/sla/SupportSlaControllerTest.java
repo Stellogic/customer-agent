@@ -14,16 +14,24 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class SupportSlaControllerTest {
     private static final UUID TICKET_ID = UUID.fromString("17000000-0000-0000-0000-000000000001");
-    private final SupportSlaProjectionService service = org.mockito.Mockito.mock(SupportSlaProjectionService.class);
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new SupportSlaController(service)).build();
+    private final SupportSlaProjectionService service =
+            org.mockito.Mockito.mock(SupportSlaProjectionService.class);
+    private final MockMvc mvc =
+            MockMvcBuilders.standaloneSetup(new SupportSlaController(service)).build();
 
     @Test
     void currentAssigneeReceivesOnlyItsWarningProjection() throws Exception {
-        when(service.notifications("support-demo")).thenReturn(List.of(new SlaWarningNotification(
-                TICKET_ID, "RESOLUTION", Instant.parse("2026-08-09T14:00:00Z"))));
+        when(service.notifications("support-demo"))
+                .thenReturn(
+                        List.of(
+                                new SlaWarningNotification(
+                                        TICKET_ID,
+                                        "RESOLUTION",
+                                        Instant.parse("2026-08-09T14:00:00Z"))));
 
-        mvc.perform(get("/api/support/sla/notifications")
-                        .header("X-Synthetic-Support-Id", "support-demo"))
+        mvc.perform(
+                        get("/api/support/sla/notifications")
+                                .header("X-Synthetic-Support-Id", "support-demo"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].ticketId").value(TICKET_ID.toString()))
                 .andExpect(jsonPath("$[0].objective").value("RESOLUTION"))
@@ -32,12 +40,20 @@ class SupportSlaControllerTest {
 
     @Test
     void sharedQueueExposesOnlyTheConfirmedMinimumSummary() throws Exception {
-        when(service.escalations()).thenReturn(List.of(new SharedEscalationSummary(
-                TICKET_ID, "INVESTIGATING", "AGENT", "SLA_BREACH", List.of("RESOLUTION"),
-                Instant.parse("2026-08-09T14:00:00Z"))));
+        when(service.escalations())
+                .thenReturn(
+                        List.of(
+                                new SharedEscalationSummary(
+                                        TICKET_ID,
+                                        "INVESTIGATING",
+                                        "AGENT",
+                                        "SLA_BREACH",
+                                        List.of("RESOLUTION"),
+                                        Instant.parse("2026-08-09T14:00:00Z"))));
 
-        mvc.perform(get("/api/support/escalations")
-                        .header("X-Synthetic-Support-Id", "support-demo"))
+        mvc.perform(
+                        get("/api/support/escalations")
+                                .header("X-Synthetic-Support-Id", "support-demo"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].reasonCode").value("SLA_BREACH"))
                 .andExpect(jsonPath("$[0].lifecycleState").value("INVESTIGATING"))
@@ -50,8 +66,9 @@ class SupportSlaControllerTest {
 
     @Test
     void nonSupportIdentityCannotReadInternalProjections() throws Exception {
-        mvc.perform(get("/api/support/escalations")
-                        .header("X-Synthetic-Support-Id", "customer-demo"))
+        mvc.perform(
+                        get("/api/support/escalations")
+                                .header("X-Synthetic-Support-Id", "customer-demo"))
                 .andExpect(status().isForbidden());
     }
 }

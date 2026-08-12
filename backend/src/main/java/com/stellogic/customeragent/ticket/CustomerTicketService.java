@@ -7,8 +7,12 @@ public interface CustomerTicketService {
     TicketCreationResult create(CreateCustomerTicket command);
 
     UUID createFollowUp(
-            String customerId, String requestId, String orderReference, String description,
-            String issueKind, UUID originalTicketId);
+            String customerId,
+            String requestId,
+            String orderReference,
+            String description,
+            String issueKind,
+            UUID originalTicketId);
 
     CustomerPublicSnapshot snapshot(String customerId, UUID ticketId);
 

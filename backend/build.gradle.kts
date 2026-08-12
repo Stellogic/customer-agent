@@ -1,6 +1,8 @@
 plugins {
     java
+    checkstyle
     id("org.springframework.boot") version "4.1.0"
+    id("com.diffplug.spotless") version "8.9.0"
 }
 
 group = "com.stellogic.customeragent"
@@ -26,6 +28,19 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
+}
+
+checkstyle {
+    toolVersion = "13.10.0"
+    configDirectory.set(layout.projectDirectory.dir("config/checkstyle"))
+}
+
+spotless {
+    java {
+        target("src/**/*.java")
+        googleJavaFormat("1.35.0").aosp()
+    }
 }
 
 dependencyLocking {

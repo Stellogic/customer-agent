@@ -29,30 +29,41 @@ public final class AuthorizedSsePollingStream {
     }
 
     private static <E> void startPolling(
-            SseEmitter emitter, String threadName, long intervalMillis, String initialCursor, Source<E> source) {
+            SseEmitter emitter,
+            String threadName,
+            long intervalMillis,
+            String initialCursor,
+            Source<E> source) {
         AtomicBoolean closed = new AtomicBoolean();
         emitter.onCompletion(() -> closed.set(true));
-        emitter.onTimeout(() -> { closed.set(true); emitter.complete(); });
+        emitter.onTimeout(
+                () -> {
+                    closed.set(true);
+                    emitter.complete();
+                });
         emitter.onError(error -> closed.set(true));
-        Thread.ofVirtual().name(threadName).start(() -> {
-            String cursor = initialCursor;
-            try {
-                while (!closed.get()) {
-                    Thread.sleep(intervalMillis);
-                    List<E> incremental = source.events(cursor);
-                    source.authorize();
-                    for (E event : incremental) {
-                        sendAuthorized(emitter, source, event);
-                        cursor = source.cursor(event);
-                    }
-                }
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                emitter.complete();
-            } catch (Exception exception) {
-                emitter.completeWithError(exception);
-            }
-        });
+        Thread.ofVirtual()
+                .name(threadName)
+                .start(
+                        () -> {
+                            String cursor = initialCursor;
+                            try {
+                                while (!closed.get()) {
+                                    Thread.sleep(intervalMillis);
+                                    List<E> incremental = source.events(cursor);
+                                    source.authorize();
+                                    for (E event : incremental) {
+                                        sendAuthorized(emitter, source, event);
+                                        cursor = source.cursor(event);
+                                    }
+                                }
+                            } catch (InterruptedException exception) {
+                                Thread.currentThread().interrupt();
+                                emitter.complete();
+                            } catch (Exception exception) {
+                                emitter.completeWithError(exception);
+                            }
+                        });
     }
 
     private static <E> void sendAuthorized(SseEmitter emitter, Source<E> source, E event)

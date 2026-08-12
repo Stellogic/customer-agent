@@ -22,7 +22,8 @@ public final class CustomerTicketExceptionHandler {
 
     @ExceptionHandler(InvalidCustomerRequestException.class)
     ResponseEntity<Map<String, String>> invalid(InvalidCustomerRequestException exception) {
-        return ResponseEntity.badRequest().body(Map.of("code", "INVALID_REQUEST", "message", exception.getMessage()));
+        return ResponseEntity.badRequest()
+                .body(Map.of("code", "INVALID_REQUEST", "message", exception.getMessage()));
     }
 
     @ExceptionHandler(CustomerAuthenticationException.class)

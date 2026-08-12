@@ -4,7 +4,8 @@ import java.util.UUID;
 
 record CreateClarification(UUID ticketId, UUID generationId, String requestId, String reasonCode) {}
 
-record ClarificationRequestResult(UUID clarificationRequestId, String promptCode, String question) {}
+record ClarificationRequestResult(
+        UUID clarificationRequestId, String promptCode, String question) {}
 
 record ReplyToClarification(
         String customerId,

@@ -19,18 +19,23 @@ class StatusConfiguration {
             @Value("${baseline.agent.base-url}") String agentBaseUrl,
             @Value("${baseline.agent.token}") String agentToken) {
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
-        RestClient agent = RestClient.builder()
-                .baseUrl(agentBaseUrl)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + agentToken)
-                .requestFactory(new SimpleClientHttpRequestFactory())
-                .build();
+        RestClient agent =
+                RestClient.builder()
+                        .baseUrl(agentBaseUrl)
+                        .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + agentToken)
+                        .requestFactory(new SimpleClientHttpRequestFactory())
+                        .build();
 
         AvailabilityProbe databaseProbe = () -> jdbc.queryForObject("select 1", Integer.class) == 1;
-        AvailabilityProbe agentProbe = () -> agent.post()
-                .uri("/threads/search")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body("{}")
-                .exchange((request, response) -> response.getStatusCode().is2xxSuccessful());
+        AvailabilityProbe agentProbe =
+                () ->
+                        agent.post()
+                                .uri("/threads/search")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body("{}")
+                                .exchange(
+                                        (request, response) ->
+                                                response.getStatusCode().is2xxSuccessful());
         return new SystemStatusService(databaseProbe, agentProbe);
     }
 }

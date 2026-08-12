@@ -1,7 +1,7 @@
 package com.stellogic.customeragent.handoff;
 
-import java.util.UUID;
 import java.util.List;
+import java.util.UUID;
 
 record RequestHumanHandoff(String customerId, UUID ticketId, String requestId, String reasonCode) {}
 
@@ -26,4 +26,5 @@ record RequestAgentHumanHandoff(
         AgentHumanHandoffReason reasonCode,
         AgentHumanHandoffSummary summary) {}
 
-record AgentHumanHandoffResult(String requestId, String handlingMode, String reasonCode, boolean replayed) {}
+record AgentHumanHandoffResult(
+        String requestId, String handlingMode, String reasonCode, boolean replayed) {}

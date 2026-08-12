@@ -5,12 +5,12 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class SyntheticApprovers {
-    private static final List<Entry> ENTRIES = List.of(
-            new Entry("approver-demo", "审批人演示入口"),
-            new Entry("approver-other-demo", "另一审批人并发边界入口"));
-    private static final Set<String> IDS = ENTRIES.stream()
-            .map(Entry::id)
-            .collect(Collectors.toUnmodifiableSet());
+    private static final List<Entry> ENTRIES =
+            List.of(
+                    new Entry("approver-demo", "审批人演示入口"),
+                    new Entry("approver-other-demo", "另一审批人并发边界入口"));
+    private static final Set<String> IDS =
+            ENTRIES.stream().map(Entry::id).collect(Collectors.toUnmodifiableSet());
 
     private SyntheticApprovers() {}
 

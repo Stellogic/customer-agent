@@ -25,9 +25,8 @@ public final class DelayCompensationPolicy {
         if (delay.compareTo(HOURS_72) <= 0) {
             return new Decision(true, Method.COUPON, TWENTY);
         }
-        BigDecimal amount = paidAmount.multiply(REFUND_RATE)
-                .min(REFUND_CAP)
-                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal amount =
+                paidAmount.multiply(REFUND_RATE).min(REFUND_CAP).setScale(2, RoundingMode.HALF_UP);
         return new Decision(true, Method.SIMULATED_PARTIAL_REFUND, amount);
     }
 
