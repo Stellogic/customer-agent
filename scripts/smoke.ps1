@@ -172,7 +172,6 @@ if ($status.status -ne 'UP') {
 }
 
 $sensitiveRules = Get-Content "$PSScriptRoot/../frontend/src/sensitive-content-patterns.json" -Raw | ConvertFrom-Json
-$sensitiveContentPattern = $sensitiveRules.contentPatterns -join '|'
 $frontendSensitivePattern = (@($sensitiveRules.contentPatterns) + @($sensitiveRules.internalAddressPatterns)) -join '|'
 docker run --rm --entrypoint sh "customer-agent/frontend:$imageTag" -c "
     grep -R -q '/support' /usr/share/nginx/html &&
@@ -180,10 +179,8 @@ docker run --rm --entrypoint sh "customer-agent/frontend:$imageTag" -c "
     ! grep -R -E '$frontendSensitivePattern' /usr/share/nginx/html"
 
 $runtimeLogs = docker compose logs --no-color
-$forbiddenRuntimeLog = $runtimeLogs | Select-String -Pattern $sensitiveContentPattern
-if ($forbiddenRuntimeLog) {
-    throw "运行日志包含禁止进入产品日志的敏感或内部标识: $($forbiddenRuntimeLog | Select-Object -First 1)"
-}
+& "$PSScriptRoot/assert-runtime-log-policy.ps1" -LogLines $runtimeLogs
+Write-Host '运行日志应用正文敏感内容扫描通过（Compose 元数据已剥离）'
 
 $versions = [ordered]@{
     node = (docker run --rm node:24.19.0-bookworm-slim node --version 2>$null)
