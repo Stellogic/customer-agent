@@ -4,7 +4,7 @@ x-secrets: &local-secrets
   SPRING_TO_AGENT_TOKEN: ${SPRING_TO_AGENT_TOKEN:-local-spring-to-agent}
   AGENT_MACHINE_TOKEN: ${AGENT_MACHINE_TOKEN:-local-agent-machine}
   EXECUTOR_MACHINE_TOKEN: ${EXECUTOR_MACHINE_TOKEN:-local-executor-machine}
-  DEMO_FIXED_INSTANT: ${DEMO_FIXED_INSTANT:-2026-08-09T14:00:00Z}
+  DEMO_FIXED_INSTANT: ${DEMO_FIXED_INSTANT-2026-08-09T14:00:00Z}
 
 services:
   postgres:
@@ -14,6 +14,8 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql
       - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./agent/approval_queue_time_setup.sql:/smoke/approval_queue_time_setup.sql:ro
+      - ./agent/approval_queue_time_cleanup.sql:/smoke/approval_queue_time_cleanup.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 2s
@@ -158,6 +160,20 @@ services:
       <<: *local-secrets
     depends_on:
       frontend:
+        condition: service_healthy
+    networks: [data, services]
+
+  approval-queue-time-smoke:
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-local}
+    profiles: [smoke]
+    entrypoint: ["python", "/smoke/approval_queue_time_smoke.py"]
+    volumes:
+      - ./agent/approval_queue_time_smoke.py:/smoke/approval_queue_time_smoke.py:ro
+    environment:
+      SPRING_INTERNAL_URL: http://backend:8080
+      SPRING_DATABASE_URI: postgresql://spring_app:local-spring-app@postgres:5432/customer_agent
+    depends_on:
+      backend:
         condition: service_healthy
     networks: [data, services]
 

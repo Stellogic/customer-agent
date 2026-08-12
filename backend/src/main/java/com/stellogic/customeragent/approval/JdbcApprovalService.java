@@ -64,6 +64,7 @@ class JdbcApprovalService implements ApprovalService {
     public List<ApprovalModels.QueueItem> queue() {
         Instant serverNow = clock.instant();
         proposalExpiry.expireDue(serverNow);
+        serverNow = clock.instant();
         Timestamp now = Timestamp.from(serverNow);
         return jdbc.query(
                 "select p.id, p.compensation_method, p.amount, p.created_at, p.expires_at "
