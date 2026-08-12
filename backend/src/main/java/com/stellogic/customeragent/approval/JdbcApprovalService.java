@@ -217,8 +217,9 @@ class JdbcApprovalService implements ApprovalService {
                 jdbc.query(
                         "select p.ticket_id, p.revision_number, p.content_digest, p.order_reference, p.reason_code, "
                                 + "p.delay_hours, p.delay_seconds, p.compensation_method, p.amount, p.policy_version, "
-                                + "s.paid_amount, s.available_compensation_amount, "
-                                + "s.active_reservation_amount, s.paid, s.cancelled, s.fully_refunded, "
+                                + "s.paid_amount, s.total_available_compensation_amount, "
+                                + "s.active_reservation_amount, s.remaining_available_compensation_amount, "
+                                + "s.paid, s.cancelled, s.fully_refunded, "
                                 + "s.existing_compensation, s.evidence_references::text, l.expires_at, p.created_at, p.expires_at, "
                                 + "p.status, l.status "
                                 + "from approval_lease l join compensation_proposal_revision p on p.id = l.proposal_revision_id "
@@ -240,16 +241,17 @@ class JdbcApprovalService implements ApprovalService {
                                         rs.getBigDecimal(11),
                                         rs.getBigDecimal(12),
                                         rs.getBigDecimal(13),
-                                        rs.getBoolean(14),
+                                        rs.getBigDecimal(14),
                                         rs.getBoolean(15),
                                         rs.getBoolean(16),
                                         rs.getBoolean(17),
-                                        rs.getString(18),
-                                        rs.getTimestamp(19).toInstant(),
+                                        rs.getBoolean(18),
+                                        rs.getString(19),
                                         rs.getTimestamp(20).toInstant(),
                                         rs.getTimestamp(21).toInstant(),
-                                        rs.getString(22),
-                                        rs.getString(23)),
+                                        rs.getTimestamp(22).toInstant(),
+                                        rs.getString(23),
+                                        rs.getString(24)),
                         command.revisionId(),
                         command.approverId(),
                         command.leaseToken(),
@@ -283,8 +285,12 @@ class JdbcApprovalService implements ApprovalService {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("delaySeconds", row.delaySeconds());
         snapshot.put("paidAmount", row.paidAmount().toPlainString());
-        snapshot.put("availableCompensationAmount", row.availableAmount().toPlainString());
-        snapshot.put("activeReservationAmount", row.reservedAmount().toPlainString());
+        snapshot.put(
+                "totalAvailableCompensationAmount", row.totalAvailableAmount().toPlainString());
+        snapshot.put("activeReservationAmount", row.activeReservationAmount().toPlainString());
+        snapshot.put(
+                "remainingAvailableCompensationAmount",
+                row.remainingAvailableAmount().toPlainString());
         List<String> checks = eligibilityChecks(row, authoritative.amount());
         List<ApprovalModels.ResponsibilityEvent> responsibility =
                 jdbc.query(
@@ -708,8 +714,10 @@ class JdbcApprovalService implements ApprovalService {
                 jdbc.query(
                         "select p.ticket_id, p.revision_number, p.content_digest, p.status, p.expires_at, "
                                 + "p.order_reference, p.delay_hours, p.delay_seconds, p.compensation_method, p.amount, "
-                                + "p.reason_code, p.policy_version, s.paid_amount, s.available_compensation_amount, "
-                                + "s.active_reservation_amount, s.paid, s.cancelled, s.fully_refunded, s.existing_compensation "
+                                + "p.reason_code, p.policy_version, s.paid_amount, "
+                                + "s.total_available_compensation_amount, s.active_reservation_amount, "
+                                + "s.remaining_available_compensation_amount, s.paid, s.cancelled, "
+                                + "s.fully_refunded, s.existing_compensation "
                                 + "from compensation_proposal_revision p join approval_evidence_snapshot s "
                                 + "on s.proposal_revision_id = p.id where p.id = ? for update of p",
                         (rs, row) ->
@@ -730,10 +738,11 @@ class JdbcApprovalService implements ApprovalService {
                                                 rs.getBigDecimal(13),
                                                 rs.getBigDecimal(14),
                                                 rs.getBigDecimal(15),
-                                                rs.getBoolean(16),
+                                                rs.getBigDecimal(16),
                                                 rs.getBoolean(17),
                                                 rs.getBoolean(18),
-                                                rs.getBoolean(19))),
+                                                rs.getBoolean(19),
+                                                rs.getBoolean(20))),
                         command.revisionId());
         if (proposals.isEmpty() || !ticketId.equals(proposals.getFirst().ticketId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
@@ -932,13 +941,20 @@ class JdbcApprovalService implements ApprovalService {
                 && proposal.method() == authoritative.method()
                 && proposal.amount().compareTo(authoritative.amount()) == 0
                 && snapshot.paidAmount().compareTo(order.paidAmount()) == 0
-                && snapshot.availableAmount().compareTo(order.availableAmount()) == 0
-                && snapshot.reservedAmount().compareTo(activeReservations) == 0
+                && snapshot.totalAvailableAmount().compareTo(order.totalAvailableAmount()) == 0
+                && snapshot.activeReservationAmount().compareTo(activeReservations) == 0
+                && snapshot.remainingAvailableAmount()
+                                .compareTo(
+                                        snapshot.totalAvailableAmount()
+                                                .subtract(snapshot.activeReservationAmount()))
+                        == 0
                 && snapshot.paid() == order.paid()
                 && snapshot.cancelled() == order.cancelled()
                 && snapshot.fullyRefunded() == order.fullyRefunded()
                 && snapshot.existingCompensation() == order.existingCompensation()
-                && activeReservations.add(authoritative.amount()).compareTo(order.availableAmount())
+                && activeReservations
+                                .add(authoritative.amount())
+                                .compareTo(order.totalAvailableAmount())
                         <= 0;
     }
 
@@ -1068,7 +1084,7 @@ class JdbcApprovalService implements ApprovalService {
                 !row.cancelled() ? "ORDER_NOT_CANCELLED" : "ORDER_CANCELLED",
                 !row.fullyRefunded() ? "ORDER_NOT_FULLY_REFUNDED" : "ORDER_FULLY_REFUNDED",
                 !row.existingCompensation() ? "NO_EXISTING_COMPENSATION" : "EXISTING_COMPENSATION",
-                row.availableAmount().compareTo(authoritativeAmount) >= 0
+                row.remainingAvailableAmount().compareTo(authoritativeAmount) >= 0
                         ? "ALLOWANCE_SUFFICIENT"
                         : "ALLOWANCE_INSUFFICIENT");
     }
@@ -1131,8 +1147,9 @@ class JdbcApprovalService implements ApprovalService {
 
     private record ApprovalEvidenceFacts(
             BigDecimal paidAmount,
-            BigDecimal availableAmount,
-            BigDecimal reservedAmount,
+            BigDecimal totalAvailableAmount,
+            BigDecimal activeReservationAmount,
+            BigDecimal remainingAvailableAmount,
             boolean paid,
             boolean cancelled,
             boolean fullyRefunded,
@@ -1140,7 +1157,7 @@ class JdbcApprovalService implements ApprovalService {
 
     private record AuthoritativeOrderFacts(
             BigDecimal paidAmount,
-            BigDecimal availableAmount,
+            BigDecimal totalAvailableAmount,
             int delayHours,
             long delaySeconds,
             boolean paid,
@@ -1178,8 +1195,9 @@ class JdbcApprovalService implements ApprovalService {
             BigDecimal amount,
             String policyVersion,
             BigDecimal paidAmount,
-            BigDecimal availableAmount,
-            BigDecimal reservedAmount,
+            BigDecimal totalAvailableAmount,
+            BigDecimal activeReservationAmount,
+            BigDecimal remainingAvailableAmount,
             boolean paid,
             boolean cancelled,
             boolean fullyRefunded,

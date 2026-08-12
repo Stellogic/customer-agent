@@ -37,6 +37,7 @@ class JdbcCompensationProposalStoreTest {
                         new BigDecimal("268.00"),
                         new BigDecimal("268.00"),
                         new BigDecimal("0.00"),
+                        new BigDecimal("268.00"),
                         true,
                         false,
                         false,

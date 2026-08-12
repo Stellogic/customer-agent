@@ -111,16 +111,18 @@ class JdbcCompensationProposalStore {
         jdbc.update(
                 "insert into approval_evidence_snapshot "
                         + "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "
-                        + "available_compensation_amount, active_reservation_amount, paid, cancelled, "
-                        + "fully_refunded, existing_compensation, evidence_references, captured_at) "
-                        + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, jsonb_build_array(?, ?), ?)",
+                        + "total_available_compensation_amount, active_reservation_amount, "
+                        + "remaining_available_compensation_amount, paid, cancelled, fully_refunded, "
+                        + "existing_compensation, evidence_references, captured_at) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, jsonb_build_array(?, ?), ?)",
                 revisionId,
                 content.orderReference(),
                 content.delayHours(),
                 content.delaySeconds(),
                 content.paidAmount(),
-                content.availableAmount(),
+                content.totalAvailableAmount(),
                 content.activeReservationAmount(),
+                content.remainingAvailableAmount(),
                 content.paid(),
                 content.cancelled(),
                 content.fullyRefunded(),
@@ -142,8 +144,9 @@ class JdbcCompensationProposalStore {
             List<String> evidenceReferences,
             String policyVersion,
             BigDecimal paidAmount,
-            BigDecimal availableAmount,
+            BigDecimal totalAvailableAmount,
             BigDecimal activeReservationAmount,
+            BigDecimal remainingAvailableAmount,
             boolean paid,
             boolean cancelled,
             boolean fullyRefunded,
@@ -159,8 +162,9 @@ class JdbcCompensationProposalStore {
                     String.join("\n", evidenceReferences),
                     policyVersion,
                     paidAmount.toPlainString(),
-                    availableAmount.toPlainString(),
+                    totalAvailableAmount.toPlainString(),
                     activeReservationAmount.toPlainString(),
+                    remainingAvailableAmount.toPlainString(),
                     Boolean.toString(paid),
                     Boolean.toString(cancelled),
                     Boolean.toString(fullyRefunded),
