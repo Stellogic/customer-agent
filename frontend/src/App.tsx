@@ -33,6 +33,19 @@ type EventEnvelope = {
 
 const customerHeaders = { "X-Synthetic-Customer-Id": "customer-demo" };
 
+function clarificationRejectionMessage(status: number) {
+  switch (status) {
+    case 401:
+      return "登录状态已失效，请重新登录后再试。";
+    case 403:
+      return "你当前无权回复这张工单。";
+    case 404:
+      return "未找到该工单或澄清请求，请返回工单列表确认。";
+    default:
+      return null;
+  }
+}
+
 export function App() {
   const [orderReference, setOrderReference] = useState("");
   const [description, setDescription] = useState("");
@@ -124,11 +137,40 @@ export function App() {
           body: JSON.stringify({ answer: clarificationAnswer }),
         },
       );
-      if (!response.ok) throw new Error("clarification reply failed");
-      await loadTicket(ticketId);
-      replyMessageId.current = globalThis.crypto.randomUUID();
-      resumeRequestId.current = globalThis.crypto.randomUUID();
+      if (response.status === 422) {
+        rotateClarificationRequestIds();
+        setError("回复内容未通过校验，请检查后重新提交。");
+        return;
+      }
+      if (response.status === 409) {
+        rotateClarificationRequestIds();
+        try {
+          await loadTicket(ticketId);
+          setError("该澄清已失效或工单状态已变化，已刷新最新状态。");
+        } catch {
+          setError("该澄清已失效或工单状态已变化；最新状态刷新失败，请手动刷新。");
+        }
+        return;
+      }
+      const deterministicError = clarificationRejectionMessage(response.status);
+      if (deterministicError) {
+        rotateClarificationRequestIds();
+        setError(deterministicError);
+        return;
+      }
+      if (!response.ok && response.status < 500) {
+        rotateClarificationRequestIds();
+        setError("回复未被接受，请检查当前工单状态后重试。");
+        return;
+      }
+      if (!response.ok) throw new Error("clarification reply result unknown");
+      rotateClarificationRequestIds();
       setClarificationAnswer("");
+      try {
+        await loadTicket(ticketId);
+      } catch {
+        setError("回复已提交，但最新工单状态刷新失败，请手动刷新。");
+      }
     } catch {
       const status = await fetch(
         `/api/customer/tickets/${ticketId}/clarification-resumes/${resumeRequestId.current}`,
@@ -138,12 +180,25 @@ export function App() {
         },
       ).catch(() => null);
       if (status?.ok) {
-        await loadTicket(ticketId);
+        try {
+          await loadTicket(ticketId);
+          if (snapshotRef.current?.clarification?.id !== clarificationId) {
+            rotateClarificationRequestIds();
+            setClarificationAnswer("");
+          }
+        } catch {
+          setError("已找到原回复的恢复记录，但最新工单状态刷新失败，请手动刷新。");
+        }
       } else {
         setError("回复状态暂时未知；请保留本页重试，稳定恢复身份不会启动第二次调查。");
       }
     } finally {
       setSubmitting(false);
+    }
+
+    function rotateClarificationRequestIds() {
+      replyMessageId.current = globalThis.crypto.randomUUID();
+      resumeRequestId.current = globalThis.crypto.randomUUID();
     }
   }
 
