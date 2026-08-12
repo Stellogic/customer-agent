@@ -5,21 +5,35 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   deterministic-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         component: [backend, agent, frontend]
     steps:
       - uses: actions/checkout@v4
-      - name: Build and run deterministic tests
+      - name: Run Spotless, Checkstyle, ArchUnit, and backend tests
+        if: matrix.component == 'backend'
         shell: pwsh
-        run: ./scripts/check.ps1 -Component ${{ matrix.component }} -SkipAcceptance
+        run: ./scripts/check.ps1 -Component backend -SkipAcceptance
+      - name: Run Ruff format, Ruff lint, Pyright, and Pytest
+        if: matrix.component == 'agent'
+        shell: pwsh
+        run: ./scripts/check.ps1 -Component agent -SkipAcceptance
+      - name: Run Prettier, ESLint, TypeScript, Vitest, and Vite build
+        if: matrix.component == 'frontend'
+        shell: pwsh
+        run: ./scripts/check.ps1 -Component frontend -SkipAcceptance
 
   fullstack-acceptance:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Run empty-database deterministic full-stack acceptance
