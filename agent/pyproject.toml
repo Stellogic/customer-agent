@@ -13,8 +13,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "pyright==1.1.411",
   "pytest==8.4.2",
   "pytest-asyncio==1.1.0",
+  "ruff==0.16.2",
 ]
 
 [build-system]
@@ -27,3 +29,21 @@ packages = ["src/baseline_agent"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.ruff]
+exclude = ["src/baseline_agent/migrate.py"]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501", "RUF001"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["SIM105"]
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+reportTypedDictNotRequiredAccess = false

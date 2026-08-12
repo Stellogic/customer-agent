@@ -6,7 +6,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/home/gradle/.gradle gradle bootJar --no-daemon
 
 FROM build AS test
-RUN --mount=type=cache,target=/home/gradle/.gradle gradle test --no-daemon
+RUN --mount=type=cache,target=/home/gradle/.gradle gradle check --no-daemon
 
 FROM eclipse-temurin:25.0.3_9-jre-noble AS runtime
 RUN apt-get update \

@@ -17,7 +17,13 @@ describe("客服共享队列工作台", () => {
     globalThis.history.replaceState(null, "", "/support");
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json({ id: "support-demo", role: "SUPPORT" }))
-      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:7", [handoffItem(), breachedItem()], [breachedItem()]))
+      .mockResolvedValueOnce(
+        snapshotResponse(
+          "support-workbench-v1:7",
+          [handoffItem(), breachedItem()],
+          [breachedItem()],
+        ),
+      )
       .mockResolvedValueOnce(openStream());
 
     render(<RootApplication />);
@@ -28,7 +34,9 @@ describe("客服共享队列工作台", () => {
     expect(await screen.findAllByText(HANDOFF_TICKET)).toHaveLength(1);
     expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
     expect(screen.queryByRole("combobox", { name: /角色/ })).not.toBeInTheDocument();
-    expect(screen.queryByText(/CUSTOMER_REQUESTED|AGENT_HUMAN_HANDOFF|调查摘要/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/CUSTOMER_REQUESTED|AGENT_HUMAN_HANDOFF|调查摘要/),
+    ).not.toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe("/api/demo/session");
     expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe("/api/support/workbench/snapshot");
   });
@@ -41,58 +49,88 @@ describe("客服共享队列工作台", () => {
 
     expect(await screen.findByRole("heading", { name: "无权访问客服工作台" })).toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalledWith("/api/support/workbench/snapshot", expect.anything());
+    expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalledWith(
+      "/api/support/workbench/snapshot",
+      expect.anything(),
+    );
   });
 
   it("序号缺口停止旧流并整体替换为新快照", async () => {
     let resolveRecovery: ((response: Response) => void) | undefined;
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:2", [handoffItem()], []))
-      .mockResolvedValueOnce(sseResponse(eventBlock("support-workbench-v1:4", "QUEUE_TICKET_REMOVED", {
-        ticketId: HANDOFF_TICKET,
-      })))
-      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveRecovery = resolve; }))
+      .mockResolvedValueOnce(
+        sseResponse(
+          eventBlock("support-workbench-v1:4", "QUEUE_TICKET_REMOVED", {
+            ticketId: HANDOFF_TICKET,
+          }),
+        ),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveRecovery = resolve;
+          }),
+      )
       .mockResolvedValueOnce(openStream());
 
     render(<SupportWorkbench supportId="support-demo" />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("当前队列可能过期");
-    resolveRecovery?.(snapshotResponse("support-workbench-v1:8", [breachedItem()], [breachedItem()]));
+    resolveRecovery?.(
+      snapshotResponse("support-workbench-v1:8", [breachedItem()], [breachedItem()]),
+    );
     expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
     expect(screen.queryByText(HANDOFF_TICKET)).not.toBeInTheDocument();
-    expect(vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"))
-      .toHaveLength(2);
+    expect(
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"),
+    ).toHaveLength(2);
   });
 
   it("非法 payload 与 reset_required 都不会继续应用旧状态", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:2", [handoffItem()], []))
-      .mockResolvedValueOnce(sseResponse(eventBlock("support-workbench-v1:3", "QUEUE_TICKET_UPSERTED", {
-        ticketId: BREACHED_TICKET,
-        lifecycleState: "INVESTIGATING",
-        handlingMode: "AGENT",
-        sharedEnteredAt: "2026-08-11T01:05:00Z",
-        escalationEnteredAt: null,
-        investigationSummary: "不得进入浏览器事件",
-      })))
+      .mockResolvedValueOnce(
+        sseResponse(
+          eventBlock("support-workbench-v1:3", "QUEUE_TICKET_UPSERTED", {
+            ticketId: BREACHED_TICKET,
+            lifecycleState: "INVESTIGATING",
+            handlingMode: "AGENT",
+            sharedEnteredAt: "2026-08-11T01:05:00Z",
+            escalationEnteredAt: null,
+            investigationSummary: "不得进入浏览器事件",
+          }),
+        ),
+      )
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:9", [], []))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ code: "SNAPSHOT_REQUIRED" }), { status: 409 }))
-      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:10", [breachedItem()], [breachedItem()]))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: "SNAPSHOT_REQUIRED" }), { status: 409 }),
+      )
+      .mockResolvedValueOnce(
+        snapshotResponse("support-workbench-v1:10", [breachedItem()], [breachedItem()]),
+      )
       .mockResolvedValueOnce(openStream());
 
     render(<SupportWorkbench supportId="support-demo" />);
 
     expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
     expect(screen.queryByText("不得进入浏览器事件")).not.toBeInTheDocument();
-    expect(vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"))
-      .toHaveLength(3);
+    expect(
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"),
+    ).toHaveLength(3);
   });
 
   it("断线明确标记可能过期并提供保持焦点可操作的手动同步", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:2", [handoffItem()], []))
       .mockRejectedValueOnce(new TypeError("disconnected"))
-      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:3", [breachedItem()], [breachedItem()]))
+      .mockResolvedValueOnce(
+        snapshotResponse("support-workbench-v1:3", [breachedItem()], [breachedItem()]),
+      )
       .mockResolvedValueOnce(openStream());
 
     render(<SupportWorkbench supportId="support-demo" />);
@@ -159,14 +197,20 @@ function eventBlock(id: string, type: string, payload: unknown) {
 }
 
 function sseResponse(value: string) {
-  return new Response(new ReadableStream({
-    start(controller) {
-      controller.enqueue(new TextEncoder().encode(value));
-      controller.close();
-    },
-  }), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(value));
+        controller.close();
+      },
+    }),
+    { status: 200, headers: { "Content-Type": "text/event-stream" } },
+  );
 }
 
 function openStream() {
-  return new Response(new ReadableStream(), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  return new Response(new ReadableStream(), {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  });
 }

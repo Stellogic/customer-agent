@@ -1,0 +1,19 @@
+param(
+    [ValidateSet("all", "backend", "agent", "frontend")]
+    [string]$Component = "all",
+    [switch]$SkipAcceptance
+)
+
+$ErrorActionPreference = "Stop"
+$components = if ($Component -eq "all") { @("backend", "agent", "frontend") } else { @($Component) }
+
+foreach ($current in $components) {
+    docker build --target test --tag "customer-agent/${current}-test:local" $current
+    if ($LASTEXITCODE -ne 0) {
+        throw "$current canonical check failed"
+    }
+}
+
+if (-not $SkipAcceptance -and $Component -eq "all") {
+    & "$PSScriptRoot/smoke.ps1" -Reset
+}

@@ -16,12 +16,41 @@ describe("审批视图授权撤销", () => {
     let closeStream: (() => void) | undefined;
     globalThis.history.replaceState(null, "", `/approver?revision=${REVISION_ID}`);
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json([{ proposalRevisionId: REVISION_ID, compensationMethod: "COUPON", amount: 20, submittedAt: "2026-08-11T03:00:00Z", expiresAt: "2026-08-12T03:00:00Z" }]))
-      .mockResolvedValueOnce(Response.json({ proposalRevisionId: REVISION_ID, leaseToken: LEASE_TOKEN, leaseVersion: 1, expiresAt: "2026-08-11T03:15:00Z", replayed: false }, { status: 201 }))
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            proposalRevisionId: REVISION_ID,
+            compensationMethod: "COUPON",
+            amount: 20,
+            submittedAt: "2026-08-11T03:00:00Z",
+            expiresAt: "2026-08-12T03:00:00Z",
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            proposalRevisionId: REVISION_ID,
+            leaseToken: LEASE_TOKEN,
+            leaseVersion: 1,
+            expiresAt: "2026-08-11T03:15:00Z",
+            replayed: false,
+          },
+          { status: 201 },
+        ),
+      )
       .mockResolvedValueOnce(Response.json(approvalSnapshot()))
-      .mockImplementationOnce(async () => new Response(new ReadableStream({
-        start(controller) { closeStream = () => controller.close(); },
-      }), { status: 200, headers: { "Content-Type": "text/event-stream" } }))
+      .mockImplementationOnce(
+        async () =>
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                closeStream = () => controller.close();
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "text/event-stream" } },
+          ),
+      )
       .mockResolvedValueOnce(new Response(null, { status: 403 }));
 
     render(<ApprovalWorkbench approverId="approver-demo" />);
@@ -30,10 +59,16 @@ describe("审批视图授权撤销", () => {
     expect(await screen.findByText("order:ORDER-DELAY-001")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "批准补偿" })).toBeInTheDocument();
     closeStream?.();
-    await waitFor(() => expect(screen.queryByRole("button", { name: "批准补偿" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "批准补偿" })).not.toBeInTheDocument(),
+    );
     expect(screen.queryByText("order:ORDER-DELAY-001")).not.toBeInTheDocument();
-    expect(await screen.findByRole("heading", { level: 1, name: "待审批补偿" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByText("order:ORDER-DELAY-001")).not.toBeInTheDocument());
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "待审批补偿" }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByText("order:ORDER-DELAY-001")).not.toBeInTheDocument(),
+    );
     expect(screen.queryByRole("button", { name: "批准补偿" })).not.toBeInTheDocument();
     expect(globalThis.location.search).toBe("");
   });
@@ -41,12 +76,41 @@ describe("审批视图授权撤销", () => {
   it("瞬时断线使用同一租约和游标重新读取权威快照而不暴露额外能力", async () => {
     let closeStream: (() => void) | undefined;
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json([{ proposalRevisionId: REVISION_ID, compensationMethod: "COUPON", amount: 20, submittedAt: "2026-08-11T03:00:00Z", expiresAt: "2026-08-12T03:00:00Z" }]))
-      .mockResolvedValueOnce(Response.json({ proposalRevisionId: REVISION_ID, leaseToken: LEASE_TOKEN, leaseVersion: 1, expiresAt: "2026-08-11T03:15:00Z", replayed: false }, { status: 201 }))
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            proposalRevisionId: REVISION_ID,
+            compensationMethod: "COUPON",
+            amount: 20,
+            submittedAt: "2026-08-11T03:00:00Z",
+            expiresAt: "2026-08-12T03:00:00Z",
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            proposalRevisionId: REVISION_ID,
+            leaseToken: LEASE_TOKEN,
+            leaseVersion: 1,
+            expiresAt: "2026-08-11T03:15:00Z",
+            replayed: false,
+          },
+          { status: 201 },
+        ),
+      )
       .mockResolvedValueOnce(Response.json(approvalSnapshot()))
-      .mockImplementationOnce(async () => new Response(new ReadableStream({
-        start(controller) { closeStream = () => controller.close(); },
-      }), { status: 200, headers: { "Content-Type": "text/event-stream" } }))
+      .mockImplementationOnce(
+        async () =>
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                closeStream = () => controller.close();
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "text/event-stream" } },
+          ),
+      )
       .mockResolvedValueOnce(Response.json({ ...approvalSnapshot(), cursor: "approval-view-v1:2" }))
       .mockResolvedValueOnce(openStream());
 
@@ -55,10 +119,17 @@ describe("审批视图授权撤销", () => {
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
     expect(await screen.findByText("order:ORDER-DELAY-001")).toBeInTheDocument();
     closeStream?.();
-    expect(await screen.findByText("审批连接已断开；正在按当前租约重新校验权威快照…")).toBeInTheDocument();
+    expect(
+      await screen.findByText("审批连接已断开；正在按当前租约重新校验权威快照…"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("order:ORDER-DELAY-001")).not.toBeInTheDocument();
-    await waitFor(() => expect(vi.mocked(globalThis.fetch).mock.calls.filter(([input]) =>
-      String(input).endsWith("/approval-view"))).toHaveLength(2));
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(globalThis.fetch)
+          .mock.calls.filter(([input]) => String(input).endsWith("/approval-view")),
+      ).toHaveLength(2),
+    );
     expect(screen.getByText("order:ORDER-DELAY-001")).toBeInTheDocument();
     const reconnect = vi.mocked(globalThis.fetch).mock.calls.at(-1)?.[1];
     expect(new Headers(reconnect?.headers).get("Last-Event-ID")).toBe("approval-view-v1:2");
@@ -71,21 +142,49 @@ describe("审批视图授权撤销", () => {
 
     render(<ApprovalWorkbench approverId="approver-demo" />);
 
-    expect(await screen.findByRole("heading", { level: 1, name: "待审批补偿" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "待审批补偿" }),
+    ).toBeInTheDocument();
     expect(globalThis.location.search).toBe("");
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
   });
 
   it("旧事件被忽略而序号缺口和非法 payload 触发完整快照重置", async () => {
     const stale = eventBlock("approval-view-v1:1", "APPROVAL_AUTHORITY_STARTED", {
-      proposalRevisionId: REVISION_ID, leaseVersion: 1, authorityState: "ACTIVE", rawToolPayload: "forbidden",
+      proposalRevisionId: REVISION_ID,
+      leaseVersion: 1,
+      authorityState: "ACTIVE",
+      rawToolPayload: "forbidden",
     });
     const gap = eventBlock("approval-view-v1:3", "APPROVAL_AUTHORITY_STARTED", {
-      proposalRevisionId: REVISION_ID, leaseVersion: 1, authorityState: "ACTIVE",
+      proposalRevisionId: REVISION_ID,
+      leaseVersion: 1,
+      authorityState: "ACTIVE",
     });
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json([{ proposalRevisionId: REVISION_ID, compensationMethod: "COUPON", amount: 20, submittedAt: "2026-08-11T03:00:00Z", expiresAt: "2026-08-12T03:00:00Z" }]))
-      .mockResolvedValueOnce(Response.json({ proposalRevisionId: REVISION_ID, leaseToken: LEASE_TOKEN, leaseVersion: 1, expiresAt: "2026-08-11T03:15:00Z", replayed: false }, { status: 201 }))
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            proposalRevisionId: REVISION_ID,
+            compensationMethod: "COUPON",
+            amount: 20,
+            submittedAt: "2026-08-11T03:00:00Z",
+            expiresAt: "2026-08-12T03:00:00Z",
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            proposalRevisionId: REVISION_ID,
+            leaseToken: LEASE_TOKEN,
+            leaseVersion: 1,
+            expiresAt: "2026-08-11T03:15:00Z",
+            replayed: false,
+          },
+          { status: 201 },
+        ),
+      )
       .mockResolvedValueOnce(Response.json(approvalSnapshot()))
       .mockResolvedValueOnce(sseResponse(stale + gap))
       .mockResolvedValueOnce(Response.json({ ...approvalSnapshot(), cursor: "approval-view-v1:4" }))
@@ -94,8 +193,13 @@ describe("审批视图授权撤销", () => {
     render(<ApprovalWorkbench approverId="approver-demo" />);
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
 
-    await waitFor(() => expect(vi.mocked(globalThis.fetch).mock.calls.filter(([input]) =>
-      String(input).endsWith("/approval-view"))).toHaveLength(2));
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(globalThis.fetch)
+          .mock.calls.filter(([input]) => String(input).endsWith("/approval-view")),
+      ).toHaveLength(2),
+    );
     expect(screen.queryByText("forbidden")).not.toBeInTheDocument();
     expect(screen.getByText("order:ORDER-DELAY-001")).toBeInTheDocument();
   });
@@ -135,11 +239,20 @@ function eventBlock(id: string, type: string, payload: unknown) {
 }
 
 function sseResponse(value: string) {
-  return new Response(new ReadableStream({
-    start(controller) { controller.enqueue(new TextEncoder().encode(value)); controller.close(); },
-  }), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(value));
+        controller.close();
+      },
+    }),
+    { status: 200, headers: { "Content-Type": "text/event-stream" } },
+  );
 }
 
 function openStream() {
-  return new Response(new ReadableStream(), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  return new Response(new ReadableStream(), {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  });
 }

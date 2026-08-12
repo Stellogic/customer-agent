@@ -26,6 +26,13 @@ Architecture and implementation details have not yet been designed or approved. 
 
 Resolve consequential decisions through the configured engineering workflow and record the evidence and trade-offs before implementation. Add detailed project rules to this file only after the user has confirmed them or they have been accepted through that workflow.
 
+## Canonical verification
+
+- Before completing any implementation task, run `pwsh ./scripts/check.ps1` from the repository root.
+- Use `-Component backend|agent|frontend -SkipAcceptance` only for fast, focused iteration.
+- The canonical check is a hard requirement: do not submit changes while it is failing.
+- CI invokes the same component checks and runs full-stack acceptance separately.
+
 ## Agent skills
 
 ### Issue tracker

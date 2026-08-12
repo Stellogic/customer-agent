@@ -1,10 +1,10 @@
+import datetime
 import json
 import os
 import sys
 import threading
 import time
 import uuid
-import datetime
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 
@@ -116,10 +116,19 @@ def main() -> None:
         assert public_projection["ticket"]["handlingMode"] == "AGENT"
         assert public_projection["ticket"]["firstRespondedAt"]
         assert len(public_projection["messages"]) == 2
-        assert [message["author"] for message in public_projection["messages"]] == ["CUSTOMER", "SUPPORT"]
+        assert [message["author"] for message in public_projection["messages"]] == [
+            "CUSTOMER",
+            "SUPPORT",
+        ]
         forbidden_fields = (
-            "internalNote", "investigationFact", "proposal", "approval", "threadId",
-            "runId", "checkpoint", "toolPayload",
+            "internalNote",
+            "investigationFact",
+            "proposal",
+            "approval",
+            "threadId",
+            "runId",
+            "checkpoint",
+            "toolPayload",
         )
         serialized_projection = json.dumps(public_projection)
         assert not any(field in serialized_projection for field in forbidden_fields)
@@ -167,15 +176,24 @@ def main() -> None:
             "select lifecycle_state, handling_mode, first_responded_at is not null from support_ticket where id = %s",
             (ticket_uuid,),
         ).fetchone() == ("INVESTIGATING", "AGENT", True)
-        assert connection.execute(
-            "select count(*) from customer_ticket_request where ticket_id = %s", (ticket_uuid,)
-        ).fetchone()[0] == 1
-        assert connection.execute(
-            "select count(*) from public_message where ticket_id = %s", (ticket_uuid,)
-        ).fetchone()[0] == 2
-        assert connection.execute(
-            "select count(*) from audit_event where ticket_id = %s", (ticket_uuid,)
-        ).fetchone()[0] >= 2
+        assert (
+            connection.execute(
+                "select count(*) from customer_ticket_request where ticket_id = %s", (ticket_uuid,)
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            connection.execute(
+                "select count(*) from public_message where ticket_id = %s", (ticket_uuid,)
+            ).fetchone()[0]
+            == 2
+        )
+        assert (
+            connection.execute(
+                "select count(*) from audit_event where ticket_id = %s", (ticket_uuid,)
+            ).fetchone()[0]
+            >= 2
+        )
 
     no_compensation_request = f"issue-14-{uuid.uuid4()}"
     no_compensation_payload = {
@@ -227,15 +245,25 @@ def main() -> None:
         assert generation is not None
         assert generation[2] == "COMPLETED"
         assert generation[4] == "COMPLETED"
-        assert connection.execute(
-            "select count(*) from investigation_fact where generation_id = %s", (generation[0],)
-        ).fetchone()[0] == 6
-        assert connection.execute(
-            "select count(*) from agent_command_request where generation_id = %s", (generation[0],)
-        ).fetchone()[0] == 1
-        assert connection.execute(
-            "select count(*) from public_message where ticket_id = %s", (resolved_uuid,)
-        ).fetchone()[0] == 3
+        assert (
+            connection.execute(
+                "select count(*) from investigation_fact where generation_id = %s", (generation[0],)
+            ).fetchone()[0]
+            == 6
+        )
+        assert (
+            connection.execute(
+                "select count(*) from agent_command_request where generation_id = %s",
+                (generation[0],),
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            connection.execute(
+                "select count(*) from public_message where ticket_id = %s", (resolved_uuid,)
+            ).fetchone()[0]
+            == 3
+        )
         generation_id = str(generation[0])
         generation_thread_id = str(generation[1])
         submission_request_id = str(generation[3])
@@ -247,7 +275,8 @@ def main() -> None:
         )
         expect_status(runs, 200)
         matching_runs = [
-            run for run in runs.json()
+            run
+            for run in runs.json()
             if run.get("metadata", {}).get("submission_request_id") == submission_request_id
         ]
         assert len(matching_runs) == 1, matching_runs
@@ -306,9 +335,12 @@ def main() -> None:
         expect_status(wrong_ticket_replay, 403)
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        assert connection.execute(
-            "select count(*) from audit_event where ticket_id = %s", (resolved_uuid,)
-        ).fetchone()[0] >= 8
+        assert (
+            connection.execute(
+                "select count(*) from audit_event where ticket_id = %s", (resolved_uuid,)
+            ).fetchone()[0]
+            >= 8
+        )
 
     proposal_request = f"issue-15-{uuid.uuid4()}"
     proposal_order_reference = "ORDER-DELAY-001"
@@ -346,9 +378,21 @@ def main() -> None:
         time.sleep(0.5)
     assert proposal_row is not None
     assert proposal_row[2:] == (
-        1, 80, 288000, "SIMULATED_PARTIAL_REFUND", Decimal("26.80"), "LOGISTICS_DELAY",
-        "delay-policy-v1", proposal_row[9], "PENDING_APPROVAL", "COMPLETED",
-        80, 288000, Decimal("268.00"), Decimal("268.00"), 2,
+        1,
+        80,
+        288000,
+        "SIMULATED_PARTIAL_REFUND",
+        Decimal("26.80"),
+        "LOGISTICS_DELAY",
+        "delay-policy-v1",
+        proposal_row[9],
+        "PENDING_APPROVAL",
+        "COMPLETED",
+        80,
+        288000,
+        Decimal("268.00"),
+        Decimal("268.00"),
+        2,
     )
     assert len(proposal_row[9]) == 64
     first_revision_id, proposal_id = proposal_row[:2]
@@ -378,7 +422,6 @@ def main() -> None:
         pass
 
     approver_headers = {"X-Synthetic-Approver-Id": "approver-demo"}
-    other_approver_headers = {"X-Synthetic-Approver-Id": "approver-other-demo"}
     with httpx.Client(timeout=20.0) as client:
         queue = client.get(
             f"{spring_url}/api/approver/compensation-proposals", headers=approver_headers
@@ -388,7 +431,11 @@ def main() -> None:
             item for item in queue.json() if item["proposalRevisionId"] == str(first_revision_id)
         )
         assert set(queue_item) == {
-            "proposalRevisionId", "compensationMethod", "amount", "submittedAt", "expiresAt"
+            "proposalRevisionId",
+            "compensationMethod",
+            "amount",
+            "submittedAt",
+            "expiresAt",
         }
 
         for forbidden_identity in ("customer-demo", "support-demo"):
@@ -427,13 +474,17 @@ def main() -> None:
             )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        approval_claim_responses = list(executor.map(
-            claim_concurrently, ["approver-demo", "approver-other-demo"]
-        ))
+        approval_claim_responses = list(
+            executor.map(claim_concurrently, ["approver-demo", "approver-other-demo"])
+        )
     assert sorted(response.status_code for response in approval_claim_responses) == [201, 409], [
         (response.status_code, response.text) for response in approval_claim_responses
     ]
-    winner_index = next(index for index, response in enumerate(approval_claim_responses) if response.status_code == 201)
+    winner_index = next(
+        index
+        for index, response in enumerate(approval_claim_responses)
+        if response.status_code == 201
+    )
     winner_id = ["approver-demo", "approver-other-demo"][winner_index]
     loser_id = "approver-other-demo" if winner_id == "approver-demo" else "approver-demo"
     winner_headers = {"X-Synthetic-Approver-Id": winner_id}
@@ -477,13 +528,25 @@ def main() -> None:
         assert approval_projection["delaySeconds"] == 288000
         assert approval_projection["leaseToken"] == lease_one["leaseToken"]
         assert [event["eventType"] for event in approval_projection["responsibilityChain"]] == [
-            "COMPENSATION_PROPOSAL_REVISION_CREATED", "APPROVAL_LEASE_CLAIMED"
+            "COMPENSATION_PROPOSAL_REVISION_CREATED",
+            "APPROVAL_LEASE_CLAIMED",
         ]
         assert approval_projection["responsibilityChain"][1]["leaseVersion"] == 1
-        assert not any(field in approval_projection for field in (
-            "ticket", "ticketId", "customerId", "description", "publicMessages", "internalNotes",
-            "execution", "generationId", "threadId", "toolPayload",
-        ))
+        assert not any(
+            field in approval_projection
+            for field in (
+                "ticket",
+                "ticketId",
+                "customerId",
+                "description",
+                "publicMessages",
+                "internalNotes",
+                "execution",
+                "generationId",
+                "threadId",
+                "toolPayload",
+            )
+        )
         denied_other_approver = client.get(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
             headers={
@@ -524,7 +587,9 @@ def main() -> None:
         finally:
             stream_executor.shutdown(wait=False, cancel_futures=True)
         assert released.json() == {
-            "proposalRevisionId": str(first_revision_id), "released": True, "replayed": False
+            "proposalRevisionId": str(first_revision_id),
+            "released": True,
+            "replayed": False,
         }
         release_replay = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/release",
@@ -612,15 +677,21 @@ def main() -> None:
         )
         expect_status(expired_view, 403)
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-            assert connection.execute(
-                "select status from approval_lease where proposal_revision_id = %s and lease_version = 2",
-                (first_revision_id,),
-            ).fetchone()[0] == "EXPIRED"
-            assert connection.execute(
-                "select count(*) from audit_event where subject_id = %s "
-                "and event_type = 'APPROVAL_LEASE_EXPIRED' and authorization_version = 2",
-                (first_revision_id,),
-            ).fetchone()[0] == 1
+            assert (
+                connection.execute(
+                    "select status from approval_lease where proposal_revision_id = %s and lease_version = 2",
+                    (first_revision_id,),
+                ).fetchone()[0]
+                == "EXPIRED"
+            )
+            assert (
+                connection.execute(
+                    "select count(*) from audit_event where subject_id = %s "
+                    "and event_type = 'APPROVAL_LEASE_EXPIRED' and authorization_version = 2",
+                    (first_revision_id,),
+                ).fetchone()[0]
+                == 1
+            )
         reclaim_three = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
             headers={
@@ -671,7 +742,7 @@ def main() -> None:
             "available_compensation_amount, active_reservation_amount, paid, cancelled, fully_refunded, "
             "existing_compensation, evidence_references, captured_at) values "
             "(%s, 'ORDER-DELAY-UNDER-24', 24, 86400, 268.00, 268.00, 0.00, true, false, false, false, "
-            "'[\"order:ORDER-DELAY-UNDER-24\",\"logistics:ORDER-DELAY-UNDER-24\"]', "
+            '\'["order:ORDER-DELAY-UNDER-24","logistics:ORDER-DELAY-UNDER-24"]\', '
             "'2026-08-08T14:00:00Z')",
             (expired_revision_id,),
         )
@@ -741,7 +812,9 @@ def main() -> None:
             "order by id",
             (expired_revision_id,),
         ).fetchall()
-        assert [(event_type, occurred_at.isoformat()) for event_type, occurred_at in expiry_audit] == [
+        assert [
+            (event_type, occurred_at.isoformat()) for event_type, occurred_at in expiry_audit
+        ] == [
             ("COMPENSATION_PROPOSAL_REVISION_EXPIRED", "2026-08-09T14:00:00+00:00"),
             ("APPROVAL_LEASE_REVOKED", "2026-08-09T14:00:00+00:00"),
         ]
@@ -765,7 +838,14 @@ def main() -> None:
                 "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, content_digest, status, created_at, expires_at) "
                 "select %s, %s, 1, %s, order_reference, %s, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, %s, 'PENDING_APPROVAL', now(), now() + interval '24 hours' "
                 "from compensation_proposal_revision where id = %s",
-                (uuid.uuid4(), uuid.uuid4(), duplicate_ticket, duplicate_generation, "f" * 64, first_revision_id),
+                (
+                    uuid.uuid4(),
+                    uuid.uuid4(),
+                    duplicate_ticket,
+                    duplicate_generation,
+                    "f" * 64,
+                    first_revision_id,
+                ),
             )
         raise AssertionError("active intent unique constraint unexpectedly accepted a duplicate")
     except psycopg.errors.UniqueViolation as error:
@@ -837,15 +917,21 @@ def main() -> None:
             (proposal_id, 1, 80, 288000, Decimal("26.80"), "SUPERSEDED"),
             (proposal_id, 2, 81, 291600, Decimal("26.80"), "PENDING_APPROVAL"),
         ]
-        assert connection.execute(
-            "select status from approval_lease where proposal_revision_id = %s and lease_version = 3",
-            (first_revision_id,),
-        ).fetchone()[0] == "REVOKED"
-        assert connection.execute(
-            "select count(*) from audit_event where ticket_id = %s and event_type in "
-            "('APPROVAL_LEASE_CLAIMED', 'APPROVAL_LEASE_RELEASED', 'APPROVAL_LEASE_REVOKED')",
-            (uuid.UUID(proposal_ticket_id),),
-        ).fetchone()[0] == 5
+        assert (
+            connection.execute(
+                "select status from approval_lease where proposal_revision_id = %s and lease_version = 3",
+                (first_revision_id,),
+            ).fetchone()[0]
+            == "REVOKED"
+        )
+        assert (
+            connection.execute(
+                "select count(*) from audit_event where ticket_id = %s and event_type in "
+                "('APPROVAL_LEASE_CLAIMED', 'APPROVAL_LEASE_RELEASED', 'APPROVAL_LEASE_REVOKED')",
+                (uuid.UUID(proposal_ticket_id),),
+            ).fetchone()[0]
+            == 5
+        )
 
     third_generation = uuid.uuid4()
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -903,8 +989,11 @@ def main() -> None:
         ).fetchall() == [(1, "SUPERSEDED"), (2, "APPROVED")]
 
     def seed_pending_decision_fixture(
-        order_reference: str, content_digest: str, description: str,
-        delay_hours: int = 80, delay_seconds: int = 288000,
+        order_reference: str,
+        content_digest: str,
+        description: str,
+        delay_hours: int = 80,
+        delay_seconds: int = 288000,
         compensation_method: str = "SIMULATED_PARTIAL_REFUND",
         amount: Decimal = Decimal("26.80"),
     ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
@@ -913,42 +1002,53 @@ def main() -> None:
         fixture_revision_id = uuid.uuid4()
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
             connection.execute(
-            "insert into support_ticket "
-            "(id, customer_id, order_reference, description, lifecycle_state, handling_mode, "
-            "created_at, first_responded_at) values "
-            "(%s, 'customer-demo', %s, %s, "
-            "'INVESTIGATING', 'AGENT', '2026-08-09T13:55:00Z', '2026-08-09T13:56:00Z')",
+                "insert into support_ticket "
+                "(id, customer_id, order_reference, description, lifecycle_state, handling_mode, "
+                "created_at, first_responded_at) values "
+                "(%s, 'customer-demo', %s, %s, "
+                "'INVESTIGATING', 'AGENT', '2026-08-09T13:55:00Z', '2026-08-09T13:56:00Z')",
                 (fixture_ticket_id, order_reference, description),
             )
             connection.execute(
-            "insert into agent_processing_generation "
-            "(id, ticket_id, generation_number, thread_id, status, created_at) "
-            "values (%s, %s, 1, %s, 'ACTIVE', '2026-08-09T13:56:00Z')",
+                "insert into agent_processing_generation "
+                "(id, ticket_id, generation_number, thread_id, status, created_at) "
+                "values (%s, %s, 1, %s, 'ACTIVE', '2026-08-09T13:56:00Z')",
                 (fixture_generation_id, fixture_ticket_id, uuid.uuid4()),
             )
             connection.execute(
-            "insert into compensation_proposal_revision "
-            "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, delay_hours, "
-            "delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, "
-            "content_digest, status, created_at, expires_at) values "
-            "(%s, %s, 1, %s, %s, %s, %s, %s, "
-            "%s, %s, 'LOGISTICS_DELAY', "
-            "jsonb_build_array('order:' || %s, 'logistics:' || %s), "
-            "'delay-policy-v1', %s, 'PENDING_APPROVAL', "
-            "'2026-08-09T13:57:00Z', '2026-08-10T13:57:00Z')",
-                (fixture_revision_id, uuid.uuid4(), fixture_ticket_id, order_reference,
-                 fixture_generation_id, delay_hours, delay_seconds, compensation_method, amount,
-                 order_reference, order_reference, content_digest),
+                "insert into compensation_proposal_revision "
+                "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, delay_hours, "
+                "delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, "
+                "content_digest, status, created_at, expires_at) values "
+                "(%s, %s, 1, %s, %s, %s, %s, %s, "
+                "%s, %s, 'LOGISTICS_DELAY', "
+                "jsonb_build_array('order:' || %s, 'logistics:' || %s), "
+                "'delay-policy-v1', %s, 'PENDING_APPROVAL', "
+                "'2026-08-09T13:57:00Z', '2026-08-10T13:57:00Z')",
+                (
+                    fixture_revision_id,
+                    uuid.uuid4(),
+                    fixture_ticket_id,
+                    order_reference,
+                    fixture_generation_id,
+                    delay_hours,
+                    delay_seconds,
+                    compensation_method,
+                    amount,
+                    order_reference,
+                    order_reference,
+                    content_digest,
+                ),
             )
             connection.execute(
-            "insert into approval_evidence_snapshot "
-            "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "
-            "available_compensation_amount, active_reservation_amount, paid, cancelled, fully_refunded, "
-            "existing_compensation, evidence_references, captured_at) "
-            "select %s, order_reference, %s, %s, paid_amount, available_compensation_amount, 0.00, "
-            "paid, cancelled, fully_refunded, existing_compensation, "
-            "jsonb_build_array('order:' || order_reference, 'logistics:' || order_reference), "
-            "'2026-08-09T13:57:00Z' from synthetic_order where order_reference = %s",
+                "insert into approval_evidence_snapshot "
+                "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "
+                "available_compensation_amount, active_reservation_amount, paid, cancelled, fully_refunded, "
+                "existing_compensation, evidence_references, captured_at) "
+                "select %s, order_reference, %s, %s, paid_amount, available_compensation_amount, 0.00, "
+                "paid, cancelled, fully_refunded, existing_compensation, "
+                "jsonb_build_array('order:' || order_reference, 'logistics:' || order_reference), "
+                "'2026-08-09T13:57:00Z' from synthetic_order where order_reference = %s",
                 (fixture_revision_id, delay_hours, delay_seconds, order_reference),
             )
         return fixture_ticket_id, fixture_generation_id, fixture_revision_id
@@ -1059,38 +1159,49 @@ def main() -> None:
             (approval_revision_id,),
         ).fetchone()
         assert approval_record[1:5] == (
-            "APPROVED", approval_body["internalNote"], "APPROVED", "DECIDED"
+            "APPROVED",
+            approval_body["internalNote"],
+            "APPROVED",
+            "DECIDED",
         )
         assert approval_record[6] == "ACTIVE"
         assert str(approval_record[7]) == approved_payload["executionId"]
         assert approval_record[8:] == (
-            "READY", f"compensation-execution:{approval_revision_id}", Decimal("26.80")
+            "READY",
+            f"compensation-execution:{approval_revision_id}",
+            Decimal("26.80"),
         )
-        assert connection.execute(
-            "select count(*) from proposal_decision where proposal_revision_id = %s",
-            (approval_revision_id,),
-        ).fetchone()[0] == 1
-        assert connection.execute(
-            "select count(*) from compensation_execution where proposal_revision_id = %s",
-            (approval_revision_id,),
-        ).fetchone()[0] == 1
-        assert connection.execute(
-            "select count(*) from audit_event where subject_id = %s "
-            "and event_type = 'COMPENSATION_PROPOSAL_APPROVED'",
-            (approval_record[0],),
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "select count(*) from proposal_decision where proposal_revision_id = %s",
+                (approval_revision_id,),
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            connection.execute(
+                "select count(*) from compensation_execution where proposal_revision_id = %s",
+                (approval_revision_id,),
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            connection.execute(
+                "select count(*) from audit_event where subject_id = %s "
+                "and event_type = 'COMPENSATION_PROPOSAL_APPROVED'",
+                (approval_record[0],),
+            ).fetchone()[0]
+            == 1
+        )
 
-    executor_headers = {
-        "Authorization": f"Bearer {os.environ['EXECUTOR_MACHINE_TOKEN']}"
-    }
+    executor_headers = {"Authorization": f"Bearer {os.environ['EXECUTOR_MACHINE_TOKEN']}"}
     with httpx.Client(timeout=20.0) as client:
         assignments = client.get(
             f"{spring_url}/internal/compensation-executions", headers=executor_headers
         )
         expect_status(assignments, 200)
         assert any(
-            item["executionId"] == approved_payload["executionId"]
-            and item["status"] == "READY"
+            item["executionId"] == approved_payload["executionId"] and item["status"] == "READY"
             for item in assignments.json()
         )
         denied_assignments = client.get(
@@ -1115,7 +1226,9 @@ def main() -> None:
         execution_claim_responses = list(executor.map(claim_execution, claim_request_ids))
     assert sorted(response.status_code for response in execution_claim_responses) == [201, 409]
     winning_claim_index = next(
-        index for index, response in enumerate(execution_claim_responses) if response.status_code == 201
+        index
+        for index, response in enumerate(execution_claim_responses)
+        if response.status_code == 201
     )
     winning_claim = execution_claim_responses[winning_claim_index].json()
     winning_claim_request_id = claim_request_ids[winning_claim_index]
@@ -1160,7 +1273,10 @@ def main() -> None:
             headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(unknown_customer, 200)
-        assert unknown_customer.json()["messages"][-1]["body"] == "补偿结果正在自动确认中，请勿重复提交。"
+        assert (
+            unknown_customer.json()["messages"][-1]["body"]
+            == "补偿结果正在自动确认中，请勿重复提交。"
+        )
         ordinary_retry = client.post(
             f"{spring_url}/internal/compensation-executions/{execution_id}/claims",
             headers={**executor_headers, "Idempotency-Key": f"forbidden-retry-{uuid.uuid4()}"},
@@ -1173,7 +1289,9 @@ def main() -> None:
         expect_status(provider_reconciliation, 200)
         provider_reconciliation_payload = provider_reconciliation.json()
         assert provider_reconciliation_payload["outcome"] == "FOUND"
-        assert provider_reconciliation_payload["resultReference"] == f"simulated-refund:{execution_id}"
+        assert (
+            provider_reconciliation_payload["resultReference"] == f"simulated-refund:{execution_id}"
+        )
         forged_reconciliation = client.post(
             f"{spring_url}/internal/compensation-executions/{execution_id}/reconciliations",
             headers={**executor_headers, "Idempotency-Key": f"forged-reconcile-{uuid.uuid4()}"},
@@ -1198,13 +1316,18 @@ def main() -> None:
                 )
 
         with ThreadPoolExecutor(max_workers=2) as executor:
-            concurrent_reconciliations = list(executor.map(
-                lambda _: submit_same_reconciliation(), range(2)
-            ))
+            concurrent_reconciliations = list(
+                executor.map(lambda _: submit_same_reconciliation(), range(2))
+            )
         assert [response.status_code for response in concurrent_reconciliations] == [200, 200]
-        assert sorted(response.json()["replayed"] for response in concurrent_reconciliations) == [False, True]
+        assert sorted(response.json()["replayed"] for response in concurrent_reconciliations) == [
+            False,
+            True,
+        ]
         succeeded_payload = next(
-            response.json() for response in concurrent_reconciliations if not response.json()["replayed"]
+            response.json()
+            for response in concurrent_reconciliations
+            if not response.json()["replayed"]
         )
         assert succeeded_payload["status"] == "SUCCEEDED"
         assert succeeded_payload["customerMessage"] == (
@@ -1243,7 +1366,10 @@ def main() -> None:
         expect_status(execution_customer, 200)
         execution_customer_payload = execution_customer.json()
         assert execution_customer_payload["ticket"]["lifecycleState"] == "RESOLVED"
-        assert execution_customer_payload["messages"][-1]["body"] == succeeded_payload["customerMessage"]
+        assert (
+            execution_customer_payload["messages"][-1]["body"]
+            == succeeded_payload["customerMessage"]
+        )
         customer_projection_text = json.dumps(execution_customer_payload, ensure_ascii=False)
         assert execution_id not in customer_projection_text
         assert winning_claim["idempotencyKey"] not in customer_projection_text
@@ -1257,33 +1383,53 @@ def main() -> None:
             "join synthetic_order o on o.order_reference = e.order_reference where e.id = %s",
             (uuid.UUID(execution_id),),
         ).fetchone() == ("SUCCEEDED", "CONSUMED", True)
-        assert connection.execute(
-            "select count(*) from compensation_execution_attempt where execution_id = %s",
-            (uuid.UUID(execution_id),),
-        ).fetchone()[0] == 2
-        assert connection.execute(
-            "select count(*) from compensation_execution_result where execution_id = %s",
-            (uuid.UUID(execution_id),),
-        ).fetchone()[0] == 1
-        assert connection.execute(
-            "select count(*) from simulated_partial_refund where execution_id = %s",
-            (uuid.UUID(execution_id),),
-        ).fetchone()[0] == 1
-        assert connection.execute(
-            "select count(*) from simulated_compensation_provider_operation where execution_id = %s",
-            (uuid.UUID(execution_id),),
-        ).fetchone()[0] == 1
-        assert connection.execute(
-            "select count(*) from audit_event where ticket_id = %s and "
-            "event_type in ('COMPENSATION_EXECUTION_SUCCEEDED', 'TICKET_RESOLVED')",
-            (approval_ticket_id,),
-        ).fetchone()[0] == 2
+        assert (
+            connection.execute(
+                "select count(*) from compensation_execution_attempt where execution_id = %s",
+                (uuid.UUID(execution_id),),
+            ).fetchone()[0]
+            == 2
+        )
+        assert (
+            connection.execute(
+                "select count(*) from compensation_execution_result where execution_id = %s",
+                (uuid.UUID(execution_id),),
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            connection.execute(
+                "select count(*) from simulated_partial_refund where execution_id = %s",
+                (uuid.UUID(execution_id),),
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            connection.execute(
+                "select count(*) from simulated_compensation_provider_operation where execution_id = %s",
+                (uuid.UUID(execution_id),),
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            connection.execute(
+                "select count(*) from audit_event where ticket_id = %s and "
+                "event_type in ('COMPENSATION_EXECUTION_SUCCEEDED', 'TICKET_RESOLVED')",
+                (approval_ticket_id,),
+            ).fetchone()[0]
+            == 2
+        )
 
     def approve_partial_execution(order_reference: str) -> tuple[str, str, dict[str, object]]:
         digest = uuid.uuid4().hex * 2
         ticket, _, revision = seed_pending_decision_fixture(
-            order_reference, digest, f"{order_reference} 对账验收",
-            80, 288000, "SIMULATED_PARTIAL_REFUND", Decimal("26.80"),
+            order_reference,
+            digest,
+            f"{order_reference} 对账验收",
+            80,
+            288000,
+            "SIMULATED_PARTIAL_REFUND",
+            Decimal("26.80"),
         )
         with httpx.Client(timeout=20.0) as client:
             lease_response = client.post(
@@ -1312,10 +1458,15 @@ def main() -> None:
             expect_status(claim_response, 201)
         return scenario_execution_id, str(ticket), claim_response.json()
 
-    def report_unknown(client: httpx.Client, scenario_execution_id: str, claim: dict[str, object]) -> None:
+    def report_unknown(
+        client: httpx.Client, scenario_execution_id: str, claim: dict[str, object]
+    ) -> None:
         unknown_response = client.post(
             f"{spring_url}/internal/compensation-executions/{scenario_execution_id}/unknown",
-            headers={**executor_headers, "Idempotency-Key": f"scenario-unknown-{scenario_execution_id}"},
+            headers={
+                **executor_headers,
+                "Idempotency-Key": f"scenario-unknown-{scenario_execution_id}",
+            },
             json={
                 "attemptId": claim["attemptId"],
                 "idempotencyKey": claim["idempotencyKey"],
@@ -1328,9 +1479,7 @@ def main() -> None:
     before_failure_id, _, before_failure_claim = approve_partial_execution(
         "ORDER-DELAY-EXECUTION-BEFORE-FAILURE"
     )
-    not_found_id, _, not_found_claim = approve_partial_execution(
-        "ORDER-DELAY-EXECUTION-NOT-FOUND"
-    )
+    not_found_id, _, not_found_claim = approve_partial_execution("ORDER-DELAY-EXECUTION-NOT-FOUND")
     persistent_unknown_id, _, persistent_unknown_claim = approve_partial_execution(
         "ORDER-DELAY-EXECUTION-UNKNOWN"
     )
@@ -1383,7 +1532,10 @@ def main() -> None:
                 assert query.json()["outcome"] == expected
                 reconciled_scenario = client.post(
                     f"{spring_url}/internal/compensation-executions/{scenario_execution_id}/reconciliations",
-                    headers={**executor_headers, "Idempotency-Key": f"scenario-reconcile-{uuid.uuid4()}"},
+                    headers={
+                        **executor_headers,
+                        "Idempotency-Key": f"scenario-reconcile-{uuid.uuid4()}",
+                    },
                     json=query.json(),
                 )
                 expect_status(reconciled_scenario, 200)
@@ -1393,7 +1545,10 @@ def main() -> None:
 
         exhausted_query = client.get(
             f"{spring_url}/internal/compensation-simulator/{persistent_unknown_id}/reconciliation",
-            headers={**executor_headers, "Idempotency-Key": persistent_unknown_claim["idempotencyKey"]},
+            headers={
+                **executor_headers,
+                "Idempotency-Key": persistent_unknown_claim["idempotencyKey"],
+            },
         )
         expect_status(exhausted_query, 200)
         exhausted_reconciliation = client.post(
@@ -1428,18 +1583,26 @@ def main() -> None:
             "join compensation_reservation r on r.id = e.reservation_id where e.id = %s",
             (uuid.UUID(persistent_unknown_id),),
         ).fetchone() == ("UNKNOWN", "ACTIVE", 3)
-        assert connection.execute(
-            "select count(*) from domain_operation_alert where execution_id = %s",
-            (uuid.UUID(persistent_unknown_id),),
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "select count(*) from domain_operation_alert where execution_id = %s",
+                (uuid.UUID(persistent_unknown_id),),
+            ).fetchone()[0]
+            == 1
+        )
 
     def approve_and_execute_coupon(
         order_reference: str, delay_hours: int, delay_seconds: int, amount: Decimal
     ) -> tuple[str, str]:
         digest = uuid.uuid4().hex * 2
         ticket, _, revision = seed_pending_decision_fixture(
-            order_reference, digest, f"{amount} CNY 优惠券执行验收",
-            delay_hours, delay_seconds, "COUPON", amount,
+            order_reference,
+            digest,
+            f"{amount} CNY 优惠券执行验收",
+            delay_hours,
+            delay_seconds,
+            "COUPON",
+            amount,
         )
         with httpx.Client(timeout=20.0) as client:
             lease_response = client.post(
@@ -1502,8 +1665,13 @@ def main() -> None:
 
     auto_digest = uuid.uuid4().hex * 2
     auto_ticket_id, _, auto_revision_id = seed_pending_decision_fixture(
-        "ORDER-DELAY-EXECUTOR-AUTO", auto_digest, "常驻执行器自动消费验收",
-        24, 86400, "COUPON", Decimal("10.00"),
+        "ORDER-DELAY-EXECUTOR-AUTO",
+        auto_digest,
+        "常驻执行器自动消费验收",
+        24,
+        86400,
+        "COUPON",
+        Decimal("10.00"),
     )
     with httpx.Client(timeout=20.0) as client:
         auto_lease_response = client.post(
@@ -1539,6 +1707,7 @@ def main() -> None:
         )
         expect_status(drift_claim, 201)
         drift_lease = drift_claim.json()
+
     def approve_while_order_writer_holds_lock() -> httpx.Response:
         with httpx.Client(timeout=20.0) as concurrent_client:
             return concurrent_client.post(
@@ -1560,7 +1729,9 @@ def main() -> None:
         with ThreadPoolExecutor(max_workers=1) as executor:
             drift_future = executor.submit(approve_while_order_writer_holds_lock)
             time.sleep(0.25)
-            assert not drift_future.done(), "approval did not wait for the authoritative order writer"
+            assert not drift_future.done(), (
+                "approval did not wait for the authoritative order writer"
+            )
             connection.commit()
             drift_approval = drift_future.result()
     expect_status(drift_approval, 409)
@@ -1570,14 +1741,20 @@ def main() -> None:
             "join approval_lease l on l.proposal_revision_id = p.id where p.id = %s",
             (drift_revision_id,),
         ).fetchone() == ("SUPERSEDED", "REVOKED")
-        assert connection.execute(
-            "select count(*) from proposal_decision where proposal_revision_id = %s",
-            (drift_revision_id,),
-        ).fetchone()[0] == 0
-        assert connection.execute(
-            "select count(*) from compensation_execution where proposal_revision_id = %s",
-            (drift_revision_id,),
-        ).fetchone()[0] == 0
+        assert (
+            connection.execute(
+                "select count(*) from proposal_decision where proposal_revision_id = %s",
+                (drift_revision_id,),
+            ).fetchone()[0]
+            == 0
+        )
+        assert (
+            connection.execute(
+                "select count(*) from compensation_execution where proposal_revision_id = %s",
+                (drift_revision_id,),
+            ).fetchone()[0]
+            == 0
+        )
 
     proposal_race_scopes = []
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -1616,12 +1793,15 @@ def main() -> None:
                     "evidence_references, policy_version, content_digest, status, created_at, expires_at) "
                     "values (%s, %s, 1, %s, 'ORDER-DELAY-PROPOSAL-RACE', %s, 80, 288000, "
                     "'SIMULATED_PARTIAL_REFUND', 26.80, 'LOGISTICS_DELAY', "
-                    "'[\"order:ORDER-DELAY-PROPOSAL-RACE\",\"logistics:ORDER-DELAY-PROPOSAL-RACE\"]', "
+                    '\'["order:ORDER-DELAY-PROPOSAL-RACE","logistics:ORDER-DELAY-PROPOSAL-RACE"]\', '
                     "'delay-policy-v1', %s, 'PENDING_APPROVAL', "
                     "'2026-08-09T13:57:00Z', '2026-08-10T13:57:00Z')",
                     (
-                        candidate_revision_id, uuid.uuid4(), candidate_ticket_id,
-                        candidate_generation_id, candidate_revision_id.hex * 2,
+                        candidate_revision_id,
+                        uuid.uuid4(),
+                        candidate_ticket_id,
+                        candidate_generation_id,
+                        candidate_revision_id.hex * 2,
                     ),
                 )
             return "accepted"
@@ -1675,18 +1855,21 @@ def main() -> None:
             (race_revision_id,),
         ).fetchone()[0]
         assert race_decision in ("APPROVED", "REJECTED")
-        assert connection.execute(
-            "select count(*) from proposal_decision where proposal_revision_id = %s",
-            (race_revision_id,),
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "select count(*) from proposal_decision where proposal_revision_id = %s",
+                (race_revision_id,),
+            ).fetchone()[0]
+            == 1
+        )
         assert connection.execute(
             "select count(*) from compensation_execution where proposal_revision_id = %s",
             (race_revision_id,),
         ).fetchone()[0] == (1 if race_decision == "APPROVED" else 0)
 
     rejection_digest = "a" * 64
-    rejection_ticket_id, rejection_generation_id, rejection_revision_id = seed_pending_decision_fixture(
-        "ORDER-DELAY-CANCELLED", rejection_digest, "审批驳回验收"
+    rejection_ticket_id, _rejection_generation_id, rejection_revision_id = (
+        seed_pending_decision_fixture("ORDER-DELAY-CANCELLED", rejection_digest, "审批驳回验收")
     )
 
     with httpx.Client(timeout=20.0) as client:
@@ -1764,19 +1947,21 @@ def main() -> None:
                 )
 
         with ThreadPoolExecutor(max_workers=2) as executor:
-            rejection_responses = list(executor.map(
-                reject_concurrently, rejection_request_ids
-            ))
+            rejection_responses = list(executor.map(reject_concurrently, rejection_request_ids))
         assert sorted(response.status_code for response in rejection_responses) == [200, 200], [
             (response.status_code, response.text) for response in rejection_responses
         ]
-        assert sorted(response.json()["replayed"] for response in rejection_responses) == [False, True]
+        assert sorted(response.json()["replayed"] for response in rejection_responses) == [
+            False,
+            True,
+        ]
         try:
             assert rejection_stream_closed.result(timeout=5) is True
         finally:
             rejection_stream_executor.shutdown(wait=False, cancel_futures=True)
         rejection_winner_index = next(
-            index for index, response in enumerate(rejection_responses)
+            index
+            for index, response in enumerate(rejection_responses)
             if response.json()["replayed"] is False
         )
         rejected = rejection_responses[rejection_winner_index]
@@ -1836,8 +2021,7 @@ def main() -> None:
         )
         expect_status(rejection_queue, 200)
         rejection_queue_item = next(
-            item for item in rejection_queue.json()
-            if item["ticketId"] == str(rejection_ticket_id)
+            item for item in rejection_queue.json() if item["ticketId"] == str(rejection_ticket_id)
         )
         assert rejection_queue_item["reasonCodes"] == ["APPROVAL_REJECTED_HANDOFF"]
         assert "internalReason" not in rejection_queue_item
@@ -1856,17 +2040,28 @@ def main() -> None:
             (rejection_revision_id,),
         ).fetchone()
         assert rejection_record[1:] == (
-            "REJECTED", rejection_body["internalReason"], "REJECTED", "DECIDED",
-            "HUMAN", "APPROVAL_REJECTED", "HANDED_OFF",
+            "REJECTED",
+            rejection_body["internalReason"],
+            "REJECTED",
+            "DECIDED",
+            "HUMAN",
+            "APPROVAL_REJECTED",
+            "HANDED_OFF",
         )
-        assert connection.execute(
-            "select count(*) from compensation_reservation where order_reference = 'ORDER-DELAY-CANCELLED'"
-        ).fetchone()[0] == 0
-        assert connection.execute(
-            "select count(*) from audit_event where subject_type = 'PROPOSAL_DECISION' "
-            "and subject_id = %s and event_type = 'COMPENSATION_PROPOSAL_REJECTED'",
-            (rejection_record[0],),
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "select count(*) from compensation_reservation where order_reference = 'ORDER-DELAY-CANCELLED'"
+            ).fetchone()[0]
+            == 0
+        )
+        assert (
+            connection.execute(
+                "select count(*) from audit_event where subject_type = 'PROPOSAL_DECISION' "
+                "and subject_id = %s and event_type = 'COMPENSATION_PROPOSAL_REJECTED'",
+                (rejection_record[0],),
+            ).fetchone()[0]
+            == 1
+        )
 
     boundary_digest = "c" * 64
     boundary_ticket_id, _, boundary_revision_id = seed_pending_decision_fixture(
@@ -1899,17 +2094,26 @@ def main() -> None:
         )
         expect_status(boundary_rejection, 403)
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        assert connection.execute(
-            "select status from approval_lease where proposal_revision_id = %s and lease_version = 1",
-            (boundary_revision_id,),
-        ).fetchone()[0] == "EXPIRED"
-        assert connection.execute(
-            "select count(*) from proposal_decision where proposal_revision_id = %s",
-            (boundary_revision_id,),
-        ).fetchone()[0] == 0
-        assert connection.execute(
-            "select handling_mode from support_ticket where id = %s", (boundary_ticket_id,)
-        ).fetchone()[0] == "AGENT"
+        assert (
+            connection.execute(
+                "select status from approval_lease where proposal_revision_id = %s and lease_version = 1",
+                (boundary_revision_id,),
+            ).fetchone()[0]
+            == "EXPIRED"
+        )
+        assert (
+            connection.execute(
+                "select count(*) from proposal_decision where proposal_revision_id = %s",
+                (boundary_revision_id,),
+            ).fetchone()[0]
+            == 0
+        )
+        assert (
+            connection.execute(
+                "select handling_mode from support_ticket where id = %s", (boundary_ticket_id,)
+            ).fetchone()[0]
+            == "AGENT"
+        )
 
     reservation_barrier = threading.Barrier(2)
 
@@ -1978,7 +2182,10 @@ def main() -> None:
                     "X-Synthetic-Customer-Id": "customer-demo",
                     "Idempotency-Key": f"clarification-{label}-{uuid.uuid4()}",
                 },
-                json={"orderReference": "ORDER-DELAY-AMBIGUOUS", "description": f"需要确认订单 {label}"},
+                json={
+                    "orderReference": "ORDER-DELAY-AMBIGUOUS",
+                    "description": f"需要确认订单 {label}",
+                },
             )
             expect_status(response, 201)
             created_id = response.json()["ticketId"]
@@ -1989,7 +2196,10 @@ def main() -> None:
                 )
                 expect_status(projection_response, 200)
                 projection = projection_response.json()
-                if projection["ticket"]["lifecycleState"] == "WAITING_FOR_CUSTOMER" and projection["clarification"]:
+                if (
+                    projection["ticket"]["lifecycleState"] == "WAITING_FOR_CUSTOMER"
+                    and projection["clarification"]
+                ):
                     return created_id, projection
                 time.sleep(0.25)
         raise AssertionError("clarification request was not published")
@@ -2080,10 +2290,13 @@ def main() -> None:
         ).fetchone()
         assert clarification_generation is not None
         assert clarification_generation[2] >= 0 and clarification_generation[3] is not None
-        assert connection.execute(
-            "select count(*) from agent_resume_request where generation_id = %s",
-            (clarification_generation[0],),
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "select count(*) from agent_resume_request where generation_id = %s",
+                (clarification_generation[0],),
+            ).fetchone()[0]
+            == 1
+        )
 
     with httpx.Client(timeout=20.0) as client:
         runs = client.get(
@@ -2093,7 +2306,10 @@ def main() -> None:
         expect_status(runs, 200)
         run_metadata = [run.get("metadata", {}) for run in runs.json()]
         assert sum("submission_request_id" in metadata for metadata in run_metadata) == 1
-        assert sum(metadata.get("resume_request_id") == resume_request_id for metadata in run_metadata) == 1
+        assert (
+            sum(metadata.get("resume_request_id") == resume_request_id for metadata in run_metadata)
+            == 1
+        )
 
     concurrent_ticket_id, concurrent_projection = create_ambiguous_ticket("concurrent")
     concurrent_request_id = concurrent_projection["clarification"]["id"]
@@ -2257,36 +2473,51 @@ def main() -> None:
             (uuid.UUID(handoff_ticket_id),),
         ).fetchone()
         assert handoff_state == (lifecycle_before_handoff, "HUMAN", True, "CUSTOMER_REQUESTED")
-        assert connection.execute(
-            "select status from agent_processing_generation where id = %s",
-            (handoff_generation_id,),
-        ).fetchone()[0] == "HANDED_OFF"
-        assert connection.execute(
-            "select status from customer_clarification_request where id = %s",
-            (uuid.UUID(handoff_clarification_id),),
-        ).fetchone()[0] == "INVALIDATED"
-        assert connection.execute(
-            "select count(*) from customer_human_handoff_request where ticket_id = %s",
-            (uuid.UUID(handoff_ticket_id),),
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "select status from agent_processing_generation where id = %s",
+                (handoff_generation_id,),
+            ).fetchone()[0]
+            == "HANDED_OFF"
+        )
+        assert (
+            connection.execute(
+                "select status from customer_clarification_request where id = %s",
+                (uuid.UUID(handoff_clarification_id),),
+            ).fetchone()[0]
+            == "INVALIDATED"
+        )
+        assert (
+            connection.execute(
+                "select count(*) from customer_human_handoff_request where ticket_id = %s",
+                (uuid.UUID(handoff_ticket_id),),
+            ).fetchone()[0]
+            == 1
+        )
         handoff_summary = connection.execute(
             "select investigation_summary from customer_human_handoff_request where ticket_id = %s",
             (uuid.UUID(handoff_ticket_id),),
         ).fetchone()[0]
         assert handoff_summary["generationId"] == str(handoff_generation_id)
         assert isinstance(handoff_summary["facts"], list)
-        assert connection.execute(
-            "select count(*) from audit_event where ticket_id = %s and event_type in ("
-            "'CUSTOMER_HUMAN_HANDOFF_REQUEST_RECORDED', 'CUSTOMER_HUMAN_PREFERENCE_RECORDED', "
-            "'AGENT_GENERATION_HANDED_OFF', 'SHARED_SUPPORT_QUEUE_ENTERED')",
-            (uuid.UUID(handoff_ticket_id),),
-        ).fetchone()[0] == 4
-        assert connection.execute(
-            "select count(*) from audit_event where ticket_id = %s and ("
-            "event_type = 'AGENT_COMMAND_REJECTED_STALE_OR_OUT_OF_SCOPE_GENERATION' or "
-            "event_type = 'CLARIFICATION_REJECTED_STALE_CLARIFICATION_GENERATION')",
-            (uuid.UUID(handoff_ticket_id),),
-        ).fetchone()[0] >= 4
+        assert (
+            connection.execute(
+                "select count(*) from audit_event where ticket_id = %s and event_type in ("
+                "'CUSTOMER_HUMAN_HANDOFF_REQUEST_RECORDED', 'CUSTOMER_HUMAN_PREFERENCE_RECORDED', "
+                "'AGENT_GENERATION_HANDED_OFF', 'SHARED_SUPPORT_QUEUE_ENTERED')",
+                (uuid.UUID(handoff_ticket_id),),
+            ).fetchone()[0]
+            == 4
+        )
+        assert (
+            connection.execute(
+                "select count(*) from audit_event where ticket_id = %s and ("
+                "event_type = 'AGENT_COMMAND_REJECTED_STALE_OR_OUT_OF_SCOPE_GENERATION' or "
+                "event_type = 'CLARIFICATION_REJECTED_STALE_CLARIFICATION_GENERATION')",
+                (uuid.UUID(handoff_ticket_id),),
+            ).fetchone()[0]
+            >= 4
+        )
         assert connection.execute(
             "select count(*) from public_message where ticket_id = %s",
             (uuid.UUID(handoff_ticket_id),),
@@ -2347,11 +2578,13 @@ def main() -> None:
                 **agent_handoff_body,
                 "summary": {
                     "conclusionCode": "INVESTIGATION_COULD_NOT_CONTINUE",
-                    "facts": [{
-                        "type": "ORDER",
-                        "value": "raw payload fragment",
-                        "evidenceReference": "order:forged",
-                    }],
+                    "facts": [
+                        {
+                            "type": "ORDER",
+                            "value": "raw payload fragment",
+                            "evidenceReference": "order:forged",
+                        }
+                    ],
                 },
             },
         )
@@ -2379,7 +2612,10 @@ def main() -> None:
         expect_status(conflicting_replay, 409)
         stale_new_handoff = client.post(
             agent_handoff_url,
-            headers={**agent_handoff_headers, "Idempotency-Key": f"late-agent-handoff-{uuid.uuid4()}"},
+            headers={
+                **agent_handoff_headers,
+                "Idempotency-Key": f"late-agent-handoff-{uuid.uuid4()}",
+            },
             json=agent_handoff_body,
         )
         expect_status(stale_new_handoff, 403)
@@ -2403,7 +2639,8 @@ def main() -> None:
         )
         expect_status(agent_handoff_queue_response, 200)
         agent_handoff_queue_item = next(
-            item for item in agent_handoff_queue_response.json()
+            item
+            for item in agent_handoff_queue_response.json()
             if item["ticketId"] == agent_handoff_ticket_id
         )
         assert agent_handoff_queue_item["reasonCodes"] == ["AGENT_HUMAN_HANDOFF"]
@@ -2415,10 +2652,13 @@ def main() -> None:
             "from support_ticket where id = %s",
             (uuid.UUID(agent_handoff_ticket_id),),
         ).fetchone() == (agent_handoff_lifecycle, "HUMAN", False, "FACT_CONFLICT")
-        assert connection.execute(
-            "select status from agent_processing_generation where id = %s",
-            (agent_handoff_generation_id,),
-        ).fetchone()[0] == "HANDED_OFF"
+        assert (
+            connection.execute(
+                "select status from agent_processing_generation where id = %s",
+                (agent_handoff_generation_id,),
+            ).fetchone()[0]
+            == "HANDED_OFF"
+        )
         stored_reason, stored_summary = connection.execute(
             "select reason_code, investigation_summary from agent_human_handoff_request "
             "where generation_id = %s and request_id = %s",
@@ -2461,22 +2701,28 @@ def main() -> None:
             return response.status_code
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        concurrent_agent_handoff_statuses = list(executor.map(
-            concurrent_agent_handoff, ["FACT_CONFLICT", "UNSUPPORTED_SCENARIO"]
-        ))
+        concurrent_agent_handoff_statuses = list(
+            executor.map(concurrent_agent_handoff, ["FACT_CONFLICT", "UNSUPPORTED_SCENARIO"])
+        )
     assert sorted(concurrent_agent_handoff_statuses) == [202, 403]
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        assert connection.execute(
-            "select count(*) from agent_human_handoff_request where ticket_id = %s",
-            (uuid.UUID(concurrent_agent_handoff_ticket_id),),
-        ).fetchone()[0] == 1
-        assert connection.execute(
-            "select count(*) from public_message where ticket_id = %s and body = %s",
-            (
-                uuid.UUID(concurrent_agent_handoff_ticket_id),
-                "为确保处理安全，此工单已转由客服继续调查。客服将在此工单中与您联系。",
-            ),
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "select count(*) from agent_human_handoff_request where ticket_id = %s",
+                (uuid.UUID(concurrent_agent_handoff_ticket_id),),
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            connection.execute(
+                "select count(*) from public_message where ticket_id = %s and body = %s",
+                (
+                    uuid.UUID(concurrent_agent_handoff_ticket_id),
+                    "为确保处理安全，此工单已转由客服继续调查。客服将在此工单中与您联系。",
+                ),
+            ).fetchone()[0]
+            == 1
+        )
 
     resolved_handoff_request_id = f"resolved-handoff-{uuid.uuid4()}"
     with httpx.Client(timeout=20.0) as client:
@@ -2555,14 +2801,20 @@ def main() -> None:
             "select handling_mode, customer_human_preference from support_ticket where id = %s",
             (uuid.UUID(race_ticket_id),),
         ).fetchone() == ("HUMAN", True)
-        assert connection.execute(
-            "select count(*) from agent_processing_generation where ticket_id = %s and status = 'ACTIVE'",
-            (uuid.UUID(race_ticket_id),),
-        ).fetchone()[0] == 0
-        assert connection.execute(
-            "select count(*) from customer_clarification_request where id = %s and status = 'OPEN'",
-            (uuid.UUID(race_clarification_id),),
-        ).fetchone()[0] == 0
+        assert (
+            connection.execute(
+                "select count(*) from agent_processing_generation where ticket_id = %s and status = 'ACTIVE'",
+                (uuid.UUID(race_ticket_id),),
+            ).fetchone()[0]
+            == 0
+        )
+        assert (
+            connection.execute(
+                "select count(*) from customer_clarification_request where id = %s and status = 'OPEN'",
+                (uuid.UUID(race_clarification_id),),
+            ).fetchone()[0]
+            == 0
+        )
 
     superseded_ticket_id, superseded_projection = create_ambiguous_ticket("superseded")
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -2585,10 +2837,13 @@ def main() -> None:
     replacement_generation_id = uuid.uuid4()
     replacement_thread_id = uuid.uuid4()
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        assert connection.execute(
-            "select status from customer_clarification_request where id = %s",
-            (uuid.UUID(superseded_projection["clarification"]["id"]),),
-        ).fetchone()[0] == "INVALIDATED"
+        assert (
+            connection.execute(
+                "select status from customer_clarification_request where id = %s",
+                (uuid.UUID(superseded_projection["clarification"]["id"]),),
+            ).fetchone()[0]
+            == "INVALIDATED"
+        )
         connection.execute(
             "update support_ticket set lifecycle_state = 'INVESTIGATING' where id = %s",
             (uuid.UUID(superseded_ticket_id),),
@@ -2612,7 +2867,10 @@ def main() -> None:
             json={"reasonCode": "ORDER_AMBIGUOUS"},
         )
         expect_status(replacement_request, 200)
-        assert replacement_request.json()["clarificationRequestId"] != superseded_projection["clarification"]["id"]
+        assert (
+            replacement_request.json()["clarificationRequestId"]
+            != superseded_projection["clarification"]["id"]
+        )
 
     human_ticket_id, human_projection = create_ambiguous_ticket("human-preference")
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -2620,10 +2878,13 @@ def main() -> None:
             "update support_ticket set customer_human_preference = true where id = %s",
             (uuid.UUID(human_ticket_id),),
         )
-        assert connection.execute(
-            "select status from customer_clarification_request where id = %s",
-            (uuid.UUID(human_projection["clarification"]["id"]),),
-        ).fetchone()[0] == "INVALIDATED"
+        assert (
+            connection.execute(
+                "select status from customer_clarification_request where id = %s",
+                (uuid.UUID(human_projection["clarification"]["id"]),),
+            ).fetchone()[0]
+            == "INVALIDATED"
+        )
     with httpx.Client(timeout=20.0) as client:
         human_preference = client.post(
             f"{spring_url}/api/customer/tickets/{human_ticket_id}/clarifications/"
@@ -2741,9 +3002,9 @@ def main() -> None:
             headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(notifications, 200)
-        assert {item["objective"] for item in notifications.json() if item["ticketId"] == ticket_id} == {
-            "FIRST_RESPONSE", "RESOLUTION"
-        }
+        assert {
+            item["objective"] for item in notifications.json() if item["ticketId"] == ticket_id
+        } == {"FIRST_RESPONSE", "RESOLUTION"}
         escalations = client.get(
             f"{spring_url}/api/support/escalations",
             headers={"X-Synthetic-Support-Id": "support-demo"},
@@ -2754,9 +3015,16 @@ def main() -> None:
         assert queue_item["handlingMode"] == "AGENT"
         assert queue_item["reasonCode"] == "SLA_BREACH"
         assert set(queue_item["breachedObjectives"]) == {"FIRST_RESPONSE", "RESOLUTION"}
-        assert not any(field in queue_item for field in (
-            "customerId", "orderReference", "description", "messages", "investigationFacts"
-        ))
+        assert not any(
+            field in queue_item
+            for field in (
+                "customerId",
+                "orderReference",
+                "description",
+                "messages",
+                "investigationFacts",
+            )
+        )
         workbench_before_handoff = client.get(
             f"{spring_url}/api/support/workbench/snapshot",
             headers={"X-Synthetic-Support-Id": "support-demo"},
@@ -2792,8 +3060,13 @@ def main() -> None:
             headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(shared_queue, 200)
-        combined_queue_item = next(item for item in shared_queue.json() if item["ticketId"] == ticket_id)
-        assert set(combined_queue_item["reasonCodes"]) == {"SLA_BREACH", "CUSTOMER_REQUESTED_HANDOFF"}
+        combined_queue_item = next(
+            item for item in shared_queue.json() if item["ticketId"] == ticket_id
+        )
+        assert set(combined_queue_item["reasonCodes"]) == {
+            "SLA_BREACH",
+            "CUSTOMER_REQUESTED_HANDOFF",
+        }
         assert combined_queue_item["handlingMode"] == "HUMAN"
         escalations_after_handoff = client.get(
             f"{spring_url}/api/support/escalations",
@@ -2812,14 +3085,29 @@ def main() -> None:
             item for item in workbench_after_handoff["sharedQueue"] if item["ticketId"] == ticket_id
         )
         escalation_workbench_item = next(
-            item for item in workbench_after_handoff["escalationQueue"] if item["ticketId"] == ticket_id
+            item
+            for item in workbench_after_handoff["escalationQueue"]
+            if item["ticketId"] == ticket_id
         )
         assert shared_workbench_item["handlingMode"] == "HUMAN"
         assert escalation_workbench_item["handlingMode"] == "HUMAN"
-        assert set(shared_workbench_item) == {"ticketId", "lifecycleState", "handlingMode", "enteredAt"}
-        assert not any(field in json.dumps(workbench_after_handoff) for field in (
-            "reasonCode", "investigationSummary", "customerId", "orderReference", "description", "messages"
-        ))
+        assert set(shared_workbench_item) == {
+            "ticketId",
+            "lifecycleState",
+            "handlingMode",
+            "enteredAt",
+        }
+        assert not any(
+            field in json.dumps(workbench_after_handoff)
+            for field in (
+                "reasonCode",
+                "investigationSummary",
+                "customerId",
+                "orderReference",
+                "description",
+                "messages",
+            )
+        )
         with client.stream(
             "GET",
             f"{spring_url}/api/support/workbench/events",
@@ -2832,7 +3120,9 @@ def main() -> None:
             replay_lines = []
             for line in stream.iter_lines():
                 replay_lines.append(line)
-                if line == "" and any(part.startswith("id:support-workbench-v1:") for part in replay_lines):
+                if line == "" and any(
+                    part.startswith("id:support-workbench-v1:") for part in replay_lines
+                ):
                     break
         assert any(part == "event:QUEUE_TICKET_UPSERTED" for part in replay_lines)
         assert any('"view":"SUPPORT_WORKBENCH"' in part for part in replay_lines)
@@ -2913,21 +3203,30 @@ def main() -> None:
         )
         expect_status(immediate_reply, 202)
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        assert connection.execute(
-            "select count(*) from ticket_sla_fact where ticket_id = %s "
-            "and objective = 'RESOLUTION' and fact_type = 'BREACH'",
-            (uuid.UUID(immediate_ticket_id),),
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "select count(*) from ticket_sla_fact where ticket_id = %s "
+                "and objective = 'RESOLUTION' and fact_type = 'BREACH'",
+                (uuid.UUID(immediate_ticket_id),),
+            ).fetchone()[0]
+            == 1
+        )
 
     time.sleep(1.5)
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        assert connection.execute(
-            "select count(*) from ticket_sla_fact where ticket_id = %s", (ticket_uuid,)
-        ).fetchone()[0] == 4
-        assert connection.execute(
-            "select count(*) from audit_event where ticket_id = %s and event_type like 'SLA_%%'",
-            (ticket_uuid,),
-        ).fetchone()[0] == 4
+        assert (
+            connection.execute(
+                "select count(*) from ticket_sla_fact where ticket_id = %s", (ticket_uuid,)
+            ).fetchone()[0]
+            == 4
+        )
+        assert (
+            connection.execute(
+                "select count(*) from audit_event where ticket_id = %s and event_type like 'SLA_%%'",
+                (ticket_uuid,),
+            ).fetchone()[0]
+            == 4
+        )
         assert connection.execute(
             "select lifecycle_state, handling_mode, resolution_elapsed_seconds from support_ticket where id = %s",
             (ticket_uuid,),
@@ -2966,10 +3265,13 @@ def main() -> None:
             "select lifecycle_state, resolution_elapsed_seconds from support_ticket where id = %s",
             (concurrent_state_ticket_id,),
         ).fetchone() == ("RESOLVED", 86400)
-        assert connection.execute(
-            "select count(*) from ticket_sla_fact where ticket_id = %s and objective = 'RESOLUTION'",
-            (concurrent_state_ticket_id,),
-        ).fetchone()[0] == 2
+        assert (
+            connection.execute(
+                "select count(*) from ticket_sla_fact where ticket_id = %s and objective = 'RESOLUTION'",
+                (concurrent_state_ticket_id,),
+            ).fetchone()[0]
+            == 2
+        )
         connection.execute(
             "update support_ticket set lifecycle_state = 'INVESTIGATING', "
             "resolution_running_since = %s, resolved_at = null, close_due_at = null where id = %s",
@@ -2982,10 +3284,13 @@ def main() -> None:
             "from support_ticket where id = %s",
             (concurrent_state_ticket_id,),
         ).fetchone() == ("INVESTIGATING", 86400, True)
-        assert connection.execute(
-            "select count(*) from ticket_sla_fact where ticket_id = %s and objective = 'RESOLUTION'",
-            (concurrent_state_ticket_id,),
-        ).fetchone()[0] == 2
+        assert (
+            connection.execute(
+                "select count(*) from ticket_sla_fact where ticket_id = %s and objective = 'RESOLUTION'",
+                (concurrent_state_ticket_id,),
+            ).fetchone()[0]
+            == 2
+        )
     try:
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
             connection.execute(
@@ -3022,7 +3327,9 @@ def main() -> None:
 
     closure_now = datetime.datetime.fromisoformat(fixed_now.replace("Z", "+00:00"))
     before_boundary_id = create_closure_fixture(
-        "before-boundary", closure_now - datetime.timedelta(hours=72) + datetime.timedelta(microseconds=1), "AGENT"
+        "before-boundary",
+        closure_now - datetime.timedelta(hours=72) + datetime.timedelta(microseconds=1),
+        "AGENT",
     )
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         before_first_response = connection.execute(
@@ -3047,7 +3354,9 @@ def main() -> None:
         )
         expect_status(reopened, 200)
         assert reopened.json() == {
-            "ticketId": str(before_boundary_id), "outcome": "REOPENED", "replayed": False
+            "ticketId": str(before_boundary_id),
+            "outcome": "REOPENED",
+            "replayed": False,
         }
         reopened_replay = client.post(
             f"{spring_url}/api/customer/tickets/{before_boundary_id}/replies",
@@ -3079,10 +3388,13 @@ def main() -> None:
         assert generations[0] == before_generation
         assert generations[1][0] == before_generation[0] + 1
         assert generations[1][1] != before_generation[1]
-        assert connection.execute(
-            "select count(*) from customer_reply_request where customer_id = 'customer-demo' "
-            "and message_id = 'issue-28-before-boundary-message'",
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "select count(*) from customer_reply_request where customer_id = 'customer-demo' "
+                "and message_id = 'issue-28-before-boundary-message'",
+            ).fetchone()[0]
+            == 1
+        )
 
     different_issue_id = create_closure_fixture(
         "different-issue", closure_now - datetime.timedelta(hours=1)
@@ -3121,24 +3433,37 @@ def main() -> None:
         expect_status(conflict, 409)
         assert conflict.json()["code"] == "MESSAGE_ID_CONFLICT"
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        assert connection.execute(
-            "select lifecycle_state from support_ticket where id = %s", (different_issue_id,)
-        ).fetchone()[0] == "RESOLVED"
-        assert connection.execute(
-            "select count(*) from public_message where ticket_id = %s", (different_issue_id,)
-        ).fetchone()[0] == original_message_count
+        assert (
+            connection.execute(
+                "select lifecycle_state from support_ticket where id = %s", (different_issue_id,)
+            ).fetchone()[0]
+            == "RESOLVED"
+        )
+        assert (
+            connection.execute(
+                "select count(*) from public_message where ticket_id = %s", (different_issue_id,)
+            ).fetchone()[0]
+            == original_message_count
+        )
         assert connection.execute(
             "select follow_up_of, issue_kind, handling_mode from support_ticket where id = %s",
             (different_linked_id,),
         ).fetchone() == (different_issue_id, "OTHER", "HUMAN")
-        assert connection.execute(
-            "select count(*) from agent_processing_generation where ticket_id = %s", (different_linked_id,)
-        ).fetchone()[0] == 0
-        assert connection.execute(
-            "select count(*) from shared_support_queue_entry where ticket_id = %s "
-            "and reason_code = 'UNSUPPORTED_ISSUE'",
-            (different_linked_id,),
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "select count(*) from agent_processing_generation where ticket_id = %s",
+                (different_linked_id,),
+            ).fetchone()[0]
+            == 0
+        )
+        assert (
+            connection.execute(
+                "select count(*) from shared_support_queue_entry where ticket_id = %s "
+                "and reason_code = 'UNSUPPORTED_ISSUE'",
+                (different_linked_id,),
+            ).fetchone()[0]
+            == 1
+        )
 
     exact_boundary_id = create_closure_fixture(
         "exact-boundary", closure_now - datetime.timedelta(hours=1)
@@ -3167,8 +3492,11 @@ def main() -> None:
     lock_connection.execute(
         "update support_ticket set resolved_at = %s, "
         "close_due_at = %s::timestamptz + interval '72 hours' where id = %s",
-        (closure_now - datetime.timedelta(hours=72),
-         closure_now - datetime.timedelta(hours=72), exact_boundary_id),
+        (
+            closure_now - datetime.timedelta(hours=72),
+            closure_now - datetime.timedelta(hours=72),
+            exact_boundary_id,
+        ),
     )
     lock_connection.commit()
     boundary_pool = ThreadPoolExecutor(max_workers=1)
@@ -3199,21 +3527,33 @@ def main() -> None:
     boundary_linked_id = uuid.UUID(boundary_result_ids.pop())
     time.sleep(1.5)
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        assert connection.execute(
-            "select lifecycle_state from support_ticket where id = %s", (exact_boundary_id,)
-        ).fetchone()[0] == "CLOSED"
-        assert connection.execute(
-            "select count(*) from audit_event where ticket_id = %s and event_type = 'TICKET_CLOSED'",
-            (exact_boundary_id,),
-        ).fetchone()[0] == 1
-        assert connection.execute(
-            "select follow_up_of from support_ticket where id = %s", (boundary_linked_id,)
-        ).fetchone()[0] == exact_boundary_id
-        assert connection.execute(
-            "select count(*) from customer_reply_request where original_ticket_id = %s "
-            "and message_id = 'issue-28-exact-boundary-message'",
-            (exact_boundary_id,),
-        ).fetchone()[0] == 1
+        assert (
+            connection.execute(
+                "select lifecycle_state from support_ticket where id = %s", (exact_boundary_id,)
+            ).fetchone()[0]
+            == "CLOSED"
+        )
+        assert (
+            connection.execute(
+                "select count(*) from audit_event where ticket_id = %s and event_type = 'TICKET_CLOSED'",
+                (exact_boundary_id,),
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            connection.execute(
+                "select follow_up_of from support_ticket where id = %s", (boundary_linked_id,)
+            ).fetchone()[0]
+            == exact_boundary_id
+        )
+        assert (
+            connection.execute(
+                "select count(*) from customer_reply_request where original_ticket_id = %s "
+                "and message_id = 'issue-28-exact-boundary-message'",
+                (exact_boundary_id,),
+            ).fetchone()[0]
+            == 1
+        )
 
     with httpx.Client(timeout=20.0) as client:
         closed_follow_up = client.post(
@@ -3231,12 +3571,18 @@ def main() -> None:
         expect_status(closed_follow_up, 201)
         closed_follow_up_id = uuid.UUID(closed_follow_up.json()["ticketId"])
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        assert connection.execute(
-            "select follow_up_of from support_ticket where id = %s", (closed_follow_up_id,)
-        ).fetchone()[0] == exact_boundary_id
-        assert connection.execute(
-            "select lifecycle_state from support_ticket where id = %s", (exact_boundary_id,)
-        ).fetchone()[0] == "CLOSED"
+        assert (
+            connection.execute(
+                "select follow_up_of from support_ticket where id = %s", (closed_follow_up_id,)
+            ).fetchone()[0]
+            == exact_boundary_id
+        )
+        assert (
+            connection.execute(
+                "select lifecycle_state from support_ticket where id = %s", (exact_boundary_id,)
+            ).fetchone()[0]
+            == "CLOSED"
+        )
 
     with psycopg.connect(os.environ["AGENT_DATABASE_URI"]) as connection:
         assert connection.execute("select current_database(), current_user").fetchone() == (
@@ -3254,50 +3600,62 @@ def main() -> None:
             psycopg.connect(uri).close()
         except psycopg.OperationalError:
             continue
-        raise AssertionError(f"cross-database connection unexpectedly succeeded: {forbidden_database}")
+        raise AssertionError(
+            f"cross-database connection unexpectedly succeeded: {forbidden_database}"
+        )
 
-    print(json.dumps({
-        "status": "UP",
-        "thread_id": thread_id,
-        "checkpoint_count": checkpoint_count,
-        "ticket_id": ticket_id,
-        "resolved_ticket_id": resolved_ticket_id,
-        "proposal_ticket_id": proposal_ticket_id,
-        "proposal_revision_count": 2,
-        "rejected_proposal_count": len(rejected_ticket_ids),
-        "concurrent_reservation_results": reservation_results,
-        "concurrent_clarification_reply_statuses": concurrent_reply_statuses,
-        "human_handoff_ticket_id": handoff_ticket_id,
-        "agent_handoff_ticket_id": agent_handoff_ticket_id,
-        "concurrent_agent_handoff_statuses": concurrent_agent_handoff_statuses,
-        "handoff_reply_race_statuses": race_statuses,
-        "clarification_resume_status": resume_status,
-        "sla_fact_count": len(sla_facts),
-        "sla_resume_immediate": True,
-        "concurrent_replays": 7,
-        "approval_claim_statuses": sorted(response.status_code for response in approval_claim_responses),
-        "approval_lease_versions": [1, 2, 3],
-        "approval_replacement_revoked": True,
-        "approval_rejection_ticket_id": str(rejection_ticket_id),
-        "approval_rejection_replayed": True,
-        "concurrent_rejection_statuses": sorted(
-            response.status_code for response in rejection_responses
-        ),
-        "approval_execution_id": approved_payload["executionId"],
-        "execution_claim_statuses": sorted(response.status_code for response in execution_claim_responses),
-        "execution_success_replayed": True,
-        "coupon_10_execution_id": coupon_10_execution_id,
-        "coupon_10_ticket_id": coupon_10_ticket_id,
-        "coupon_20_execution_id": coupon_20_execution_id,
-        "coupon_20_ticket_id": coupon_20_ticket_id,
-        "partial_refund_ticket_id": str(approval_ticket_id),
-        "automatic_executor_execution_id": auto_execution_id,
-        "automatic_executor_ticket_id": str(auto_ticket_id),
-        "approval_fact_drift_invalidated": str(drift_ticket_id),
-        "concurrent_proposal_intent_results": sorted(proposal_race_results),
-        "approve_reject_statuses": sorted(response.status_code for response in race_responses),
-        "approve_reject_winner": race_decision,
-    }))
+    print(
+        json.dumps(
+            {
+                "status": "UP",
+                "thread_id": thread_id,
+                "checkpoint_count": checkpoint_count,
+                "ticket_id": ticket_id,
+                "resolved_ticket_id": resolved_ticket_id,
+                "proposal_ticket_id": proposal_ticket_id,
+                "proposal_revision_count": 2,
+                "rejected_proposal_count": len(rejected_ticket_ids),
+                "concurrent_reservation_results": reservation_results,
+                "concurrent_clarification_reply_statuses": concurrent_reply_statuses,
+                "human_handoff_ticket_id": handoff_ticket_id,
+                "agent_handoff_ticket_id": agent_handoff_ticket_id,
+                "concurrent_agent_handoff_statuses": concurrent_agent_handoff_statuses,
+                "handoff_reply_race_statuses": race_statuses,
+                "clarification_resume_status": resume_status,
+                "sla_fact_count": len(sla_facts),
+                "sla_resume_immediate": True,
+                "concurrent_replays": 7,
+                "approval_claim_statuses": sorted(
+                    response.status_code for response in approval_claim_responses
+                ),
+                "approval_lease_versions": [1, 2, 3],
+                "approval_replacement_revoked": True,
+                "approval_rejection_ticket_id": str(rejection_ticket_id),
+                "approval_rejection_replayed": True,
+                "concurrent_rejection_statuses": sorted(
+                    response.status_code for response in rejection_responses
+                ),
+                "approval_execution_id": approved_payload["executionId"],
+                "execution_claim_statuses": sorted(
+                    response.status_code for response in execution_claim_responses
+                ),
+                "execution_success_replayed": True,
+                "coupon_10_execution_id": coupon_10_execution_id,
+                "coupon_10_ticket_id": coupon_10_ticket_id,
+                "coupon_20_execution_id": coupon_20_execution_id,
+                "coupon_20_ticket_id": coupon_20_ticket_id,
+                "partial_refund_ticket_id": str(approval_ticket_id),
+                "automatic_executor_execution_id": auto_execution_id,
+                "automatic_executor_ticket_id": str(auto_ticket_id),
+                "approval_fact_drift_invalidated": str(drift_ticket_id),
+                "concurrent_proposal_intent_results": sorted(proposal_race_results),
+                "approve_reject_statuses": sorted(
+                    response.status_code for response in race_responses
+                ),
+                "approve_reject_winner": race_decision,
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

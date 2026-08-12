@@ -6,7 +6,6 @@ import time
 
 import httpx
 
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -26,8 +25,7 @@ def execute_ready_once(client: httpx.Client) -> int:
             result = client.post(
                 f"/internal/compensation-executions/{execution_id}/reconciliations",
                 headers={
-                    "Idempotency-Key":
-                        f"reconcile:{execution_id}:{provider_result['queryId']}"
+                    "Idempotency-Key": f"reconcile:{execution_id}:{provider_result['queryId']}"
                 },
                 json=provider_result,
             )

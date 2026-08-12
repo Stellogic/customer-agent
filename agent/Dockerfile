@@ -10,7 +10,10 @@ COPY src ./src
 COPY tests ./tests
 
 FROM base AS test
-RUN uv run pytest
+RUN uv run ruff format --check . \
+    && uv run ruff check . \
+    && uv run pyright \
+    && uv run pytest
 
 FROM base AS runtime
 RUN uv sync --frozen --no-dev

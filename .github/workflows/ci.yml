@@ -15,7 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build and run deterministic tests
-        run: docker build --target test --tag customer-agent/${{ matrix.component }}-test:ci ${{ matrix.component }}
+        shell: pwsh
+        run: ./scripts/check.ps1 -Component ${{ matrix.component }} -SkipAcceptance
 
   fullstack-acceptance:
     runs-on: ubuntu-latest

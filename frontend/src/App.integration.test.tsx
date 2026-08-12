@@ -16,7 +16,8 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
 
   it("跨 React 表单、Spring API、迁移后的 PostgreSQL 与客户授权恢复公开受理结果", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
-      const path = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const path =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       return nativeFetch(new URL(path, liveBaseUrl), init);
     });
 
@@ -38,7 +39,8 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
 
   it("客服工作台从独立 Spring 快照恢复共享队列且不公开转人工理由详情", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
-      const path = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const path =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       return nativeFetch(new URL(path, liveBaseUrl), init);
     });
 
@@ -46,6 +48,8 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
 
     expect(await screen.findByRole("heading", { name: "客服共享队列" })).toBeInTheDocument();
     expect(await screen.findByText("队列可发现不等于工单详情授权")).toBeInTheDocument();
-    expect(screen.queryByText(/CUSTOMER_REQUESTED_HANDOFF|AGENT_HUMAN_HANDOFF|调查摘要/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/CUSTOMER_REQUESTED_HANDOFF|AGENT_HUMAN_HANDOFF|调查摘要/),
+    ).not.toBeInTheDocument();
   });
 });

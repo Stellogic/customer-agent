@@ -1,5 +1,11 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { consumeSseEvents, hasOnlyKeys, isRecord, parseViewCursor, type SseEvent } from "./streamProtocol";
+import {
+  consumeSseEvents,
+  hasOnlyKeys,
+  isRecord,
+  parseViewCursor,
+  type SseEvent,
+} from "./streamProtocol";
 
 const CUSTOMER_PUBLIC_SCHEMA = "customer-public-v1" as const;
 
@@ -7,7 +13,13 @@ type Snapshot = {
   view: "CUSTOMER_PUBLIC";
   schema: typeof CUSTOMER_PUBLIC_SCHEMA;
   cursor: string;
-  ticket: { id: string; lifecycleState: string; handlingMode: string; agentGeneration: number; firstRespondedAt: string };
+  ticket: {
+    id: string;
+    lifecycleState: string;
+    handlingMode: string;
+    agentGeneration: number;
+    firstRespondedAt: string;
+  };
   messages: Array<{ author: string; body: string; sentAt: string }>;
   clarification: { id: string; promptCode: string; question: string } | null;
 };
@@ -57,11 +69,15 @@ export function App() {
       const created = await fetch("/api/customer/tickets", {
         method: "POST",
         credentials: "same-origin",
-        headers: { ...customerHeaders, "Content-Type": "application/json", "Idempotency-Key": requestId.current },
+        headers: {
+          ...customerHeaders,
+          "Content-Type": "application/json",
+          "Idempotency-Key": requestId.current,
+        },
         body: JSON.stringify({ orderReference, description }),
       });
       if (!created.ok) throw new Error("ticket creation failed");
-      const { ticketId } = await created.json() as { ticketId: string };
+      const { ticketId } = (await created.json()) as { ticketId: string };
       await loadTicket(ticketId);
     } catch {
       setError("提交未完成，请保留本页并重试。相同请求不会创建第二张工单。");
@@ -71,9 +87,12 @@ export function App() {
   }
 
   async function loadTicket(ticketId: string) {
-    const loaded = await fetch(`/api/customer/tickets/${ticketId}`, { headers: customerHeaders, credentials: "same-origin" });
+    const loaded = await fetch(`/api/customer/tickets/${ticketId}`, {
+      headers: customerHeaders,
+      credentials: "same-origin",
+    });
     if (!loaded.ok) throw new Error("snapshot request failed");
-    const authoritative = await loaded.json() as Snapshot;
+    const authoritative = (await loaded.json()) as Snapshot;
     if (!isSnapshot(authoritative)) throw new Error("incompatible snapshot");
     snapshotRef.current = authoritative;
     setSnapshot(authoritative);
@@ -96,19 +115,28 @@ export function App() {
       "X-Resume-Request-Id": resumeRequestId.current,
     };
     try {
-      const response = await fetch(`/api/customer/tickets/${ticketId}/clarifications/${clarificationId}/replies`, {
-        method: "POST", credentials: "same-origin", headers,
-        body: JSON.stringify({ answer: clarificationAnswer }),
-      });
+      const response = await fetch(
+        `/api/customer/tickets/${ticketId}/clarifications/${clarificationId}/replies`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers,
+          body: JSON.stringify({ answer: clarificationAnswer }),
+        },
+      );
       if (!response.ok) throw new Error("clarification reply failed");
       await loadTicket(ticketId);
       replyMessageId.current = globalThis.crypto.randomUUID();
       resumeRequestId.current = globalThis.crypto.randomUUID();
       setClarificationAnswer("");
     } catch {
-      const status = await fetch(`/api/customer/tickets/${ticketId}/clarification-resumes/${resumeRequestId.current}`, {
-        headers: customerHeaders, credentials: "same-origin",
-      }).catch(() => null);
+      const status = await fetch(
+        `/api/customer/tickets/${ticketId}/clarification-resumes/${resumeRequestId.current}`,
+        {
+          headers: customerHeaders,
+          credentials: "same-origin",
+        },
+      ).catch(() => null);
       if (status?.ok) {
         await loadTicket(ticketId);
       } else {
@@ -129,17 +157,24 @@ export function App() {
       const response = await fetch(`/api/customer/tickets/${ticketId}/human-handoff`, {
         method: "POST",
         credentials: "same-origin",
-        headers: { ...customerHeaders, "Content-Type": "application/json", "Idempotency-Key": requestId },
+        headers: {
+          ...customerHeaders,
+          "Content-Type": "application/json",
+          "Idempotency-Key": requestId,
+        },
         body: JSON.stringify({ reasonCode: "CUSTOMER_REQUESTED" }),
       });
       if (!response.ok) throw new Error("human handoff failed");
       await loadTicket(ticketId);
       handoffRequestId.current = globalThis.crypto.randomUUID();
     } catch {
-      const status = await fetch(`/api/customer/tickets/${ticketId}/human-handoff-requests/${requestId}`, {
-        headers: customerHeaders,
-        credentials: "same-origin",
-      }).catch(() => null);
+      const status = await fetch(
+        `/api/customer/tickets/${ticketId}/human-handoff-requests/${requestId}`,
+        {
+          headers: customerHeaders,
+          credentials: "same-origin",
+        },
+      ).catch(() => null);
       if (status?.ok) {
         await loadTicket(ticketId);
         handoffRequestId.current = globalThis.crypto.randomUUID();
@@ -172,7 +207,7 @@ export function App() {
         }),
       });
       if (!response.ok) throw new Error("ticket reply failed");
-      const result = await response.json() as { ticketId: string };
+      const result = (await response.json()) as { ticketId: string };
       await loadTicket(result.ticketId);
       ticketReplyRequestId.current = globalThis.crypto.randomUUID();
       setTicketReplyBody("");
@@ -188,10 +223,16 @@ export function App() {
     const controller = new AbortController();
     streamController.current = controller;
     const markDisconnected = () => {
-      if (!controller.signal.aborted) setError("实时更新已断开；当前内容可能过期，刷新后将从权威快照恢复。");
+      if (!controller.signal.aborted)
+        setError("实时更新已断开；当前内容可能过期，刷新后将从权威快照恢复。");
     };
     const scheduleRecovery = () => {
-      if (controller.signal.aborted || streamController.current !== controller || reconnectTimer.current !== null) return;
+      if (
+        controller.signal.aborted ||
+        streamController.current !== controller ||
+        reconnectTimer.current !== null
+      )
+        return;
       reconnectTimer.current = globalThis.setTimeout(async () => {
         reconnectTimer.current = null;
         if (streamController.current !== controller) return;
@@ -237,9 +278,15 @@ export function App() {
     } catch {
       return false;
     }
-    if (!isRecord(envelope) || !hasOnlyKeys(envelope, ["view", "schema", "generation", "payload"])
-      || envelope.view !== "CUSTOMER_PUBLIC" || envelope.schema !== CUSTOMER_PUBLIC_SCHEMA
-      || !Number.isSafeInteger(envelope.generation) || envelope.generation < 0) return false;
+    if (
+      !isRecord(envelope) ||
+      !hasOnlyKeys(envelope, ["view", "schema", "generation", "payload"]) ||
+      envelope.view !== "CUSTOMER_PUBLIC" ||
+      envelope.schema !== CUSTOMER_PUBLIC_SCHEMA ||
+      !Number.isSafeInteger(envelope.generation) ||
+      envelope.generation < 0
+    )
+      return false;
     if (envelope.generation < current.ticket.agentGeneration) {
       const next = { ...current, cursor: event.id };
       snapshotRef.current = next;
@@ -255,32 +302,52 @@ export function App() {
       if (current.ticket.handlingMode === "HUMAN" && message.author === "AGENT") {
         next = { ...current, cursor: event.id };
       } else {
-        const duplicate = current.messages.some((existing) =>
-          existing.author === message.author && existing.body === message.body && existing.sentAt === message.sentAt);
-        next = { ...current, cursor: event.id, messages: duplicate ? current.messages : [...current.messages, message] };
+        const duplicate = current.messages.some(
+          (existing) =>
+            existing.author === message.author &&
+            existing.body === message.body &&
+            existing.sentAt === message.sentAt,
+        );
+        next = {
+          ...current,
+          cursor: event.id,
+          messages: duplicate ? current.messages : [...current.messages, message],
+        };
       }
     } else if (event.type === "TICKET_ACCEPTED") {
       if (!isTicketTransition(payload)) return false;
       next = { ...current, cursor: event.id, ticket: { ...current.ticket, ...payload } };
-    } else if (event.type === "CUSTOMER_CLARIFICATION_REQUESTED" || event.type === "TICKET_INVESTIGATION_RESUMED") {
+    } else if (
+      event.type === "CUSTOMER_CLARIFICATION_REQUESTED" ||
+      event.type === "TICKET_INVESTIGATION_RESUMED"
+    ) {
       if (!isClarificationTransition(payload)) return false;
       next = {
-          ...current,
-          cursor: event.id,
-          ticket: { ...current.ticket, lifecycleState: payload.lifecycleState },
-          clarification: payload.clarification === undefined ? current.clarification : payload.clarification,
-        };
+        ...current,
+        cursor: event.id,
+        ticket: { ...current.ticket, lifecycleState: payload.lifecycleState },
+        clarification:
+          payload.clarification === undefined ? current.clarification : payload.clarification,
+      };
     } else if (event.type === "TICKET_HANDED_OFF") {
       if (!isHandoffTransition(payload)) return false;
       next = {
-          ...current,
-          cursor: event.id,
-          ticket: { ...current.ticket, handlingMode: payload.handlingMode },
-          clarification: null,
-        };
-    } else if (event.type === "TICKET_RESOLVED" || event.type === "TICKET_REOPENED" || event.type === "TICKET_CLOSED") {
+        ...current,
+        cursor: event.id,
+        ticket: { ...current.ticket, handlingMode: payload.handlingMode },
+        clarification: null,
+      };
+    } else if (
+      event.type === "TICKET_RESOLVED" ||
+      event.type === "TICKET_REOPENED" ||
+      event.type === "TICKET_CLOSED"
+    ) {
       if (!isLifecycleTransition(payload, event.type)) return false;
-      next = { ...current, cursor: event.id, ticket: { ...current.ticket, lifecycleState: payload.lifecycleState } };
+      next = {
+        ...current,
+        cursor: event.id,
+        ticket: { ...current.ticket, lifecycleState: payload.lifecycleState },
+      };
     } else {
       return false;
     }
@@ -293,67 +360,145 @@ export function App() {
     <main className="help-center">
       <header>
         <p className="eyebrow">STELLOGIC 帮助中心</p>
-        <h1>物流遇到问题？<br />我们从这里开始处理。</h1>
-        <p className="lede">提交后，你会得到一张可查询的客服工单。调查异步继续；订单无法唯一确认时，我们会在同一工单中向你提问。</p>
+        <h1>
+          物流遇到问题？
+          <br />
+          我们从这里开始处理。
+        </h1>
+        <p className="lede">
+          提交后，你会得到一张可查询的客服工单。调查异步继续；订单无法唯一确认时，我们会在同一工单中向你提问。
+        </p>
       </header>
 
       {!snapshot ? (
         <form className="ticket-form" onSubmit={submit}>
-          <label>订单编号<input aria-label="订单编号" value={orderReference} onChange={(event) => setOrderReference(event.target.value)} required /></label>
-          <label>问题描述<textarea aria-label="问题描述" value={description} onChange={(event) => setDescription(event.target.value)} required rows={5} /></label>
+          <label>
+            订单编号
+            <input
+              aria-label="订单编号"
+              value={orderReference}
+              onChange={(event) => setOrderReference(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            问题描述
+            <textarea
+              aria-label="问题描述"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              required
+              rows={5}
+            />
+          </label>
           <button disabled={submitting}>{submitting ? "正在提交…" : "提交物流延迟问题"}</button>
-          {error && <p className="error" role="alert">{error}</p>}
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
         </form>
       ) : (
         <section className="ticket-card" aria-live="polite">
           <div className="ticket-heading">
-            <div><p className="eyebrow">客服工单</p><h2>{snapshot.ticket.id}</h2></div>
-            <span className="status">{snapshot.ticket.lifecycleState === "CLOSED" ? "已关闭" : snapshot.ticket.handlingMode === "HUMAN" ? "人工处理中" : snapshot.ticket.lifecycleState === "INVESTIGATING" ? "调查中" : snapshot.ticket.lifecycleState === "WAITING_FOR_CUSTOMER" ? "等待你的回复" : snapshot.ticket.lifecycleState}</span>
+            <div>
+              <p className="eyebrow">客服工单</p>
+              <h2>{snapshot.ticket.id}</h2>
+            </div>
+            <span className="status">
+              {snapshot.ticket.lifecycleState === "CLOSED"
+                ? "已关闭"
+                : snapshot.ticket.handlingMode === "HUMAN"
+                  ? "人工处理中"
+                  : snapshot.ticket.lifecycleState === "INVESTIGATING"
+                    ? "调查中"
+                    : snapshot.ticket.lifecycleState === "WAITING_FOR_CUSTOMER"
+                      ? "等待你的回复"
+                      : snapshot.ticket.lifecycleState}
+            </span>
           </div>
           <ol className="conversation">
             {snapshot.messages.map((message, index) => (
               <li key={`${message.sentAt}-${index}`} className={message.author.toLowerCase()}>
-                <span>{message.author === "CUSTOMER" ? "你" : message.author === "AGENT" ? "智能客服" : "客服"}</span>
+                <span>
+                  {message.author === "CUSTOMER"
+                    ? "你"
+                    : message.author === "AGENT"
+                      ? "智能客服"
+                      : "客服"}
+                </span>
                 <p>{message.body}</p>
               </li>
             ))}
           </ol>
           {snapshot.clarification && snapshot.ticket.handlingMode === "AGENT" && (
             <form className="clarification-form" onSubmit={submitClarification}>
-              <label>{snapshot.clarification.question}
-                <input aria-label="订单确认码" value={clarificationAnswer}
-                  onChange={(event) => setClarificationAnswer(event.target.value)} required />
+              <label>
+                {snapshot.clarification.question}
+                <input
+                  aria-label="订单确认码"
+                  value={clarificationAnswer}
+                  onChange={(event) => setClarificationAnswer(event.target.value)}
+                  required
+                />
               </label>
-              <button disabled={submitting}>{submitting ? "正在恢复调查…" : "回复并继续调查"}</button>
+              <button disabled={submitting}>
+                {submitting ? "正在恢复调查…" : "回复并继续调查"}
+              </button>
             </form>
           )}
           {["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState) && (
             <form className="clarification-form" onSubmit={submitTicketReply}>
-              <label>回复涉及的订单编号
-                <input aria-label="回复订单编号" value={ticketReplyOrderReference}
-                  onChange={(event) => setTicketReplyOrderReference(event.target.value)} required />
+              <label>
+                回复涉及的订单编号
+                <input
+                  aria-label="回复订单编号"
+                  value={ticketReplyOrderReference}
+                  onChange={(event) => setTicketReplyOrderReference(event.target.value)}
+                  required
+                />
               </label>
-              <label>这是哪类问题
-                <select aria-label="回复问题类型" value={ticketReplyIssueKind}
-                  onChange={(event) => setTicketReplyIssueKind(event.target.value)}>
+              <label>
+                这是哪类问题
+                <select
+                  aria-label="回复问题类型"
+                  value={ticketReplyIssueKind}
+                  onChange={(event) => setTicketReplyIssueKind(event.target.value)}
+                >
                   <option value="LOGISTICS_DELAY">原物流延迟问题</option>
                   <option value="OTHER">其他问题</option>
                 </select>
               </label>
-              <label>你的回复
-                <textarea aria-label="工单回复" value={ticketReplyBody}
-                  onChange={(event) => setTicketReplyBody(event.target.value)} required rows={3} />
+              <label>
+                你的回复
+                <textarea
+                  aria-label="工单回复"
+                  value={ticketReplyBody}
+                  onChange={(event) => setTicketReplyBody(event.target.value)}
+                  required
+                  rows={3}
+                />
               </label>
               <button disabled={submitting}>{submitting ? "正在提交…" : "发送回复"}</button>
             </form>
           )}
-          {snapshot.ticket.handlingMode === "AGENT" && snapshot.ticket.lifecycleState !== "CLOSED" && (
-            <button type="button" className="handoff-button" disabled={submitting} onClick={requestHumanHandoff}>
-              {submitting ? "正在提交…" : "转人工处理"}
-            </button>
-          )}
+          {snapshot.ticket.handlingMode === "AGENT" &&
+            snapshot.ticket.lifecycleState !== "CLOSED" && (
+              <button
+                type="button"
+                className="handoff-button"
+                disabled={submitting}
+                onClick={requestHumanHandoff}
+              >
+                {submitting ? "正在提交…" : "转人工处理"}
+              </button>
+            )}
           <p className="recovery-note">刷新页面时，公开沟通会从 Spring 权威快照恢复。</p>
-          {error && <p className="error" role="alert">{error}</p>}
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
         </section>
       )}
     </main>
@@ -361,11 +506,21 @@ export function App() {
 }
 
 function isSnapshot(value: unknown): value is Snapshot {
-  if (!isRecord(value) || value.view !== "CUSTOMER_PUBLIC" || value.schema !== CUSTOMER_PUBLIC_SCHEMA) return false;
+  if (
+    !isRecord(value) ||
+    value.view !== "CUSTOMER_PUBLIC" ||
+    value.schema !== CUSTOMER_PUBLIC_SCHEMA
+  )
+    return false;
   const cursor = typeof value.cursor === "string" ? parseCursor(value.cursor) : null;
-  return cursor?.epoch === value.schema && isRecord(value.ticket) && Array.isArray(value.messages)
-    && Number.isSafeInteger(value.ticket.agentGeneration) && Number(value.ticket.agentGeneration) >= 0
-    && value.messages.every(isPublicMessage);
+  return (
+    cursor?.epoch === value.schema &&
+    isRecord(value.ticket) &&
+    Array.isArray(value.messages) &&
+    Number.isSafeInteger(value.ticket.agentGeneration) &&
+    Number(value.ticket.agentGeneration) >= 0 &&
+    value.messages.every(isPublicMessage)
+  );
 }
 
 function parseCursor(cursor: string) {
@@ -373,33 +528,68 @@ function parseCursor(cursor: string) {
 }
 
 function isPublicMessage(value: unknown): value is Snapshot["messages"][number] {
-  return isRecord(value) && hasOnlyKeys(value, ["author", "body", "sentAt"])
-    && ["CUSTOMER", "SUPPORT", "AGENT"].includes(String(value.author))
-    && typeof value.body === "string" && typeof value.sentAt === "string";
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["author", "body", "sentAt"]) &&
+    ["CUSTOMER", "SUPPORT", "AGENT"].includes(String(value.author)) &&
+    typeof value.body === "string" &&
+    typeof value.sentAt === "string"
+  );
 }
 
-function isTicketTransition(value: unknown): value is { lifecycleState: string; handlingMode: string; ticketId?: string } {
-  return isRecord(value) && hasOnlyKeys(value, ["ticketId", "lifecycleState", "handlingMode"])
-    && typeof value.lifecycleState === "string" && typeof value.handlingMode === "string";
+function isTicketTransition(
+  value: unknown,
+): value is { lifecycleState: string; handlingMode: string; ticketId?: string } {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["ticketId", "lifecycleState", "handlingMode"]) &&
+    typeof value.lifecycleState === "string" &&
+    typeof value.handlingMode === "string"
+  );
 }
 
-function isClarificationTransition(value: unknown): value is { lifecycleState: string; clarification?: Snapshot["clarification"] } {
-  if (!isRecord(value) || !hasOnlyKeys(value, ["lifecycleState", "clarification"]) || typeof value.lifecycleState !== "string") return false;
+function isClarificationTransition(
+  value: unknown,
+): value is { lifecycleState: string; clarification?: Snapshot["clarification"] } {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["lifecycleState", "clarification"]) ||
+    typeof value.lifecycleState !== "string"
+  )
+    return false;
   const clarification = value.clarification;
-  return clarification === undefined || clarification === null
-    || (isRecord(clarification) && hasOnlyKeys(clarification, ["id", "promptCode", "question"])
-      && typeof clarification.id === "string" && typeof clarification.promptCode === "string"
-      && typeof clarification.question === "string");
+  return (
+    clarification === undefined ||
+    clarification === null ||
+    (isRecord(clarification) &&
+      hasOnlyKeys(clarification, ["id", "promptCode", "question"]) &&
+      typeof clarification.id === "string" &&
+      typeof clarification.promptCode === "string" &&
+      typeof clarification.question === "string")
+  );
 }
 
-function isHandoffTransition(value: unknown): value is { handlingMode: string; clarification: null } {
-  return isRecord(value) && hasOnlyKeys(value, ["handlingMode", "clarification"])
-    && value.handlingMode === "HUMAN" && value.clarification === null;
+function isHandoffTransition(
+  value: unknown,
+): value is { handlingMode: string; clarification: null } {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["handlingMode", "clarification"]) &&
+    value.handlingMode === "HUMAN" &&
+    value.clarification === null
+  );
 }
 
-function isLifecycleTransition(value: unknown, eventType: string): value is { lifecycleState: string } {
+function isLifecycleTransition(
+  value: unknown,
+  eventType: string,
+): value is { lifecycleState: string } {
   if (!isRecord(value) || !hasOnlyKeys(value, ["lifecycleState"])) return false;
-  const expected = eventType === "TICKET_RESOLVED" ? "RESOLVED"
-    : eventType === "TICKET_REOPENED" ? "INVESTIGATING" : "CLOSED";
+  const expected =
+    eventType === "TICKET_RESOLVED"
+      ? "RESOLVED"
+      : eventType === "TICKET_REOPENED"
+        ? "INVESTIGATING"
+        : "CLOSED";
   return value.lifecycleState === expected;
 }

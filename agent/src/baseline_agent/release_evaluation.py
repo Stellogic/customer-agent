@@ -6,9 +6,11 @@ from typing import Any
 
 import httpx
 
-
 ALLOWED_CONCLUSION_FIELDS = {
-    "compensationRequired", "reasonCode", "orderReference", "evidenceRefs",
+    "compensationRequired",
+    "reasonCode",
+    "orderReference",
+    "evidenceRefs",
 }
 
 

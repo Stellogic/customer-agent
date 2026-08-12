@@ -6,7 +6,6 @@ from baseline_agent.release_evaluation import (
     evaluate_conclusion,
 )
 
-
 FACTS = {
     "orderReference": "ORDER-DELAY-E2E-RECONCILIATION",
     "delayHours": 80,
@@ -68,7 +67,10 @@ def test_responses_request_uses_synthetic_facts_and_strict_json_schema_only():
     assert request["text"]["format"]["strict"] is True
     assert request["text"]["format"]["type"] == "json_schema"
     assert set(request["text"]["format"]["schema"]["properties"]) == {
-        "compensationRequired", "reasonCode", "orderReference", "evidenceRefs",
+        "compensationRequired",
+        "reasonCode",
+        "orderReference",
+        "evidenceRefs",
     }
     assert "paymentToken" not in serialized
     assert "prompt" not in serialized.lower()

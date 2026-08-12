@@ -13,12 +13,14 @@ def test_executor_claims_and_confirms_each_assignment_with_stable_delivery_ids()
         if request.method == "GET":
             return httpx.Response(
                 200,
-                json=[{
-                    "executionId": "30000000-0000-0000-0000-000000000001",
-                    "compensationMethod": "COUPON",
-                    "amount": 10.00,
-                    "status": "READY",
-                }],
+                json=[
+                    {
+                        "executionId": "30000000-0000-0000-0000-000000000001",
+                        "compensationMethod": "COUPON",
+                        "amount": 10.00,
+                        "status": "READY",
+                    }
+                ],
             )
         if request.url.path.endswith("/claims"):
             return httpx.Response(
@@ -71,12 +73,17 @@ def test_executor_recovers_lost_claim_response_and_retries_the_same_success() ->
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal claim_calls, success_calls
         if request.method == "GET":
-            return httpx.Response(200, json=[{
-                "executionId": execution_id,
-                "compensationMethod": "COUPON",
-                "amount": 20.00,
-                "status": "PROCESSING" if claim_calls else "READY",
-            }])
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "executionId": execution_id,
+                        "compensationMethod": "COUPON",
+                        "amount": 20.00,
+                        "status": "PROCESSING" if claim_calls else "READY",
+                    }
+                ],
+            )
         if request.url.path.endswith("/claims"):
             claim_calls += 1
             if claim_calls == 1:
@@ -115,25 +122,33 @@ def test_executor_reconciles_same_refund_after_provider_response_is_lost() -> No
         path = request.url.path
         if path == "/internal/compensation-executions":
             status = "READY" if provider_execute_calls == 0 else "UNKNOWN"
-            return httpx.Response(200, json=[{
-                "executionId": execution_id,
-                "idempotencyKey": idempotency_key,
-                "compensationMethod": "SIMULATED_PARTIAL_REFUND",
-                "amount": 26.80,
-                "status": status,
-            }])
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "executionId": execution_id,
+                        "idempotencyKey": idempotency_key,
+                        "compensationMethod": "SIMULATED_PARTIAL_REFUND",
+                        "amount": 26.80,
+                        "status": status,
+                    }
+                ],
+            )
         if path.endswith("/claims"):
             spring_paths.append(path)
-            return httpx.Response(201, json={
-                "executionId": execution_id,
-                "attemptId": "30000000-0000-0000-0000-000000000006",
-                "status": "PROCESSING",
-                "idempotencyKey": idempotency_key,
-                "parameterDigest": parameter_digest,
-                "compensationMethod": "SIMULATED_PARTIAL_REFUND",
-                "amount": 26.80,
-                "replayed": False,
-            })
+            return httpx.Response(
+                201,
+                json={
+                    "executionId": execution_id,
+                    "attemptId": "30000000-0000-0000-0000-000000000006",
+                    "status": "PROCESSING",
+                    "idempotencyKey": idempotency_key,
+                    "parameterDigest": parameter_digest,
+                    "compensationMethod": "SIMULATED_PARTIAL_REFUND",
+                    "amount": 26.80,
+                    "replayed": False,
+                },
+            )
         if path == f"/internal/compensation-simulator/{execution_id}/executions":
             provider_execute_calls += 1
             raise httpx.ReadTimeout("provider response was lost", request=request)
@@ -142,11 +157,14 @@ def test_executor_reconciles_same_refund_after_provider_response_is_lost() -> No
             return httpx.Response(200, json={"status": "UNKNOWN"})
         if path == f"/internal/compensation-simulator/{execution_id}/reconciliation":
             assert request.headers["Idempotency-Key"] == idempotency_key
-            return httpx.Response(200, json={
-                "queryId": "provider-query-1",
-                "outcome": "FOUND",
-                "resultReference": f"simulated-refund:{execution_id}",
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "queryId": "provider-query-1",
+                    "outcome": "FOUND",
+                    "resultReference": f"simulated-refund:{execution_id}",
+                },
+            )
         if path.endswith("/reconciliations"):
             spring_paths.append(path)
             return httpx.Response(200, json={"status": "SUCCEEDED"})
@@ -176,29 +194,40 @@ def test_executor_releases_only_after_provider_confirms_no_side_effect() -> None
         path = request.url.path
         paths.append(path)
         if request.method == "GET":
-            return httpx.Response(200, json=[{
-                "executionId": execution_id,
-                "compensationMethod": "SIMULATED_PARTIAL_REFUND",
-                "amount": 26.80,
-                "status": "READY",
-            }])
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "executionId": execution_id,
+                        "compensationMethod": "SIMULATED_PARTIAL_REFUND",
+                        "amount": 26.80,
+                        "status": "READY",
+                    }
+                ],
+            )
         if path.endswith("/claims"):
-            return httpx.Response(201, json={
-                "executionId": execution_id,
-                "attemptId": "30000000-0000-0000-0000-000000000009",
-                "status": "PROCESSING",
-                "idempotencyKey": "compensation-execution:confirmed-failure",
-                "parameterDigest": "d" * 64,
-                "compensationMethod": "SIMULATED_PARTIAL_REFUND",
-                "amount": 26.80,
-                "replayed": False,
-            })
+            return httpx.Response(
+                201,
+                json={
+                    "executionId": execution_id,
+                    "attemptId": "30000000-0000-0000-0000-000000000009",
+                    "status": "PROCESSING",
+                    "idempotencyKey": "compensation-execution:confirmed-failure",
+                    "parameterDigest": "d" * 64,
+                    "compensationMethod": "SIMULATED_PARTIAL_REFUND",
+                    "amount": 26.80,
+                    "replayed": False,
+                },
+            )
         if path.endswith("/executions"):
-            return httpx.Response(200, json={
-                "outcome": "CONFIRMED_NOT_OCCURRED",
-                "resultReference": None,
-                "responseLost": False,
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "outcome": "CONFIRMED_NOT_OCCURRED",
+                    "resultReference": None,
+                    "responseLost": False,
+                },
+            )
         if path.endswith("/failures"):
             return httpx.Response(200, json={"status": "FAILED"})
         raise AssertionError(f"unexpected request: {request.method} {path}")
