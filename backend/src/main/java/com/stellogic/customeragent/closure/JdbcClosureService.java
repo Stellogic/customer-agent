@@ -226,6 +226,7 @@ public class JdbcClosureService implements ClosureService {
                         ticketId,
                         at);
         if (updated == 0) return;
+        jdbc.update("delete from shared_support_queue_entry where ticket_id = ?", ticketId);
         publicProjection.appendClosed(ticketId, now);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "

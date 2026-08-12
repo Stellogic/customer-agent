@@ -3482,6 +3482,63 @@ def main() -> None:
     exact_boundary_id = create_closure_fixture(
         "exact-boundary", closure_now - datetime.timedelta(hours=1)
     )
+    queue_reasons_before_close = [
+        "SLA_BREACH",
+        "CUSTOMER_REQUESTED_HANDOFF",
+        "AGENT_HUMAN_HANDOFF",
+    ]
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into shared_support_queue_entry (ticket_id, reason_code, entered_at) "
+            "select %s, reason_code, %s from unnest(%s::text[]) reason_code",
+            (exact_boundary_id, closure_now, queue_reasons_before_close),
+        )
+    with httpx.Client(timeout=20.0) as client:
+        queue_before_close = client.get(
+            f"{spring_url}/api/support/workbench/snapshot",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(queue_before_close, 200)
+        queue_before_close_payload = queue_before_close.json()
+        assert str(exact_boundary_id) in {
+            item["ticketId"] for item in queue_before_close_payload["sharedQueue"]
+        }
+        queue_cursor_before_close = queue_before_close_payload["cursor"]
+
+    queue_stream_connected = threading.Event()
+
+    def observe_live_queue_removal() -> str:
+        with (
+            httpx.Client(timeout=20.0) as stream_client,
+            stream_client.stream(
+                "GET",
+                f"{spring_url}/api/support/workbench/events",
+                headers={
+                    "X-Synthetic-Support-Id": "support-demo",
+                    "Last-Event-ID": queue_cursor_before_close,
+                },
+            ) as queue_events,
+        ):
+            expect_status(queue_events, 200)
+            queue_event_block = []
+            for line in queue_events.iter_lines():
+                if line == ":connected":
+                    queue_stream_connected.set()
+                if line:
+                    queue_event_block.append(line)
+                    continue
+                rendered_event = "\n".join(queue_event_block)
+                if (
+                    "event:QUEUE_TICKET_REMOVED" in rendered_event
+                    and str(exact_boundary_id) in rendered_event
+                ):
+                    return rendered_event
+                queue_event_block = []
+        raise AssertionError("live support queue stream closed before ticket removal")
+
+    queue_stream_pool = ThreadPoolExecutor(max_workers=1)
+    queue_stream_future = queue_stream_pool.submit(observe_live_queue_removal)
+    assert queue_stream_connected.wait(timeout=5), "support queue SSE did not establish"
     boundary_headers = {
         "X-Synthetic-Customer-Id": "customer-demo",
         "Idempotency-Key": "issue-28-exact-boundary-message",
@@ -3568,6 +3625,27 @@ def main() -> None:
             ).fetchone()[0]
             == 1
         )
+        assert (
+            connection.execute(
+                "select count(*) from shared_support_queue_entry where ticket_id = %s",
+                (exact_boundary_id,),
+            ).fetchone()[0]
+            == 0
+        )
+
+    with httpx.Client(timeout=20.0) as client:
+        queue_after_close = client.get(
+            f"{spring_url}/api/support/workbench/snapshot",
+            headers={"X-Synthetic-Support-Id": "support-demo"},
+        )
+        expect_status(queue_after_close, 200)
+        assert str(exact_boundary_id) not in {
+            item["ticketId"] for item in queue_after_close.json()["sharedQueue"]
+        }
+    queue_event_stream = queue_stream_future.result(timeout=10)
+    queue_stream_pool.shutdown()
+    assert "event:QUEUE_TICKET_REMOVED" in queue_event_stream
+    assert str(exact_boundary_id) in queue_event_stream
 
     with httpx.Client(timeout=20.0) as client:
         closed_follow_up = client.post(
