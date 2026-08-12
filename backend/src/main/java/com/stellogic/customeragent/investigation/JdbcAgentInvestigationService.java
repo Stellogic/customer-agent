@@ -274,9 +274,9 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         DelayCompensationPolicy.Decision decision =
                 policy.evaluate(Duration.ofSeconds(order.delaySeconds()), order.paidAmount());
         if (!decision.eligible()) reject(ticketId, "COMPENSATION_PROPOSAL_INELIGIBLE");
-        BigDecimal available =
-                order.availableCompensationAmount().subtract(order.activeReservationAmount());
-        if (available.compareTo(decision.amount()) < 0) {
+        BigDecimal remainingAvailable =
+                order.totalAvailableCompensationAmount().subtract(order.activeReservationAmount());
+        if (remainingAvailable.compareTo(decision.amount()) < 0) {
             reject(ticketId, "COMPENSATION_ALLOWANCE_INSUFFICIENT");
         }
 
@@ -295,8 +295,9 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                                     conclusion.evidenceRefs(),
                                     order.policyVersion(),
                                     order.paidAmount(),
-                                    available,
+                                    order.totalAvailableCompensationAmount(),
                                     order.activeReservationAmount(),
+                                    remainingAvailable,
                                     order.paid(),
                                     order.cancelled(),
                                     order.fullyRefunded(),
@@ -497,7 +498,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             boolean existingCompensation,
             String policyVersion,
             BigDecimal paidAmount,
-            BigDecimal availableCompensationAmount,
+            BigDecimal totalAvailableCompensationAmount,
             int pendingActionCount,
             BigDecimal activeReservationAmount) {
         InvestigationFacts asFacts() {

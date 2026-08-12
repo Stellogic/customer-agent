@@ -367,7 +367,8 @@ def main() -> None:
                 "select p.id, p.proposal_id, p.revision_number, p.delay_hours, p.delay_seconds, "
                 "p.compensation_method, p.amount, p.reason_code, p.policy_version, "
                 "p.content_digest, p.status, g.status, s.delay_hours, s.delay_seconds, s.paid_amount, "
-                "s.available_compensation_amount, jsonb_array_length(s.evidence_references) "
+                "s.total_available_compensation_amount, s.active_reservation_amount, "
+                "s.remaining_available_compensation_amount, jsonb_array_length(s.evidence_references) "
                 "from compensation_proposal_revision p "
                 "join agent_processing_generation g on g.id = p.generation_id "
                 "join approval_evidence_snapshot s on s.proposal_revision_id = p.id "
@@ -392,6 +393,8 @@ def main() -> None:
         80,
         288000,
         Decimal("268.00"),
+        Decimal("268.00"),
+        Decimal("0.00"),
         Decimal("268.00"),
         2,
     )
@@ -527,6 +530,13 @@ def main() -> None:
         assert approval_projection["orderReference"] == proposal_order_reference
         assert approval_projection["reasonCode"] == "LOGISTICS_DELAY"
         assert approval_projection["delaySeconds"] == 288000
+        assert approval_projection["evidenceSnapshot"] == {
+            "delaySeconds": 288000,
+            "paidAmount": "268.00",
+            "totalAvailableCompensationAmount": "268.00",
+            "activeReservationAmount": "0.00",
+            "remainingAvailableCompensationAmount": "268.00",
+        }
         assert approval_projection["leaseToken"] == lease_one["leaseToken"]
         assert [event["eventType"] for event in approval_projection["responsibilityChain"]] == [
             "COMPENSATION_PROPOSAL_REVISION_CREATED",
@@ -740,9 +750,11 @@ def main() -> None:
         connection.execute(
             "insert into approval_evidence_snapshot "
             "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "
-            "available_compensation_amount, active_reservation_amount, paid, cancelled, fully_refunded, "
+            "total_available_compensation_amount, active_reservation_amount, "
+            "remaining_available_compensation_amount, paid, cancelled, fully_refunded, "
             "existing_compensation, evidence_references, captured_at) values "
-            "(%s, 'ORDER-DELAY-UNDER-24', 24, 86400, 268.00, 268.00, 0.00, true, false, false, false, "
+            "(%s, 'ORDER-DELAY-UNDER-24', 24, 86400, 268.00, 268.00, 0.00, 268.00, "
+            "true, false, false, false, "
             '\'["order:ORDER-DELAY-UNDER-24","logistics:ORDER-DELAY-UNDER-24"]\', '
             "'2026-08-08T14:00:00Z')",
             (expired_revision_id,),
@@ -1044,15 +1056,107 @@ def main() -> None:
             connection.execute(
                 "insert into approval_evidence_snapshot "
                 "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "
-                "available_compensation_amount, active_reservation_amount, paid, cancelled, fully_refunded, "
+                "total_available_compensation_amount, active_reservation_amount, "
+                "remaining_available_compensation_amount, paid, cancelled, fully_refunded, "
                 "existing_compensation, evidence_references, captured_at) "
-                "select %s, order_reference, %s, %s, paid_amount, available_compensation_amount, 0.00, "
+                "select %s, order_reference, %s, %s, paid_amount, available_compensation_amount, "
+                "0.00, available_compensation_amount, "
                 "paid, cancelled, fully_refunded, existing_compensation, "
                 "jsonb_build_array('order:' || order_reference, 'logistics:' || order_reference), "
                 "'2026-08-09T13:57:00Z' from synthetic_order where order_reference = %s",
                 (fixture_revision_id, delay_hours, delay_seconds, order_reference),
             )
         return fixture_ticket_id, fixture_generation_id, fixture_revision_id
+
+    reserved_request = f"issue-55-{uuid.uuid4()}"
+    with httpx.Client(timeout=20.0) as client:
+        reserved_ticket = client.post(
+            f"{spring_url}/api/customer/tickets",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": reserved_request,
+            },
+            json={
+                "orderReference": "ORDER-DELAY-APPROVAL-RESERVED",
+                "description": "已有额度预占时仍可审批的合成场景",
+            },
+        )
+        expect_status(reserved_ticket, 201)
+        reserved_ticket_id = uuid.UUID(reserved_ticket.json()["ticketId"])
+
+    reserved_proposal = None
+    for _ in range(60):
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            reserved_proposal = connection.execute(
+                "select p.id, p.content_digest, s.total_available_compensation_amount, "
+                "s.active_reservation_amount, s.remaining_available_compensation_amount "
+                "from compensation_proposal_revision p "
+                "join approval_evidence_snapshot s on s.proposal_revision_id = p.id "
+                "where p.ticket_id = %s",
+                (reserved_ticket_id,),
+            ).fetchone()
+        if reserved_proposal is not None:
+            break
+        time.sleep(0.5)
+    assert reserved_proposal is not None
+    reserved_revision_id, reserved_digest = reserved_proposal[:2]
+    assert reserved_proposal[2:] == (
+        Decimal("268.00"),
+        Decimal("10.00"),
+        Decimal("258.00"),
+    )
+
+    with httpx.Client(timeout=20.0) as client:
+        reserved_claim = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{reserved_revision_id}/claims",
+            headers={
+                **approver_headers,
+                "Idempotency-Key": f"reserved-claim-{uuid.uuid4()}",
+            },
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(reserved_claim, 201)
+        reserved_lease = reserved_claim.json()
+        reserved_headers = {
+            **approver_headers,
+            "X-Approval-Lease-Token": reserved_lease["leaseToken"],
+            "X-Approval-Lease-Version": str(reserved_lease["leaseVersion"]),
+        }
+        reserved_view = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{reserved_revision_id}/approval-view",
+            headers=reserved_headers,
+        )
+        expect_status(reserved_view, 200)
+        assert reserved_view.json()["evidenceSnapshot"] == {
+            "delaySeconds": 288000,
+            "paidAmount": "268.00",
+            "totalAvailableCompensationAmount": "268.00",
+            "activeReservationAmount": "10.00",
+            "remainingAvailableCompensationAmount": "258.00",
+        }
+        reserved_approval = client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{reserved_revision_id}/approve",
+            headers={
+                **reserved_headers,
+                "Idempotency-Key": f"reserved-approve-{uuid.uuid4()}",
+            },
+            json={"proposalRevision": 1, "contentDigest": reserved_digest},
+        )
+        expect_status(reserved_approval, 200)
+        assert reserved_approval.json()["executionStatus"] == "READY"
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select coalesce(sum(amount), 0), count(*) from compensation_reservation "
+            "where order_reference = 'ORDER-DELAY-APPROVAL-RESERVED' and status = 'ACTIVE'"
+        ).fetchone() == (Decimal("36.80"), 2)
+        assert (
+            connection.execute(
+                "select count(*) from compensation_execution "
+                "where order_reference = 'ORDER-DELAY-APPROVAL-RESERVED'"
+            ).fetchone()[0]
+            == 1
+        )
 
     approval_digest = "9" * 64
     approval_ticket_id, _, approval_revision_id = seed_pending_decision_fixture(

@@ -106,7 +106,17 @@ class ApprovalControllerTest {
                                         "NO_EXISTING_COMPENSATION",
                                         "ALLOWANCE_SUFFICIENT"),
                                 List.of("order:ORDER-DELAY-001", "logistics:ORDER-DELAY-001"),
-                                Map.of("delaySeconds", 288000, "paidAmount", "268.00"),
+                                Map.of(
+                                        "delaySeconds",
+                                        288000,
+                                        "paidAmount",
+                                        "268.00",
+                                        "totalAvailableCompensationAmount",
+                                        "268.00",
+                                        "activeReservationAmount",
+                                        "10.00",
+                                        "remainingAvailableCompensationAmount",
+                                        "258.00"),
                                 List.of(
                                         new ApprovalModels.ResponsibilityEvent(
                                                 "COMPENSATION_PROPOSAL_REVISION_CREATED",
@@ -133,6 +143,15 @@ class ApprovalControllerTest {
                 .andExpect(jsonPath("$.cursor").value("approval-view-v1:1"))
                 .andExpect(jsonPath("$.contentDigest").value("digest"))
                 .andExpect(jsonPath("$.authoritativeAmount").value(26.80))
+                .andExpect(
+                        jsonPath("$.evidenceSnapshot.totalAvailableCompensationAmount")
+                                .value("268.00"))
+                .andExpect(jsonPath("$.evidenceSnapshot.activeReservationAmount").value("10.00"))
+                .andExpect(
+                        jsonPath("$.evidenceSnapshot.remainingAvailableCompensationAmount")
+                                .value("258.00"))
+                .andExpect(
+                        jsonPath("$.evidenceSnapshot.availableCompensationAmount").doesNotExist())
                 .andExpect(jsonPath("$.ticket").doesNotExist())
                 .andExpect(jsonPath("$.publicMessages").doesNotExist())
                 .andExpect(jsonPath("$.internalNotes").doesNotExist())
