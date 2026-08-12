@@ -32,6 +32,8 @@ baseline:
   agent:
     base-url: ${AGENT_SERVER_URL:http://localhost:2024}
     token: ${SPRING_TO_AGENT_TOKEN:local-spring-to-agent}
+    probe-connect-timeout: ${AGENT_PROBE_CONNECT_TIMEOUT:500ms}
+    probe-read-timeout: ${AGENT_PROBE_READ_TIMEOUT:1s}
     submission-poll-delay: ${AGENT_SUBMISSION_POLL_DELAY:250}
   approval:
     default-lease-seconds: ${APPROVAL_DEFAULT_LEASE_SECONDS:900}

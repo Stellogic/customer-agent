@@ -96,6 +96,8 @@ services:
       SPRING_DATABASE_USER: spring_app
       SPRING_DATABASE_PASSWORD: local-spring-app
       AGENT_SERVER_URL: http://agent-server:2024
+      AGENT_PROBE_CONNECT_TIMEOUT: ${AGENT_PROBE_CONNECT_TIMEOUT:-500ms}
+      AGENT_PROBE_READ_TIMEOUT: ${AGENT_PROBE_READ_TIMEOUT:-1s}
       <<: *local-secrets
     depends_on:
       spring-migrate:
