@@ -30,7 +30,7 @@ pwsh -File scripts/real-model-smoke.ps1
 
 它只评价固定合成场景的结构化正确性、最小证据和安全不变量，不评价逐字措辞；详细口径见 `docs/delivery/issue-29-verification.md`。
 
-`-Reset` 只删除本 Compose 项目的本地合成数据卷。日常复测可省略该参数。停止服务：
+`-Reset` 只删除本 Compose 项目的本地合成数据卷，并运行 `FULL_RESET_GATE`：这是 `scripts/check.ps1` 与 CI 使用的正式全量门禁，包含要求空 fixture 的广域 `integration-smoke`。日常在同一专用数据卷上省略 `-Reset` 时，脚本明确运行 `PERSISTENT_RERUN_SUITE`：覆盖 Issue #29 两条链、本轮唯一 namespace 的持久化与唯一补偿断言、既有自动执行器成功结果的持久证据回读、React live 验收、前端产物和运行日志隐私扫描，以及冻结时钟下的稳定 attempt 排序。它不会为自动执行器创建一笔新的广域 fixture，也明确排除跨历史功能复用固定业务 fixture 的 `integration-smoke`，因为不应通过清库或改写既有业务证据来使其重跑；因此该模式不等价于正式全量门禁。停止服务：
 
 ```powershell
 docker compose down

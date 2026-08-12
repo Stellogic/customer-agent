@@ -6,6 +6,8 @@ import sensitiveContent from "./sensitive-content-patterns.json";
 
 const liveBaseUrl = import.meta.env.VITE_SMOKE_BASE_URL as string | undefined;
 const scenario = import.meta.env.VITE_E2E_SCENARIO as "normal" | "reconciliation" | undefined;
+const orderReference = import.meta.env.VITE_E2E_ORDER_REFERENCE as string | undefined;
+const skipLiveScenario = !liveBaseUrl || !scenario || !orderReference;
 const asyncFlowTimeout = 60_000;
 
 function completedSsePayload(payload: string): string {
@@ -14,7 +16,7 @@ function completedSsePayload(payload: string): string {
   return last?.index === undefined ? "" : payload.slice(0, last.index + last[0].length);
 }
 
-describe.skipIf(!liveBaseUrl || !scenario)("Issue #29 两条 React 全栈验收", () => {
+describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
   const nativeFetch = globalThis.fetch;
 
   afterEach(() => {
@@ -59,8 +61,17 @@ describe.skipIf(!liveBaseUrl || !scenario)("Issue #29 两条 React 全栈验收"
       return response;
     });
 
-    const orderReference =
-      scenario === "normal" ? "ORDER-DELAY-E2E-NORMAL" : "ORDER-DELAY-E2E-RECONCILIATION";
+    async function approvalQueueRevisionIds(): Promise<string[]> {
+      const response = await globalThis.fetch("/api/approver/compensation-proposals", {
+        headers: { "X-Synthetic-Approver-Id": "approver-demo" },
+      });
+      expect(response.ok).toBe(true);
+      const queue = (await response.json()) as Array<{ proposalRevisionId: string }>;
+      return queue.map((item) => item.proposalRevisionId);
+    }
+
+    const queueBeforeScenario = await approvalQueueRevisionIds();
+
     const customer = render(<App />);
     fireEvent.change(screen.getByLabelText("订单编号"), { target: { value: orderReference } });
     fireEvent.change(screen.getByLabelText("问题描述"), {
@@ -74,8 +85,23 @@ describe.skipIf(!liveBaseUrl || !scenario)("Issue #29 两条 React 全栈验收"
     const ticketUrl = globalThis.location.href;
     customer.unmount();
 
+    const queueAfterScenario = await approvalQueueRevisionIds();
+    const scenarioRevisionIds = queueAfterScenario.filter(
+      (revisionId) => !queueBeforeScenario.includes(revisionId),
+    );
+    expect(scenarioRevisionIds).toHaveLength(1);
+    const scenarioQueueIndex = queueAfterScenario.indexOf(scenarioRevisionIds[0]);
+
     const approver = render(<ApprovalWorkbench approverId="approver-demo" />);
-    fireEvent.click(await screen.findByRole("button", { name: "领取审批" }, { timeout: 10_000 }));
+    await waitFor(
+      () => {
+        expect(screen.getAllByRole("button", { name: "领取审批" })).toHaveLength(
+          queueAfterScenario.length,
+        );
+      },
+      { timeout: 10_000 },
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: "领取审批" })[scenarioQueueIndex]);
     expect(await screen.findByRole("heading", { name: orderReference })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "批准补偿" }));
     expect(
