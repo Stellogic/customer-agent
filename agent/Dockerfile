@@ -2,7 +2,10 @@ FROM python:3.13.14-slim-bookworm AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 WORKDIR /app
-RUN pip install --no-cache-dir uv==0.8.22
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends libatomic1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir uv==0.8.22
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
 COPY langgraph.json ./
