@@ -1592,6 +1592,51 @@ def main() -> None:
             == 1
         )
 
+    def assert_success_sla_projection(ticket: uuid.UUID) -> None:
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            assert connection.execute(
+                "select objective, fact_type, elapsed_seconds, occurred_at from ticket_sla_fact "
+                "where ticket_id = %s order by objective, fact_type",
+                (ticket,),
+            ).fetchall() == [
+                (
+                    "RESOLUTION",
+                    "BREACH",
+                    86400,
+                    datetime.datetime.fromisoformat("2026-08-09T14:00:00+00:00"),
+                ),
+                (
+                    "RESOLUTION",
+                    "WARNING",
+                    86400,
+                    datetime.datetime.fromisoformat("2026-08-09T14:00:00+00:00"),
+                ),
+            ]
+            assert (
+                connection.execute(
+                    "select count(*) from audit_event where ticket_id = %s "
+                    "and event_type in ('SLA_RESOLUTION_WARNING', 'SLA_RESOLUTION_BREACH')",
+                    (ticket,),
+                ).fetchone()[0]
+                == 2
+            )
+            assert (
+                connection.execute(
+                    "select count(*) from support_sla_notification where ticket_id = %s "
+                    "and objective = 'RESOLUTION' and fact_type = 'WARNING'",
+                    (ticket,),
+                ).fetchone()[0]
+                == 1
+            )
+            assert (
+                connection.execute(
+                    "select count(*) from shared_support_queue_entry where ticket_id = %s "
+                    "and reason_code = 'SLA_BREACH'",
+                    (ticket,),
+                ).fetchone()[0]
+                == 1
+            )
+
     def approve_and_execute_coupon(
         order_reference: str, delay_hours: int, delay_seconds: int, amount: Decimal
     ) -> tuple[str, str]:
@@ -1631,9 +1676,22 @@ def main() -> None:
             )
             expect_status(coupon_claim, 201)
             coupon_claim_payload = coupon_claim.json()
+            with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                connection.execute(
+                    "update support_ticket set resolution_elapsed_seconds = 86400, "
+                    "resolution_running_since = null where id = %s",
+                    (ticket,),
+                )
+                connection.execute(
+                    "insert into support_assignment "
+                    "(id, ticket_id, support_id, status, assigned_at) "
+                    "values (%s, %s, 'support-demo', 'ACTIVE', '2026-08-09T14:00:00Z')",
+                    (uuid.uuid4(), ticket),
+                )
+            success_request_id = f"coupon-result-{uuid.uuid4()}"
             coupon_success = client.post(
                 f"{spring_url}/internal/compensation-executions/{coupon_execution_id}/success",
-                headers={**executor_headers, "Idempotency-Key": f"coupon-result-{uuid.uuid4()}"},
+                headers={**executor_headers, "Idempotency-Key": success_request_id},
                 json={
                     "attemptId": coupon_claim_payload["attemptId"],
                     "idempotencyKey": coupon_claim_payload["idempotencyKey"],
@@ -1643,6 +1701,45 @@ def main() -> None:
             expect_status(coupon_success, 200)
             expected_message = f"已发放 {amount:.2f} CNY 优惠券。"
             assert coupon_success.json()["customerMessage"] == expected_message
+            assert_success_sla_projection(ticket)
+            same_request_parameter_conflict = client.post(
+                f"{spring_url}/internal/compensation-executions/{coupon_execution_id}/success",
+                headers={**executor_headers, "Idempotency-Key": success_request_id},
+                json={
+                    "attemptId": str(uuid.uuid4()),
+                    "idempotencyKey": coupon_claim_payload["idempotencyKey"],
+                    "parameterDigest": coupon_claim_payload["parameterDigest"],
+                },
+            )
+            expect_status(same_request_parameter_conflict, 409)
+            terminal_barrier = threading.Barrier(2)
+
+            def redeliver_terminal_success(attempt_id: str) -> httpx.Response:
+                terminal_barrier.wait()
+                with httpx.Client(timeout=20.0) as terminal_client:
+                    return terminal_client.post(
+                        f"{spring_url}/internal/compensation-executions/"
+                        f"{coupon_execution_id}/success",
+                        headers={
+                            **executor_headers,
+                            "Idempotency-Key": f"coupon-terminal-{uuid.uuid4()}",
+                        },
+                        json={
+                            "attemptId": attempt_id,
+                            "idempotencyKey": coupon_claim_payload["idempotencyKey"],
+                            "parameterDigest": coupon_claim_payload["parameterDigest"],
+                        },
+                    )
+
+            with ThreadPoolExecutor(max_workers=2) as terminal_executor:
+                terminal_success_replay, terminal_attempt_conflict = terminal_executor.map(
+                    redeliver_terminal_success,
+                    [coupon_claim_payload["attemptId"], str(uuid.uuid4())],
+                )
+            expect_status(terminal_success_replay, 200)
+            expect_status(terminal_attempt_conflict, 409)
+            assert terminal_success_replay.json() == {**coupon_success.json(), "replayed": True}
+            assert_success_sla_projection(ticket)
             customer = client.get(
                 f"{spring_url}/api/customer/tickets/{ticket}",
                 headers={"X-Synthetic-Customer-Id": "customer-demo"},
