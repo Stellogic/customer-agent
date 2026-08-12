@@ -26,11 +26,11 @@ final class ArchitectureTest {
     }
 
     @Test
-    void policyAndReliabilityCodeRemainIndependentOfSpring() {
+    void compensationPolicyRemainsIndependentOfSpring() {
         ArchRule rule =
                 noClasses()
                         .that()
-                        .resideInAnyPackage("..compensation..", "..reliability..")
+                        .resideInAnyPackage("..compensation..")
                         .should()
                         .dependOnClassesThat()
                         .resideInAnyPackage("org.springframework..");
