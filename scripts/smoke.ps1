@@ -148,6 +148,31 @@ if ($Reset) {
     if ($LASTEXITCODE -ne 0) {
         throw "集成 smoke 失败，退出码: $LASTEXITCODE"
     }
+
+    $hadDemoFixedInstant = Test-Path Env:DEMO_FIXED_INSTANT
+    $priorDemoFixedInstant = $env:DEMO_FIXED_INSTANT
+    try {
+        docker compose exec -T postgres psql -U postgres -d customer_agent `
+            -f /smoke/approval_queue_time_setup.sql
+        $env:DEMO_FIXED_INSTANT = ''
+        docker compose up --detach --force-recreate --wait backend
+        docker compose --profile smoke run --rm approval-queue-time-smoke
+        if ($LASTEXITCODE -ne 0) {
+            throw "审批队列权威时间锁等待 smoke 失败，退出码: $LASTEXITCODE"
+        }
+    } finally {
+        try {
+            docker compose exec -T postgres psql -U postgres -d customer_agent `
+                -f /smoke/approval_queue_time_cleanup.sql
+        } finally {
+            if ($hadDemoFixedInstant) {
+                $env:DEMO_FIXED_INSTANT = $priorDemoFixedInstant
+            } else {
+                Remove-Item Env:DEMO_FIXED_INSTANT -ErrorAction SilentlyContinue
+            }
+            docker compose up --detach --force-recreate --wait backend
+        }
+    }
 } else {
     Write-Host 'PERSISTENT_RERUN_SUITE 排除项：要求空 fixture 的广域 integration-smoke；原因是它跨历史功能复用固定业务 fixture，不能安全清库，正式门禁由 -Reset 覆盖。'
 }
