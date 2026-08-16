@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { App } from "./App";
 import { SupportWorkbench } from "./SupportWorkbench";
 import { ApprovalWorkbench } from "./ApprovalWorkbench";
+import { LoginPage } from "./LoginPage";
 
 export function RootApplication() {
+  if (globalThis.location.pathname === "/help/login") return <LoginPage audience="customer" />;
+  if (globalThis.location.pathname === "/internal/login") return <LoginPage audience="internal" />;
   if (globalThis.location.pathname === "/support") return <SupportRoute />;
   if (globalThis.location.pathname === "/approver") return <ApproverRoute />;
   return <App />;

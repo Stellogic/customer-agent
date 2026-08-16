@@ -12,6 +12,14 @@ spring:
     password: ${SPRING_MIGRATION_DATABASE_PASSWORD:local-spring-migrator}
   main:
     web-application-type: ${SPRING_WEB_APPLICATION_TYPE:servlet}
+server:
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: strict
+        secure: ${SESSION_COOKIE_SECURE:true}
 management:
   endpoints:
     web:
