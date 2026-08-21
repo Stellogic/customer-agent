@@ -4,10 +4,12 @@ WORKDIR /workspace
 COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
 COPY config ./config
 COPY src ./src
-RUN --mount=type=cache,target=/home/gradle/.gradle gradle bootJar --no-daemon
+RUN --mount=type=cache,target=/home/gradle/.gradle \
+    gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
 
 FROM build AS test
-RUN --mount=type=cache,target=/home/gradle/.gradle gradle check --no-daemon
+RUN --mount=type=cache,target=/home/gradle/.gradle \
+    gradle --init-script config/gradle-proxy.init.gradle.kts check --no-daemon
 
 FROM eclipse-temurin:25.0.3_9-jre-noble AS runtime
 RUN apt-get update \
