@@ -25,11 +25,6 @@ fun proxyUri(environmentName: String, value: String): URI {
     if (uri.scheme?.lowercase() !in setOf("http", "https") || uri.host.isNullOrBlank()) {
         throw GradleException("$environmentName must be a valid HTTP or HTTPS proxy URI")
     }
-    if (uri.rawUserInfo != null) {
-        throw GradleException(
-            "$environmentName contains credentials; authenticated proxy URIs are not supported"
-        )
-    }
     if ((!uri.path.isNullOrEmpty() && uri.path != "/") || uri.rawQuery != null || uri.rawFragment != null) {
         throw GradleException("$environmentName must not contain a path, query, or fragment")
     }
@@ -46,6 +41,10 @@ fun configureProxy(environmentName: String, lowerName: String, propertyPrefix: S
     val defaultPort = if (uri.scheme.equals("https", ignoreCase = true)) 443 else 80
     System.setProperty("$propertyPrefix.proxyHost", uri.host)
     System.setProperty("$propertyPrefix.proxyPort", (uri.port.takeIf { it >= 0 } ?: defaultPort).toString())
+    uri.userInfo?.split(':', limit = 2)?.let { credentials ->
+        System.setProperty("$propertyPrefix.proxyUser", credentials.first())
+        System.setProperty("$propertyPrefix.proxyPassword", credentials.getOrElse(1) { "" })
+    }
 }
 
 fun javaNonProxyHosts(value: String): String {

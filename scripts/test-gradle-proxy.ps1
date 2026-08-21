@@ -3,9 +3,64 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $proxyImageTag = "customer-agent/gradle-proxy-contract:local"
 $noProxyImageTag = "customer-agent/gradle-no-proxy-contract:local"
+$authenticatedProxyImageTag = "customer-agent/gradle-authenticated-proxy-contract:local"
 $fixture = "$PSScriptRoot/fixtures/gradle-proxy-contract/Dockerfile"
 $proxyUser = "proxy-user-$([guid]::NewGuid().ToString('N'))"
 $proxyPassword = "proxy-password-$([guid]::NewGuid().ToString('N'))"
+$probeSuffix = [guid]::NewGuid().ToString('N')
+$proxyNetwork = "customer-agent-gradle-proxy-net-$probeSuffix"
+$proxyContainer = "customer-agent-gradle-proxy-$probeSuffix"
+
+function Invoke-CurlProxyProbe {
+    docker network create $proxyNetwork | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create the Gradle proxy contract network"
+    }
+
+    docker run --detach --name $proxyContainer --network $proxyNetwork alpine:3.22 `
+        sh -c "while true; do printf 'HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\nproxy-ok' | nc -l -p 8080; done" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to start the Gradle proxy contract endpoint"
+    }
+
+    $proxyEndpoint = "http://${proxyContainer}:8080"
+    $result = docker run --rm --network $proxyNetwork `
+        --env "HTTP_PROXY=$proxyEndpoint" `
+        --env "http_proxy=$proxyEndpoint" `
+        --env "HTTPS_PROXY=$proxyEndpoint" `
+        --env "https_proxy=$proxyEndpoint" `
+        --env "NO_PROXY=" `
+        --env "no_proxy=" `
+        gradle:9.3.1-jdk25 curl --fail --silent --show-error http://origin.example.test/probe
+    if ($LASTEXITCODE -ne 0 -or $result -ne "proxy-ok") {
+        throw "Ordinary HTTP client did not use the standard proxy environment"
+    }
+}
+
+function Invoke-AuthenticatedProxyBuild {
+    $proxy = "http://${proxyUser}:${proxyPassword}@proxy.example.test:8080"
+    $output = docker build `
+        --file $fixture `
+        --target authenticated-proxy-contract `
+        --tag $authenticatedProxyImageTag `
+        --build-arg "HTTP_PROXY=" `
+        --build-arg "http_proxy=" `
+        --build-arg "HTTPS_PROXY=$proxy" `
+        --build-arg "https_proxy=$proxy" `
+        --build-arg "NO_PROXY=" `
+        --build-arg "no_proxy=" `
+        $repositoryRoot 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+
+    if ($output.Contains($proxyUser, [System.StringComparison]::Ordinal) -or
+        $output.Contains($proxyPassword, [System.StringComparison]::Ordinal)
+    ) {
+        throw "Authenticated proxy build output leaked a credential"
+    }
+    if ($exitCode -ne 0) {
+        throw "Authenticated Gradle proxy contract test failed"
+    }
+}
 
 function Invoke-RejectedProxyBuild {
     param(
@@ -41,6 +96,8 @@ function Invoke-RejectedProxyBuild {
 }
 
 try {
+    Invoke-CurlProxyProbe
+
     docker build `
         --file $fixture `
         --target proxy-contract `
@@ -68,11 +125,7 @@ try {
         throw "Gradle no-proxy contract test failed"
     }
 
-    Invoke-RejectedProxyBuild `
-        -Proxy "http://${proxyUser}:${proxyPassword}@proxy.example.test:8080" `
-        -NoProxy "" `
-        -ForbiddenOutput @($proxyUser, $proxyPassword) `
-        -ExpectedMessage "authenticated proxy URIs are not supported"
+    Invoke-AuthenticatedProxyBuild
 
     Invoke-RejectedProxyBuild `
         -Proxy "http://proxy.example.test:8080" `
@@ -80,5 +133,7 @@ try {
         -ForbiddenOutput @("10.0.0.0/8") `
         -ExpectedMessage "Java non-proxy host patterns cannot represent"
 } finally {
-    docker image rm $proxyImageTag $noProxyImageTag 2>$null | Out-Null
+    docker container rm --force $proxyContainer 2>$null | Out-Null
+    docker network rm $proxyNetwork 2>$null | Out-Null
+    docker image rm $proxyImageTag $noProxyImageTag $authenticatedProxyImageTag 2>$null | Out-Null
 }

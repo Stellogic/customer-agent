@@ -14,5 +14,8 @@ RUN gradle --init-script /contract/gradle-proxy.init.gradle.kts verifyProxyContr
 FROM contract-base AS no-proxy-contract
 RUN gradle --init-script /contract/gradle-proxy.init.gradle.kts verifyNoProxyContract --no-daemon
 
+FROM contract-base AS authenticated-proxy-contract
+RUN gradle --init-script /contract/gradle-proxy.init.gradle.kts verifyAuthenticatedProxyContract --no-daemon
+
 FROM contract-base AS rejected-proxy-contract
 RUN gradle --init-script /contract/gradle-proxy.init.gradle.kts help --no-daemon

@@ -3,7 +3,7 @@
 ## 交付范围
 
 - backend Docker 构建通过 Gradle init script 把 BuildKit 注入的标准 `HTTP_PROXY`、`HTTPS_PROXY` 与可等价表达的 `NO_PROXY` 映射到 Java 网络 system properties。
-- 仓库不保存代理 endpoint 或凭据；带 userinfo 的 proxy URI 会以脱敏错误拒绝。
+- 仓库不保存代理 endpoint 或凭据；带 userinfo 的 proxy URI 只在临时 Gradle JVM 中映射为 proxy user/password，回归用运行时随机合成值证明构建输出不泄露它们。
 - frontend 的纯本地 BusyBox `wget` healthcheck 显式禁用代理，避免请求离开容器。
 - 不启用 Clash TUN，不修改产品业务逻辑，不涉及 #73。
 
@@ -15,12 +15,12 @@
 pwsh ./scripts/test-gradle-proxy.ps1
 ```
 
-首个 red 证明 BuildKit 已注入 `HTTP_PROXY`，但 Gradle 未配置 `http.proxyHost`。实现后，同一入口覆盖并通过：
+首个 red 先由唯一临时本地 proxy container 证明普通 `curl` 能采用同类标准代理环境，再证明 BuildKit 已注入 `HTTP_PROXY`、但 Gradle 未配置 `http.proxyHost`。实现后，同一入口覆盖并通过：
 
 - 无代理时不设置 JVM proxy property；
 - 无凭据 HTTP/HTTPS proxy 的 host、显式 port；
 - 前导点域名 `NO_PROXY` 到 Java `http.nonProxyHosts` 的明确转换；
-- 合成带凭据 URI 被拒绝，捕获输出不含 username/password；
+- 运行时随机合成带凭据 URI 被安全采用，捕获的成功构建输出不含 username/password；
 - CIDR `NO_PROXY` 因 Java pattern 无法等价表达而被脱敏拒绝；
 - 唯一测试镜像标签在成功或失败后均精确删除。
 

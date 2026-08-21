@@ -30,3 +30,15 @@ tasks.register("verifyNoProxyContract") {
         check(System.getProperty("http.nonProxyHosts") == null)
     }
 }
+
+tasks.register("verifyAuthenticatedProxyContract") {
+    doLast {
+        val credentials = java.net.URI(System.getenv("HTTPS_PROXY")).userInfo.split(':', limit = 2)
+        check(System.getProperty("https.proxyUser") == credentials.first()) {
+            "HTTPS_PROXY credentials were not mapped to the Gradle proxy user"
+        }
+        check(System.getProperty("https.proxyPassword") == credentials.getOrElse(1) { "" }) {
+            "HTTPS_PROXY credentials were not mapped to the Gradle proxy password"
+        }
+    }
+}

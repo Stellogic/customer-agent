@@ -181,14 +181,14 @@ proxyconnect tcp: dial tcp 127.0.0.1:7897: connect: connection refused
 安全边界如下：
 
 - 无代理环境不设置或清除任何 JVM proxy property；显式 Gradle/JVM 配置保持优先。
-- proxy URI 只接受 HTTP/HTTPS、有效 host、无 path/query/fragment 的形式；带 userinfo 的 URI 在任何网络访问前用不含原值的错误拒绝，不把凭据写入脚本、镜像层、构建日志或 Git。
+- proxy URI 只接受 HTTP/HTTPS、有效 host、无 path/query/fragment 的形式；可选 userinfo 只在临时 Gradle JVM 中映射为对应的 proxy user/password system properties，不把凭据写入脚本、镜像层、构建日志或 Git。
 - `NO_PROXY` 只把逗号分隔的主机、Java 支持的首尾通配符、前导点域名与 IPv6 loopback 转成 Java `|` 模式；CIDR、端口限定、其他 IPv6 或不可等价通配符会用脱敏错误拒绝，不悄悄扩大或缩小绕过范围。
 - frontend 本地 healthcheck 使用 BusyBox `wget -Y off` 直连 `127.0.0.1`，避免纯本地健康请求被运行容器的 proxy 环境带出容器；应用自身的代理环境没有被清空。
 
 TDD 与运行证据：
 
-1. 首个快速回归先证明 BuildKit 中标准 proxy 变量已存在，但 Gradle 的 `http.proxyHost` 为空，确定性红灯信息为 `HTTP_PROXY was injected, but Gradle did not configure http.proxyHost`。
-2. 加入 init seam 后，同一回归转绿；随后覆盖无代理、HTTP/HTTPS 显式端口、前导点 `NO_PROXY`、合成带凭据 URI 不泄露、CIDR 不可等价转换的安全拒绝。测试脚本用唯一镜像标签并在 `finally` 精确删除。
+1. 首个快速回归创建唯一临时 network 与本地 proxy container，先证明普通 `curl` 能经标准 proxy 环境取得 `proxy-ok`，再证明 BuildKit 中同类标准变量已存在、但 Gradle 的 `http.proxyHost` 为空；确定性红灯信息为 `HTTP_PROXY was injected, but Gradle did not configure http.proxyHost`。
+2. 加入 init seam 后，同一回归转绿；随后覆盖无代理、HTTP/HTTPS 显式端口、前导点 `NO_PROXY`、运行时随机合成带凭据 URI 的安全采用与输出不泄露，以及 CIDR 不可等价转换的脱敏拒绝。测试脚本在 `finally` 按唯一名称精确删除临时 container、network 与三个测试镜像标签。
 3. 真实 `backend` Docker `test` target 通过，原失败点 `:checkstyleMain`、完整 backend 测试与格式检查均成功；聚焦镜像标签已删除。
 4. 第一次完整门禁在 frontend healthcheck 暴露 BusyBox `wget` 代理行为，第二次在 Issue #29 异步流暴露运行容器 `NO_PROXY` 缺少 Compose 服务名；两者均通过同请求的 red/green 对照收敛，没有把失败重跑当作偶发抖动。Docker 客户端可回滚 `noProxy` 最终补充本仓库 Compose 服务 DNS 名称，使新 agent-server 对 `backend` 的 HTTPX 请求由失败转为 HTTP `200`。
 5. 最终从空 customer-agent 卷、共享 Engine、无额外命令行环境覆盖，仓库根目录原样 `pwsh ./scripts/check.ps1` 退出码 `0`。backend、Agent 22 项、frontend 38 项、Issue #29 normal/reconciliation、广域 integration smoke、审批队列时间、React live 与日志隐私扫描全部通过；最终状态输出 `FULL_RESET_GATE`、Spring/database/agent 均为 `UP`。测试脚本改用运行时随机合成凭据后，额外的最终复跑曾在 registry 对 `nginx:1.29.4-alpine` 的 metadata HEAD 遇到一次 `EOF`；同一共享 Engine 上精确 `docker pull nginx:1.29.4-alpine` 随即成功，随后再次原样运行完整门禁仍退出 `0`，因此该瞬时 registry 失败没有被当成产品或代理修复证据。
