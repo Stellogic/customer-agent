@@ -137,7 +137,7 @@ services:
     ports:
       - "127.0.0.1:4180:8080"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/system/status"]
+      test: ["CMD", "wget", "-Y", "off", "-qO-", "http://127.0.0.1:8080/api/system/status"]
       interval: 3s
       timeout: 4s
       retries: 30
