@@ -188,7 +188,7 @@ proxyconnect tcp: dial tcp 127.0.0.1:7897: connect: connection refused
 TDD 与运行证据：
 
 1. 首个快速回归创建唯一临时 network 与本地 proxy container，在有界就绪检查后先证明普通 `curl` 能经标准 proxy 环境取得 `proxy-ok`，再证明 BuildKit 中同类标准变量已存在、但 Gradle 的 `http.proxyHost` 为空；确定性红灯信息为 `HTTP_PROXY was injected, but Gradle did not configure http.proxyHost`。
-2. 加入 init seam 后，同一回归转绿；随后覆盖无代理、HTTP/HTTPS 显式端口、前导点 `NO_PROXY`、运行时随机合成且包含 percent-encoded 分隔符的带凭据 URI、安全采用与输出不泄露，以及 CIDR 不可等价转换的脱敏拒绝。测试脚本为每轮生成并发唯一的 container、network 与三个镜像标签，在 `finally` 按唯一名称精确删除并回读不存在。
+2. 加入 init seam 后，同一回归转绿；随后覆盖无代理、HTTP/HTTPS 显式端口、前导点 `NO_PROXY`、运行时随机合成且包含 percent-encoded 分隔符的带凭据 URI、安全采用与解码值/编码值/完整 URI 均不泄露，以及 CIDR 不可等价转换的脱敏拒绝。测试脚本为每轮生成并发唯一的 container、network 与三个镜像标签，在 `finally` 按唯一名称精确删除，并验证三类 Docker 回读查询成功且目标均不存在。
 3. 真实 `backend` Docker `test` target 通过，原失败点 `:checkstyleMain`、完整 backend 测试与格式检查均成功；聚焦镜像标签已删除。
 4. 第一次完整门禁在 frontend healthcheck 暴露 BusyBox `wget` 代理行为，第二次在 Issue #29 异步流暴露运行容器 `NO_PROXY` 缺少 Compose 服务名；两者均通过同请求的 red/green 对照收敛，没有把失败重跑当作偶发抖动。Docker 客户端可回滚 `noProxy` 最终补充本仓库 Compose 服务 DNS 名称，使新 agent-server 对 `backend` 的 HTTPX 请求由失败转为 HTTP `200`。
 5. 最终从空 customer-agent 卷、共享 Engine、无额外命令行环境覆盖，仓库根目录原样 `pwsh ./scripts/check.ps1` 退出码 `0`。backend、Agent 22 项、frontend 38 项、Issue #29 normal/reconciliation、广域 integration smoke、审批队列时间、React live 与日志隐私扫描全部通过；最终状态输出 `FULL_RESET_GATE`、Spring/database/agent 均为 `UP`。测试脚本改用运行时随机合成凭据后，额外的最终复跑曾在 registry 对 `nginx:1.29.4-alpine` 的 metadata HEAD 遇到一次 `EOF`；同一共享 Engine 上精确 `docker pull nginx:1.29.4-alpine` 随即成功，随后再次原样运行完整门禁仍退出 `0`，因此该瞬时 registry 失败没有被当成产品或代理修复证据。

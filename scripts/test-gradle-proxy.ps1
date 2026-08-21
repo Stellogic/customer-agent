@@ -60,10 +60,10 @@ function Invoke-AuthenticatedProxyBuild {
         $repositoryRoot 2>&1 | Out-String
     $exitCode = $LASTEXITCODE
 
-    if ($output.Contains($proxyUser, [System.StringComparison]::Ordinal) -or
-        $output.Contains($proxyPassword, [System.StringComparison]::Ordinal)
-    ) {
-        throw "Authenticated proxy build output leaked a credential"
+    foreach ($forbidden in @($proxyUser, $proxyPassword, $encodedUser, $encodedPassword, $proxy)) {
+        if ($output.Contains($forbidden, [System.StringComparison]::Ordinal)) {
+            throw "Authenticated proxy build output leaked a credential"
+        }
     }
     if ($exitCode -ne 0) {
         throw "Authenticated Gradle proxy contract test failed"
@@ -145,13 +145,25 @@ try {
     docker network rm $proxyNetwork 2>$null | Out-Null
     docker image rm $proxyImageTag $noProxyImageTag $authenticatedProxyImageTag 2>$null | Out-Null
 
-    $containerRemains = @(docker container ls --all --filter "name=^/${proxyContainer}$" --quiet).Count -ne 0
-    $networkRemains = @(docker network ls --filter "name=^${proxyNetwork}$" --quiet).Count -ne 0
-    $imageRemains = @(
-        docker image ls --format '{{.Repository}}:{{.Tag}}' |
-            Where-Object { $_ -in @($proxyImageTag, $noProxyImageTag, $authenticatedProxyImageTag) }
-    ).Count -ne 0
-    if ($containerRemains -or $networkRemains -or $imageRemains) {
+    $remainingContainers = @(docker container ls --all --filter "name=^/${proxyContainer}$" --quiet)
+    $containerReadSucceeded = $LASTEXITCODE -eq 0
+    $remainingNetworks = @(docker network ls --filter "name=^${proxyNetwork}$" --quiet)
+    $networkReadSucceeded = $LASTEXITCODE -eq 0
+    $allImages = @(docker image ls --format '{{.Repository}}:{{.Tag}}')
+    $imageReadSucceeded = $LASTEXITCODE -eq 0
+    $remainingImages = @(
+        $allImages | Where-Object {
+            $_ -in @($proxyImageTag, $noProxyImageTag, $authenticatedProxyImageTag)
+        }
+    )
+    if (
+        -not $containerReadSucceeded -or
+        -not $networkReadSucceeded -or
+        -not $imageReadSucceeded -or
+        $remainingContainers.Count -ne 0 -or
+        $remainingNetworks.Count -ne 0 -or
+        $remainingImages.Count -ne 0
+    ) {
         throw "Gradle proxy contract resources were not cleaned up precisely"
     }
 }
