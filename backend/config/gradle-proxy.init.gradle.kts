@@ -1,4 +1,6 @@
 import java.net.URI
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 
 fun environmentValue(upperName: String, lowerName: String): String? {
     val values =
@@ -31,6 +33,16 @@ fun proxyUri(environmentName: String, value: String): URI {
     return uri
 }
 
+fun decodedProxyCredentials(uri: URI): Pair<String, String>? {
+    val rawCredentials = uri.rawUserInfo ?: return null
+    val components = rawCredentials.split(':', limit = 2)
+
+    fun decode(rawComponent: String): String =
+        URLDecoder.decode(rawComponent.replace("+", "%2B"), StandardCharsets.UTF_8)
+
+    return decode(components.first()) to decode(components.getOrElse(1) { "" })
+}
+
 fun configureProxy(environmentName: String, lowerName: String, propertyPrefix: String) {
     val value = environmentValue(environmentName, lowerName) ?: return
     if (!System.getProperty("$propertyPrefix.proxyHost").isNullOrBlank()) {
@@ -41,9 +53,9 @@ fun configureProxy(environmentName: String, lowerName: String, propertyPrefix: S
     val defaultPort = if (uri.scheme.equals("https", ignoreCase = true)) 443 else 80
     System.setProperty("$propertyPrefix.proxyHost", uri.host)
     System.setProperty("$propertyPrefix.proxyPort", (uri.port.takeIf { it >= 0 } ?: defaultPort).toString())
-    uri.userInfo?.split(':', limit = 2)?.let { credentials ->
-        System.setProperty("$propertyPrefix.proxyUser", credentials.first())
-        System.setProperty("$propertyPrefix.proxyPassword", credentials.getOrElse(1) { "" })
+    decodedProxyCredentials(uri)?.let { credentials ->
+        System.setProperty("$propertyPrefix.proxyUser", credentials.first)
+        System.setProperty("$propertyPrefix.proxyPassword", credentials.second)
     }
 }
 

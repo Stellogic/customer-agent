@@ -1,13 +1,13 @@
 $ErrorActionPreference = "Stop"
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$proxyImageTag = "customer-agent/gradle-proxy-contract:local"
-$noProxyImageTag = "customer-agent/gradle-no-proxy-contract:local"
-$authenticatedProxyImageTag = "customer-agent/gradle-authenticated-proxy-contract:local"
 $fixture = "$PSScriptRoot/fixtures/gradle-proxy-contract/Dockerfile"
-$proxyUser = "proxy-user-$([guid]::NewGuid().ToString('N'))"
-$proxyPassword = "proxy-password-$([guid]::NewGuid().ToString('N'))"
 $probeSuffix = [guid]::NewGuid().ToString('N')
+$proxyImageTag = "customer-agent/gradle-proxy-contract:$probeSuffix"
+$noProxyImageTag = "customer-agent/gradle-no-proxy-contract:$probeSuffix"
+$authenticatedProxyImageTag = "customer-agent/gradle-authenticated-proxy-contract:$probeSuffix"
+$proxyUser = "proxy:user-$([guid]::NewGuid().ToString('N'))"
+$proxyPassword = "proxy+p@ss-$([guid]::NewGuid().ToString('N'))"
 $proxyNetwork = "customer-agent-gradle-proxy-net-$probeSuffix"
 $proxyContainer = "customer-agent-gradle-proxy-$probeSuffix"
 
@@ -21,6 +21,12 @@ function Invoke-CurlProxyProbe {
         sh -c "while true; do printf 'HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\nproxy-ok' | nc -l -p 8080; done" | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to start the Gradle proxy contract endpoint"
+    }
+
+    docker exec $proxyContainer sh -c `
+        "for attempt in 1 2 3 4 5 6 7 8 9 10; do nc -z 127.0.0.1 8080 && exit 0; sleep 0.1; done; exit 1"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Gradle proxy contract endpoint did not become ready"
     }
 
     $proxyEndpoint = "http://${proxyContainer}:8080"
@@ -38,7 +44,9 @@ function Invoke-CurlProxyProbe {
 }
 
 function Invoke-AuthenticatedProxyBuild {
-    $proxy = "http://${proxyUser}:${proxyPassword}@proxy.example.test:8080"
+    $encodedUser = [uri]::EscapeDataString($proxyUser)
+    $encodedPassword = [uri]::EscapeDataString($proxyPassword)
+    $proxy = "http://${encodedUser}:${encodedPassword}@proxy.example.test:8080"
     $output = docker build `
         --file $fixture `
         --target authenticated-proxy-contract `
@@ -136,4 +144,14 @@ try {
     docker container rm --force $proxyContainer 2>$null | Out-Null
     docker network rm $proxyNetwork 2>$null | Out-Null
     docker image rm $proxyImageTag $noProxyImageTag $authenticatedProxyImageTag 2>$null | Out-Null
+
+    $containerRemains = @(docker container ls --all --filter "name=^/${proxyContainer}$" --quiet).Count -ne 0
+    $networkRemains = @(docker network ls --filter "name=^${proxyNetwork}$" --quiet).Count -ne 0
+    $imageRemains = @(
+        docker image ls --format '{{.Repository}}:{{.Tag}}' |
+            Where-Object { $_ -in @($proxyImageTag, $noProxyImageTag, $authenticatedProxyImageTag) }
+    ).Count -ne 0
+    if ($containerRemains -or $networkRemains -or $imageRemains) {
+        throw "Gradle proxy contract resources were not cleaned up precisely"
+    }
 }

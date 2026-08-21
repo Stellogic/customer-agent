@@ -20,9 +20,9 @@ pwsh ./scripts/test-gradle-proxy.ps1
 - 无代理时不设置 JVM proxy property；
 - 无凭据 HTTP/HTTPS proxy 的 host、显式 port；
 - 前导点域名 `NO_PROXY` 到 Java `http.nonProxyHosts` 的明确转换；
-- 运行时随机合成带凭据 URI 被安全采用，捕获的成功构建输出不含 username/password；
+- 运行时随机合成带凭据 URI 被安全采用，覆盖 percent-encoded 分隔符，且捕获的成功构建输出不含 username/password；
 - CIDR `NO_PROXY` 因 Java pattern 无法等价表达而被脱敏拒绝；
-- 唯一测试镜像标签在成功或失败后均精确删除。
+- 普通 HTTP 对照在有界就绪检查后执行；container、network 与三个并发唯一测试镜像标签在成功或失败后均精确删除并回读不存在。
 
 官方契约：[Docker CLI proxy configuration](https://docs.docker.com/engine/cli/proxy/)、[Gradle init scripts](https://docs.gradle.org/current/userguide/init_scripts.html)、[Gradle networking](https://docs.gradle.org/current/userguide/networking.html)、[Java networking properties](https://docs.oracle.com/en/java/javase/26/docs/api/java.base/java/net/doc-files/net-properties.html)。
 
