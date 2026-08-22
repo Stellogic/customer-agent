@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.queue;
 
+import static com.stellogic.customeragent.identity.HumanTestPrincipals.support;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,7 +16,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -150,9 +150,5 @@ class SupportWorkbenchControllerTest {
                                 + "{\"ticketId\":\""
                                 + HANDOFF_TICKET
                                 + "\"}}");
-    }
-
-    private static UsernamePasswordAuthenticationToken support() {
-        return UsernamePasswordAuthenticationToken.authenticated("support-demo", "n/a", List.of());
     }
 }

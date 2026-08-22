@@ -1,5 +1,7 @@
 package com.stellogic.customeragent.queue;
 
+import static com.stellogic.customeragent.identity.HumanSessionTestClient.login;
+import static com.stellogic.customeragent.identity.HumanSessionTestClient.token;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,6 +30,7 @@ import tools.jackson.databind.ObjectMapper;
 @WebMvcTest(
         controllers = {
             SupportWorkbenchController.class,
+            SharedSupportQueueController.class,
             AuthSessionController.class,
             DemoAccountController.class
         })
@@ -43,6 +46,7 @@ class SupportPrincipalSecurityTest {
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper json;
     @Autowired private SupportWorkbenchProjectionService service;
+    @Autowired private SharedSupportQueueProjectionService sharedQueue;
 
     @Test
     void forgedSupportHeaderCannotReplaceTheAuthenticatedSupportPrincipal() throws Exception {
@@ -53,7 +57,7 @@ class SupportPrincipalSecurityTest {
 
         mvc.perform(
                         get("/api/support/workbench/snapshot")
-                                .session(login("support-demo"))
+                                .session(login(mvc, json, "support-demo"))
                                 .header("X-Synthetic-Support-Id", "internal-demo"))
                 .andExpect(status().isOk());
 
@@ -68,21 +72,66 @@ class SupportPrincipalSecurityTest {
                 .andExpect(status().isUnauthorized());
         mvc.perform(
                         get("/api/support/workbench/snapshot")
-                                .session(login("customer-demo"))
+                                .session(login(mvc, json, "customer-demo"))
                                 .header("X-Synthetic-Support-Id", "support-demo"))
                 .andExpect(status().isForbidden());
         mvc.perform(
                         get("/api/support/workbench/snapshot")
-                                .session(login("approver-demo"))
+                                .session(login(mvc, json, "approver-demo"))
                                 .header("X-Synthetic-Support-Id", "support-demo"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void supportAndDualRolePrincipalsCanReadTheMinimalSharedQueue() throws Exception {
+        when(sharedQueue.queue()).thenReturn(List.of());
+
+        mvc.perform(
+                        get("/api/support/queue")
+                                .session(login(mvc, json, "support-demo"))
+                                .header("X-Synthetic-Support-Id", "approver-demo"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/support/queue").session(login(mvc, json, "internal-demo")))
+                .andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/support/queue")
+                                .session(login(mvc, json, "customer-demo"))
+                                .header("X-Synthetic-Support-Id", "support-demo"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/support/queue").header("X-Synthetic-Support-Id", "support-demo"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void detailsAndEventsRemainBehindTheSameSupportRoleBoundary() throws Exception {
+        when(service.details("support-demo", TICKET_ID))
+                .thenThrow(new SupportTicketNotFoundException());
+
+        mvc.perform(
+                        get("/api/support/workbench/tickets/{ticketId}", TICKET_ID)
+                                .session(login(mvc, json, "support-demo")))
+                .andExpect(status().isNotFound());
+        mvc.perform(
+                        get("/api/support/workbench/tickets/{ticketId}", TICKET_ID)
+                                .session(login(mvc, json, "customer-demo"))
+                                .header("X-Synthetic-Support-Id", "support-demo"))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/support/workbench/events")
+                                .session(login(mvc, json, "approver-demo"))
+                                .header("X-Synthetic-Support-Id", "support-demo"))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        get("/api/support/workbench/events")
+                                .header("X-Synthetic-Support-Id", "support-demo"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
     void supportClaimRequiresCurrentCsrfAndAlwaysUsesThePrincipalAsAssignee() throws Exception {
         when(service.claim("support-demo", TICKET_ID))
                 .thenReturn(new SupportAssignmentClaim(TICKET_ID, "support-demo", false));
-        MockHttpSession support = login("support-demo");
+        MockHttpSession support = login(mvc, json, "support-demo");
 
         mvc.perform(
                         post("/api/support/workbench/tickets/{ticketId}/claims", TICKET_ID)
@@ -96,30 +145,11 @@ class SupportPrincipalSecurityTest {
         mvc.perform(
                         post("/api/support/workbench/tickets/{ticketId}/claims", TICKET_ID)
                                 .session(support)
-                                .header("X-CSRF-TOKEN", token(csrf))
+                                .header("X-CSRF-TOKEN", token(json, csrf))
                                 .header("X-Synthetic-Support-Id", "internal-demo"))
                 .andExpect(status().isCreated());
 
         verify(service).claim("support-demo", TICKET_ID);
-    }
-
-    private MockHttpSession login(String username) throws Exception {
-        MvcResult csrf = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andReturn();
-        MockHttpSession anonymous = (MockHttpSession) csrf.getRequest().getSession(false);
-        MvcResult login =
-                mvc.perform(
-                                post("/api/auth/login")
-                                        .session(anonymous)
-                                        .header("X-CSRF-TOKEN", token(csrf))
-                                        .param("username", username)
-                                        .param("password", "local-demo-password"))
-                        .andExpect(status().isNoContent())
-                        .andReturn();
-        return (MockHttpSession) login.getRequest().getSession(false);
-    }
-
-    private String token(MvcResult csrf) throws Exception {
-        return json.readTree(csrf.getResponse().getContentAsString()).get("token").asText();
     }
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -127,6 +157,11 @@ class SupportPrincipalSecurityTest {
         @Bean
         SupportWorkbenchProjectionService supportWorkbenchProjectionService() {
             return mock(SupportWorkbenchProjectionService.class);
+        }
+
+        @Bean
+        SharedSupportQueueProjectionService sharedSupportQueueProjectionService() {
+            return mock(SharedSupportQueueProjectionService.class);
         }
     }
 }

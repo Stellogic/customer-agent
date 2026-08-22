@@ -1,7 +1,6 @@
 package com.stellogic.customeragent.queue;
 
 import java.util.List;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,7 +15,7 @@ public final class SharedSupportQueueController {
     }
 
     @GetMapping
-    List<SharedQueueSummary> queue(Authentication authentication) {
+    List<SharedQueueSummary> queue() {
         return service.queue();
     }
 }

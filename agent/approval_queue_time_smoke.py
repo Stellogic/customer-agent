@@ -11,6 +11,18 @@ LEASE_BOUNDARY_REVISION = "68000000-0000-0000-0000-000000000033"
 BLOCKER_LEASE = "68000000-0000-0000-0000-000000000051"
 
 
+def login_approver(client: httpx.Client, spring_url: str) -> None:
+    csrf_response = client.get(f"{spring_url}/api/auth/csrf")
+    assert csrf_response.status_code == 200, csrf_response.text
+    csrf = csrf_response.json()
+    login = client.post(
+        f"{spring_url}/api/auth/login",
+        headers={csrf["headerName"]: csrf["token"]},
+        data={"username": "approver-demo", "password": "local-demo-password"},
+    )
+    assert login.status_code == 204, login.text
+
+
 def main() -> None:
     spring_url = os.environ["SPRING_INTERNAL_URL"]
     spring_database_uri = os.environ["SPRING_DATABASE_URI"]
@@ -35,6 +47,7 @@ def main() -> None:
 
         def read_queue() -> httpx.Response:
             with httpx.Client(timeout=20.0) as client:
+                login_approver(client, spring_url)
                 return client.get(
                     f"{spring_url}/api/approver/compensation-proposals",
                     headers=approver_headers,
@@ -79,6 +92,7 @@ def main() -> None:
     assert str(LEASE_BOUNDARY_REVISION) in visible
 
     with httpx.Client(timeout=20.0) as client:
+        login_approver(client, spring_url)
         repeated = client.get(
             f"{spring_url}/api/approver/compensation-proposals", headers=approver_headers
         )

@@ -21,7 +21,7 @@ public final class SupportSlaController {
     }
 
     @GetMapping("/escalations")
-    List<SharedEscalationSummary> escalations(Authentication authentication) {
+    List<SharedEscalationSummary> escalations() {
         return service.escalations();
     }
 }

@@ -17,9 +17,12 @@ export function createCookieBrowserFetch(nativeFetch: typeof fetch, baseUrl: str
   };
 }
 
-export async function loginCustomer(browserFetch: typeof fetch): Promise<CurrentSession> {
+async function loginHuman(
+  browserFetch: typeof fetch,
+  username: "customer-demo" | "approver-demo",
+): Promise<CurrentSession> {
   const csrfResponse = await browserFetch("/api/auth/csrf");
-  if (!csrfResponse.ok) throw new Error("customer csrf unavailable");
+  if (!csrfResponse.ok) throw new Error(`${username} csrf unavailable`);
   const csrf = (await csrfResponse.json()) as CsrfToken;
   const login = await browserFetch("/api/auth/login", {
     method: "POST",
@@ -28,12 +31,20 @@ export async function loginCustomer(browserFetch: typeof fetch): Promise<Current
       [csrf.headerName]: csrf.token,
     },
     body: new URLSearchParams({
-      username: "customer-demo",
+      username,
       password: "local-demo-password",
     }),
   });
-  if (login.status !== 204) throw new Error("customer login failed");
+  if (login.status !== 204) throw new Error(`${username} login failed`);
   const session = await browserFetch("/api/auth/session");
-  if (!session.ok) throw new Error("customer session unavailable");
+  if (!session.ok) throw new Error(`${username} session unavailable`);
   return (await session.json()) as CurrentSession;
+}
+
+export function loginCustomer(browserFetch: typeof fetch): Promise<CurrentSession> {
+  return loginHuman(browserFetch, "customer-demo");
+}
+
+export function loginApprover(browserFetch: typeof fetch): Promise<CurrentSession> {
+  return loginHuman(browserFetch, "approver-demo");
 }

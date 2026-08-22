@@ -43,14 +43,19 @@ def start_authorized_sse(url: str, headers: dict[str, str], cursor: str):
     return executor, future
 
 
-def login_customer(client: httpx.Client, spring_url: str) -> tuple[str, str]:
+def login_human(
+    client: httpx.Client,
+    spring_url: str,
+    username: str,
+    expected_capabilities: list[str],
+) -> tuple[str, str]:
     anonymous_csrf = client.get(f"{spring_url}/api/auth/csrf")
     expect_status(anonymous_csrf, 200)
     anonymous_token = anonymous_csrf.json()
     login = client.post(
         f"{spring_url}/api/auth/login",
         headers={anonymous_token["headerName"]: anonymous_token["token"]},
-        data={"username": "customer-demo", "password": "local-demo-password"},
+        data={"username": username, "password": "local-demo-password"},
     )
     expect_status(login, 204)
     current_csrf = client.get(f"{spring_url}/api/auth/csrf")
@@ -59,35 +64,15 @@ def login_customer(client: httpx.Client, spring_url: str) -> tuple[str, str]:
     client.headers[current_token["headerName"]] = current_token["token"]
     session = client.get(f"{spring_url}/api/auth/session")
     expect_status(session, 200)
-    assert session.json()["id"] == "customer-demo"
-    return current_token["headerName"], current_token["token"]
-
-
-def login_support(client: httpx.Client, spring_url: str) -> tuple[str, str]:
-    anonymous_csrf = client.get(f"{spring_url}/api/auth/csrf")
-    expect_status(anonymous_csrf, 200)
-    anonymous_token = anonymous_csrf.json()
-    login = client.post(
-        f"{spring_url}/api/auth/login",
-        headers={anonymous_token["headerName"]: anonymous_token["token"]},
-        data={"username": "support-demo", "password": "local-demo-password"},
-    )
-    expect_status(login, 204)
-    current_csrf = client.get(f"{spring_url}/api/auth/csrf")
-    expect_status(current_csrf, 200)
-    current_token = current_csrf.json()
-    client.headers[current_token["headerName"]] = current_token["token"]
-    session = client.get(f"{spring_url}/api/auth/session")
-    expect_status(session, 200)
-    assert session.json()["id"] == "support-demo"
-    assert session.json()["capabilities"] == ["SUPPORT_WORKBENCH_ACCESS"]
+    assert session.json()["id"] == username
+    assert session.json()["capabilities"] == expected_capabilities
     return current_token["headerName"], current_token["token"]
 
 
 @cache
 def customer_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
     with httpx.Client(timeout=20.0) as client:
-        csrf_header = login_customer(client, spring_url)
+        csrf_header = login_human(client, spring_url, "customer-demo", ["CUSTOMER_HELP_ACCESS"])
         session_id = client.cookies.get("JSESSIONID")
         assert session_id is not None
         return csrf_header, ("Cookie", f"JSESSIONID={session_id}")
@@ -96,7 +81,18 @@ def customer_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
 @cache
 def support_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
     with httpx.Client(timeout=20.0) as client:
-        csrf_header = login_support(client, spring_url)
+        csrf_header = login_human(client, spring_url, "support-demo", ["SUPPORT_WORKBENCH_ACCESS"])
+        session_id = client.cookies.get("JSESSIONID")
+        assert session_id is not None
+        return csrf_header, ("Cookie", f"JSESSIONID={session_id}")
+
+
+@cache
+def approver_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
+    with httpx.Client(timeout=20.0) as client:
+        csrf_header = login_human(
+            client, spring_url, "approver-demo", ["APPROVAL_WORKBENCH_ACCESS"]
+        )
         session_id = client.cookies.get("JSESSIONID")
         assert session_id is not None
         return csrf_header, ("Cookie", f"JSESSIONID={session_id}")
@@ -106,16 +102,19 @@ def support_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
 def customer_browser_client(spring_url: str) -> Iterator[httpx.Client]:
     customer_headers = dict(customer_session_headers(spring_url))
     support_headers = dict(support_session_headers(spring_url))
+    approver_headers = dict(approver_session_headers(spring_url))
 
-    def authorize_customer_request(request: httpx.Request) -> None:
+    def authorize_human_request(request: httpx.Request) -> None:
         if request.url.path.startswith("/api/customer/"):
             request.headers.update(customer_headers)
         if request.url.path.startswith("/api/support/"):
             request.headers.update(support_headers)
+        if request.url.path.startswith("/api/approver/"):
+            request.headers.update(approver_headers)
 
     with httpx.Client(
         timeout=20.0,
-        event_hooks={"request": [authorize_customer_request]},
+        event_hooks={"request": [authorize_human_request]},
     ) as client:
         yield client
 
@@ -123,7 +122,7 @@ def customer_browser_client(spring_url: str) -> Iterator[httpx.Client]:
 @contextmanager
 def isolated_customer_browser_client(spring_url: str) -> Iterator[httpx.Client]:
     with httpx.Client(timeout=20.0) as client:
-        login_customer(client, spring_url)
+        login_human(client, spring_url, "customer-demo", ["CUSTOMER_HELP_ACCESS"])
         yield client
 
 
@@ -135,6 +134,7 @@ def main() -> None:
 
     customer_session_headers(spring_url)
     support_session_headers(spring_url)
+    approver_session_headers(spring_url)
 
     with httpx.Client(timeout=20.0) as client:
         thread_response = client.post(f"{agent_url}/threads", headers=spring_headers, json={})
@@ -553,7 +553,17 @@ def main() -> None:
     except psycopg.errors.RaiseException:
         pass
 
-    approver_headers = {"X-Synthetic-Approver-Id": "approver-demo"}
+    approver_headers = {
+        **dict(approver_session_headers(spring_url)),
+        "X-Synthetic-Approver-Id": "approver-demo",
+    }
+    with httpx.Client(timeout=20.0) as support_client:
+        support_client.headers.update(dict(support_session_headers(spring_url)))
+        forged_approval = support_client.get(
+            f"{spring_url}/api/approver/compensation-proposals",
+            headers={"X-Synthetic-Approver-Id": "approver-demo"},
+        )
+        expect_status(forged_approval, 403)
     with customer_browser_client(spring_url) as client:
         queue = client.get(
             f"{spring_url}/api/approver/compensation-proposals", headers=approver_headers
@@ -580,7 +590,7 @@ def main() -> None:
             approver_customer_detail = anonymous_client.get(
                 f"{spring_url}/api/customer/tickets/{proposal_ticket_id}", headers=approver_headers
             )
-            expect_status(approver_customer_detail, 401)
+            expect_status(approver_customer_detail, 403)
         approver_support_detail = client.get(
             f"{spring_url}/api/support/tickets/{proposal_ticket_id}", headers=approver_headers
         )
@@ -620,7 +630,10 @@ def main() -> None:
     )
     winner_id = ["approver-demo", "approver-other-demo"][winner_index]
     loser_id = "approver-other-demo" if winner_id == "approver-demo" else "approver-demo"
-    winner_headers = {"X-Synthetic-Approver-Id": winner_id}
+    winner_headers = {
+        **dict(approver_session_headers(spring_url)),
+        "X-Synthetic-Approver-Id": winner_id,
+    }
     lease_one = approval_claim_responses[winner_index].json()
     assert lease_one["leaseVersion"] == 1 and lease_one["replayed"] is False
 
@@ -778,6 +791,7 @@ def main() -> None:
         )
         expect_status(stale_release, 403)
         lease_two_headers = {
+            **dict(approver_session_headers(spring_url)),
             "X-Synthetic-Approver-Id": loser_id,
             "X-Approval-Lease-Token": lease_two["leaseToken"],
             "X-Approval-Lease-Version": "2",

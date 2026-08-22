@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.sla;
 
+import static com.stellogic.customeragent.identity.HumanTestPrincipals.support;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -9,7 +10,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -59,9 +59,5 @@ class SupportSlaControllerTest {
                 .andExpect(jsonPath("$[0].description").doesNotExist())
                 .andExpect(jsonPath("$[0].messages").doesNotExist())
                 .andExpect(jsonPath("$[0].investigationFacts").doesNotExist());
-    }
-
-    private static UsernamePasswordAuthenticationToken support() {
-        return UsernamePasswordAuthenticationToken.authenticated("support-demo", "n/a", List.of());
     }
 }
