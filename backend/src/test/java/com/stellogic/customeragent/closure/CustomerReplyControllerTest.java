@@ -33,7 +33,6 @@ class CustomerReplyControllerTest {
         mvc.perform(
                         post("/api/customer/tickets/{ticketId}/replies", ORIGINAL)
                                 .principal(customer())
-                                .header("X-Synthetic-Customer-Id", "customer-other-demo")
                                 .header("Idempotency-Key", "reply-28-same")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -56,7 +55,6 @@ class CustomerReplyControllerTest {
         mvc.perform(
                         post("/api/customer/tickets/{ticketId}/replies", ORIGINAL)
                                 .principal(customer())
-                                .header("X-Synthetic-Customer-Id", "customer-other-demo")
                                 .header("Idempotency-Key", "reply-28-different")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(

@@ -19,7 +19,7 @@ import {
 } from "./routePolicy";
 import { CurrentSessionContext, loadOptionalCurrentSession } from "./session";
 import { observeHumanSession, subscribeToHumanSessionInvalidation } from "./humanSessionLifecycle";
-import { INTERNAL_WORKSPACES, ROUTES, internalWorkspace } from "./workspaceRegistry";
+import { INTERNAL_WORKSPACES, LEGACY_ROUTE_REDIRECTS, ROUTES } from "./workspaceRegistry";
 
 const CustomerShell = lazy(() => import("./shells/CustomerShell"));
 const InternalShell = lazy(() => import("./shells/InternalShell"));
@@ -39,11 +39,9 @@ export function RootApplication() {
         <Routes>
           <Route path={ROUTES.customerLogin} element={<LoginRoute audience="customer" />} />
           <Route path={ROUTES.internalLogin} element={<LoginRoute audience="internal" />} />
-          <Route path="/support" element={<LegacyRoute to={internalWorkspace("support").path} />} />
-          <Route
-            path="/approver"
-            element={<LegacyRoute to={internalWorkspace("approvals").path} />}
-          />
+          {LEGACY_ROUTE_REDIRECTS.map((route) => (
+            <Route key={route.path} path={route.path} element={<LegacyRoute to={route.to} />} />
+          ))}
           <Route element={<SessionGate />}>
             <Route index element={<DefaultLanding />} />
             <Route

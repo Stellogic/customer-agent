@@ -37,4 +37,16 @@ final class ArchitectureTest {
 
         rule.check(productionClasses);
     }
+
+    @Test
+    void legacySyntheticHumanIdentityEntrypointsAreAbsent() {
+        ArchRule rule =
+                noClasses()
+                        .should()
+                        .haveSimpleName("SyntheticIdentityController")
+                        .orShould()
+                        .haveSimpleName("SyntheticApprovers");
+
+        rule.check(productionClasses);
+    }
 }

@@ -7,6 +7,11 @@ export const ROUTES = {
   internalLogin: "/internal/login",
 } as const;
 
+export const LEGACY_ROUTE_REDIRECTS = [
+  { path: "/support", to: "/internal/support", deprecated: true },
+  { path: "/approver", to: "/internal/approvals", deprecated: true },
+] as const;
+
 export type InternalWorkspace = {
   id: "support" | "approvals";
   capability: HumanCapability;

@@ -46,9 +46,7 @@ class ApprovalControllerTest {
                                         Instant.parse("2026-08-09T14:00:00Z"),
                                         Instant.parse("2026-08-10T14:00:00Z"))));
 
-        mvc.perform(
-                        get("/api/approver/compensation-proposals")
-                                .header("X-Synthetic-Approver-Id", "approver-demo"))
+        mvc.perform(get("/api/approver/compensation-proposals"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].proposalRevisionId").value(REVISION_ID.toString()))
                 .andExpect(jsonPath("$[0].compensationMethod").value("SIMULATED_PARTIAL_REFUND"))
@@ -73,7 +71,6 @@ class ApprovalControllerTest {
                         post(
                                         "/api/approver/compensation-proposals/{revisionId}/claims",
                                         REVISION_ID)
-                                .header("X-Synthetic-Approver-Id", "approver-demo")
                                 .header("Idempotency-Key", "claim-20")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"requestedLeaseSeconds\":900}"))
@@ -137,7 +134,6 @@ class ApprovalControllerTest {
                         get(
                                         "/api/approver/compensation-proposals/{revisionId}/approval-view",
                                         REVISION_ID)
-                                .header("X-Synthetic-Approver-Id", "approver-demo")
                                 .header("X-Approval-Lease-Token", LEASE_TOKEN)
                                 .header("X-Approval-Lease-Version", "1"))
                 .andExpect(status().isOk())
@@ -183,7 +179,6 @@ class ApprovalControllerTest {
                         get(
                                         "/api/approver/compensation-proposals/{revisionId}/approval-view/events",
                                         REVISION_ID)
-                                .header("X-Synthetic-Approver-Id", "approver-demo")
                                 .header("X-Approval-Lease-Token", LEASE_TOKEN)
                                 .header("X-Approval-Lease-Version", "1")
                                 .header("Last-Event-ID", "approval-view-v1:1"))
@@ -206,7 +201,6 @@ class ApprovalControllerTest {
                         get(
                                         "/api/approver/compensation-proposals/{revisionId}/approval-view/events",
                                         REVISION_ID)
-                                .header("X-Synthetic-Approver-Id", "approver-demo")
                                 .header("X-Approval-Lease-Token", LEASE_TOKEN)
                                 .header("X-Approval-Lease-Version", "1")
                                 .header("Last-Event-ID", "approval-view-v1:0"))
@@ -235,7 +229,6 @@ class ApprovalControllerTest {
                         post(
                                         "/api/approver/compensation-proposals/{revisionId}/release",
                                         REVISION_ID)
-                                .header("X-Synthetic-Approver-Id", "approver-demo")
                                 .header("X-Approval-Lease-Token", LEASE_TOKEN)
                                 .header("X-Approval-Lease-Version", "1")
                                 .header("Idempotency-Key", "release-20"))
@@ -254,7 +247,6 @@ class ApprovalControllerTest {
                         post(
                                         "/api/approver/compensation-proposals/{revisionId}/reject",
                                         REVISION_ID)
-                                .header("X-Synthetic-Approver-Id", "approver-demo")
                                 .header("X-Approval-Lease-Token", LEASE_TOKEN)
                                 .header("X-Approval-Lease-Version", "1")
                                 .header("Idempotency-Key", "decision-21")
@@ -290,7 +282,6 @@ class ApprovalControllerTest {
                         post(
                                         "/api/approver/compensation-proposals/{revisionId}/approve",
                                         REVISION_ID)
-                                .header("X-Synthetic-Approver-Id", "approver-demo")
                                 .header("X-Approval-Lease-Token", LEASE_TOKEN)
                                 .header("X-Approval-Lease-Version", "1")
                                 .header("Idempotency-Key", "decision-22")
@@ -316,7 +307,6 @@ class ApprovalControllerTest {
                         post(
                                         "/api/approver/compensation-proposals/{revisionId}/reject",
                                         REVISION_ID)
-                                .header("X-Synthetic-Approver-Id", "approver-demo")
                                 .header("X-Approval-Lease-Token", LEASE_TOKEN)
                                 .header("X-Approval-Lease-Version", "1")
                                 .header("Idempotency-Key", "decision-21-empty")
