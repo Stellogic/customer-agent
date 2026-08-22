@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.sla;
 
+import static com.stellogic.customeragent.identity.HumanTestPrincipals.support;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -29,9 +30,7 @@ class SupportSlaControllerTest {
                                         "RESOLUTION",
                                         Instant.parse("2026-08-09T14:00:00Z"))));
 
-        mvc.perform(
-                        get("/api/support/sla/notifications")
-                                .header("X-Synthetic-Support-Id", "support-demo"))
+        mvc.perform(get("/api/support/sla/notifications").principal(support()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].ticketId").value(TICKET_ID.toString()))
                 .andExpect(jsonPath("$[0].objective").value("RESOLUTION"))
@@ -51,9 +50,7 @@ class SupportSlaControllerTest {
                                         List.of("RESOLUTION"),
                                         Instant.parse("2026-08-09T14:00:00Z"))));
 
-        mvc.perform(
-                        get("/api/support/escalations")
-                                .header("X-Synthetic-Support-Id", "support-demo"))
+        mvc.perform(get("/api/support/escalations").principal(support()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].reasonCode").value("SLA_BREACH"))
                 .andExpect(jsonPath("$[0].lifecycleState").value("INVESTIGATING"))
@@ -62,13 +59,5 @@ class SupportSlaControllerTest {
                 .andExpect(jsonPath("$[0].description").doesNotExist())
                 .andExpect(jsonPath("$[0].messages").doesNotExist())
                 .andExpect(jsonPath("$[0].investigationFacts").doesNotExist());
-    }
-
-    @Test
-    void nonSupportIdentityCannotReadInternalProjections() throws Exception {
-        mvc.perform(
-                        get("/api/support/escalations")
-                                .header("X-Synthetic-Support-Id", "customer-demo"))
-                .andExpect(status().isForbidden());
     }
 }

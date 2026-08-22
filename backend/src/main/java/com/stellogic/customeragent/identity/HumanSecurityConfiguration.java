@@ -20,7 +20,8 @@ public class HumanSecurityConfiguration {
 
     @Bean
     SecurityFilterChain humanSessionSecurity(HttpSecurity http) throws Exception {
-        http.securityMatcher("/api/auth/**", "/api/customer/**")
+        http.securityMatcher(
+                        "/api/auth/**", "/api/customer/**", "/api/support/**", "/api/approver/**")
                 .authorizeHttpRequests(
                         requests ->
                                 requests.requestMatchers(
@@ -30,8 +31,13 @@ public class HumanSecurityConfiguration {
                                         .permitAll()
                                         .requestMatchers("/api/customer/**")
                                         .hasRole("CUSTOMER")
+                                        .requestMatchers("/api/support/**")
+                                        .hasRole("SUPPORT")
+                                        .requestMatchers("/api/approver/**")
+                                        .hasRole("APPROVER")
                                         .anyRequest()
                                         .authenticated())
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/approver/**"))
                 .formLogin(
                         form ->
                                 form.loginProcessingUrl("/api/auth/login")

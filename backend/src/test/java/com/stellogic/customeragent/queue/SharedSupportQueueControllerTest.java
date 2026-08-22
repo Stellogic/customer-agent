@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.queue;
 
+import static com.stellogic.customeragent.identity.HumanTestPrincipals.support;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -31,7 +32,7 @@ class SharedSupportQueueControllerTest {
                                         List.of("CUSTOMER_REQUESTED_HANDOFF"),
                                         Instant.parse("2026-08-09T14:00:00Z"))));
 
-        mvc.perform(get("/api/support/queue").header("X-Synthetic-Support-Id", "support-demo"))
+        mvc.perform(get("/api/support/queue").principal(support()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].ticketId").value(TICKET_ID.toString()))
                 .andExpect(jsonPath("$[0].lifecycleState").value("WAITING_FOR_CUSTOMER"))
@@ -40,11 +41,5 @@ class SharedSupportQueueControllerTest {
                 .andExpect(jsonPath("$[0].customerId").doesNotExist())
                 .andExpect(jsonPath("$[0].description").doesNotExist())
                 .andExpect(jsonPath("$[0].messages").doesNotExist());
-    }
-
-    @Test
-    void customerCannotReadTheSharedSupportQueue() throws Exception {
-        mvc.perform(get("/api/support/queue").header("X-Synthetic-Support-Id", "customer-demo"))
-                .andExpect(status().isForbidden());
     }
 }

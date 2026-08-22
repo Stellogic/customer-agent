@@ -55,7 +55,7 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
       return nativeFetch(new URL(path, liveBaseUrl), init);
     });
 
-    render(<SupportWorkbench supportId="support-demo" />);
+    render(<SupportWorkbench />);
 
     expect(await screen.findByRole("heading", { name: "客服共享队列" })).toBeInTheDocument();
     expect(await screen.findByText("队列可发现不等于工单详情授权")).toBeInTheDocument();

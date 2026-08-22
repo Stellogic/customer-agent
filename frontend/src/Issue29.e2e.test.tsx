@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ApprovalWorkbench } from "./ApprovalWorkbench";
-import { createCookieBrowserFetch, loginCustomer } from "./liveBrowserTestClient";
+import { createCookieBrowserFetch, loginApprover, loginCustomer } from "./liveBrowserTestClient";
 import sensitiveContent from "./sensitive-content-patterns.json";
 
 const liveBaseUrl = import.meta.env.VITE_SMOKE_BASE_URL as string | undefined;
@@ -63,9 +63,6 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
       return response;
     });
 
-    const session = await loginCustomer(globalThis.fetch);
-    expect(session.id).toBe("customer-demo");
-
     async function approvalQueueRevisionIds(): Promise<string[]> {
       const response = await globalThis.fetch("/api/approver/compensation-proposals", {
         headers: { "X-Synthetic-Approver-Id": "approver-demo" },
@@ -75,8 +72,12 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
       return queue.map((item) => item.proposalRevisionId);
     }
 
+    const approverSession = await loginApprover(globalThis.fetch);
+    expect(approverSession.id).toBe("approver-demo");
     const queueBeforeScenario = await approvalQueueRevisionIds();
 
+    const session = await loginCustomer(globalThis.fetch);
+    expect(session.id).toBe("customer-demo");
     const customer = render(<App />);
     fireEvent.change(screen.getByLabelText("订单编号"), { target: { value: orderReference } });
     fireEvent.change(screen.getByLabelText("问题描述"), {
@@ -90,6 +91,7 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
     const ticketUrl = globalThis.location.href;
     customer.unmount();
 
+    expect((await loginApprover(globalThis.fetch)).id).toBe("approver-demo");
     const queueAfterScenario = await approvalQueueRevisionIds();
     const scenarioRevisionIds = queueAfterScenario.filter(
       (revisionId) => !queueBeforeScenario.includes(revisionId),
@@ -114,6 +116,7 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
     ).toBeInTheDocument();
     approver.unmount();
 
+    expect((await loginCustomer(globalThis.fetch)).id).toBe("customer-demo");
     globalThis.history.replaceState(null, "", ticketUrl);
     render(<App />);
     if (scenario === "reconciliation") {

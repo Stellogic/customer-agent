@@ -6,6 +6,7 @@ import {
   parseViewCursor,
   type SseEvent,
 } from "./streamProtocol";
+import { loadCsrfToken } from "./csrf";
 
 const SUPPORT_SCHEMA = "support-workbench-v1" as const;
 const lifecycleStates = [
@@ -42,14 +43,33 @@ type EventEnvelope = {
 };
 type QueueUpsert = QueueItem & { sharedEnteredAt: string; escalationEnteredAt: string | null };
 
-export function SupportWorkbench({ supportId }: { supportId: string }) {
+type TicketDetails = {
+  ticketId: string;
+  customerId: string;
+  orderReference: string;
+  description: string;
+  lifecycleState: LifecycleState;
+  handlingMode: HandlingMode;
+  publicConversation: Array<{ author: string; body: string; sentAt: string }>;
+  investigationFacts: Array<{
+    factType: string;
+    factValue: string;
+    evidenceReference: string;
+    recordedAt: string;
+  }>;
+  businessTimeline: Array<{ eventType: string; actorId: string; occurredAt: string }>;
+};
+
+export function SupportWorkbench() {
   const [snapshot, setSnapshot] = useState<WorkbenchSnapshot | null>(null);
   const [connection, setConnection] = useState<
     "loading" | "syncing" | "resetting" | "live" | "stale"
   >("loading");
+  const [details, setDetails] = useState<TicketDetails | null>(null);
+  const [claimingTicketId, setClaimingTicketId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
   const snapshotRef = useRef<WorkbenchSnapshot | null>(null);
   const streamController = useRef<AbortController | null>(null);
-  const supportHeaders = { "X-Synthetic-Support-Id": supportId };
 
   useEffect(() => {
     void loadSnapshot("loading");
@@ -61,7 +81,6 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
     setConnection(status);
     try {
       const response = await fetch("/api/support/workbench/snapshot", {
-        headers: supportHeaders,
         credentials: "same-origin",
         cache: "no-store",
       });
@@ -82,7 +101,7 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
     streamController.current = controller;
     try {
       const response = await fetch("/api/support/workbench/events", {
-        headers: { ...supportHeaders, "Last-Event-ID": cursor, Accept: "text/event-stream" },
+        headers: { "Last-Event-ID": cursor, Accept: "text/event-stream" },
         credentials: "same-origin",
         cache: "no-store",
         signal: controller.signal,
@@ -175,6 +194,32 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
     return true;
   }
 
+  async function claimTicket(ticketId: string) {
+    setClaimingTicketId(ticketId);
+    setActionError("");
+    try {
+      const csrf = await loadCsrfToken();
+      const claim = await fetch(`/api/support/workbench/tickets/${ticketId}/claims`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { [csrf.headerName]: csrf.token },
+      });
+      if (!claim.ok) throw new Error("claim rejected");
+      const detailResponse = await fetch(`/api/support/workbench/tickets/${ticketId}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!detailResponse.ok) throw new Error("assigned detail unavailable");
+      const value = (await detailResponse.json()) as unknown;
+      if (!isTicketDetails(value)) throw new Error("incompatible detail");
+      setDetails(value);
+    } catch {
+      setActionError("领取未完成或分配已失效；请重新同步队列后再试。");
+    } finally {
+      setClaimingTicketId(null);
+    }
+  }
+
   return (
     <main className="support-workbench" aria-label="客服工作台">
       <header className="workbench-header">
@@ -208,14 +253,39 @@ export function SupportWorkbench({ supportId }: { supportId: string }) {
           title="待接手工单"
           description="转人工与其他共享队列条目"
           items={snapshot?.sharedQueue ?? []}
+          claimingTicketId={claimingTicketId}
+          onClaim={claimTicket}
         />
         <QueueSection
           title="SLA 违约升级"
           description="已发生 SLA 违约、需要提高关注的工单"
           items={snapshot?.escalationQueue ?? []}
+          claimingTicketId={claimingTicketId}
+          onClaim={claimTicket}
           accent
         />
       </div>
+
+      {actionError && (
+        <p className="error" role="alert">
+          {actionError}
+        </p>
+      )}
+
+      {details && (
+        <section className="ticket-card" aria-labelledby="support-ticket-detail-title">
+          <h2 id="support-ticket-detail-title">当前工单详情</h2>
+          <p>{details.ticketId}</p>
+          <dl>
+            <dt>订单编号</dt>
+            <dd>{details.orderReference}</dd>
+            <dt>问题描述</dt>
+            <dd>{details.description}</dd>
+            <dt>当前状态</dt>
+            <dd>{stateLabel(details.lifecycleState)}</dd>
+          </dl>
+        </section>
+      )}
 
       <footer className="workbench-footer">
         <p>快照游标与客户、审批视图相互独立；刷新不会沿用旧本地队列。</p>
@@ -237,11 +307,15 @@ function QueueSection({
   title,
   description,
   items,
+  claimingTicketId,
+  onClaim,
   accent = false,
 }: {
   title: string;
   description: string;
   items: QueueItem[];
+  claimingTicketId: string | null;
+  onClaim: (ticketId: string) => Promise<void>;
   accent?: boolean;
 }) {
   return (
@@ -269,6 +343,14 @@ function QueueSection({
                 </span>
               </div>
               <time dateTime={item.enteredAt}>{formatTime(item.enteredAt)}</time>
+              <button
+                type="button"
+                aria-label={`领取工单 ${item.ticketId}`}
+                disabled={claimingTicketId !== null}
+                onClick={() => void onClaim(item.ticketId)}
+              >
+                {claimingTicketId === item.ticketId ? "正在领取…" : "领取"}
+              </button>
             </li>
           ))}
         </ul>
@@ -302,6 +384,32 @@ function isQueueItem(value: unknown): value is QueueItem {
     isLifecycleState(value.lifecycleState) &&
     isHandlingMode(value.handlingMode) &&
     typeof value.enteredAt === "string"
+  );
+}
+
+function isTicketDetails(value: unknown): value is TicketDetails {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "ticketId",
+      "customerId",
+      "orderReference",
+      "description",
+      "lifecycleState",
+      "handlingMode",
+      "publicConversation",
+      "investigationFacts",
+      "businessTimeline",
+    ]) &&
+    isTicketId(value.ticketId) &&
+    typeof value.customerId === "string" &&
+    typeof value.orderReference === "string" &&
+    typeof value.description === "string" &&
+    isLifecycleState(value.lifecycleState) &&
+    isHandlingMode(value.handlingMode) &&
+    Array.isArray(value.publicConversation) &&
+    Array.isArray(value.investigationFacts) &&
+    Array.isArray(value.businessTimeline)
   );
 }
 
