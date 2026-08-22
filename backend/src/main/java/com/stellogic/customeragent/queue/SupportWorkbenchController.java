@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.queue;
 
 import com.stellogic.customeragent.stream.AuthorizedSsePollingStream;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
@@ -50,9 +51,50 @@ public final class SupportWorkbenchController {
                 .body(claim);
     }
 
+    @GetMapping(value = "/tickets/{ticketId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    SseEmitter assignedTicketEvents(
+            Authentication authentication,
+            @PathVariable UUID ticketId,
+            HttpServletRequest request) {
+        String support = authentication.getName();
+        return AuthorizedSsePollingStream.open(
+                "support-ticket-authority-" + ticketId,
+                250,
+                AuthorizedSsePollingStream.MAX_AUTHORIZATION_STALENESS_MILLIS,
+                null,
+                AuthorizedSsePollingStream.requireCurrentHttpSession(
+                        request,
+                        support,
+                        new AuthorizedSsePollingStream.Source<Object>() {
+                            @Override
+                            public List<Object> events(String ignoredCursor) {
+                                service.details(support, ticketId);
+                                return List.of();
+                            }
+
+                            @Override
+                            public void authorize() {
+                                service.details(support, ticketId);
+                            }
+
+                            @Override
+                            public String cursor(Object ignoredEvent) {
+                                throw new IllegalStateException(
+                                        "authority stream does not emit events");
+                            }
+
+                            @Override
+                            public SseEmitter.SseEventBuilder render(Object ignoredEvent) {
+                                throw new IllegalStateException(
+                                        "authority stream does not emit events");
+                            }
+                        }));
+    }
+
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     SseEmitter events(
             Authentication authentication,
+            HttpServletRequest request,
             @RequestHeader(value = "Last-Event-ID", required = false) String cursor) {
         String support = authentication.getName();
         return AuthorizedSsePollingStream.open(
@@ -60,30 +102,33 @@ public final class SupportWorkbenchController {
                 250,
                 AuthorizedSsePollingStream.MAX_AUTHORIZATION_STALENESS_MILLIS,
                 cursor,
-                new AuthorizedSsePollingStream.Source<SupportWorkbenchEvent>() {
-                    @Override
-                    public List<SupportWorkbenchEvent> events(String afterCursor) {
-                        return service.events(support, afterCursor);
-                    }
+                AuthorizedSsePollingStream.requireCurrentHttpSession(
+                        request,
+                        support,
+                        new AuthorizedSsePollingStream.Source<SupportWorkbenchEvent>() {
+                            @Override
+                            public List<SupportWorkbenchEvent> events(String afterCursor) {
+                                return service.events(support, afterCursor);
+                            }
 
-                    @Override
-                    public void authorize() {
-                        service.snapshot(support);
-                    }
+                            @Override
+                            public void authorize() {
+                                service.snapshot(support);
+                            }
 
-                    @Override
-                    public String cursor(SupportWorkbenchEvent event) {
-                        return event.cursor();
-                    }
+                            @Override
+                            public String cursor(SupportWorkbenchEvent event) {
+                                return event.cursor();
+                            }
 
-                    @Override
-                    public SseEmitter.SseEventBuilder render(SupportWorkbenchEvent event) {
-                        return SseEmitter.event()
-                                .id(event.cursor())
-                                .name(event.type())
-                                .data(event.publicData());
-                    }
-                });
+                            @Override
+                            public SseEmitter.SseEventBuilder render(SupportWorkbenchEvent event) {
+                                return SseEmitter.event()
+                                        .id(event.cursor())
+                                        .name(event.type())
+                                        .data(event.publicData());
+                            }
+                        }));
     }
 
     record SnapshotResponse(

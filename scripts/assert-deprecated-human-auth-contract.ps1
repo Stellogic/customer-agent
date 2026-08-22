@@ -13,7 +13,9 @@ $negativeHeaderTestAllowlist = @(
     'backend/src/test/java/com/stellogic/customeragent/identity/HumanApiNegativeMatrixTest.java',
     'frontend/src/App.test.tsx',
     'frontend/src/SupportWorkbench.test.tsx',
-    'frontend/src/ApprovalWorkbench.test.tsx'
+    'frontend/src/ApprovalWorkbench.test.tsx',
+    'frontend/e2e/issue80.approval-separation.spec.ts',
+    'frontend/e2e/issue80.business-boundaries.spec.ts'
 )
 $unexpectedHeaderMatches = @($headerMatches | Where-Object {
     $normalized = ($_ -split ':', 2)[0].TrimStart('.', '/', '\').Replace('\', '/')

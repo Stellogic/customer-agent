@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.ticket;
 
+import static com.stellogic.customeragent.identity.HumanTestPrincipals.session;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -27,6 +28,7 @@ class CustomerTicketApiTest {
     private final MockMvc mvc =
             MockMvcBuilders.standaloneSetup(new CustomerTicketController(service))
                     .setControllerAdvice(new CustomerTicketExceptionHandler())
+                    .defaultRequest(get("/").session(session("customer-demo")))
                     .build();
 
     @Test
@@ -182,6 +184,7 @@ class CustomerTicketApiTest {
         mvc.perform(
                         get("/api/customer/tickets/{ticketId}/events", TICKET_ID)
                                 .principal(customer("customer-other-demo"))
+                                .session(session("customer-other-demo"))
                                 .header("Last-Event-ID", "customer-public-v1:2"))
                 .andExpect(status().isNotFound());
     }

@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -24,8 +25,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,6 +40,81 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 class AuthorizedSsePollingStreamHttpTest {
+    @Test
+    void destroyedHttpSessionRevokesAnAlreadyBoundStreamSource() {
+        MockHttpSession session = new MockHttpSession();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSession(session);
+        AuthorizedSsePollingStream.Source<String> source =
+                AuthorizedSsePollingStream.requireCurrentHttpSession(
+                        request,
+                        null,
+                        new AuthorizedSsePollingStream.Source<>() {
+                            @Override
+                            public List<String> events(String afterCursor) {
+                                return List.of();
+                            }
+
+                            @Override
+                            public void authorize() {}
+
+                            @Override
+                            public String cursor(String event) {
+                                return event;
+                            }
+
+                            @Override
+                            public SseEmitter.SseEventBuilder render(String event) {
+                                return SseEmitter.event().data(event);
+                            }
+                        });
+
+        source.authorize();
+        AuthorizedSsePollingStream.invalidateHttpSession(session);
+
+        assertThatThrownBy(source::authorize)
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        exception ->
+                                assertThat(exception.getStatusCode())
+                                        .isEqualTo(HttpStatus.UNAUTHORIZED));
+    }
+
+    @Test
+    void subjectReplacementRevokesOldStreamButAllowsNewStreamForTheSameSession() {
+        MockHttpSession session = new MockHttpSession();
+        replaceSubject(session, "support-demo");
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSession(session);
+        AuthorizedSsePollingStream.Source<String> oldSource = guardedSource(request);
+
+        replaceSubject(session, "approver-demo");
+        AuthorizedSsePollingStream.Source<String> newSource = guardedSource(request);
+
+        assertThatThrownBy(oldSource::authorize).isInstanceOf(ResponseStatusException.class);
+        newSource.authorize();
+    }
+
+    @Test
+    void staleRequestAuthenticationCannotBindTheReplacementSubjectsSessionAuthority() {
+        MockHttpSession session = new MockHttpSession();
+        replaceSubject(session, "approver-demo");
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSession(session);
+
+        assertThatThrownBy(() -> guardedSource(request, "support-demo"))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    private void replaceSubject(MockHttpSession session, String subject) {
+        var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(
+                        subject, "credential", List.of()));
+        session.setAttribute(
+                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+    }
+
     @Test
     void externalSseClosesWithinSixtySecondsAndCannotSendProjectionAfterRevocation()
             throws Exception {
@@ -75,6 +156,49 @@ class AuthorizedSsePollingStreamHttpTest {
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
+    }
+
+    private AuthorizedSsePollingStream.Source<String> guardedSource(
+            MockHttpServletRequest request) {
+        return guardedSource(request, sessionSubject(request));
+    }
+
+    private AuthorizedSsePollingStream.Source<String> guardedSource(
+            MockHttpServletRequest request, String expectedSubject) {
+        return AuthorizedSsePollingStream.requireCurrentHttpSession(
+                request,
+                expectedSubject,
+                new AuthorizedSsePollingStream.Source<>() {
+                    @Override
+                    public List<String> events(String afterCursor) {
+                        return List.of();
+                    }
+
+                    @Override
+                    public void authorize() {}
+
+                    @Override
+                    public String cursor(String event) {
+                        return event;
+                    }
+
+                    @Override
+                    public SseEmitter.SseEventBuilder render(String event) {
+                        return SseEmitter.event().data(event);
+                    }
+                });
+    }
+
+    private String sessionSubject(MockHttpServletRequest request) {
+        Object value =
+                request.getSession(false)
+                        .getAttribute(
+                                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+        if (value instanceof org.springframework.security.core.context.SecurityContext context
+                && context.getAuthentication() != null) {
+            return context.getAuthentication().getName();
+        }
+        return null;
     }
 
     private ConfigurableApplicationContext startServer() {

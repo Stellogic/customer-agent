@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.identity;
 
+import com.stellogic.customeragent.stream.AuthorizedSsePollingStream;
 import org.springframework.boot.web.servlet.ServletListenerRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,6 +11,7 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
@@ -56,6 +58,19 @@ public class HumanSecurityConfiguration {
                                 form.loginProcessingUrl("/api/auth/login")
                                         .successHandler(
                                                 (request, response, authentication) -> {
+                                                    Object previousSessionId =
+                                                            request.getAttribute(
+                                                                    HumanLoginSseRevocationFilter
+                                                                            .PREVIOUS_SESSION_ID_ATTRIBUTE);
+                                                    if (previousSessionId instanceof String id) {
+                                                        AuthorizedSsePollingStream
+                                                                .invalidateHttpSessionId(id);
+                                                    }
+                                                    var session = request.getSession(false);
+                                                    if (session != null) {
+                                                        AuthorizedSsePollingStream
+                                                                .rotateHttpSession(session);
+                                                    }
                                                     securityEvents.loginSucceeded(
                                                             authentication.getName());
                                                     response.setStatus(
@@ -74,6 +89,8 @@ public class HumanSecurityConfiguration {
                                                 (request, response, authentication) -> {
                                                     var session = request.getSession(false);
                                                     if (session != null) {
+                                                        AuthorizedSsePollingStream
+                                                                .invalidateHttpSession(session);
                                                         session.setAttribute(
                                                                 HumanSecurityEvents
                                                                         .EXPLICIT_LOGOUT_ATTRIBUTE,
@@ -97,6 +114,8 @@ public class HumanSecurityConfiguration {
                 .sessionManagement(
                         sessions ->
                                 sessions.sessionFixation(fixation -> fixation.changeSessionId()));
+        http.addFilterBefore(
+                new HumanLoginSseRevocationFilter(), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }

@@ -2,6 +2,7 @@ package com.stellogic.customeragent.queue;
 
 import java.util.Map;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -17,6 +18,7 @@ public final class SupportWorkbenchExceptionHandler {
     @ExceptionHandler(SupportWorkbenchCursorException.class)
     ResponseEntity<Map<String, String>> cursorConflict() {
         return ResponseEntity.status(HttpStatus.CONFLICT)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("code", "SNAPSHOT_REQUIRED", "message", "游标不兼容，请重新读取客服工作台权威快照"));
     }
 

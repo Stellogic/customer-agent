@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.approval;
 
 import static com.stellogic.customeragent.identity.HumanTestPrincipals.approver;
+import static com.stellogic.customeragent.identity.HumanTestPrincipals.session;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -12,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -31,7 +33,8 @@ class ApprovalControllerTest {
     private final ApprovalService service = org.mockito.Mockito.mock(ApprovalService.class);
     private final MockMvc mvc =
             MockMvcBuilders.standaloneSetup(new ApprovalController(service))
-                    .defaultRequest(get("/").principal(approver()))
+                    .defaultRequest(
+                            get("/").principal(approver()).session(session("approver-demo")))
                     .build();
 
     @Test
@@ -212,9 +215,17 @@ class ApprovalControllerTest {
     @Test
     void humanApprovalStreamHasAServerEnforcedSixtySecondAuthorizationWindow() {
         when(service.events(any(), any())).thenReturn(List.of());
+        HttpServletRequest request = org.mockito.Mockito.mock(HttpServletRequest.class);
+        when(request.getSession(false)).thenReturn(session("approver-demo"));
         SseEmitter emitter =
                 new ApprovalController(service)
-                        .events(approver(), LEASE_TOKEN, 1L, "approval-view-v1:0", REVISION_ID);
+                        .events(
+                                approver(),
+                                request,
+                                LEASE_TOKEN,
+                                1L,
+                                "approval-view-v1:0",
+                                REVISION_ID);
 
         org.assertj.core.api.Assertions.assertThat(emitter.getTimeout()).isEqualTo(60_000L);
         emitter.complete();
