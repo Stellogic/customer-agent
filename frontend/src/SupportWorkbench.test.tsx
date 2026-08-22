@@ -157,6 +157,26 @@ describe("客服共享队列工作台", () => {
     ).toHaveLength(2);
   });
 
+  it("服务端结束单次 SSE 后自动重读快照并建立新的授权连接", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:1", [handoffItem()], []))
+      .mockResolvedValueOnce(sseResponse(""))
+      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:2", [breachedItem()], []))
+      .mockResolvedValueOnce(openStream());
+
+    render(<SupportWorkbench />);
+
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(globalThis.fetch)
+          .mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"),
+      ).toHaveLength(2),
+    );
+    expect(await screen.findByText(BREACHED_TICKET)).toBeInTheDocument();
+    expect(screen.queryByText(HANDOFF_TICKET)).not.toBeInTheDocument();
+  });
+
   it("非法 payload 与 reset_required 都不会继续应用旧状态", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:2", [handoffItem()], []))
@@ -192,7 +212,7 @@ describe("客服共享队列工作台", () => {
     ).toHaveLength(3);
   });
 
-  it("断线明确标记可能过期并提供保持焦点可操作的手动同步", async () => {
+  it("异常断线也自动清除旧投影并重新读取权威快照", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:2", [handoffItem()], []))
       .mockRejectedValueOnce(new TypeError("disconnected"))
@@ -203,15 +223,9 @@ describe("客服共享队列工作台", () => {
 
     render(<SupportWorkbench />);
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("可能过期");
-    const refresh = screen.getByRole("button", { name: "重新同步队列" });
-    refresh.focus();
-    fireEvent.click(refresh);
-
     expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
-    await waitFor(() => expect(refresh).not.toBeDisabled());
-    expect(document.activeElement).toBe(refresh);
+    expect(screen.queryByText(HANDOFF_TICKET)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重新同步队列" })).not.toBeDisabled();
   });
 
   it("窄屏仍保留地标、标题层级和可读的队列列表", async () => {

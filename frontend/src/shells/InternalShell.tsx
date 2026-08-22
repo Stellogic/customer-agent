@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { hasCapability } from "../routePolicy";
 import { CurrentSessionContext } from "../session";
 import { INTERNAL_WORKSPACES, ROUTES } from "../workspaceRegistry";
+import { SessionLogoutButton } from "../SessionLogoutButton";
 
 export default function InternalShell() {
   const session = CurrentSessionContext.use();
@@ -25,7 +26,10 @@ export default function InternalShell() {
         </nav>
       </Layout.Sider>
       <Layout>
-        <Layout.Header className="internal-shell-header">统一内部工作台</Layout.Header>
+        <Layout.Header className="internal-shell-header">
+          统一内部工作台
+          <SessionLogoutButton />
+        </Layout.Header>
         <Layout.Content>
           <Outlet />
         </Layout.Content>

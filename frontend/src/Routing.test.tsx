@@ -1,6 +1,10 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RootApplication } from "./RootApplication";
+import {
+  announceHumanSessionChange,
+  resetHumanSessionLifecycleForTests,
+} from "./humanSessionLifecycle";
 
 type Session = {
   id: string;
@@ -44,6 +48,7 @@ const dualRole: Session = {
 describe("Issue #73 静态路由与两个界面壳", () => {
   afterEach(() => {
     cleanup();
+    resetHumanSessionLifecycleForTests();
     vi.restoreAllMocks();
     globalThis.history.replaceState(null, "", "/");
   });
@@ -173,6 +178,136 @@ describe("Issue #73 静态路由与两个界面壳", () => {
 
     await waitFor(() => expect(globalThis.location.pathname).toBe("/internal/approvals"));
   });
+
+  it("其他标签退出后当前标签立即卸载主体工作区并回到对应登录入口", async () => {
+    globalThis.history.replaceState(null, "", "/internal");
+    let sessionReads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/auth/session") {
+        sessionReads += 1;
+        return sessionReads === 1 ? Response.json(dualRole) : new Response(null, { status: 401 });
+      }
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "anonymous-after-logout", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === "/api/auth/demo-accounts") return new Response(null, { status: 404 });
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<RootApplication />);
+    await waitFor(() => expect(globalThis.location.pathname).toBe("/internal"));
+
+    announceHumanSessionChange("logged-out");
+
+    await waitFor(() => expect(globalThis.location.pathname).toBe("/internal/login"));
+    expect(await screen.findByRole("heading", { name: "内部工作人员登录" })).toBeInTheDocument();
+  }, 60_000);
+
+  it("其他标签退出会立即中止当前标签 SSE 并移除客户缓存投影", async () => {
+    const ticketId = "78000000-0000-0000-0000-000000000001";
+    globalThis.history.replaceState(null, "", `/help?ticket=${ticketId}`);
+    let sessionReads = 0;
+    let streamAborted = false;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === "/api/auth/session") {
+        sessionReads += 1;
+        return sessionReads === 1 ? Response.json(customer) : new Response(null, { status: 401 });
+      }
+      if (path === `/api/customer/tickets/${ticketId}`) {
+        return Response.json({
+          view: "CUSTOMER_PUBLIC",
+          schema: "customer-public-v1",
+          cursor: "customer-public-v1:1",
+          ticket: {
+            id: ticketId,
+            lifecycleState: "INVESTIGATING",
+            handlingMode: "AGENT",
+            agentGeneration: 1,
+            firstRespondedAt: "2026-08-22T00:00:00Z",
+          },
+          messages: [
+            { author: "SUPPORT", body: "仅属于旧客户主体的缓存", sentAt: "2026-08-22T00:00:00Z" },
+          ],
+        });
+      }
+      if (path === `/api/customer/tickets/${ticketId}/events`) {
+        init?.signal?.addEventListener("abort", () => {
+          streamAborted = true;
+        });
+        return new Response(new ReadableStream({ start() {} }), {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "anonymous-after-logout", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === "/api/auth/demo-accounts") return new Response(null, { status: 404 });
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<RootApplication />);
+    expect(await screen.findByText("仅属于旧客户主体的缓存")).toBeInTheDocument();
+
+    announceHumanSessionChange("logged-out");
+
+    await waitFor(() => expect(streamAborted).toBe(true));
+    expect(screen.queryByText("仅属于旧客户主体的缓存")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "客户登录" })).toBeInTheDocument();
+  }, 60_000);
+
+  it("跨标签通知丢失时由 SSE 403 重校验 Session 并卸载旧客户投影", async () => {
+    const ticketId = "78000000-0000-0000-0000-000000000002";
+    globalThis.history.replaceState(null, "", `/help?ticket=${ticketId}`);
+    let sessionReads = 0;
+    let customerSnapshotReads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/auth/session") {
+        sessionReads += 1;
+        return Response.json(sessionReads === 1 ? customer : support);
+      }
+      if (path === `/api/customer/tickets/${ticketId}`) {
+        customerSnapshotReads += 1;
+        return Response.json({
+          view: "CUSTOMER_PUBLIC",
+          schema: "customer-public-v1",
+          cursor: "customer-public-v1:1",
+          ticket: {
+            id: ticketId,
+            lifecycleState: "INVESTIGATING",
+            handlingMode: "AGENT",
+            agentGeneration: 1,
+            firstRespondedAt: "2026-08-22T00:00:00Z",
+          },
+          messages: [
+            {
+              author: "SUPPORT",
+              body: "通知丢失前的旧客户投影",
+              sentAt: "2026-08-22T00:00:00Z",
+            },
+          ],
+        });
+      }
+      if (path === `/api/customer/tickets/${ticketId}/events`) {
+        return new Response(null, { status: 403 });
+      }
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-session", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === "/api/auth/demo-accounts") return new Response(null, { status: 404 });
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<RootApplication />);
+
+    await waitFor(() => expect(sessionReads).toBeGreaterThanOrEqual(2));
+    expect(customerSnapshotReads).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("通知丢失前的旧客户投影")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "403" })).toBeInTheDocument();
+  }, 60_000);
 });
 
 function mockSession(session: Session) {

@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.identity;
 
+import org.springframework.boot.web.servlet.ServletListenerRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -19,7 +20,20 @@ public class HumanSecurityConfiguration {
     }
 
     @Bean
-    SecurityFilterChain humanSessionSecurity(HttpSecurity http) throws Exception {
+    HumanSecurityEvents humanSecurityEvents() {
+        return new HumanSecurityEvents();
+    }
+
+    @Bean
+    ServletListenerRegistrationBean<HumanSessionExpirationListener> humanSessionExpirationListener(
+            HumanSecurityEvents securityEvents) {
+        return new ServletListenerRegistrationBean<>(
+                new HumanSessionExpirationListener(securityEvents));
+    }
+
+    @Bean
+    SecurityFilterChain humanSessionSecurity(HttpSecurity http, HumanSecurityEvents securityEvents)
+            throws Exception {
         http.securityMatcher(
                         "/api/auth/**", "/api/customer/**", "/api/support/**", "/api/approver/**")
                 .authorizeHttpRequests(
@@ -41,20 +55,40 @@ public class HumanSecurityConfiguration {
                         form ->
                                 form.loginProcessingUrl("/api/auth/login")
                                         .successHandler(
-                                                (request, response, authentication) ->
-                                                        response.setStatus(
-                                                                HttpStatus.NO_CONTENT.value()))
+                                                (request, response, authentication) -> {
+                                                    securityEvents.loginSucceeded(
+                                                            authentication.getName());
+                                                    response.setStatus(
+                                                            HttpStatus.NO_CONTENT.value());
+                                                })
                                         .failureHandler(
-                                                (request, response, exception) ->
-                                                        response.sendError(
-                                                                HttpStatus.UNAUTHORIZED.value())))
+                                                (request, response, exception) -> {
+                                                    securityEvents.loginFailed();
+                                                    response.sendError(
+                                                            HttpStatus.UNAUTHORIZED.value());
+                                                }))
                 .logout(
                         logout ->
                                 logout.logoutUrl("/api/auth/logout")
+                                        .addLogoutHandler(
+                                                (request, response, authentication) -> {
+                                                    var session = request.getSession(false);
+                                                    if (session != null) {
+                                                        session.setAttribute(
+                                                                HumanSecurityEvents
+                                                                        .EXPLICIT_LOGOUT_ATTRIBUTE,
+                                                                Boolean.TRUE);
+                                                    }
+                                                })
                                         .logoutSuccessHandler(
-                                                (request, response, authentication) ->
-                                                        response.setStatus(
-                                                                HttpStatus.NO_CONTENT.value())))
+                                                (request, response, authentication) -> {
+                                                    if (authentication != null) {
+                                                        securityEvents.loggedOut(
+                                                                authentication.getName());
+                                                    }
+                                                    response.setStatus(
+                                                            HttpStatus.NO_CONTENT.value());
+                                                }))
                 .exceptionHandling(
                         exceptions ->
                                 exceptions.authenticationEntryPoint(

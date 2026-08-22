@@ -5,6 +5,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 public final class AuthorizedSsePollingStream {
+    public static final long MAX_AUTHORIZATION_STALENESS_MILLIS = 60_000L;
+
     private AuthorizedSsePollingStream() {}
 
     public static <E> SseEmitter open(

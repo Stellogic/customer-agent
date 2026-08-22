@@ -24,6 +24,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
@@ -86,6 +89,63 @@ class HumanSessionLifecycleTest {
         }
     }
 
+    @Test
+    void inactiveSessionIsRejectedByTheNextHttpRequest() throws Exception {
+        try (ConfigurableApplicationContext server = startServer()) {
+            HttpClient client = HttpClient.newHttpClient();
+            URI baseUri = baseUri(server);
+            HttpResponse<String> csrf =
+                    client.send(
+                            HttpRequest.newBuilder(baseUri.resolve("/api/auth/csrf")).GET().build(),
+                            HttpResponse.BodyHandlers.ofString());
+            String anonymousCookie = requestCookie(sessionSetCookie(csrf));
+            String csrfToken =
+                    server.getBean(ObjectMapper.class).readTree(csrf.body()).get("token").asText();
+            HttpResponse<String> login =
+                    client.send(
+                            HttpRequest.newBuilder(baseUri.resolve("/api/auth/login"))
+                                    .header("Cookie", anonymousCookie)
+                                    .header("X-CSRF-TOKEN", csrfToken)
+                                    .header(
+                                            "Content-Type",
+                                            MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+                                    .POST(
+                                            HttpRequest.BodyPublishers.ofString(
+                                                    "username=customer-demo&password=local-demo-password"))
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+            assertThat(login.statusCode()).isEqualTo(HttpServletResponse.SC_NO_CONTENT);
+            String authenticatedCookie = requestCookie(sessionSetCookie(login));
+            HttpResponse<String> authenticatedCsrf =
+                    client.send(
+                            HttpRequest.newBuilder(baseUri.resolve("/api/auth/csrf"))
+                                    .header("Cookie", authenticatedCookie)
+                                    .GET()
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+            String authenticatedToken =
+                    server.getBean(ObjectMapper.class)
+                            .readTree(authenticatedCsrf.body())
+                            .get("token")
+                            .asText();
+            HttpResponse<String> shortenTimeout =
+                    client.send(
+                            HttpRequest.newBuilder(
+                                            baseUri.resolve("/api/auth/test/session-timeout"))
+                                    .header("Cookie", authenticatedCookie)
+                                    .header("X-CSRF-TOKEN", authenticatedToken)
+                                    .POST(HttpRequest.BodyPublishers.noBody())
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+            assertThat(shortenTimeout.statusCode()).isEqualTo(HttpServletResponse.SC_NO_CONTENT);
+
+            Thread.sleep(1_500);
+
+            HttpResponse<String> expired = getCurrentSession(client, baseUri, authenticatedCookie);
+            assertThat(expired.statusCode()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+        }
+    }
+
     private ConfigurableApplicationContext startServer() {
         SpringApplication application = new SpringApplication(LifecycleTestApplication.class);
         application.setWebApplicationType(WebApplicationType.SERVLET);
@@ -139,7 +199,8 @@ class HumanSessionLifecycleTest {
     @Import({
         AuthSessionController.class,
         HumanSecurityConfiguration.class,
-        LocalDemoHumanAccountsConfiguration.class
+        LocalDemoHumanAccountsConfiguration.class,
+        SessionTimeoutTestController.class
     })
     static class LifecycleTestApplication {
         @Bean
@@ -181,6 +242,15 @@ class HumanSessionLifecycleTest {
 
         int seconds() {
             return seconds.get();
+        }
+    }
+
+    @RestController
+    static class SessionTimeoutTestController {
+        @PostMapping("/api/auth/test/session-timeout")
+        ResponseEntity<Void> shorten(HttpSession session) {
+            session.setMaxInactiveInterval(1);
+            return ResponseEntity.noContent().build();
         }
     }
 }

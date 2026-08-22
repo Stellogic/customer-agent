@@ -7,6 +7,7 @@ import {
   type SseEvent,
 } from "./streamProtocol";
 import { loadCsrfToken } from "./csrf";
+import { humanSessionFetch } from "./humanSessionLifecycle";
 
 const CUSTOMER_PUBLIC_SCHEMA = "customer-public-v1" as const;
 
@@ -79,7 +80,7 @@ export function App() {
     setError("");
     try {
       const csrf = await loadCsrfToken();
-      const created = await fetch("/api/customer/tickets", {
+      const created = await humanSessionFetch("/api/customer/tickets", {
         method: "POST",
         credentials: "same-origin",
         headers: {
@@ -100,7 +101,7 @@ export function App() {
   }
 
   async function loadTicket(ticketId: string) {
-    const loaded = await fetch(`/api/customer/tickets/${ticketId}`, {
+    const loaded = await humanSessionFetch(`/api/customer/tickets/${ticketId}`, {
       credentials: "same-origin",
     });
     if (!loaded.ok) throw new Error("snapshot request failed");
@@ -128,7 +129,7 @@ export function App() {
         "Idempotency-Key": replyMessageId.current,
         "X-Resume-Request-Id": resumeRequestId.current,
       };
-      const response = await fetch(
+      const response = await humanSessionFetch(
         `/api/customer/tickets/${ticketId}/clarifications/${clarificationId}/replies`,
         {
           method: "POST",
@@ -172,7 +173,7 @@ export function App() {
         setError("回复已提交，但最新工单状态刷新失败，请手动刷新。");
       }
     } catch {
-      const status = await fetch(
+      const status = await humanSessionFetch(
         `/api/customer/tickets/${ticketId}/clarification-resumes/${resumeRequestId.current}`,
         {
           credentials: "same-origin",
@@ -209,7 +210,7 @@ export function App() {
     const requestId = handoffRequestId.current;
     try {
       const csrf = await loadCsrfToken();
-      const response = await fetch(`/api/customer/tickets/${ticketId}/human-handoff`, {
+      const response = await humanSessionFetch(`/api/customer/tickets/${ticketId}/human-handoff`, {
         method: "POST",
         credentials: "same-origin",
         headers: {
@@ -223,7 +224,7 @@ export function App() {
       await loadTicket(ticketId);
       handoffRequestId.current = globalThis.crypto.randomUUID();
     } catch {
-      const status = await fetch(
+      const status = await humanSessionFetch(
         `/api/customer/tickets/${ticketId}/human-handoff-requests/${requestId}`,
         {
           credentials: "same-origin",
@@ -247,20 +248,23 @@ export function App() {
     setError("");
     try {
       const csrf = await loadCsrfToken();
-      const response = await fetch(`/api/customer/tickets/${snapshot.ticket.id}/replies`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          [csrf.headerName]: csrf.token,
-          "Content-Type": "application/json",
-          "Idempotency-Key": ticketReplyRequestId.current,
+      const response = await humanSessionFetch(
+        `/api/customer/tickets/${snapshot.ticket.id}/replies`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            [csrf.headerName]: csrf.token,
+            "Content-Type": "application/json",
+            "Idempotency-Key": ticketReplyRequestId.current,
+          },
+          body: JSON.stringify({
+            orderReference: ticketReplyOrderReference,
+            issueKind: ticketReplyIssueKind,
+            message: ticketReplyBody,
+          }),
         },
-        body: JSON.stringify({
-          orderReference: ticketReplyOrderReference,
-          issueKind: ticketReplyIssueKind,
-          message: ticketReplyBody,
-        }),
-      });
+      );
       if (!response.ok) throw new Error("ticket reply failed");
       const result = (await response.json()) as { ticketId: string };
       await loadTicket(result.ticketId);
@@ -278,8 +282,11 @@ export function App() {
     const controller = new AbortController();
     streamController.current = controller;
     const markDisconnected = () => {
-      if (!controller.signal.aborted)
+      if (!controller.signal.aborted) {
+        snapshotRef.current = null;
+        setSnapshot(null);
         setError("实时更新已断开；当前内容可能过期，刷新后将从权威快照恢复。");
+      }
     };
     const scheduleRecovery = () => {
       if (
@@ -300,7 +307,7 @@ export function App() {
       }, 1_000);
     };
     try {
-      const response = await fetch(`/api/customer/tickets/${ticketId}/events`, {
+      const response = await humanSessionFetch(`/api/customer/tickets/${ticketId}/events`, {
         headers: { "Last-Event-ID": cursor, Accept: "text/event-stream" },
         credentials: "same-origin",
         signal: controller.signal,

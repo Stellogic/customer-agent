@@ -1,7 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { CurrentSession } from "./authContract";
 import { loadCsrfToken, type CsrfToken } from "./csrf";
+import { logoutHumanSession } from "./humanSessionActions";
 import { loadCurrentSession, loadOptionalCurrentSession } from "./session";
+import { announceHumanSessionChange, humanSessionFetch } from "./humanSessionLifecycle";
 
 type LoginAudience = "customer" | "internal";
 type DemoAccount = {
@@ -60,7 +62,7 @@ export function LoginPage({
     setPending(true);
     setError("");
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await humanSessionFetch("/api/auth/login", {
         method: "POST",
         credentials: "same-origin",
         headers: {
@@ -72,6 +74,7 @@ export function LoginPage({
       if (!response.ok) throw new Error("login rejected");
       const [nextCsrf, session] = await Promise.all([loadCsrfToken(), loadCurrentSession()]);
       setCsrf(nextCsrf);
+      announceHumanSessionChange("subject-replaced");
       if (onAuthenticated) onAuthenticated(session);
       else setCurrent(session);
       setPassword("");
@@ -87,13 +90,7 @@ export function LoginPage({
     setPending(true);
     setError("");
     try {
-      const response = await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { [csrf.headerName]: csrf.token },
-      });
-      if (!response.ok) throw new Error("logout rejected");
-      setCsrf(await loadCsrfToken());
+      setCsrf(await logoutHumanSession());
       setCurrent(undefined);
       setUsername("");
       setPassword("");

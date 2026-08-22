@@ -18,6 +18,7 @@ import {
   type HumanCapability,
 } from "./routePolicy";
 import { CurrentSessionContext, loadOptionalCurrentSession } from "./session";
+import { observeHumanSession, subscribeToHumanSessionInvalidation } from "./humanSessionLifecycle";
 import { INTERNAL_WORKSPACES, ROUTES, internalWorkspace } from "./workspaceRegistry";
 
 const CustomerShell = lazy(() => import("./shells/CustomerShell"));
@@ -103,9 +104,16 @@ function SessionGate() {
 
   useEffect(() => {
     let active = true;
+    let invalidated = false;
+    const unsubscribe = subscribeToHumanSessionInvalidation(() => {
+      invalidated = true;
+      observeHumanSession(undefined);
+      if (active) setState({ status: "anonymous" });
+    });
     void loadOptionalCurrentSession()
       .then((session) => {
-        if (!active) return;
+        if (!active || invalidated) return;
+        observeHumanSession(session);
         setState(session ? { status: "authenticated", session } : { status: "anonymous" });
       })
       .catch(() => {
@@ -113,6 +121,8 @@ function SessionGate() {
       });
     return () => {
       active = false;
+      observeHumanSession(undefined);
+      unsubscribe();
     };
   }, []);
 

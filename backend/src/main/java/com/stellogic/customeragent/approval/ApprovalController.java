@@ -74,7 +74,7 @@ public final class ApprovalController {
         return AuthorizedSsePollingStream.open(
                 "approval-view-events",
                 100,
-                0L,
+                AuthorizedSsePollingStream.MAX_AUTHORIZATION_STALENESS_MILLIS,
                 cursor,
                 new AuthorizedSsePollingStream.Source<ApprovalModels.ApprovalViewEvent>() {
                     @Override
