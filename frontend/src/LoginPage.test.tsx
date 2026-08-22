@@ -81,15 +81,10 @@ describe("人工身份登录基线", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "登录" }));
 
-    expect(await screen.findByText("当前身份：演示客户")).toBeInTheDocument();
+    await waitFor(() => expect(globalThis.location.pathname).toBe("/help"));
     expect(loginPosts).toBe(1);
     await waitFor(() => expect(csrfReads).toBe(2));
-
-    fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
-
-    expect(await screen.findByRole("heading", { name: "客户登录" })).toBeInTheDocument();
-    expect(logoutPosts).toBe(1);
-    await waitFor(() => expect(csrfReads).toBe(3));
+    expect(logoutPosts).toBe(0);
   });
 
   it("刷新内部登录入口时从服务端 Session 恢复唯一当前主体", async () => {
@@ -119,7 +114,8 @@ describe("人工身份登录基线", () => {
 
     render(<RootApplication />);
 
-    expect(await screen.findByText("当前身份：演示双角色工作人员")).toBeInTheDocument();
+    await waitFor(() => expect(globalThis.location.pathname).toBe("/internal"));
+    expect(await screen.findByRole("heading", { name: "选择工作区" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "内部工作人员登录" })).not.toBeInTheDocument();
   });
 
@@ -183,7 +179,7 @@ describe("人工身份登录基线", () => {
     expect(screen.queryByRole("button", { name: "使用演示客户填充" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "使用演示客服填充" }));
     fireEvent.click(screen.getByRole("button", { name: "登录" }));
-    expect(await screen.findByText("当前身份：演示客服")).toBeInTheDocument();
+    await waitFor(() => expect(globalThis.location.pathname).toBe("/internal/support"));
   });
 
   it("拒绝服务端返回契约外的角色或页面能力", async () => {

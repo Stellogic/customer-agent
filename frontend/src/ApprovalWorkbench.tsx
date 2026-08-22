@@ -55,7 +55,7 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
   const headers = { "X-Synthetic-Approver-Id": approverId };
 
   useEffect(() => {
-    globalThis.history.replaceState(null, "", "/approver");
+    globalThis.history.replaceState(null, "", "/internal/approvals");
     void loadQueue();
     return () => {
       streamController.current?.abort();
@@ -98,7 +98,7 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
       const lease = (await response.json()) as unknown;
       if (!isLease(lease)) throw new Error("invalid lease");
       activeLease.current = lease;
-      globalThis.history.replaceState(null, "", `/approver?revision=${revisionId}`);
+      globalThis.history.replaceState(null, "", `/internal/approvals?revision=${revisionId}`);
       await loadApprovalView(lease);
     } catch {
       revokeLocalAuthority("审批责任不可用，已返回队列。");
@@ -183,7 +183,7 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
     if (activeLease.current?.leaseToken !== lease.leaseToken || reconnectTimer.current !== null)
       return;
     setSnapshot(null);
-    globalThis.history.replaceState(null, "", "/approver");
+    globalThis.history.replaceState(null, "", "/internal/approvals");
     setStatus("审批连接已断开；正在按当前租约重新校验权威快照…");
     reconnectTimer.current = globalThis.setTimeout(() => {
       reconnectTimer.current = null;
@@ -236,7 +236,7 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
     activeLease.current = null;
     setSnapshot(null);
     setStatus(message);
-    globalThis.history.replaceState(null, "", "/approver");
+    globalThis.history.replaceState(null, "", "/internal/approvals");
   }
 
   return (

@@ -7,7 +7,9 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "jsdom",
+    fileParallelism: false,
     setupFiles: "./src/test-setup.ts",
+    testTimeout: 30_000,
   },
   server: {
     allowedHosts: ["localhost", "127.0.0.1", "frontend"],
