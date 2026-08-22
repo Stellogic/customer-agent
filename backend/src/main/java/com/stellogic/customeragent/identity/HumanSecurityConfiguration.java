@@ -37,7 +37,6 @@ public class HumanSecurityConfiguration {
                                         .hasRole("APPROVER")
                                         .anyRequest()
                                         .authenticated())
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/approver/**"))
                 .formLogin(
                         form ->
                                 form.loginProcessingUrl("/api/auth/login")

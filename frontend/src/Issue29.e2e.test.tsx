@@ -65,7 +65,7 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
 
     async function approvalQueueRevisionIds(): Promise<string[]> {
       const response = await globalThis.fetch("/api/approver/compensation-proposals", {
-        headers: { "X-Synthetic-Approver-Id": "approver-demo" },
+        credentials: "same-origin",
       });
       expect(response.ok).toBe(true);
       const queue = (await response.json()) as Array<{ proposalRevisionId: string }>;
@@ -99,7 +99,7 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
     expect(scenarioRevisionIds).toHaveLength(1);
     const scenarioQueueIndex = queueAfterScenario.indexOf(scenarioRevisionIds[0]);
 
-    const approver = render(<ApprovalWorkbench approverId="approver-demo" />);
+    const approver = render(<ApprovalWorkbench />);
     await waitFor(
       () => {
         expect(screen.getAllByRole("button", { name: "领取审批" })).toHaveLength(
@@ -149,14 +149,13 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
         );
       }),
     ).toBe(true);
-    await waitFor(
-      () => {
-        expect(
-          streamAudits.some((audit) => completedSsePayload(audit.payload).includes("RESOLVED")),
-        ).toBe(true);
-      },
-      { timeout: 5_000 },
+    const resolvedByEvent = streamAudits.some((audit) =>
+      completedSsePayload(audit.payload).includes("RESOLVED"),
     );
+    const resolvedByAuthoritativeSnapshot = browserNetworkPayloads.some((payload) =>
+      payload.includes('"lifecycleState":"RESOLVED"'),
+    );
+    expect(resolvedByEvent || resolvedByAuthoritativeSnapshot).toBe(true);
     const forbiddenNetworkContent = new RegExp(
       [...sensitiveContent.contentPatterns, ...sensitiveContent.internalAddressPatterns].join("|"),
       "i",

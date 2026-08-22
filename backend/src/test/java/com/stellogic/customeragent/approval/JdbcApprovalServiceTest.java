@@ -48,7 +48,7 @@ class JdbcApprovalServiceTest {
                         900,
                         900);
 
-        service.queue();
+        service.queue("approver-demo");
 
         InOrder order = inOrder(clock, proposalExpiry, jdbc);
         order.verify(clock).instant();

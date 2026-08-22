@@ -61,7 +61,7 @@ class JdbcApprovalService implements ApprovalService {
 
     @Override
     @Transactional
-    public List<ApprovalModels.QueueItem> queue() {
+    public List<ApprovalModels.QueueItem> queue(String approverId) {
         Instant serverNow = clock.instant();
         proposalExpiry.expireDue(serverNow);
         serverNow = clock.instant();
@@ -258,8 +258,7 @@ class JdbcApprovalService implements ApprovalService {
                         command.leaseToken(),
                         command.leaseVersion());
         if (rows.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN, "current approval lease required");
+            rejectMissingCurrentLease(command.revisionId(), command.approverId());
         }
         ViewRow row = rows.getFirst();
         Instant now = clock.instant();
@@ -451,8 +450,7 @@ class JdbcApprovalService implements ApprovalService {
                         command.leaseToken(),
                         command.leaseVersion());
         if (leases.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN, "current approval lease required");
+            rejectMissingCurrentLease(command.revisionId(), command.approverId());
         }
         LeaseScope lease = leases.getFirst();
         Instant now = clock.instant();
@@ -575,8 +573,7 @@ class JdbcApprovalService implements ApprovalService {
                         command.leaseToken(),
                         command.leaseVersion());
         if (leases.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN, "current approval lease required");
+            rejectMissingCurrentLease(command.revisionId(), command.approverId());
         }
         DecisionLease lease = leases.getFirst();
         requireCurrentLease(
@@ -761,8 +758,7 @@ class JdbcApprovalService implements ApprovalService {
                         command.leaseToken(),
                         command.leaseVersion());
         if (leases.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN, "current approval lease required");
+            rejectMissingCurrentLease(command.revisionId(), command.approverId());
         }
         DecisionLease lease = leases.getFirst();
         requireCurrentLease(
@@ -917,6 +913,27 @@ class JdbcApprovalService implements ApprovalService {
                 revisionId);
     }
 
+    private void rejectMissingCurrentLease(UUID revisionId, String approverId) {
+        Integer proposalCount =
+                jdbc.queryForObject(
+                        "select count(*) from compensation_proposal_revision where id = ?",
+                        Integer.class,
+                        revisionId);
+        Integer approverLeaseCount =
+                jdbc.queryForObject(
+                        "select count(*) from approval_lease where proposal_revision_id = ? and approver_id = ?",
+                        Integer.class,
+                        revisionId,
+                        approverId);
+        if (proposalCount == null
+                || proposalCount == 0
+                || approverLeaseCount == null
+                || approverLeaseCount == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
+        }
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "current approval lease required");
+    }
+
     private void lockAllowance(String orderReference) {
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
@@ -1004,7 +1021,7 @@ class JdbcApprovalService implements ApprovalService {
                 && !scope.proposalExpiresAt().isAfter(scope.serverNow())) {
             proposalExpiry.expireIfDue(scope.revisionId(), scope.serverNow());
             throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN, "current approval lease required");
+                    HttpStatus.CONFLICT, "current approval lease required");
         }
         if (!"PENDING_APPROVAL".equals(scope.proposalStatus())
                 || !"ACTIVE".equals(scope.leaseStatus())
@@ -1018,7 +1035,7 @@ class JdbcApprovalService implements ApprovalService {
                         scope.serverNow());
             }
             throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN, "current approval lease required");
+                    HttpStatus.CONFLICT, "current approval lease required");
         }
     }
 

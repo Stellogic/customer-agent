@@ -6,6 +6,7 @@ import {
   parseViewCursor,
   type SseEvent,
 } from "./streamProtocol";
+import { loadCsrfToken } from "./csrf";
 
 const APPROVAL_SCHEMA = "approval-view-v1" as const;
 
@@ -45,14 +46,13 @@ type ApprovalSnapshot = {
   proposalExpiresAt: string;
 };
 
-export function ApprovalWorkbench({ approverId }: { approverId: string }) {
+export function ApprovalWorkbench() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [snapshot, setSnapshot] = useState<ApprovalSnapshot | null>(null);
   const [status, setStatus] = useState("正在读取待审批队列…");
   const streamController = useRef<AbortController | null>(null);
   const reconnectTimer = useRef<number | null>(null);
   const activeLease = useRef<Lease | null>(null);
-  const headers = { "X-Synthetic-Approver-Id": approverId };
 
   useEffect(() => {
     globalThis.history.replaceState(null, "", "/internal/approvals");
@@ -66,7 +66,6 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
   async function loadQueue() {
     try {
       const response = await fetch("/api/approver/compensation-proposals", {
-        headers,
         credentials: "same-origin",
         cache: "no-store",
       });
@@ -84,11 +83,12 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
     streamController.current?.abort();
     setStatus("正在领取审批责任…");
     try {
+      const csrf = await loadCsrfToken();
       const response = await fetch(`/api/approver/compensation-proposals/${revisionId}/claims`, {
         method: "POST",
         credentials: "same-origin",
         headers: {
-          ...headers,
+          [csrf.headerName]: csrf.token,
           "Content-Type": "application/json",
           "Idempotency-Key": globalThis.crypto.randomUUID(),
         },
@@ -207,6 +207,7 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
             internalReason: "需要人工复核",
           };
     try {
+      const csrf = await loadCsrfToken();
       const response = await fetch(
         `/api/approver/compensation-proposals/${lease.proposalRevisionId}/${decision}`,
         {
@@ -214,6 +215,7 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
           credentials: "same-origin",
           headers: {
             ...leaseHeaders(lease),
+            [csrf.headerName]: csrf.token,
             "Content-Type": "application/json",
             "Idempotency-Key": globalThis.crypto.randomUUID(),
           },
@@ -223,6 +225,33 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
       if (!response.ok) throw new Error("decision rejected");
       revokeLocalAuthority("审批责任已结束，已返回队列。");
       await loadQueue();
+      setStatus("审批责任已结束，已返回队列。");
+    } catch {
+      revokeLocalAuthority("审批责任已失效，证据和操作已移除。");
+    }
+  }
+
+  async function release() {
+    const lease = activeLease.current;
+    if (!lease) return;
+    try {
+      const csrf = await loadCsrfToken();
+      const response = await fetch(
+        `/api/approver/compensation-proposals/${lease.proposalRevisionId}/release`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            ...leaseHeaders(lease),
+            [csrf.headerName]: csrf.token,
+            "Idempotency-Key": globalThis.crypto.randomUUID(),
+          },
+        },
+      );
+      if (!response.ok) throw new Error("release rejected");
+      revokeLocalAuthority("审批责任已释放，已返回队列。");
+      await loadQueue();
+      setStatus("审批责任已释放，已返回队列。");
     } catch {
       revokeLocalAuthority("审批责任已失效，证据和操作已移除。");
     }
@@ -260,6 +289,9 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
             ))}
           </ul>
           <div className="ticket-actions">
+            <button type="button" onClick={() => void release()}>
+              释放审批
+            </button>
             <button type="button" onClick={() => void decide("approve")}>
               批准补偿
             </button>
@@ -294,7 +326,6 @@ export function ApprovalWorkbench({ approverId }: { approverId: string }) {
 
   function leaseHeaders(lease: Lease) {
     return {
-      ...headers,
       "X-Approval-Lease-Token": lease.leaseToken,
       "X-Approval-Lease-Version": String(lease.leaseVersion),
     };

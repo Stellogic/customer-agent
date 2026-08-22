@@ -26,7 +26,6 @@ def login_approver(client: httpx.Client, spring_url: str) -> None:
 def main() -> None:
     spring_url = os.environ["SPRING_INTERNAL_URL"]
     spring_database_uri = os.environ["SPRING_DATABASE_URI"]
-    approver_headers = {"X-Synthetic-Approver-Id": "approver-demo"}
 
     with psycopg.connect(spring_database_uri, autocommit=True) as connection:
         boundary_row = connection.execute(
@@ -50,7 +49,6 @@ def main() -> None:
                 login_approver(client, spring_url)
                 return client.get(
                     f"{spring_url}/api/approver/compensation-proposals",
-                    headers=approver_headers,
                 )
 
         with ThreadPoolExecutor(max_workers=1) as executor:
@@ -93,9 +91,7 @@ def main() -> None:
 
     with httpx.Client(timeout=20.0) as client:
         login_approver(client, spring_url)
-        repeated = client.get(
-            f"{spring_url}/api/approver/compensation-proposals", headers=approver_headers
-        )
+        repeated = client.get(f"{spring_url}/api/approver/compensation-proposals")
     assert repeated.status_code == 200, repeated.text
     repeated_visible = {item["proposalRevisionId"] for item in repeated.json()}
     assert str(PROPOSAL_BOUNDARY_REVISION) not in repeated_visible
