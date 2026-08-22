@@ -119,6 +119,43 @@ class ApprovalCoarseSecurityTest {
     }
 
     @Test
+    void approvalLeaseViewAndReleaseUseThePrincipalDespiteAForgedHeader() throws Exception {
+        when(service.view(org.mockito.ArgumentMatchers.any())).thenReturn(null);
+        when(service.release(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new ApprovalModels.ReleaseResult(MATRIX_REVISION_ID, true, false));
+        MockHttpSession approver = login(mvc, json, "approver-demo");
+
+        mvc.perform(
+                        get(
+                                        "/api/approver/compensation-proposals/{revisionId}/approval-view",
+                                        MATRIX_REVISION_ID)
+                                .session(approver)
+                                .header("X-Synthetic-Approver-Id", "approver-other-demo")
+                                .header("X-Approval-Lease-Token", MATRIX_LEASE_TOKEN)
+                                .header("X-Approval-Lease-Version", "1"))
+                .andExpect(status().isOk());
+
+        MvcResult csrf =
+                mvc.perform(get("/api/auth/csrf").session(approver))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        mvc.perform(
+                        post(
+                                        "/api/approver/compensation-proposals/{revisionId}/release",
+                                        MATRIX_REVISION_ID)
+                                .session(approver)
+                                .header("X-CSRF-TOKEN", token(json, csrf))
+                                .header("X-Synthetic-Approver-Id", "approver-other-demo")
+                                .header("X-Approval-Lease-Token", MATRIX_LEASE_TOKEN)
+                                .header("X-Approval-Lease-Version", "1")
+                                .header("Idempotency-Key", "issue-79-release"))
+                .andExpect(status().isOk());
+
+        verify(service).view(argThat(command -> command.approverId().equals("approver-demo")));
+        verify(service).release(argThat(command -> command.approverId().equals("approver-demo")));
+    }
+
+    @Test
     void everyApprovalApiRejectsAnonymousAndWrongRoleSessionsAtTheCoarseBoundary()
             throws Exception {
         MvcResult anonymousCsrf =

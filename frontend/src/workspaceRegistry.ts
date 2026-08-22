@@ -7,9 +7,14 @@ export const ROUTES = {
   internalLogin: "/internal/login",
 } as const;
 
+const INTERNAL_ROUTE_PATHS = {
+  support: "/internal/support",
+  approvals: "/internal/approvals",
+} as const;
+
 export const LEGACY_ROUTE_REDIRECTS = [
-  { path: "/support", to: "/internal/support", deprecated: true },
-  { path: "/approver", to: "/internal/approvals", deprecated: true },
+  { path: "/support", to: INTERNAL_ROUTE_PATHS.support, deprecated: true },
+  { path: "/approver", to: INTERNAL_ROUTE_PATHS.approvals, deprecated: true },
 ] as const;
 
 export type InternalWorkspace = {
@@ -24,14 +29,14 @@ export const INTERNAL_WORKSPACES = [
   {
     id: "support",
     capability: "SUPPORT_WORKBENCH_ACCESS",
-    path: "/internal/support",
+    path: INTERNAL_ROUTE_PATHS.support,
     menuLabel: "客服工作区",
     cardLabel: "客服工作区 · 调查与响应",
   },
   {
     id: "approvals",
     capability: "APPROVAL_WORKBENCH_ACCESS",
-    path: "/internal/approvals",
+    path: INTERNAL_ROUTE_PATHS.approvals,
     menuLabel: "审批工作区",
     cardLabel: "审批工作区 · 补偿审查",
   },
