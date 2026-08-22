@@ -1,15 +1,16 @@
 package com.stellogic.customeragent.queue;
 
-import com.stellogic.customeragent.identity.SyntheticIdentityController;
 import com.stellogic.customeragent.stream.AuthorizedSsePollingStream;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,7 +19,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RestController
 @RequestMapping("/api/support/workbench")
 public final class SupportWorkbenchController {
-    private static final String SUPPORT_HEADER = "X-Synthetic-Support-Id";
     private final SupportWorkbenchProjectionService service;
 
     SupportWorkbenchController(SupportWorkbenchProjectionService service) {
@@ -26,11 +26,8 @@ public final class SupportWorkbenchController {
     }
 
     @GetMapping("/snapshot")
-    ResponseEntity<SnapshotResponse> snapshot(
-            @RequestHeader(value = SUPPORT_HEADER, required = false) String supportHeader,
-            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false)
-                    String sessionId) {
-        String supportId = resolveSupportId(supportHeader, sessionId);
+    ResponseEntity<SnapshotResponse> snapshot(Authentication authentication) {
+        String supportId = authentication.getName();
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(SnapshotResponse.from(service.snapshot(supportId)));
@@ -38,23 +35,26 @@ public final class SupportWorkbenchController {
 
     @GetMapping("/tickets/{ticketId}")
     ResponseEntity<SupportTicketDetails> details(
-            @RequestHeader(value = SUPPORT_HEADER, required = false) String supportHeader,
-            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false)
-                    String sessionId,
-            @PathVariable UUID ticketId) {
-        String supportId = resolveSupportId(supportHeader, sessionId);
+            Authentication authentication, @PathVariable UUID ticketId) {
+        String supportId = authentication.getName();
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(service.details(supportId, ticketId));
     }
 
+    @PostMapping("/tickets/{ticketId}/claims")
+    ResponseEntity<SupportAssignmentClaim> claim(
+            Authentication authentication, @PathVariable UUID ticketId) {
+        SupportAssignmentClaim claim = service.claim(authentication.getName(), ticketId);
+        return ResponseEntity.status(claim.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
+                .body(claim);
+    }
+
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     SseEmitter events(
-            @RequestHeader(value = SUPPORT_HEADER, required = false) String supportHeader,
-            @CookieValue(value = SyntheticIdentityController.SESSION_COOKIE, required = false)
-                    String sessionId,
+            Authentication authentication,
             @RequestHeader(value = "Last-Event-ID", required = false) String cursor) {
-        String support = resolveSupportId(supportHeader, sessionId);
+        String support = authentication.getName();
         return AuthorizedSsePollingStream.open(
                 "support-workbench-events",
                 250,
@@ -84,13 +84,6 @@ public final class SupportWorkbenchController {
                                 .data(event.publicData());
                     }
                 });
-    }
-
-    private static String resolveSupportId(String supportHeader, String sessionId) {
-        String supportId =
-                supportHeader == null || supportHeader.isBlank() ? sessionId : supportHeader.trim();
-        SupportWorkbenchProjectionService.requireSupport(supportId);
-        return supportId;
     }
 
     record SnapshotResponse(

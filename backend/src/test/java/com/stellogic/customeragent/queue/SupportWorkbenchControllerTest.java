@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -53,9 +54,7 @@ class SupportWorkbenchControllerTest {
                                 List.of(handoff, breach),
                                 List.of(breach)));
 
-        mvc.perform(
-                        get("/api/support/workbench/snapshot")
-                                .header("X-Synthetic-Support-Id", "support-demo"))
+        mvc.perform(get("/api/support/workbench/snapshot").principal(support()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.view").value("SUPPORT_WORKBENCH"))
@@ -72,35 +71,6 @@ class SupportWorkbenchControllerTest {
                 .andExpect(jsonPath("$.sharedQueue[0].customerId").doesNotExist())
                 .andExpect(jsonPath("$.sharedQueue[0].investigationSummary").doesNotExist())
                 .andExpect(jsonPath("$.sharedQueue[0].messages").doesNotExist());
-    }
-
-    @Test
-    void customerAndApproverCannotReadSupportWorkbenchRoutes() throws Exception {
-        mvc.perform(
-                        get("/api/support/workbench/snapshot")
-                                .header("X-Synthetic-Customer-Id", "customer-demo"))
-                .andExpect(status().isForbidden());
-
-        mvc.perform(
-                        get("/api/support/workbench/snapshot")
-                                .header("X-Synthetic-Approver-Id", "approver-demo"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void serverIssuedSupportSessionCanReadWithoutAClientForgedRoleHeader() throws Exception {
-        when(service.snapshot("support-demo"))
-                .thenReturn(
-                        new SupportWorkbenchSnapshot(
-                                "support-workbench-v1", 0, List.of(), List.of()));
-
-        mvc.perform(
-                        get("/api/support/workbench/snapshot")
-                                .cookie(
-                                        new jakarta.servlet.http.Cookie(
-                                                "synthetic-demo-session", "support-demo")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.view").value("SUPPORT_WORKBENCH"));
     }
 
     @Test
@@ -129,7 +99,7 @@ class SupportWorkbenchControllerTest {
 
         mvc.perform(
                         get("/api/support/workbench/events")
-                                .header("X-Synthetic-Support-Id", "support-demo")
+                                .principal(support())
                                 .header("Last-Event-ID", "support-workbench-v1:0"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
@@ -146,7 +116,7 @@ class SupportWorkbenchControllerTest {
 
         mvc.perform(
                         get("/api/support/workbench/events")
-                                .header("X-Synthetic-Support-Id", "support-demo")
+                                .principal(support())
                                 .header("Last-Event-ID", "support-workbench-v0:9"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("SNAPSHOT_REQUIRED"));
@@ -159,7 +129,7 @@ class SupportWorkbenchControllerTest {
 
         mvc.perform(
                         get("/api/support/workbench/tickets/{ticketId}", HANDOFF_TICKET)
-                                .header("X-Synthetic-Support-Id", "support-demo"))
+                                .principal(support()))
                 .andExpect(status().isNotFound())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.code").value("SUPPORT_TICKET_NOT_FOUND"));
@@ -180,5 +150,9 @@ class SupportWorkbenchControllerTest {
                                 + "{\"ticketId\":\""
                                 + HANDOFF_TICKET
                                 + "\"}}");
+    }
+
+    private static UsernamePasswordAuthenticationToken support() {
+        return UsernamePasswordAuthenticationToken.authenticated("support-demo", "n/a", List.of());
     }
 }

@@ -26,9 +26,6 @@ describe("客服共享队列工作台", () => {
         }),
       )
       .mockResolvedValueOnce(
-        Response.json({ id: "support-demo", role: "SUPPORT", label: "客服演示入口" }),
-      )
-      .mockResolvedValueOnce(
         snapshotResponse(
           "support-workbench-v1:7",
           [handoffItem(), breachedItem()],
@@ -49,13 +46,12 @@ describe("客服共享队列工作台", () => {
       screen.queryByText(/CUSTOMER_REQUESTED|AGENT_HUMAN_HANDOFF|调查摘要/),
     ).not.toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe("/api/auth/session");
-    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe("/api/demo/session");
-    expect(vi.mocked(globalThis.fetch).mock.calls[2]?.[0]).toBe("/api/support/workbench/snapshot");
+    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe("/api/support/workbench/snapshot");
     expect(
-      new Headers(vi.mocked(globalThis.fetch).mock.calls[2]?.[1]?.headers).get(
+      new Headers(vi.mocked(globalThis.fetch).mock.calls[1]?.[1]?.headers).get(
         "X-Synthetic-Support-Id",
       ),
-    ).toBe("support-demo");
+    ).toBeNull();
   });
 
   it("客户或审批人直接访问客服 URL 不会被自动提升为客服", async () => {
@@ -80,6 +76,53 @@ describe("客服共享队列工作台", () => {
     );
   });
 
+  it("领取写操作携带当前 CSRF 且成功后只读取已分配工单详情", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === "/api/support/workbench/snapshot") {
+        return snapshotResponse("support-workbench-v1:1", [handoffItem()], []);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/claims`) {
+        expect(init?.method).toBe("POST");
+        expect(new Headers(init?.headers).get("X-CSRF-TOKEN")).toBe("support-csrf");
+        expect(new Headers(init?.headers).get("X-Synthetic-Support-Id")).toBeNull();
+        return Response.json(
+          { ticketId: HANDOFF_TICKET, supportId: "support-demo", replayed: false },
+          { status: 201 },
+        );
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json({
+          ticketId: HANDOFF_TICKET,
+          customerId: "customer-demo",
+          orderReference: "ORDER-DELAY-001",
+          description: "物流延迟",
+          lifecycleState: "WAITING_FOR_CUSTOMER",
+          handlingMode: "HUMAN",
+          publicConversation: [],
+          investigationFacts: [],
+          businessTimeline: [],
+        });
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+
+    fireEvent.click(await screen.findByRole("button", { name: `领取工单 ${HANDOFF_TICKET}` }));
+
+    expect(await screen.findByRole("heading", { name: "当前工单详情" })).toBeInTheDocument();
+    expect(screen.getByText("ORDER-DELAY-001")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/support/workbench/tickets/${HANDOFF_TICKET}`,
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
+
   it("序号缺口停止旧流并整体替换为新快照", async () => {
     let resolveRecovery: ((response: Response) => void) | undefined;
     vi.spyOn(globalThis, "fetch")
@@ -99,7 +142,7 @@ describe("客服共享队列工作台", () => {
       )
       .mockResolvedValueOnce(openStream());
 
-    render(<SupportWorkbench supportId="support-demo" />);
+    render(<SupportWorkbench />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("当前队列可能过期");
     resolveRecovery?.(
@@ -138,7 +181,7 @@ describe("客服共享队列工作台", () => {
       )
       .mockResolvedValueOnce(openStream());
 
-    render(<SupportWorkbench supportId="support-demo" />);
+    render(<SupportWorkbench />);
 
     expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
     expect(screen.queryByText("不得进入浏览器事件")).not.toBeInTheDocument();
@@ -158,7 +201,7 @@ describe("客服共享队列工作台", () => {
       )
       .mockResolvedValueOnce(openStream());
 
-    render(<SupportWorkbench supportId="support-demo" />);
+    render(<SupportWorkbench />);
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("可能过期");
@@ -177,7 +220,7 @@ describe("客服共享队列工作台", () => {
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:1", [handoffItem()], []))
       .mockResolvedValueOnce(openStream());
 
-    render(<SupportWorkbench supportId="support-demo" />);
+    render(<SupportWorkbench />);
 
     expect(await screen.findByRole("main", { name: "客服工作台" })).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "待接手工单" })).toBeInTheDocument();

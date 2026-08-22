@@ -30,6 +30,8 @@ record SupportWorkbenchSnapshot(
         List<SupportQueueItem> sharedQueue,
         List<SupportQueueItem> escalationQueue) {}
 
+record SupportAssignmentClaim(UUID ticketId, String supportId, boolean replayed) {}
+
 record SupportWorkbenchEvent(String epoch, long sequence, String type, String jsonPayload) {
     String cursor() {
         return epoch + ":" + sequence;

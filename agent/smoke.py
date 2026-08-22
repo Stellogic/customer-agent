@@ -63,6 +63,27 @@ def login_customer(client: httpx.Client, spring_url: str) -> tuple[str, str]:
     return current_token["headerName"], current_token["token"]
 
 
+def login_support(client: httpx.Client, spring_url: str) -> tuple[str, str]:
+    anonymous_csrf = client.get(f"{spring_url}/api/auth/csrf")
+    expect_status(anonymous_csrf, 200)
+    anonymous_token = anonymous_csrf.json()
+    login = client.post(
+        f"{spring_url}/api/auth/login",
+        headers={anonymous_token["headerName"]: anonymous_token["token"]},
+        data={"username": "support-demo", "password": "local-demo-password"},
+    )
+    expect_status(login, 204)
+    current_csrf = client.get(f"{spring_url}/api/auth/csrf")
+    expect_status(current_csrf, 200)
+    current_token = current_csrf.json()
+    client.headers[current_token["headerName"]] = current_token["token"]
+    session = client.get(f"{spring_url}/api/auth/session")
+    expect_status(session, 200)
+    assert session.json()["id"] == "support-demo"
+    assert session.json()["capabilities"] == ["SUPPORT_WORKBENCH_ACCESS"]
+    return current_token["headerName"], current_token["token"]
+
+
 @cache
 def customer_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
     with httpx.Client(timeout=20.0) as client:
@@ -72,13 +93,25 @@ def customer_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
         return csrf_header, ("Cookie", f"JSESSIONID={session_id}")
 
 
+@cache
+def support_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
+    with httpx.Client(timeout=20.0) as client:
+        csrf_header = login_support(client, spring_url)
+        session_id = client.cookies.get("JSESSIONID")
+        assert session_id is not None
+        return csrf_header, ("Cookie", f"JSESSIONID={session_id}")
+
+
 @contextmanager
 def customer_browser_client(spring_url: str) -> Iterator[httpx.Client]:
-    scoped_headers = dict(customer_session_headers(spring_url))
+    customer_headers = dict(customer_session_headers(spring_url))
+    support_headers = dict(support_session_headers(spring_url))
 
     def authorize_customer_request(request: httpx.Request) -> None:
         if request.url.path.startswith("/api/customer/"):
-            request.headers.update(scoped_headers)
+            request.headers.update(customer_headers)
+        if request.url.path.startswith("/api/support/"):
+            request.headers.update(support_headers)
 
     with httpx.Client(
         timeout=20.0,
@@ -101,6 +134,7 @@ def main() -> None:
     executor_headers = {"Authorization": f"Bearer {os.environ['EXECUTOR_MACHINE_TOKEN']}"}
 
     customer_session_headers(spring_url)
+    support_session_headers(spring_url)
 
     with httpx.Client(timeout=20.0) as client:
         thread_response = client.post(f"{agent_url}/threads", headers=spring_headers, json={})
@@ -3344,17 +3378,6 @@ def main() -> None:
         assert workbench_before_handoff["view"] == "SUPPORT_WORKBENCH"
         assert workbench_before_handoff["schema"] == "support-workbench-v1"
         workbench_cursor = workbench_before_handoff["cursor"]
-        direct_support_session = client.get(f"{spring_url}/api/demo/session")
-        expect_status(direct_support_session, 401)
-        support_entry = client.get(f"{spring_url}/api/demo/enter/support", follow_redirects=False)
-        expect_status(support_entry, 302)
-        assert support_entry.headers["location"] == "/support"
-        assert "HttpOnly" in support_entry.headers["set-cookie"]
-        registered_support_session = client.get(f"{spring_url}/api/demo/session")
-        expect_status(registered_support_session, 200)
-        assert registered_support_session.json()["role"] == "SUPPORT"
-        cookie_authorized_snapshot = client.get(f"{spring_url}/api/support/workbench/snapshot")
-        expect_status(cookie_authorized_snapshot, 200)
         sla_handoff_request_id = f"sla-handoff-{uuid.uuid4()}"
         sla_handoff = client.post(
             f"{spring_url}/api/customer/tickets/{ticket_id}/human-handoff",
@@ -3438,7 +3461,7 @@ def main() -> None:
         assert any('"view":"SUPPORT_WORKBENCH"' in part for part in replay_lines)
         assigned_detail = client.get(
             f"{spring_url}/api/support/workbench/tickets/{ticket_id}",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
+            headers={"X-Synthetic-Support-Id": "internal-demo"},
         )
         expect_status(assigned_detail, 200)
         assert assigned_detail.headers["cache-control"] == "no-store"
@@ -3446,17 +3469,18 @@ def main() -> None:
         assert "publicConversation" in assigned_detail.json()
         assert "investigationFacts" in assigned_detail.json()
         assert "businessTimeline" in assigned_detail.json()
-        denied_queue = client.get(
-            f"{spring_url}/api/support/escalations",
-            headers={"X-Synthetic-Support-Id": "customer-demo"},
-        )
-        expect_status(denied_queue, 403)
+        with isolated_customer_browser_client(spring_url) as customer_client:
+            denied_queue = customer_client.get(
+                f"{spring_url}/api/support/escalations",
+                headers={"X-Synthetic-Support-Id": "support-demo"},
+            )
+            expect_status(denied_queue, 403)
         denied_workbench = httpx.get(
             f"{spring_url}/api/support/workbench/snapshot",
             headers={"X-Synthetic-Approver-Id": "approver-demo"},
             timeout=20.0,
         )
-        expect_status(denied_workbench, 403)
+        expect_status(denied_workbench, 401)
         unassigned_workbench_detail = client.get(
             f"{spring_url}/api/support/workbench/tickets/{first_warning_ticket_id}",
             headers={"X-Synthetic-Support-Id": "support-demo"},
@@ -3468,6 +3492,62 @@ def main() -> None:
             headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(unassigned_detail, 404)
+
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            connection.execute(
+                "insert into shared_support_queue_entry (ticket_id, reason_code, entered_at) "
+                "values (%s, 'SLA_BREACH', clock_timestamp())",
+                (first_warning_ticket_id,),
+            )
+
+        support_headers = dict(support_session_headers(spring_url))
+        support_cookie = {"Cookie": support_headers["Cookie"]}
+        missing_csrf_claim = httpx.post(
+            f"{spring_url}/api/support/workbench/tickets/{first_warning_ticket_id}/claims",
+            headers=support_cookie,
+            timeout=20.0,
+        )
+        expect_status(missing_csrf_claim, 403)
+        forged_claim = client.post(
+            f"{spring_url}/api/support/workbench/tickets/{first_warning_ticket_id}/claims",
+            headers={"X-Synthetic-Support-Id": "internal-demo"},
+        )
+        expect_status(forged_claim, 201)
+        assert forged_claim.json() == {
+            "ticketId": str(first_warning_ticket_id),
+            "supportId": "support-demo",
+            "replayed": False,
+        }
+        replayed_claim = client.post(
+            f"{spring_url}/api/support/workbench/tickets/{first_warning_ticket_id}/claims"
+        )
+        expect_status(replayed_claim, 200)
+        assert replayed_claim.json()["replayed"] is True
+        assigned_after_claim = client.get(
+            f"{spring_url}/api/support/workbench/tickets/{first_warning_ticket_id}"
+        )
+        expect_status(assigned_after_claim, 200)
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            assignment = connection.execute(
+                "select support_id, status from support_assignment "
+                "where ticket_id = %s order by assigned_at desc limit 1",
+                (first_warning_ticket_id,),
+            ).fetchone()
+            queued_after_claim = connection.execute(
+                "select count(*) from shared_support_queue_entry where ticket_id = %s",
+                (first_warning_ticket_id,),
+            ).fetchone()
+            assert assignment == ("support-demo", "ACTIVE")
+            assert queued_after_claim == (0,)
+            connection.execute(
+                "update support_assignment set status = 'REVOKED', revoked_at = clock_timestamp() "
+                "where ticket_id = %s and status = 'ACTIVE'",
+                (first_warning_ticket_id,),
+            )
+        revoked_detail = client.get(
+            f"{spring_url}/api/support/workbench/tickets/{first_warning_ticket_id}"
+        )
+        expect_status(revoked_detail, 404)
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         removal_ticket_id = first_warning_ticket_id

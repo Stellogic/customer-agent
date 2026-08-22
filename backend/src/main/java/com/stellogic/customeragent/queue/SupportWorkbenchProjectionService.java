@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.queue;
 
+import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -10,16 +11,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 class SupportWorkbenchProjectionService {
     static final String EPOCH = "support-workbench-v1";
-    private static final String SUPPORT_ID = "support-demo";
     private final JdbcTemplate jdbc;
+    private final TicketAuthorityLock ticketLock;
 
-    SupportWorkbenchProjectionService(JdbcTemplate jdbc) {
+    SupportWorkbenchProjectionService(JdbcTemplate jdbc, TicketAuthorityLock ticketLock) {
         this.jdbc = jdbc;
+        this.ticketLock = ticketLock;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     SupportWorkbenchSnapshot snapshot(String supportId) {
-        requireSupport(supportId);
+        requireSupportPrincipal(supportId);
         List<SupportQueueItem> shared = queueItems("");
         List<SupportQueueItem> escalations = queueItems("where q.reason_code = 'SLA_BREACH' ");
         Long sequence =
@@ -56,7 +58,7 @@ class SupportWorkbenchProjectionService {
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     SupportTicketDetails details(String supportId, UUID ticketId) {
-        requireSupport(supportId);
+        requireSupportPrincipal(supportId);
         List<SupportTicketDetails> tickets =
                 jdbc.query(
                         "select t.id, t.customer_id, t.order_reference, t.description, t.lifecycle_state, t.handling_mode "
@@ -119,6 +121,39 @@ class SupportWorkbenchProjectionService {
                 timeline);
     }
 
+    @Transactional
+    SupportAssignmentClaim claim(String supportId, UUID ticketId) {
+        requireSupportPrincipal(supportId);
+        ticketLock.acquire(ticketId);
+        List<String> activeAssignees =
+                jdbc.queryForList(
+                        "select support_id from support_assignment where ticket_id = ? and status = 'ACTIVE'",
+                        String.class,
+                        ticketId);
+        if (!activeAssignees.isEmpty()) {
+            if (supportId.equals(activeAssignees.getFirst())) {
+                return new SupportAssignmentClaim(ticketId, supportId, true);
+            }
+            throw new SupportTicketNotFoundException();
+        }
+        Integer queued =
+                jdbc.queryForObject(
+                        "select count(*) from shared_support_queue_entry where ticket_id = ?",
+                        Integer.class,
+                        ticketId);
+        if (queued == null || queued == 0) {
+            throw new SupportTicketNotFoundException();
+        }
+        jdbc.update(
+                "insert into support_assignment (id, ticket_id, support_id, status, assigned_at) "
+                        + "values (?, ?, ?, 'ACTIVE', clock_timestamp())",
+                UUID.randomUUID(),
+                ticketId,
+                supportId);
+        jdbc.update("delete from shared_support_queue_entry where ticket_id = ?", ticketId);
+        return new SupportAssignmentClaim(ticketId, supportId, false);
+    }
+
     private List<SupportQueueItem> queueItems(String predicate) {
         return jdbc.query(
                 "select q.ticket_id, t.lifecycle_state, t.handling_mode, min(q.entered_at) "
@@ -147,8 +182,8 @@ class SupportWorkbenchProjectionService {
         }
     }
 
-    static void requireSupport(String supportId) {
-        if (!SUPPORT_ID.equals(supportId == null ? null : supportId.trim())) {
+    private static void requireSupportPrincipal(String supportId) {
+        if (supportId == null || supportId.isBlank()) {
             throw new SupportIdentityRequiredException();
         }
     }

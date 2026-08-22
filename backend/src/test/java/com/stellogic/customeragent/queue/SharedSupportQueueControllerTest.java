@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -31,7 +32,7 @@ class SharedSupportQueueControllerTest {
                                         List.of("CUSTOMER_REQUESTED_HANDOFF"),
                                         Instant.parse("2026-08-09T14:00:00Z"))));
 
-        mvc.perform(get("/api/support/queue").header("X-Synthetic-Support-Id", "support-demo"))
+        mvc.perform(get("/api/support/queue").principal(support()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].ticketId").value(TICKET_ID.toString()))
                 .andExpect(jsonPath("$[0].lifecycleState").value("WAITING_FOR_CUSTOMER"))
@@ -42,9 +43,7 @@ class SharedSupportQueueControllerTest {
                 .andExpect(jsonPath("$[0].messages").doesNotExist());
     }
 
-    @Test
-    void customerCannotReadTheSharedSupportQueue() throws Exception {
-        mvc.perform(get("/api/support/queue").header("X-Synthetic-Support-Id", "customer-demo"))
-                .andExpect(status().isForbidden());
+    private static UsernamePasswordAuthenticationToken support() {
+        return UsernamePasswordAuthenticationToken.authenticated("support-demo", "n/a", List.of());
     }
 }
