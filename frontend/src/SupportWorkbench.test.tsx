@@ -18,12 +18,15 @@ describe("客服共享队列工作台", () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
         Response.json({
-          id: "support-demo",
+          id: "session-support-person",
           displayName: "演示客服",
           subjectType: "INTERNAL",
           roles: ["SUPPORT"],
           capabilities: ["SUPPORT_WORKBENCH_ACCESS"],
         }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ id: "support-demo", role: "SUPPORT", label: "客服演示入口" }),
       )
       .mockResolvedValueOnce(
         snapshotResponse(
@@ -46,7 +49,13 @@ describe("客服共享队列工作台", () => {
       screen.queryByText(/CUSTOMER_REQUESTED|AGENT_HUMAN_HANDOFF|调查摘要/),
     ).not.toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe("/api/auth/session");
-    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe("/api/support/workbench/snapshot");
+    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe("/api/demo/session");
+    expect(vi.mocked(globalThis.fetch).mock.calls[2]?.[0]).toBe("/api/support/workbench/snapshot");
+    expect(
+      new Headers(vi.mocked(globalThis.fetch).mock.calls[2]?.[1]?.headers).get(
+        "X-Synthetic-Support-Id",
+      ),
+    ).toBe("support-demo");
   });
 
   it("客户或审批人直接访问客服 URL 不会被自动提升为客服", async () => {

@@ -1,20 +1,12 @@
-export type HumanRole = "CUSTOMER" | "SUPPORT" | "APPROVER";
-export type HumanCapability =
-  "CUSTOMER_HELP_ACCESS" | "SUPPORT_WORKBENCH_ACCESS" | "APPROVAL_WORKBENCH_ACCESS";
+import type { CurrentSession, HumanCapability } from "./authContract";
+import { INTERNAL_WORKSPACES, ROUTES } from "./workspaceRegistry";
 
-export type CurrentSession = {
-  id: string;
-  displayName: string;
-  subjectType: "CUSTOMER" | "INTERNAL";
-  roles: HumanRole[];
-  capabilities: HumanCapability[];
-};
+export type { CurrentSession, HumanCapability } from "./authContract";
 
-const RETURNABLE_PATHS = new Set([
-  "/help",
-  "/internal",
-  "/internal/support",
-  "/internal/approvals",
+const RETURNABLE_PATHS = new Set<string>([
+  ROUTES.customerHome,
+  ROUTES.internalHome,
+  ...INTERNAL_WORKSPACES.map((workspace) => workspace.path),
 ]);
 
 export function hasCapability(session: CurrentSession, capability: HumanCapability) {
@@ -22,17 +14,15 @@ export function hasCapability(session: CurrentSession, capability: HumanCapabili
 }
 
 export function defaultPathFor(session: CurrentSession) {
-  if (session.subjectType === "CUSTOMER") return "/help";
-  const support = hasCapability(session, "SUPPORT_WORKBENCH_ACCESS");
-  const approval = hasCapability(session, "APPROVAL_WORKBENCH_ACCESS");
-  if (support && approval) return "/internal";
-  if (support) return "/internal/support";
-  if (approval) return "/internal/approvals";
-  return "/internal";
+  if (session.subjectType === "CUSTOMER") return ROUTES.customerHome;
+  const available = INTERNAL_WORKSPACES.filter((workspace) =>
+    hasCapability(session, workspace.capability),
+  );
+  return available.length === 1 ? available[0].path : ROUTES.internalHome;
 }
 
 export function loginPathFor(pathname: string) {
-  return pathname.startsWith("/internal") ? "/internal/login" : "/help/login";
+  return pathname.startsWith(ROUTES.internalHome) ? ROUTES.internalLogin : ROUTES.customerLogin;
 }
 
 export function safeReturnTo(value: string | null) {

@@ -1,7 +1,16 @@
 import { ApprovalWorkbench } from "../ApprovalWorkbench";
-import { CurrentSessionContext } from "../session";
+import { LegacyBusinessIdentity } from "./LegacyBusinessIdentity";
+
+const APPROVER_IDS = ["approver-demo", "approver-other-demo"] as const;
 
 export default function ApprovalWorkspace() {
-  const session = CurrentSessionContext.use();
-  return <ApprovalWorkbench approverId={session.id} />;
+  return (
+    <LegacyBusinessIdentity
+      role="APPROVER"
+      allowedIds={APPROVER_IDS}
+      deniedTitle="无权访问审批工作台"
+    >
+      {(approverId) => <ApprovalWorkbench approverId={approverId} />}
+    </LegacyBusinessIdentity>
+  );
 }

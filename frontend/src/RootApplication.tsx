@@ -18,6 +18,7 @@ import {
   type HumanCapability,
 } from "./routePolicy";
 import { CurrentSessionContext, loadOptionalCurrentSession } from "./session";
+import { INTERNAL_WORKSPACES, ROUTES, internalWorkspace } from "./workspaceRegistry";
 
 const CustomerShell = lazy(() => import("./shells/CustomerShell"));
 const InternalShell = lazy(() => import("./shells/InternalShell"));
@@ -25,20 +26,27 @@ const CustomerWorkspace = lazy(() => import("./workspaces/CustomerWorkspace"));
 const InternalLanding = lazy(() => import("./workspaces/InternalLanding"));
 const SupportWorkspace = lazy(() => import("./workspaces/SupportWorkspace"));
 const ApprovalWorkspace = lazy(() => import("./workspaces/ApprovalWorkspace"));
+const INTERNAL_WORKSPACE_COMPONENTS = {
+  support: SupportWorkspace,
+  approvals: ApprovalWorkspace,
+} as const;
 
 export function RootApplication() {
   return (
     <BrowserRouter>
       <Suspense fallback={<RouteLoading />}>
         <Routes>
-          <Route path="/help/login" element={<LoginRoute audience="customer" />} />
-          <Route path="/internal/login" element={<LoginRoute audience="internal" />} />
-          <Route path="/support" element={<LegacyRoute to="/internal/support" />} />
-          <Route path="/approver" element={<LegacyRoute to="/internal/approvals" />} />
+          <Route path={ROUTES.customerLogin} element={<LoginRoute audience="customer" />} />
+          <Route path={ROUTES.internalLogin} element={<LoginRoute audience="internal" />} />
+          <Route path="/support" element={<LegacyRoute to={internalWorkspace("support").path} />} />
+          <Route
+            path="/approver"
+            element={<LegacyRoute to={internalWorkspace("approvals").path} />}
+          />
           <Route element={<SessionGate />}>
             <Route index element={<DefaultLanding />} />
             <Route
-              path="/help"
+              path={ROUTES.customerHome}
               element={
                 <CustomerBoundary>
                   <CapabilityBoundary capability="CUSTOMER_HELP_ACCESS">
@@ -50,7 +58,7 @@ export function RootApplication() {
               <Route index element={<CustomerWorkspace />} />
             </Route>
             <Route
-              path="/internal"
+              path={ROUTES.internalHome}
               element={
                 <InternalBoundary>
                   <InternalShell />
@@ -58,22 +66,20 @@ export function RootApplication() {
               }
             >
               <Route index element={<InternalLanding />} />
-              <Route
-                path="support"
-                element={
-                  <CapabilityBoundary capability="SUPPORT_WORKBENCH_ACCESS">
-                    <SupportWorkspace />
-                  </CapabilityBoundary>
-                }
-              />
-              <Route
-                path="approvals"
-                element={
-                  <CapabilityBoundary capability="APPROVAL_WORKBENCH_ACCESS">
-                    <ApprovalWorkspace />
-                  </CapabilityBoundary>
-                }
-              />
+              {INTERNAL_WORKSPACES.map((workspace) => {
+                const Workspace = INTERNAL_WORKSPACE_COMPONENTS[workspace.id];
+                return (
+                  <Route
+                    key={workspace.id}
+                    path={workspace.id}
+                    element={
+                      <CapabilityBoundary capability={workspace.capability}>
+                        <Workspace />
+                      </CapabilityBoundary>
+                    }
+                  />
+                );
+              })}
             </Route>
           </Route>
           <Route path="*" element={<NotFound />} />

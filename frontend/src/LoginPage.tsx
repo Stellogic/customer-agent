@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import type { CurrentSession } from "./routePolicy";
+import type { CurrentSession } from "./authContract";
 import { loadCurrentSession, loadOptionalCurrentSession } from "./session";
 
 type LoginAudience = "customer" | "internal";

@@ -1,5 +1,5 @@
 import { createContext, use } from "react";
-import type { CurrentSession } from "./routePolicy";
+import type { CurrentSession } from "./authContract";
 
 const SessionContext = createContext<CurrentSession | null>(null);
 

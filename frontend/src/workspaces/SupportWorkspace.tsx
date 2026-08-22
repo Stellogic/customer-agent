@@ -1,7 +1,16 @@
 import { SupportWorkbench } from "../SupportWorkbench";
-import { CurrentSessionContext } from "../session";
+import { LegacyBusinessIdentity } from "./LegacyBusinessIdentity";
+
+const SUPPORT_IDS = ["support-demo"] as const;
 
 export default function SupportWorkspace() {
-  const session = CurrentSessionContext.use();
-  return <SupportWorkbench supportId={session.id} />;
+  return (
+    <LegacyBusinessIdentity
+      role="SUPPORT"
+      allowedIds={SUPPORT_IDS}
+      deniedTitle="无权访问客服工作台"
+    >
+      {(supportId) => <SupportWorkbench supportId={supportId} />}
+    </LegacyBusinessIdentity>
+  );
 }

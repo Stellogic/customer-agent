@@ -75,6 +75,24 @@ describe("Issue #73 静态路由与两个界面壳", () => {
     expect(screen.queryByRole("navigation", { name: "内部工作区" })).not.toBeInTheDocument();
   });
 
+  it.each([
+    [support, ["客服工作区"], ["审批工作区"]],
+    [approver, ["审批工作区"], ["客服工作区"]],
+    [dualRole, ["客服工作区", "审批工作区"], []],
+  ])("内部菜单只投影 %s 当前拥有的 capability", async (session, visibleLabels, hiddenLabels) => {
+    mockSession(session);
+
+    render(<RootApplication />);
+
+    const navigation = await screen.findByRole("navigation", { name: "内部工作区" });
+    for (const label of visibleLabels) {
+      expect(within(navigation).getByRole("link", { name: label })).toBeInTheDocument();
+    }
+    for (const label of hiddenLabels) {
+      expect(within(navigation).queryByRole("link", { name: label })).not.toBeInTheDocument();
+    }
+  });
+
   it("双角色内部默认页只展示两个 capability 入口且不预读业务数据", async () => {
     globalThis.history.replaceState(null, "", "/internal");
     const fetchMock = mockSession(dualRole);
@@ -165,6 +183,16 @@ function mockSession(session: Session) {
     }
     if (path === "/api/approver/compensation-proposals") {
       return new Response(JSON.stringify([]), { status: 200 });
+    }
+    if (path === "/api/demo/session") {
+      if (session.capabilities.includes("SUPPORT_WORKBENCH_ACCESS")) {
+        return Response.json({ id: "support-demo", role: "SUPPORT", label: "客服演示入口" });
+      }
+      return Response.json({
+        id: "approver-demo",
+        role: "APPROVER",
+        label: "审批演示入口",
+      });
     }
     return new Response(null, { status: 503 });
   });

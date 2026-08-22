@@ -16,21 +16,23 @@
 
 该组合已通过真实安装、TypeScript 类型检查、Vitest 行为测试与 Vite 生产构建。内部 Shell 使用 Ant Design `Layout`/`Menu`，轻量工作区选择页实际使用 Pro Components `ProCard`；没有引入 Umi Max、Ant Design Pro 应用框架、react-admin 或 refine。
 
+依赖证据、许可证、bundle/运维成本、锁定风险及被拒方案已记录在 [ADR 0002](../decisions/0002-static-react-shell-stack.md)。
+
 ## 路由与分包证据
 
 生产构建为三个业务区域生成独立入口 chunk：
 
 - `CustomerWorkspace`：11.83 kB（gzip 4.17 kB）
-- `SupportWorkspace`：6.79 kB（gzip 2.87 kB）
-- `ApprovalWorkspace`：7.60 kB（gzip 2.74 kB）
+- `SupportWorkspace`：6.91 kB（gzip 2.93 kB）
+- `ApprovalWorkspace`：7.75 kB（gzip 2.81 kB）
 
-同时生成独立 `CustomerShell`、`InternalShell` 与 `InternalLanding` chunk。初始 `index` chunk 为 230.74 kB（gzip 74.04 kB）；对该文件搜索“物流遇到问题”“客服共享队列”“待审批队列”均无命中，表明三类业务模块未同步进入初始 chunk。分包只用于性能，不作为授权或数据隔离边界。
+同时生成独立 `CustomerShell`、`InternalShell` 与 `InternalLanding` chunk。初始 `index` chunk 为 231.21 kB（gzip 74.29 kB）；对该文件搜索“物流遇到问题”“客服共享队列”“待审批队列”均无命中，表明三类业务模块未同步进入初始 chunk。分包只用于性能，不作为授权或数据隔离边界。
 
 ## 规范化验证
 
 从仓库根目录原样执行 `pwsh ./scripts/check.ps1`。受限沙箱首次运行因无法读取用户 Docker 配置和 named pipe（`Access denied`）失败；在宿主上下文以完全相同命令重跑后退出码为 0：
 
-- 前端容器使用规定的 Node `v24.19.0` 完成 `npm ci`、格式、lint、类型检查、48 个单元/行为测试与生产构建。
+- 前端容器使用规定的 Node `v24.19.0` 完成 `npm ci`、格式、lint、类型检查、51 个单元/行为测试与生产构建。
 - 两条 Issue #29 React 全栈验收（normal、reconciliation）均通过。
 - 真实 Spring、PostgreSQL、Agent、补偿执行器与 SSE smoke 通过，最终 `FULL_RESET_GATE` 报告 Spring、database、agent 均为 `UP`。
 - 产品运行日志敏感内容扫描通过。
