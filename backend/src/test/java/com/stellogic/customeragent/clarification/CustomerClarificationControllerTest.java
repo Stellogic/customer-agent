@@ -1,15 +1,19 @@
 package com.stellogic.customeragent.clarification;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -33,7 +37,8 @@ class CustomerClarificationControllerTest {
                                         "/api/customer/tickets/{ticketId}/clarifications/{requestId}/replies",
                                         TICKET_ID,
                                         REQUEST_ID)
-                                .header("X-Synthetic-Customer-Id", "customer-demo")
+                                .principal(customer())
+                                .header("X-Synthetic-Customer-Id", "customer-other-demo")
                                 .header("Idempotency-Key", "message-16")
                                 .header("X-Resume-Request-Id", RESUME_ID)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -42,6 +47,8 @@ class CustomerClarificationControllerTest {
                 .andExpect(jsonPath("$.resumeRequestId").value(RESUME_ID.toString()))
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.replayed").value(false));
+
+        verify(service).reply(argThat(command -> command.customerId().equals("customer-demo")));
     }
 
     @Test
@@ -55,8 +62,13 @@ class CustomerClarificationControllerTest {
                                         "/api/customer/tickets/{ticketId}/clarification-resumes/{resumeId}",
                                         TICKET_ID,
                                         RESUME_ID)
-                                .header("X-Synthetic-Customer-Id", "customer-demo"))
+                                .principal(customer())
+                                .header("X-Synthetic-Customer-Id", "customer-other-demo"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUBMITTED"));
+    }
+
+    private UsernamePasswordAuthenticationToken customer() {
+        return UsernamePasswordAuthenticationToken.authenticated("customer-demo", "n/a", List.of());
     }
 }

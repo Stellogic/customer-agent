@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { App } from "./App";
+import { createCookieBrowserFetch } from "./liveBrowserTestClient";
+import { RootApplication } from "./RootApplication";
 import { SupportWorkbench } from "./SupportWorkbench";
 
 const liveBaseUrl = import.meta.env.VITE_SMOKE_BASE_URL as string | undefined;
@@ -15,14 +16,23 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
   });
 
   it("跨 React 表单、Spring API、迁移后的 PostgreSQL 与客户授权恢复公开受理结果", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
-      const path =
-        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      return nativeFetch(new URL(path, liveBaseUrl), init);
+    const browserFetch = createCookieBrowserFetch(nativeFetch, liveBaseUrl ?? "");
+    vi.spyOn(globalThis, "fetch").mockImplementation(browserFetch);
+    globalThis.history.replaceState(null, "", "/help/login");
+
+    const firstRender = render(<RootApplication />);
+    expect(await screen.findByRole("heading", { name: "客户登录" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("用户名"), { target: { value: "customer-demo" } });
+    fireEvent.change(screen.getByLabelText("密码"), {
+      target: { value: "local-demo-password" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "登录" }));
+
+    expect(await screen.findByRole("banner", { name: "客户帮助中心" })).toBeInTheDocument();
+    expect(globalThis.location.pathname).toBe("/help");
+    expect(screen.queryByRole("navigation", { name: "内部工作区" })).not.toBeInTheDocument();
 
     const description = `React 全栈验收 ${globalThis.crypto.randomUUID()}`;
-    const firstRender = render(<App />);
     fireEvent.change(screen.getByLabelText("订单编号"), { target: { value: "ORDER-DELAY-001" } });
     fireEvent.change(screen.getByLabelText("问题描述"), { target: { value: description } });
     fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
@@ -33,7 +43,8 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
     expect(restoredUrl).toContain("?ticket=");
 
     firstRender.unmount();
-    render(<App />);
+    render(<RootApplication />);
+    expect(await screen.findByRole("banner", { name: "客户帮助中心" })).toBeInTheDocument();
     expect(await screen.findByText(description)).toBeInTheDocument();
   });
 

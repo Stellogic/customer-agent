@@ -1,15 +1,19 @@
 package com.stellogic.customeragent.handoff;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -26,7 +30,8 @@ class CustomerHumanHandoffControllerTest {
 
         mvc.perform(
                         post("/api/customer/tickets/{ticketId}/human-handoff", TICKET_ID)
-                                .header("X-Synthetic-Customer-Id", "customer-demo")
+                                .principal(customer())
+                                .header("X-Synthetic-Customer-Id", "customer-other-demo")
                                 .header("Idempotency-Key", "handoff-18")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"reasonCode\":\"CUSTOMER_REQUESTED\"}"))
@@ -35,6 +40,8 @@ class CustomerHumanHandoffControllerTest {
                 .andExpect(jsonPath("$.handlingMode").value("HUMAN"))
                 .andExpect(jsonPath("$.replayed").value(false))
                 .andExpect(jsonPath("$.internalReason").doesNotExist());
+
+        verify(service).request(argThat(command -> command.customerId().equals("customer-demo")));
     }
 
     @Test
@@ -47,9 +54,14 @@ class CustomerHumanHandoffControllerTest {
                                         "/api/customer/tickets/{ticketId}/human-handoff-requests/{requestId}",
                                         TICKET_ID,
                                         "handoff-18")
-                                .header("X-Synthetic-Customer-Id", "customer-demo"))
+                                .principal(customer())
+                                .header("X-Synthetic-Customer-Id", "customer-other-demo"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.handlingMode").value("HUMAN"))
                 .andExpect(jsonPath("$.replayed").value(true));
+    }
+
+    private UsernamePasswordAuthenticationToken customer() {
+        return UsernamePasswordAuthenticationToken.authenticated("customer-demo", "n/a", List.of());
     }
 }

@@ -1,9 +1,9 @@
 package com.stellogic.customeragent.handoff;
 
-import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,8 +16,6 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/customer/tickets/{ticketId}")
 public final class CustomerHumanHandoffController {
-    private static final Set<String> SYNTHETIC_CUSTOMERS =
-            Set.of("customer-demo", "customer-other-demo");
     private final HumanHandoffService service;
 
     CustomerHumanHandoffController(HumanHandoffService service) {
@@ -26,11 +24,11 @@ public final class CustomerHumanHandoffController {
 
     @PostMapping("/human-handoff")
     ResponseEntity<HumanHandoffResult> request(
-            @RequestHeader(value = "X-Synthetic-Customer-Id", required = false) String customerId,
+            Authentication authentication,
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @PathVariable UUID ticketId,
             @RequestBody HumanHandoffRequest body) {
-        String owner = requireCustomer(customerId);
+        String owner = authentication.getName();
         requireText(requestId, "missing stable handoff identity");
         requireText(body.reasonCode(), "missing handoff reason");
         HumanHandoffResult result =
@@ -43,19 +41,11 @@ public final class CustomerHumanHandoffController {
 
     @GetMapping("/human-handoff-requests/{requestId}")
     HumanHandoffResult status(
-            @RequestHeader(value = "X-Synthetic-Customer-Id", required = false) String customerId,
+            Authentication authentication,
             @PathVariable UUID ticketId,
             @PathVariable String requestId) {
         requireText(requestId, "missing stable handoff identity");
-        return service.status(requireCustomer(customerId), ticketId, requestId.trim());
-    }
-
-    private static String requireCustomer(String customerId) {
-        if (customerId == null || !SYNTHETIC_CUSTOMERS.contains(customerId.trim())) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED, "customer identity required");
-        }
-        return customerId.trim();
+        return service.status(authentication.getName(), ticketId, requestId.trim());
     }
 
     private static void requireText(String value, String message) {

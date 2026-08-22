@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ApprovalWorkbench } from "./ApprovalWorkbench";
+import { createCookieBrowserFetch, loginCustomer } from "./liveBrowserTestClient";
 import sensitiveContent from "./sensitive-content-patterns.json";
 
 const liveBaseUrl = import.meta.env.VITE_SMOKE_BASE_URL as string | undefined;
@@ -28,13 +29,14 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
   it(`从客户 React 表面贯穿真实 LangGraph、审批 React 表面与模拟执行器：${scenario}`, async () => {
     const browserNetworkPayloads: string[] = [];
     const streamAudits: Array<{ payload: string }> = [];
+    const browserFetch = createCookieBrowserFetch(nativeFetch, liveBaseUrl ?? "");
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const path =
         typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (typeof init?.body === "string") {
         browserNetworkPayloads.push(init.body);
       }
-      const response = await nativeFetch(new URL(path, liveBaseUrl), init);
+      const response = await browserFetch(path, init);
       if (response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
         const audit = { payload: "" };
         streamAudits.push(audit);
@@ -60,6 +62,9 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
       }
       return response;
     });
+
+    const session = await loginCustomer(globalThis.fetch);
+    expect(session.id).toBe("customer-demo");
 
     async function approvalQueueRevisionIds(): Promise<string[]> {
       const response = await globalThis.fetch("/api/approver/compensation-proposals", {

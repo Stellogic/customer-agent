@@ -6,8 +6,11 @@ import sys
 import threading
 import time
 import uuid
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from decimal import Decimal
+from functools import cache
 
 import httpx
 import psycopg
@@ -40,11 +43,64 @@ def start_authorized_sse(url: str, headers: dict[str, str], cursor: str):
     return executor, future
 
 
+def login_customer(client: httpx.Client, spring_url: str) -> tuple[str, str]:
+    anonymous_csrf = client.get(f"{spring_url}/api/auth/csrf")
+    expect_status(anonymous_csrf, 200)
+    anonymous_token = anonymous_csrf.json()
+    login = client.post(
+        f"{spring_url}/api/auth/login",
+        headers={anonymous_token["headerName"]: anonymous_token["token"]},
+        data={"username": "customer-demo", "password": "local-demo-password"},
+    )
+    expect_status(login, 204)
+    current_csrf = client.get(f"{spring_url}/api/auth/csrf")
+    expect_status(current_csrf, 200)
+    current_token = current_csrf.json()
+    client.headers[current_token["headerName"]] = current_token["token"]
+    session = client.get(f"{spring_url}/api/auth/session")
+    expect_status(session, 200)
+    assert session.json()["id"] == "customer-demo"
+    return current_token["headerName"], current_token["token"]
+
+
+@cache
+def customer_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
+    with httpx.Client(timeout=20.0) as client:
+        csrf_header = login_customer(client, spring_url)
+        session_id = client.cookies.get("JSESSIONID")
+        assert session_id is not None
+        return csrf_header, ("Cookie", f"JSESSIONID={session_id}")
+
+
+@contextmanager
+def customer_browser_client(spring_url: str) -> Iterator[httpx.Client]:
+    scoped_headers = dict(customer_session_headers(spring_url))
+
+    def authorize_customer_request(request: httpx.Request) -> None:
+        if request.url.path.startswith("/api/customer/"):
+            request.headers.update(scoped_headers)
+
+    with httpx.Client(
+        timeout=20.0,
+        event_hooks={"request": [authorize_customer_request]},
+    ) as client:
+        yield client
+
+
+@contextmanager
+def isolated_customer_browser_client(spring_url: str) -> Iterator[httpx.Client]:
+    with httpx.Client(timeout=20.0) as client:
+        login_customer(client, spring_url)
+        yield client
+
+
 def main() -> None:
     agent_url = os.environ["AGENT_SERVER_URL"]
     spring_url = os.environ["SPRING_INTERNAL_URL"]
     spring_headers = {"Authorization": f"Bearer {os.environ['SPRING_TO_AGENT_TOKEN']}"}
     executor_headers = {"Authorization": f"Bearer {os.environ['EXECUTOR_MACHINE_TOKEN']}"}
+
+    customer_session_headers(spring_url)
 
     with httpx.Client(timeout=20.0) as client:
         thread_response = client.post(f"{agent_url}/threads", headers=spring_headers, json={})
@@ -76,12 +132,12 @@ def main() -> None:
         "description": "合成订单物流已经延迟多日",
     }
     ticket_headers = {
-        "X-Synthetic-Customer-Id": "customer-demo",
+        "X-Synthetic-Customer-Id": "customer-other-demo",
         "Idempotency-Key": request_id,
     }
 
     def create_ticket(_: int) -> httpx.Response:
-        with httpx.Client(timeout=20.0) as concurrent_client:
+        with customer_browser_client(spring_url) as concurrent_client:
             return concurrent_client.post(
                 f"{spring_url}/api/customer/tickets", headers=ticket_headers, json=ticket_payload
             )
@@ -96,7 +152,25 @@ def main() -> None:
     assert len(ticket_ids) == 1
     ticket_id = ticket_ids.pop()
 
-    with httpx.Client(timeout=20.0) as client:
+    other_customer_ticket_id = uuid.uuid4()
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into support_ticket "
+            "(id, customer_id, order_reference, description, lifecycle_state, handling_mode, "
+            "created_at, first_responded_at) values (%s, 'customer-other-demo', "
+            "'ORDER-INTAKE-ONLY', 'other customer boundary', 'INVESTIGATING', 'HUMAN', "
+            "current_timestamp, current_timestamp)",
+            (other_customer_ticket_id,),
+        )
+
+    with httpx.Client(timeout=20.0) as anonymous_client:
+        forged_anonymous = anonymous_client.get(
+            f"{spring_url}/api/customer/tickets/{ticket_id}",
+            headers={"X-Synthetic-Customer-Id": "customer-demo"},
+        )
+        expect_status(forged_anonymous, 401)
+
+    with isolated_customer_browser_client(spring_url) as client:
         conflict = client.post(
             f"{spring_url}/api/customer/tickets",
             headers=ticket_headers,
@@ -107,7 +181,7 @@ def main() -> None:
 
         snapshot = client.get(
             f"{spring_url}/api/customer/tickets/{ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
+            headers={"X-Synthetic-Customer-Id": "customer-other-demo"},
         )
         expect_status(snapshot, 200)
         public_projection = snapshot.json()
@@ -135,10 +209,19 @@ def main() -> None:
         assert not any(field in serialized_projection for field in forbidden_fields)
 
         denied_snapshot = client.get(
-            f"{spring_url}/api/customer/tickets/{ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-other-demo"},
+            f"{spring_url}/api/customer/tickets/{other_customer_ticket_id}",
+            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(denied_snapshot, 404)
+        denied_handoff = client.post(
+            f"{spring_url}/api/customer/tickets/{other_customer_ticket_id}/human-handoff",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Idempotency-Key": f"other-customer-handoff-{uuid.uuid4()}",
+            },
+            json={"reasonCode": "CUSTOMER_REQUESTED"},
+        )
+        expect_status(denied_handoff, 404)
 
         with client.stream(
             "GET",
@@ -166,6 +249,17 @@ def main() -> None:
         )
         expect_status(restored, 200)
         assert restored.json() == public_projection
+
+        logout = client.post(f"{spring_url}/api/auth/logout")
+        expect_status(logout, 204)
+        rejected_reconnect = client.get(
+            f"{spring_url}/api/customer/tickets/{ticket_id}/events",
+            headers={
+                "X-Synthetic-Customer-Id": "customer-demo",
+                "Last-Event-ID": public_projection["cursor"],
+            },
+        )
+        expect_status(rejected_reconnect, 401)
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert connection.execute("select current_database(), current_user").fetchone() == (
@@ -205,7 +299,7 @@ def main() -> None:
         "X-Synthetic-Customer-Id": "customer-demo",
         "Idempotency-Key": no_compensation_request,
     }
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         accepted = client.post(
             f"{spring_url}/api/customer/tickets",
             headers=no_compensation_headers,
@@ -269,7 +363,7 @@ def main() -> None:
         generation_thread_id = str(generation[1])
         submission_request_id = str(generation[3])
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         runs = client.get(
             f"{agent_url}/threads/{generation_thread_id}/runs?limit=100",
             headers=spring_headers,
@@ -345,7 +439,7 @@ def main() -> None:
 
     proposal_request = f"issue-15-{uuid.uuid4()}"
     proposal_order_reference = "ORDER-DELAY-001"
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         accepted = client.post(
             f"{spring_url}/api/customer/tickets",
             headers={
@@ -401,7 +495,7 @@ def main() -> None:
     assert len(proposal_row[9]) == 64
     first_revision_id, proposal_id = proposal_row[:2]
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         customer_view = client.get(
             f"{spring_url}/api/customer/tickets/{proposal_ticket_id}",
             headers={"X-Synthetic-Customer-Id": "customer-demo"},
@@ -426,7 +520,7 @@ def main() -> None:
         pass
 
     approver_headers = {"X-Synthetic-Approver-Id": "approver-demo"}
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         queue = client.get(
             f"{spring_url}/api/approver/compensation-proposals", headers=approver_headers
         )
@@ -448,10 +542,11 @@ def main() -> None:
                 headers={"X-Synthetic-Approver-Id": forbidden_identity},
             )
             expect_status(denied, 401)
-        approver_customer_detail = client.get(
-            f"{spring_url}/api/customer/tickets/{proposal_ticket_id}", headers=approver_headers
-        )
-        expect_status(approver_customer_detail, 401)
+        with httpx.Client(timeout=20.0) as anonymous_client:
+            approver_customer_detail = anonymous_client.get(
+                f"{spring_url}/api/customer/tickets/{proposal_ticket_id}", headers=approver_headers
+            )
+            expect_status(approver_customer_detail, 401)
         approver_support_detail = client.get(
             f"{spring_url}/api/support/tickets/{proposal_ticket_id}", headers=approver_headers
         )
@@ -467,7 +562,7 @@ def main() -> None:
     }
 
     def claim_concurrently(approver_id: str) -> httpx.Response:
-        with httpx.Client(timeout=20.0) as concurrent_client:
+        with customer_browser_client(spring_url) as concurrent_client:
             return concurrent_client.post(
                 f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
                 headers={
@@ -495,7 +590,7 @@ def main() -> None:
     lease_one = approval_claim_responses[winner_index].json()
     assert lease_one["leaseVersion"] == 1 and lease_one["replayed"] is False
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         replay = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
             headers={**winner_headers, "Idempotency-Key": claim_requests[winner_id]},
@@ -677,7 +772,7 @@ def main() -> None:
         assert proposal_state[0] == "PENDING_APPROVAL"
         assert proposal_state[1].isoformat() == "2026-08-10T14:00:00+00:00"
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         try:
             assert expiry_stream_closed.result(timeout=5) is True
         finally:
@@ -767,7 +862,7 @@ def main() -> None:
             (uuid.uuid4(), expired_revision_id, expired_lease_token),
         )
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         claim_at_proposal_expiry = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{expired_revision_id}/claims",
             headers={**approver_headers, "Idempotency-Key": f"expired-claim-{uuid.uuid4()}"},
@@ -881,7 +976,7 @@ def main() -> None:
         "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
         "X-Agent-Generation-Id": str(second_generation),
     }
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         facts = client.get(
             f"{spring_url}/internal/agent/tickets/{proposal_ticket_id}/generations/{second_generation}/facts",
             headers={**scoped_headers, "X-Agent-Operation": "READ_INVESTIGATION_FACTS"},
@@ -969,7 +1064,7 @@ def main() -> None:
         "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
         "X-Agent-Generation-Id": str(third_generation),
     }
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         third_facts = client.get(
             f"{spring_url}/internal/agent/tickets/{proposal_ticket_id}/generations/{third_generation}/facts",
             headers={**third_headers, "X-Agent-Operation": "READ_INVESTIGATION_FACTS"},
@@ -1069,7 +1164,7 @@ def main() -> None:
         return fixture_ticket_id, fixture_generation_id, fixture_revision_id
 
     reserved_request = f"issue-55-{uuid.uuid4()}"
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         reserved_ticket = client.post(
             f"{spring_url}/api/customer/tickets",
             headers={
@@ -1106,7 +1201,7 @@ def main() -> None:
         Decimal("258.00"),
     )
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         reserved_claim = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{reserved_revision_id}/claims",
             headers={
@@ -1162,7 +1257,7 @@ def main() -> None:
     approval_ticket_id, _, approval_revision_id = seed_pending_decision_fixture(
         "ORDER-DELAY-APPROVAL", approval_digest, "审批成功验收"
     )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         approval_claim = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{approval_revision_id}/claims",
             headers={**approver_headers, "Idempotency-Key": f"approve-claim-{uuid.uuid4()}"},
@@ -1300,7 +1395,7 @@ def main() -> None:
         )
 
     executor_headers = {"Authorization": f"Bearer {os.environ['EXECUTOR_MACHINE_TOKEN']}"}
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         assignments = client.get(
             f"{spring_url}/internal/compensation-executions", headers=executor_headers
         )
@@ -1321,7 +1416,7 @@ def main() -> None:
 
     def claim_execution(request_id: str) -> httpx.Response:
         claim_barrier.wait()
-        with httpx.Client(timeout=20.0) as client:
+        with customer_browser_client(spring_url) as client:
             return client.post(
                 f"{spring_url}/internal/compensation-executions/{execution_id}/claims",
                 headers={**executor_headers, "Idempotency-Key": request_id},
@@ -1341,7 +1436,7 @@ def main() -> None:
     assert winning_claim["compensationMethod"] == "SIMULATED_PARTIAL_REFUND"
     assert winning_claim["amount"] == 26.80
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         claim_replay = client.post(
             f"{spring_url}/internal/compensation-executions/{execution_id}/claims",
             headers={**executor_headers, "Idempotency-Key": winning_claim_request_id},
@@ -1413,7 +1508,7 @@ def main() -> None:
 
         def submit_same_reconciliation() -> httpx.Response:
             reconciliation_barrier.wait()
-            with httpx.Client(timeout=20.0) as concurrent_client:
+            with customer_browser_client(spring_url) as concurrent_client:
                 return concurrent_client.post(
                     f"{spring_url}/internal/compensation-executions/{execution_id}/reconciliations",
                     headers={**executor_headers, "Idempotency-Key": reconciliation_request_id},
@@ -1536,7 +1631,7 @@ def main() -> None:
             "SIMULATED_PARTIAL_REFUND",
             Decimal("26.80"),
         )
-        with httpx.Client(timeout=20.0) as client:
+        with customer_browser_client(spring_url) as client:
             lease_response = client.post(
                 f"{spring_url}/api/approver/compensation-proposals/{revision}/claims",
                 headers={**approver_headers, "Idempotency-Key": f"reconcile-claim-{uuid.uuid4()}"},
@@ -1588,7 +1683,7 @@ def main() -> None:
     persistent_unknown_id, _, persistent_unknown_claim = approve_partial_execution(
         "ORDER-DELAY-EXECUTION-UNKNOWN"
     )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         before_failure_provider = client.post(
             f"{spring_url}/internal/compensation-simulator/{before_failure_id}/executions",
             headers={
@@ -1754,7 +1849,7 @@ def main() -> None:
             "COUPON",
             amount,
         )
-        with httpx.Client(timeout=20.0) as client:
+        with customer_browser_client(spring_url) as client:
             lease_response = client.post(
                 f"{spring_url}/api/approver/compensation-proposals/{revision}/claims",
                 headers={**approver_headers, "Idempotency-Key": f"coupon-claim-{uuid.uuid4()}"},
@@ -1820,7 +1915,7 @@ def main() -> None:
 
             def redeliver_terminal_success(attempt_id: str) -> httpx.Response:
                 terminal_barrier.wait()
-                with httpx.Client(timeout=20.0) as terminal_client:
+                with customer_browser_client(spring_url) as terminal_client:
                     return terminal_client.post(
                         f"{spring_url}/internal/compensation-executions/"
                         f"{coupon_execution_id}/success",
@@ -1875,7 +1970,7 @@ def main() -> None:
         "COUPON",
         Decimal("10.00"),
     )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         auto_lease_response = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{auto_revision_id}/claims",
             headers={**approver_headers, "Idempotency-Key": f"auto-claim-{uuid.uuid4()}"},
@@ -1901,7 +1996,7 @@ def main() -> None:
     drift_ticket_id, _, drift_revision_id = seed_pending_decision_fixture(
         "ORDER-DELAY-APPROVAL-DRIFT", drift_digest, "审批事实漂移验收"
     )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         drift_claim = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{drift_revision_id}/claims",
             headers={**approver_headers, "Idempotency-Key": f"drift-claim-{uuid.uuid4()}"},
@@ -1911,7 +2006,7 @@ def main() -> None:
         drift_lease = drift_claim.json()
 
     def approve_while_order_writer_holds_lock() -> httpx.Response:
-        with httpx.Client(timeout=20.0) as concurrent_client:
+        with customer_browser_client(spring_url) as concurrent_client:
             return concurrent_client.post(
                 f"{spring_url}/api/approver/compensation-proposals/{drift_revision_id}/approve",
                 headers={
@@ -2020,7 +2115,7 @@ def main() -> None:
     _, _, race_revision_id = seed_pending_decision_fixture(
         "ORDER-DELAY-APPROVAL-RACE", race_digest, "批准驳回竞争验收"
     )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         race_claim = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{race_revision_id}/claims",
             headers={**approver_headers, "Idempotency-Key": f"race-claim-{uuid.uuid4()}"},
@@ -2037,7 +2132,7 @@ def main() -> None:
 
     def submit_racing_decision(decision: str) -> httpx.Response:
         decision_barrier.wait()
-        with httpx.Client(timeout=20.0) as concurrent_client:
+        with customer_browser_client(spring_url) as concurrent_client:
             return concurrent_client.post(
                 f"{spring_url}/api/approver/compensation-proposals/{race_revision_id}/{decision}",
                 headers={**race_headers, "Idempotency-Key": f"race-{decision}-{uuid.uuid4()}"},
@@ -2076,7 +2171,7 @@ def main() -> None:
         seed_pending_decision_fixture("ORDER-DELAY-CANCELLED", rejection_digest, "审批驳回验收")
     )
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         rejection_claim = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{rejection_revision_id}/claims",
             headers={**approver_headers, "Idempotency-Key": f"reject-claim-{uuid.uuid4()}"},
@@ -2143,7 +2238,7 @@ def main() -> None:
         rejection_request_ids = [rejection_request_id, rejection_request_id]
 
         def reject_concurrently(request_id: str) -> httpx.Response:
-            with httpx.Client(timeout=20.0) as concurrent_client:
+            with customer_browser_client(spring_url) as concurrent_client:
                 return concurrent_client.post(
                     rejection_url,
                     headers={**rejection_headers, "Idempotency-Key": request_id},
@@ -2281,7 +2376,7 @@ def main() -> None:
             "'2026-08-09T13:59:59Z', '2026-08-09T14:00:00Z')",
             (uuid.uuid4(), boundary_revision_id, boundary_token),
         )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         boundary_rejection = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{boundary_revision_id}/reject",
             headers={
@@ -2350,7 +2445,7 @@ def main() -> None:
         "ORDER-DELAY-RESERVED": "FACT_CONFLICT",
     }
     rejected_ticket_ids = []
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         for order_reference, expected_reason in rejection_cases.items():
             response = client.post(
                 f"{spring_url}/api/customer/tickets",
@@ -2382,7 +2477,7 @@ def main() -> None:
             assert observed and proposal_count == 0, (order_reference, expected_reason)
 
     def create_ambiguous_ticket(label: str) -> tuple[str, dict]:
-        with httpx.Client(timeout=20.0) as client:
+        with customer_browser_client(spring_url) as client:
             response = client.post(
                 f"{spring_url}/api/customer/tickets",
                 headers={
@@ -2422,7 +2517,7 @@ def main() -> None:
         f"{spring_url}/api/customer/tickets/{clarification_ticket_id}/clarifications/"
         f"{clarification_request_id}/replies"
     )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         invalid = client.post(
             reply_url,
             headers={
@@ -2505,7 +2600,7 @@ def main() -> None:
             == 1
         )
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         runs = client.get(
             f"{agent_url}/threads/{clarification_generation[1]}/runs?limit=100",
             headers=spring_headers,
@@ -2524,7 +2619,7 @@ def main() -> None:
 
     def reply_concurrently(answer: str) -> int:
         reply_barrier.wait()
-        with httpx.Client(timeout=20.0) as client:
+        with customer_browser_client(spring_url) as client:
             response = client.post(
                 f"{spring_url}/api/customer/tickets/{concurrent_ticket_id}/clarifications/{concurrent_request_id}/replies",
                 headers={
@@ -2562,7 +2657,7 @@ def main() -> None:
         "X-Synthetic-Customer-Id": "customer-demo",
         "Idempotency-Key": handoff_request_id,
     }
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         handoff = client.post(
             handoff_url,
             headers=handoff_headers,
@@ -2779,7 +2874,7 @@ def main() -> None:
             ],
         },
     }
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         forged_summary = client.post(
             agent_handoff_url,
             headers={**agent_handoff_headers, "Idempotency-Key": f"forged-{uuid.uuid4()}"},
@@ -2892,7 +2987,7 @@ def main() -> None:
     )
 
     def concurrent_agent_handoff(reason: str) -> int:
-        with httpx.Client(timeout=20.0) as concurrent_client:
+        with customer_browser_client(spring_url) as concurrent_client:
             response = concurrent_client.post(
                 concurrent_agent_handoff_url,
                 headers={
@@ -2936,7 +3031,7 @@ def main() -> None:
         )
 
     resolved_handoff_request_id = f"resolved-handoff-{uuid.uuid4()}"
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         resolved_handoff = client.post(
             f"{spring_url}/api/customer/tickets/{resolved_ticket_id}/human-handoff",
             headers={
@@ -2975,7 +3070,7 @@ def main() -> None:
 
     def request_handoff_during_reply() -> int:
         race_barrier.wait()
-        with httpx.Client(timeout=20.0) as client:
+        with customer_browser_client(spring_url) as client:
             response = client.post(
                 f"{spring_url}/api/customer/tickets/{race_ticket_id}/human-handoff",
                 headers={
@@ -2988,7 +3083,7 @@ def main() -> None:
 
     def reply_during_handoff() -> int:
         race_barrier.wait()
-        with httpx.Client(timeout=20.0) as client:
+        with customer_browser_client(spring_url) as client:
             response = client.post(
                 f"{spring_url}/api/customer/tickets/{race_ticket_id}/clarifications/"
                 f"{race_clarification_id}/replies",
@@ -3033,7 +3128,7 @@ def main() -> None:
             "update agent_processing_generation set status = 'SUPERSEDED' where ticket_id = %s and status = 'ACTIVE'",
             (uuid.UUID(superseded_ticket_id),),
         )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         superseded = client.post(
             f"{spring_url}/api/customer/tickets/{superseded_ticket_id}/clarifications/"
             f"{superseded_projection['clarification']['id']}/replies",
@@ -3065,7 +3160,7 @@ def main() -> None:
             "values (%s, %s, 2, %s, 'ACTIVE', now())",
             (replacement_generation_id, uuid.UUID(superseded_ticket_id), replacement_thread_id),
         )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         replacement_request = client.post(
             f"{spring_url}/internal/agent/tickets/{superseded_ticket_id}/generations/"
             f"{replacement_generation_id}/clarifications",
@@ -3096,7 +3191,7 @@ def main() -> None:
             ).fetchone()[0]
             == "INVALIDATED"
         )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         human_preference = client.post(
             f"{spring_url}/api/customer/tickets/{human_ticket_id}/clarifications/"
             f"{human_projection['clarification']['id']}/replies",
@@ -3114,7 +3209,7 @@ def main() -> None:
             "update support_ticket set customer_human_preference = false, handling_mode = 'HUMAN' where id = %s",
             (uuid.UUID(human_ticket_id),),
         )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         handed_off = client.post(
             f"{spring_url}/api/customer/tickets/{human_ticket_id}/clarifications/"
             f"{human_projection['clarification']['id']}/replies",
@@ -3132,7 +3227,7 @@ def main() -> None:
         "X-Synthetic-Customer-Id": "customer-demo",
         "Idempotency-Key": f"sla-first-warning-{uuid.uuid4()}",
     }
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         first_warning_response = client.post(
             f"{spring_url}/api/customer/tickets",
             headers=first_warning_headers,
@@ -3211,7 +3306,7 @@ def main() -> None:
         ("RESOLUTION", "WARNING"),
     ]
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         notifications = client.get(
             f"{spring_url}/api/support/sla/notifications",
             headers={"X-Synthetic-Support-Id": "support-demo"},
@@ -3385,7 +3480,7 @@ def main() -> None:
             "delete from shared_support_queue_entry where ticket_id = %s",
             (removal_ticket_id,),
         )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         workbench_after_removal = client.get(
             f"{spring_url}/api/support/workbench/snapshot",
             headers={"X-Synthetic-Support-Id": "support-demo"},
@@ -3405,7 +3500,7 @@ def main() -> None:
             "resolution_running_since = null where id = %s",
             (uuid.UUID(immediate_ticket_id),),
         )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         immediate_reply = client.post(
             f"{spring_url}/api/customer/tickets/{immediate_ticket_id}/clarifications/"
             f"{immediate_request_id}/replies",
@@ -3447,7 +3542,7 @@ def main() -> None:
             (ticket_uuid,),
         ).fetchone() == ("WAITING_FOR_EXTERNAL", "HUMAN", 86399)
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         concurrent_state_response = client.post(
             f"{spring_url}/api/customer/tickets",
             headers={
@@ -3517,7 +3612,7 @@ def main() -> None:
         assert error.diag.constraint_name == "resolution_elapsed_seconds_monotonic"
 
     def create_closure_fixture(suffix: str, resolved_at, handling_mode: str = "HUMAN"):
-        with httpx.Client(timeout=20.0) as client:
+        with customer_browser_client(spring_url) as client:
             response = client.post(
                 f"{spring_url}/api/customer/tickets",
                 headers={
@@ -3554,7 +3649,7 @@ def main() -> None:
             "select generation_number, thread_id from agent_processing_generation where ticket_id = %s",
             (before_boundary_id,),
         ).fetchone()
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         reopened = client.post(
             f"{spring_url}/api/customer/tickets/{before_boundary_id}/replies",
             headers={
@@ -3618,7 +3713,7 @@ def main() -> None:
         original_message_count = connection.execute(
             "select count(*) from public_message where ticket_id = %s", (different_issue_id,)
         ).fetchone()[0]
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         different = client.post(
             f"{spring_url}/api/customer/tickets/{different_issue_id}/replies",
             headers={
@@ -3694,7 +3789,7 @@ def main() -> None:
             "select %s, reason_code, %s from unnest(%s::text[]) reason_code",
             (exact_boundary_id, closure_now, queue_reasons_before_close),
         )
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         queue_before_close = client.get(
             f"{spring_url}/api/support/workbench/snapshot",
             headers={"X-Synthetic-Support-Id": "support-demo"},
@@ -3710,7 +3805,7 @@ def main() -> None:
 
     def observe_live_queue_removal() -> str:
         with (
-            httpx.Client(timeout=20.0) as stream_client,
+            customer_browser_client(spring_url) as stream_client,
             stream_client.stream(
                 "GET",
                 f"{spring_url}/api/support/workbench/events",
@@ -3751,7 +3846,7 @@ def main() -> None:
     }
 
     def reply_at_boundary(_: int):
-        with httpx.Client(timeout=20.0) as concurrent_client:
+        with customer_browser_client(spring_url) as concurrent_client:
             return concurrent_client.post(
                 f"{spring_url}/api/customer/tickets/{exact_boundary_id}/replies",
                 headers=boundary_headers,
@@ -3834,7 +3929,7 @@ def main() -> None:
             == 0
         )
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         queue_after_close = client.get(
             f"{spring_url}/api/support/workbench/snapshot",
             headers={"X-Synthetic-Support-Id": "support-demo"},
@@ -3848,7 +3943,7 @@ def main() -> None:
     assert "event:QUEUE_TICKET_REMOVED" in queue_event_stream
     assert str(exact_boundary_id) in queue_event_stream
 
-    with httpx.Client(timeout=20.0) as client:
+    with customer_browser_client(spring_url) as client:
         closed_follow_up = client.post(
             f"{spring_url}/api/customer/tickets/{exact_boundary_id}/replies",
             headers={

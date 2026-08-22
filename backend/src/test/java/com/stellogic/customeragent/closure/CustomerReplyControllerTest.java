@@ -1,15 +1,19 @@
 package com.stellogic.customeragent.closure;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.stellogic.customeragent.ticket.CustomerTicketExceptionHandler;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -28,7 +32,8 @@ class CustomerReplyControllerTest {
 
         mvc.perform(
                         post("/api/customer/tickets/{ticketId}/replies", ORIGINAL)
-                                .header("X-Synthetic-Customer-Id", "customer-demo")
+                                .principal(customer())
+                                .header("X-Synthetic-Customer-Id", "customer-other-demo")
                                 .header("Idempotency-Key", "reply-28-same")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -39,6 +44,8 @@ class CustomerReplyControllerTest {
                 .andExpect(jsonPath("$.ticketId").value(ORIGINAL.toString()))
                 .andExpect(jsonPath("$.outcome").value("REOPENED"))
                 .andExpect(jsonPath("$.replayed").value(false));
+
+        verify(service).reply(argThat(command -> command.customerId().equals("customer-demo")));
     }
 
     @Test
@@ -48,7 +55,8 @@ class CustomerReplyControllerTest {
 
         mvc.perform(
                         post("/api/customer/tickets/{ticketId}/replies", ORIGINAL)
-                                .header("X-Synthetic-Customer-Id", "customer-demo")
+                                .principal(customer())
+                                .header("X-Synthetic-Customer-Id", "customer-other-demo")
                                 .header("Idempotency-Key", "reply-28-different")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -58,5 +66,9 @@ class CustomerReplyControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.ticketId").value(LINKED.toString()))
                 .andExpect(jsonPath("$.outcome").value("LINKED_TICKET_CREATED"));
+    }
+
+    private UsernamePasswordAuthenticationToken customer() {
+        return UsernamePasswordAuthenticationToken.authenticated("customer-demo", "n/a", List.of());
     }
 }

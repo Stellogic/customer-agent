@@ -6,6 +6,7 @@ import {
   parseViewCursor,
   type SseEvent,
 } from "./streamProtocol";
+import { loadCsrfToken } from "./csrf";
 
 const CUSTOMER_PUBLIC_SCHEMA = "customer-public-v1" as const;
 
@@ -30,8 +31,6 @@ type EventEnvelope = {
   generation: number;
   payload: unknown;
 };
-
-const customerHeaders = { "X-Synthetic-Customer-Id": "customer-demo" };
 
 function clarificationRejectionMessage(status: number) {
   switch (status) {
@@ -79,11 +78,12 @@ export function App() {
     setSubmitting(true);
     setError("");
     try {
+      const csrf = await loadCsrfToken();
       const created = await fetch("/api/customer/tickets", {
         method: "POST",
         credentials: "same-origin",
         headers: {
-          ...customerHeaders,
+          [csrf.headerName]: csrf.token,
           "Content-Type": "application/json",
           "Idempotency-Key": requestId.current,
         },
@@ -101,7 +101,6 @@ export function App() {
 
   async function loadTicket(ticketId: string) {
     const loaded = await fetch(`/api/customer/tickets/${ticketId}`, {
-      headers: customerHeaders,
       credentials: "same-origin",
     });
     if (!loaded.ok) throw new Error("snapshot request failed");
@@ -121,13 +120,14 @@ export function App() {
     setError("");
     const ticketId = snapshot.ticket.id;
     const clarificationId = snapshot.clarification.id;
-    const headers = {
-      ...customerHeaders,
-      "Content-Type": "application/json",
-      "Idempotency-Key": replyMessageId.current,
-      "X-Resume-Request-Id": resumeRequestId.current,
-    };
     try {
+      const csrf = await loadCsrfToken();
+      const headers = {
+        [csrf.headerName]: csrf.token,
+        "Content-Type": "application/json",
+        "Idempotency-Key": replyMessageId.current,
+        "X-Resume-Request-Id": resumeRequestId.current,
+      };
       const response = await fetch(
         `/api/customer/tickets/${ticketId}/clarifications/${clarificationId}/replies`,
         {
@@ -175,7 +175,6 @@ export function App() {
       const status = await fetch(
         `/api/customer/tickets/${ticketId}/clarification-resumes/${resumeRequestId.current}`,
         {
-          headers: customerHeaders,
           credentials: "same-origin",
         },
       ).catch(() => null);
@@ -209,11 +208,12 @@ export function App() {
     const ticketId = snapshot.ticket.id;
     const requestId = handoffRequestId.current;
     try {
+      const csrf = await loadCsrfToken();
       const response = await fetch(`/api/customer/tickets/${ticketId}/human-handoff`, {
         method: "POST",
         credentials: "same-origin",
         headers: {
-          ...customerHeaders,
+          [csrf.headerName]: csrf.token,
           "Content-Type": "application/json",
           "Idempotency-Key": requestId,
         },
@@ -226,7 +226,6 @@ export function App() {
       const status = await fetch(
         `/api/customer/tickets/${ticketId}/human-handoff-requests/${requestId}`,
         {
-          headers: customerHeaders,
           credentials: "same-origin",
         },
       ).catch(() => null);
@@ -247,11 +246,12 @@ export function App() {
     setSubmitting(true);
     setError("");
     try {
+      const csrf = await loadCsrfToken();
       const response = await fetch(`/api/customer/tickets/${snapshot.ticket.id}/replies`, {
         method: "POST",
         credentials: "same-origin",
         headers: {
-          ...customerHeaders,
+          [csrf.headerName]: csrf.token,
           "Content-Type": "application/json",
           "Idempotency-Key": ticketReplyRequestId.current,
         },
@@ -301,7 +301,7 @@ export function App() {
     };
     try {
       const response = await fetch(`/api/customer/tickets/${ticketId}/events`, {
-        headers: { ...customerHeaders, "Last-Event-ID": cursor, Accept: "text/event-stream" },
+        headers: { "Last-Event-ID": cursor, Accept: "text/event-stream" },
         credentials: "same-origin",
         signal: controller.signal,
       });

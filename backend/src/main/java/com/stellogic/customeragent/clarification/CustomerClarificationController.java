@@ -1,9 +1,9 @@
 package com.stellogic.customeragent.clarification;
 
-import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,8 +16,6 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/customer/tickets/{ticketId}")
 final class CustomerClarificationController {
-    private static final Set<String> SYNTHETIC_CUSTOMERS =
-            Set.of("customer-demo", "customer-other-demo");
     private final ClarificationService service;
 
     CustomerClarificationController(ClarificationService service) {
@@ -26,13 +24,13 @@ final class CustomerClarificationController {
 
     @PostMapping("/clarifications/{clarificationRequestId}/replies")
     ResponseEntity<ClarificationReplyResult> reply(
-            @RequestHeader(value = "X-Synthetic-Customer-Id", required = false) String customerId,
+            Authentication authentication,
             @RequestHeader(value = "Idempotency-Key", required = false) String customerMessageId,
             @RequestHeader(value = "X-Resume-Request-Id", required = false) UUID resumeRequestId,
             @PathVariable UUID ticketId,
             @PathVariable UUID clarificationRequestId,
             @RequestBody ReplyBody body) {
-        String owner = requireIdentity(customerId);
+        String owner = authentication.getName();
         requireText(customerMessageId, "missing stable customer message identity");
         if (resumeRequestId == null)
             throw new ResponseStatusException(
@@ -53,18 +51,10 @@ final class CustomerClarificationController {
 
     @GetMapping("/clarification-resumes/{resumeRequestId}")
     ClarificationReplyResult status(
-            @RequestHeader(value = "X-Synthetic-Customer-Id", required = false) String customerId,
+            Authentication authentication,
             @PathVariable UUID ticketId,
             @PathVariable UUID resumeRequestId) {
-        return service.status(requireIdentity(customerId), ticketId, resumeRequestId);
-    }
-
-    private static String requireIdentity(String customerId) {
-        if (customerId == null || !SYNTHETIC_CUSTOMERS.contains(customerId.trim())) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED, "customer identity required");
-        }
-        return customerId.trim();
+        return service.status(authentication.getName(), ticketId, resumeRequestId);
     }
 
     private static void requireText(String value, String message) {
