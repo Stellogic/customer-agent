@@ -38,7 +38,6 @@ class CustomerClarificationControllerTest {
                                         TICKET_ID,
                                         REQUEST_ID)
                                 .principal(customer())
-                                .header("X-Synthetic-Customer-Id", "customer-other-demo")
                                 .header("Idempotency-Key", "message-16")
                                 .header("X-Resume-Request-Id", RESUME_ID)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -62,8 +61,7 @@ class CustomerClarificationControllerTest {
                                         "/api/customer/tickets/{ticketId}/clarification-resumes/{resumeId}",
                                         TICKET_ID,
                                         RESUME_ID)
-                                .principal(customer())
-                                .header("X-Synthetic-Customer-Id", "customer-other-demo"))
+                                .principal(customer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUBMITTED"));
     }

@@ -31,7 +31,6 @@ class CustomerHumanHandoffControllerTest {
         mvc.perform(
                         post("/api/customer/tickets/{ticketId}/human-handoff", TICKET_ID)
                                 .principal(customer())
-                                .header("X-Synthetic-Customer-Id", "customer-other-demo")
                                 .header("Idempotency-Key", "handoff-18")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"reasonCode\":\"CUSTOMER_REQUESTED\"}"))
@@ -54,8 +53,7 @@ class CustomerHumanHandoffControllerTest {
                                         "/api/customer/tickets/{ticketId}/human-handoff-requests/{requestId}",
                                         TICKET_ID,
                                         "handoff-18")
-                                .principal(customer())
-                                .header("X-Synthetic-Customer-Id", "customer-other-demo"))
+                                .principal(customer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.handlingMode").value("HUMAN"))
                 .andExpect(jsonPath("$.replayed").value(true));

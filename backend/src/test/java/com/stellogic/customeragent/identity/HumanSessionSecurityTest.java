@@ -87,6 +87,29 @@ class HumanSessionSecurityTest {
     }
 
     @Test
+    void currentIdentityAndAuthenticationErrorsDoNotExposeCredentialsOrRouteAuthority()
+            throws Exception {
+        MvcResult anonymous =
+                mvc.perform(get("/api/auth/session"))
+                        .andExpect(status().isUnauthorized())
+                        .andReturn();
+        assertNoSensitiveContract(anonymous.getResponse().getContentAsString());
+
+        MvcResult csrf = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andReturn();
+        MockHttpSession session = (MockHttpSession) csrf.getRequest().getSession(false);
+        MvcResult failedLogin =
+                mvc.perform(
+                                post("/api/auth/login")
+                                        .session(session)
+                                        .header("X-CSRF-TOKEN", token(csrf))
+                                        .param("username", "customer-demo")
+                                        .param("password", "secret-value-79"))
+                        .andExpect(status().isUnauthorized())
+                        .andReturn();
+        assertNoSensitiveContract(failedLogin.getResponse().getContentAsString());
+    }
+
+    @Test
     void csrfRotatesAcrossLoginAndLogoutAndRejectsMissingWrongOrOldTokens() throws Exception {
         MvcResult csrf = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andReturn();
         MockHttpSession anonymousSession = (MockHttpSession) csrf.getRequest().getSession(false);
@@ -301,5 +324,15 @@ class HumanSessionSecurityTest {
 
     private String token(MvcResult csrf) throws Exception {
         return json.readTree(csrf.getResponse().getContentAsString()).get("token").asText();
+    }
+
+    private static void assertNoSensitiveContract(String responseBody) {
+        assertThat(responseBody)
+                .doesNotContainIgnoringCase("password")
+                .doesNotContainIgnoringCase("cookie")
+                .doesNotContainIgnoringCase("csrf")
+                .doesNotContainIgnoringCase("route")
+                .doesNotContainIgnoringCase("resource")
+                .doesNotContain("secret-value-79");
     }
 }

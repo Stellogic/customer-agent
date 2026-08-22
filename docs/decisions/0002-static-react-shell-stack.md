@@ -14,7 +14,7 @@
 - React Router 只消费仓库内的静态 route/workspace registry；Spring 的 `/api/auth/session` 不返回 React 路径。
 - `CustomerShell`、`InternalShell`、客户工作区、客服工作区和审批工作区均按 route lazy loading；分包只优化加载，不承担数据隔离或授权。
 - `InternalShell` 使用 Ant Design `Layout`/`Menu`；Pro Components 只在轻量内部选择页使用 `ProCard`，避免整体迁移到 Ant Design Pro/Umi。
-- 当前票只把 auth session 用于页面体验。客服与审批业务组件继续通过既有 `/api/demo/session` 接缝取得 `X-Synthetic-*` 所需身份；迁移到 Spring Principal 属于后续票。
+- 历史阶段曾由 `/api/demo/session` 与 `X-Synthetic-*` 表达人工身份；该契约已在 Issue #79 废弃并删除，现有人工 API 只接受 Spring Principal。此条仅保留决策演进记录，不是可用接口说明。
 
 ## 证据与取舍
 

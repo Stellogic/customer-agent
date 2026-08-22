@@ -166,7 +166,6 @@ def main() -> None:
         "description": "合成订单物流已经延迟多日",
     }
     ticket_headers = {
-        "X-Synthetic-Customer-Id": "customer-other-demo",
         "Idempotency-Key": request_id,
     }
 
@@ -200,7 +199,6 @@ def main() -> None:
     with httpx.Client(timeout=20.0) as anonymous_client:
         forged_anonymous = anonymous_client.get(
             f"{spring_url}/api/customer/tickets/{ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(forged_anonymous, 401)
 
@@ -215,7 +213,6 @@ def main() -> None:
 
         snapshot = client.get(
             f"{spring_url}/api/customer/tickets/{ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-other-demo"},
         )
         expect_status(snapshot, 200)
         public_projection = snapshot.json()
@@ -244,13 +241,11 @@ def main() -> None:
 
         denied_snapshot = client.get(
             f"{spring_url}/api/customer/tickets/{other_customer_ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(denied_snapshot, 404)
         denied_handoff = client.post(
             f"{spring_url}/api/customer/tickets/{other_customer_ticket_id}/human-handoff",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": f"other-customer-handoff-{uuid.uuid4()}",
             },
             json={"reasonCode": "CUSTOMER_REQUESTED"},
@@ -261,7 +256,6 @@ def main() -> None:
             "GET",
             f"{spring_url}/api/customer/tickets/{ticket_id}/events",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Last-Event-ID": "customer-public-v1:0",
             },
         ) as events:
@@ -279,7 +273,6 @@ def main() -> None:
 
         restored = client.get(
             f"{spring_url}/api/customer/tickets/{ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(restored, 200)
         assert restored.json() == public_projection
@@ -289,7 +282,6 @@ def main() -> None:
         rejected_reconnect = client.get(
             f"{spring_url}/api/customer/tickets/{ticket_id}/events",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Last-Event-ID": public_projection["cursor"],
             },
         )
@@ -330,7 +322,6 @@ def main() -> None:
         "description": "合成订单物流延迟不足二十四小时",
     }
     no_compensation_headers = {
-        "X-Synthetic-Customer-Id": "customer-demo",
         "Idempotency-Key": no_compensation_request,
     }
     with customer_browser_client(spring_url) as client:
@@ -346,7 +337,6 @@ def main() -> None:
         for _ in range(60):
             snapshot = client.get(
                 f"{spring_url}/api/customer/tickets/{resolved_ticket_id}",
-                headers={"X-Synthetic-Customer-Id": "customer-demo"},
             )
             expect_status(snapshot, 200)
             resolved_projection = snapshot.json()
@@ -477,7 +467,6 @@ def main() -> None:
         accepted = client.post(
             f"{spring_url}/api/customer/tickets",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": proposal_request,
             },
             json={
@@ -532,7 +521,6 @@ def main() -> None:
     with customer_browser_client(spring_url) as client:
         customer_view = client.get(
             f"{spring_url}/api/customer/tickets/{proposal_ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(customer_view, 200)
         projection = customer_view.json()
@@ -558,7 +546,6 @@ def main() -> None:
         support_client.headers.update(dict(support_session_headers(spring_url)))
         forged_approval = support_client.get(
             f"{spring_url}/api/approver/compensation-proposals",
-            headers={"X-Synthetic-Approver-Id": "approver-demo"},
         )
         expect_status(forged_approval, 403)
     with customer_browser_client(spring_url) as client:
@@ -580,7 +567,6 @@ def main() -> None:
         with httpx.Client(timeout=20.0) as anonymous_client:
             denied = anonymous_client.get(
                 f"{spring_url}/api/approver/compensation-proposals",
-                headers={"X-Synthetic-Approver-Id": "approver-demo"},
             )
             expect_status(denied, 401)
         with httpx.Client(timeout=20.0) as anonymous_client:
@@ -607,7 +593,6 @@ def main() -> None:
             return concurrent_client.post(
                 f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
                 headers={
-                    "X-Synthetic-Approver-Id": f"forged-{claimant}",
                     "Idempotency-Key": claim_requests[claimant],
                 },
                 json={"requestedLeaseSeconds": 900},
@@ -694,7 +679,6 @@ def main() -> None:
         denied_other_approver = client.get(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
             headers={
-                "X-Synthetic-Approver-Id": "approver-other-demo",
                 "X-Approval-Lease-Token": lease_one["leaseToken"],
                 "X-Approval-Lease-Version": "1",
             },
@@ -1630,7 +1614,6 @@ def main() -> None:
         reserved_ticket = client.post(
             f"{spring_url}/api/customer/tickets",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": reserved_request,
             },
             json={
@@ -1796,7 +1779,6 @@ def main() -> None:
         expect_status(reject_after_approval, 409)
         approval_customer = client.get(
             f"{spring_url}/api/customer/tickets/{approval_ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(approval_customer, 200)
         approval_customer_payload = approval_customer.json()
@@ -1932,7 +1914,6 @@ def main() -> None:
         assert unknown.json()["customerMessage"] == "补偿结果正在自动确认中，请勿重复提交。"
         unknown_customer = client.get(
             f"{spring_url}/api/customer/tickets/{approval_ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(unknown_customer, 200)
         assert (
@@ -2023,7 +2004,6 @@ def main() -> None:
         expect_status(terminal_claim_identity_conflict, 409)
         execution_customer = client.get(
             f"{spring_url}/api/customer/tickets/{approval_ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(execution_customer, 200)
         execution_customer_payload = execution_customer.json()
@@ -2403,7 +2383,6 @@ def main() -> None:
             assert_success_sla_projection(ticket)
             customer = client.get(
                 f"{spring_url}/api/customer/tickets/{ticket}",
-                headers={"X-Synthetic-Customer-Id": "customer-demo"},
             )
             expect_status(customer, 200)
             assert customer.json()["ticket"]["lifecycleState"] == "RESOLVED"
@@ -2764,7 +2743,6 @@ def main() -> None:
         expect_status(rejected_view, 409)
         rejection_customer = client.get(
             f"{spring_url}/api/customer/tickets/{rejection_ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(rejection_customer, 200)
         rejection_projection = rejection_customer.json()
@@ -2778,7 +2756,6 @@ def main() -> None:
         assert "APPROVAL_REJECTED" not in rejection_public_json
         rejection_queue = client.get(
             f"{spring_url}/api/support/queue",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(rejection_queue, 200)
         rejection_queue_item = next(
@@ -2912,7 +2889,6 @@ def main() -> None:
             response = client.post(
                 f"{spring_url}/api/customer/tickets",
                 headers={
-                    "X-Synthetic-Customer-Id": "customer-demo",
                     "Idempotency-Key": f"reject-{uuid.uuid4()}",
                 },
                 json={"orderReference": order_reference, "description": "不合法补偿提案验收"},
@@ -2943,7 +2919,6 @@ def main() -> None:
             response = client.post(
                 f"{spring_url}/api/customer/tickets",
                 headers={
-                    "X-Synthetic-Customer-Id": "customer-demo",
                     "Idempotency-Key": f"clarification-{label}-{uuid.uuid4()}",
                 },
                 json={
@@ -2956,7 +2931,6 @@ def main() -> None:
             for _ in range(80):
                 projection_response = client.get(
                     f"{spring_url}/api/customer/tickets/{created_id}",
-                    headers={"X-Synthetic-Customer-Id": "customer-demo"},
                 )
                 expect_status(projection_response, 200)
                 projection = projection_response.json()
@@ -2983,7 +2957,6 @@ def main() -> None:
         invalid = client.post(
             reply_url,
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": f"invalid-{uuid.uuid4()}",
                 "X-Resume-Request-Id": str(uuid.uuid4()),
             },
@@ -2993,7 +2966,6 @@ def main() -> None:
         accepted_reply = client.post(
             reply_url,
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": reply_message_id,
                 "X-Resume-Request-Id": resume_request_id,
             },
@@ -3003,7 +2975,6 @@ def main() -> None:
         duplicate_reply = client.post(
             reply_url,
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": reply_message_id,
                 "X-Resume-Request-Id": resume_request_id,
             },
@@ -3014,7 +2985,6 @@ def main() -> None:
         conflicting_reuse = client.post(
             reply_url,
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": reply_message_id,
                 "X-Resume-Request-Id": resume_request_id,
             },
@@ -3024,7 +2994,6 @@ def main() -> None:
         stale_reply = client.post(
             reply_url,
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": f"stale-{uuid.uuid4()}",
                 "X-Resume-Request-Id": str(uuid.uuid4()),
             },
@@ -3036,7 +3005,6 @@ def main() -> None:
         for _ in range(80):
             queried = client.get(
                 f"{spring_url}/api/customer/tickets/{clarification_ticket_id}/clarification-resumes/{resume_request_id}",
-                headers={"X-Synthetic-Customer-Id": "customer-demo"},
             )
             expect_status(queried, 200)
             resume_status = queried.json()["status"]
@@ -3085,7 +3053,6 @@ def main() -> None:
             response = client.post(
                 f"{spring_url}/api/customer/tickets/{concurrent_ticket_id}/clarifications/{concurrent_request_id}/replies",
                 headers={
-                    "X-Synthetic-Customer-Id": "customer-demo",
                     "Idempotency-Key": f"concurrent-message-{uuid.uuid4()}",
                     "X-Resume-Request-Id": str(uuid.uuid4()),
                 },
@@ -3116,7 +3083,6 @@ def main() -> None:
     handoff_request_id = f"handoff-{uuid.uuid4()}"
     handoff_url = f"{spring_url}/api/customer/tickets/{handoff_ticket_id}/human-handoff"
     handoff_headers = {
-        "X-Synthetic-Customer-Id": "customer-demo",
         "Idempotency-Key": handoff_request_id,
     }
     with customer_browser_client(spring_url) as client:
@@ -3146,12 +3112,10 @@ def main() -> None:
         expect_status(conflicting_handoff, 409)
         handoff_status = client.get(
             f"{spring_url}/api/customer/tickets/{handoff_ticket_id}/human-handoff-requests/{handoff_request_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(handoff_status, 200)
         restored_handoff = client.get(
             f"{spring_url}/api/customer/tickets/{handoff_ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(restored_handoff, 200)
         handoff_public = restored_handoff.json()
@@ -3167,7 +3131,6 @@ def main() -> None:
             f"{spring_url}/api/customer/tickets/{handoff_ticket_id}/clarifications/"
             f"{handoff_clarification_id}/replies",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": f"late-reply-{uuid.uuid4()}",
                 "X-Resume-Request-Id": str(uuid.uuid4()),
             },
@@ -3387,7 +3350,6 @@ def main() -> None:
         expect_status(stale_new_handoff, 403)
         agent_handoff_public_response = client.get(
             f"{spring_url}/api/customer/tickets/{agent_handoff_ticket_id}",
-            headers={"X-Synthetic-Customer-Id": "customer-demo"},
         )
         expect_status(agent_handoff_public_response, 200)
         agent_handoff_public = agent_handoff_public_response.json()
@@ -3401,7 +3363,6 @@ def main() -> None:
         assert "INVESTIGATION_COULD_NOT_CONTINUE" not in agent_handoff_public_json
         agent_handoff_queue_response = client.get(
             f"{spring_url}/api/support/queue",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(agent_handoff_queue_response, 200)
         agent_handoff_queue_item = next(
@@ -3497,7 +3458,6 @@ def main() -> None:
         resolved_handoff = client.post(
             f"{spring_url}/api/customer/tickets/{resolved_ticket_id}/human-handoff",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": resolved_handoff_request_id,
             },
             json={"reasonCode": "CUSTOMER_REQUESTED"},
@@ -3536,7 +3496,6 @@ def main() -> None:
             response = client.post(
                 f"{spring_url}/api/customer/tickets/{race_ticket_id}/human-handoff",
                 headers={
-                    "X-Synthetic-Customer-Id": "customer-demo",
                     "Idempotency-Key": race_handoff_id,
                 },
                 json={"reasonCode": "CUSTOMER_REQUESTED"},
@@ -3550,7 +3509,6 @@ def main() -> None:
                 f"{spring_url}/api/customer/tickets/{race_ticket_id}/clarifications/"
                 f"{race_clarification_id}/replies",
                 headers={
-                    "X-Synthetic-Customer-Id": "customer-demo",
                     "Idempotency-Key": f"race-reply-{uuid.uuid4()}",
                     "X-Resume-Request-Id": str(uuid.uuid4()),
                 },
@@ -3595,7 +3553,6 @@ def main() -> None:
             f"{spring_url}/api/customer/tickets/{superseded_ticket_id}/clarifications/"
             f"{superseded_projection['clarification']['id']}/replies",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": f"superseded-{uuid.uuid4()}",
                 "X-Resume-Request-Id": str(uuid.uuid4()),
             },
@@ -3658,7 +3615,6 @@ def main() -> None:
             f"{spring_url}/api/customer/tickets/{human_ticket_id}/clarifications/"
             f"{human_projection['clarification']['id']}/replies",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": f"human-pref-{uuid.uuid4()}",
                 "X-Resume-Request-Id": str(uuid.uuid4()),
             },
@@ -3676,7 +3632,6 @@ def main() -> None:
             f"{spring_url}/api/customer/tickets/{human_ticket_id}/clarifications/"
             f"{human_projection['clarification']['id']}/replies",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": f"human-mode-{uuid.uuid4()}",
                 "X-Resume-Request-Id": str(uuid.uuid4()),
             },
@@ -3686,7 +3641,6 @@ def main() -> None:
 
     fixed_now = "2026-08-09T14:00:00Z"
     first_warning_headers = {
-        "X-Synthetic-Customer-Id": "customer-demo",
         "Idempotency-Key": f"sla-first-warning-{uuid.uuid4()}",
     }
     with customer_browser_client(spring_url) as client:
@@ -3771,7 +3725,6 @@ def main() -> None:
     with customer_browser_client(spring_url) as client:
         notifications = client.get(
             f"{spring_url}/api/support/sla/notifications",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(notifications, 200)
         assert {
@@ -3779,7 +3732,6 @@ def main() -> None:
         } == {"FIRST_RESPONSE", "RESOLUTION"}
         escalations = client.get(
             f"{spring_url}/api/support/escalations",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(escalations, 200)
         queue_item = next(item for item in escalations.json() if item["ticketId"] == ticket_id)
@@ -3799,7 +3751,6 @@ def main() -> None:
         )
         workbench_before_handoff = client.get(
             f"{spring_url}/api/support/workbench/snapshot",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(workbench_before_handoff, 200)
         workbench_before_handoff = workbench_before_handoff.json()
@@ -3810,7 +3761,6 @@ def main() -> None:
         sla_handoff = client.post(
             f"{spring_url}/api/customer/tickets/{ticket_id}/human-handoff",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": sla_handoff_request_id,
             },
             json={"reasonCode": "CUSTOMER_REQUESTED"},
@@ -3818,7 +3768,6 @@ def main() -> None:
         expect_status(sla_handoff, 202)
         shared_queue = client.get(
             f"{spring_url}/api/support/queue",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(shared_queue, 200)
         combined_queue_item = next(
@@ -3831,13 +3780,11 @@ def main() -> None:
         assert combined_queue_item["handlingMode"] == "HUMAN"
         escalations_after_handoff = client.get(
             f"{spring_url}/api/support/escalations",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(escalations_after_handoff, 200)
         assert sum(item["ticketId"] == ticket_id for item in escalations_after_handoff.json()) == 1
         workbench_after_handoff = client.get(
             f"{spring_url}/api/support/workbench/snapshot",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(workbench_after_handoff, 200)
         assert workbench_after_handoff.headers["cache-control"] == "no-store"
@@ -3873,7 +3820,6 @@ def main() -> None:
             "GET",
             f"{spring_url}/api/support/workbench/events",
             headers={
-                "X-Synthetic-Support-Id": "support-demo",
                 "Last-Event-ID": workbench_cursor,
             },
         ) as stream:
@@ -3889,7 +3835,6 @@ def main() -> None:
         assert any('"view":"SUPPORT_WORKBENCH"' in part for part in replay_lines)
         assigned_detail = client.get(
             f"{spring_url}/api/support/workbench/tickets/{ticket_id}",
-            headers={"X-Synthetic-Support-Id": "internal-demo"},
         )
         expect_status(assigned_detail, 200)
         assert assigned_detail.headers["cache-control"] == "no-store"
@@ -3900,24 +3845,20 @@ def main() -> None:
         with isolated_customer_browser_client(spring_url) as customer_client:
             denied_queue = customer_client.get(
                 f"{spring_url}/api/support/escalations",
-                headers={"X-Synthetic-Support-Id": "support-demo"},
             )
             expect_status(denied_queue, 403)
         denied_workbench = httpx.get(
             f"{spring_url}/api/support/workbench/snapshot",
-            headers={"X-Synthetic-Approver-Id": "approver-demo"},
             timeout=20.0,
         )
         expect_status(denied_workbench, 401)
         unassigned_workbench_detail = client.get(
             f"{spring_url}/api/support/workbench/tickets/{first_warning_ticket_id}",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(unassigned_workbench_detail, 404)
         assert unassigned_workbench_detail.headers["cache-control"] == "no-store"
         unassigned_detail = client.get(
             f"{spring_url}/api/support/tickets/{first_warning_ticket_id}",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(unassigned_detail, 404)
 
@@ -3938,7 +3879,6 @@ def main() -> None:
         expect_status(missing_csrf_claim, 403)
         forged_claim = client.post(
             f"{spring_url}/api/support/workbench/tickets/{first_warning_ticket_id}/claims",
-            headers={"X-Synthetic-Support-Id": "internal-demo"},
         )
         expect_status(forged_claim, 201)
         assert forged_claim.json() == {
@@ -3991,7 +3931,6 @@ def main() -> None:
     with customer_browser_client(spring_url) as client:
         workbench_after_removal = client.get(
             f"{spring_url}/api/support/workbench/snapshot",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(workbench_after_removal, 200)
         assert not any(
@@ -4013,7 +3952,6 @@ def main() -> None:
             f"{spring_url}/api/customer/tickets/{immediate_ticket_id}/clarifications/"
             f"{immediate_request_id}/replies",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": f"sla-resume-message-{uuid.uuid4()}",
                 "X-Resume-Request-Id": str(uuid.uuid4()),
             },
@@ -4054,7 +3992,6 @@ def main() -> None:
         concurrent_state_response = client.post(
             f"{spring_url}/api/customer/tickets",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": f"sla-concurrent-state-{uuid.uuid4()}",
             },
             json={"orderReference": "ORDER-INTAKE-ONLY", "description": "并发状态变化验收"},
@@ -4124,7 +4061,6 @@ def main() -> None:
             response = client.post(
                 f"{spring_url}/api/customer/tickets",
                 headers={
-                    "X-Synthetic-Customer-Id": "customer-demo",
                     "Idempotency-Key": f"issue-28-{suffix}-{uuid.uuid4()}",
                 },
                 json={
@@ -4161,7 +4097,6 @@ def main() -> None:
         reopened = client.post(
             f"{spring_url}/api/customer/tickets/{before_boundary_id}/replies",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": "issue-28-before-boundary-message",
             },
             json={
@@ -4179,7 +4114,6 @@ def main() -> None:
         reopened_replay = client.post(
             f"{spring_url}/api/customer/tickets/{before_boundary_id}/replies",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": "issue-28-before-boundary-message",
             },
             json={
@@ -4225,7 +4159,6 @@ def main() -> None:
         different = client.post(
             f"{spring_url}/api/customer/tickets/{different_issue_id}/replies",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": "issue-28-different-message",
             },
             json={
@@ -4239,7 +4172,6 @@ def main() -> None:
         conflict = client.post(
             f"{spring_url}/api/customer/tickets/{different_issue_id}/replies",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": "issue-28-different-message",
             },
             json={
@@ -4300,7 +4232,6 @@ def main() -> None:
     with customer_browser_client(spring_url) as client:
         queue_before_close = client.get(
             f"{spring_url}/api/support/workbench/snapshot",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(queue_before_close, 200)
         queue_before_close_payload = queue_before_close.json()
@@ -4318,7 +4249,6 @@ def main() -> None:
                 "GET",
                 f"{spring_url}/api/support/workbench/events",
                 headers={
-                    "X-Synthetic-Support-Id": "support-demo",
                     "Last-Event-ID": queue_cursor_before_close,
                 },
             ) as queue_events,
@@ -4344,7 +4274,6 @@ def main() -> None:
     queue_stream_future = queue_stream_pool.submit(observe_live_queue_removal)
     assert queue_stream_connected.wait(timeout=5), "support queue SSE did not establish"
     boundary_headers = {
-        "X-Synthetic-Customer-Id": "customer-demo",
         "Idempotency-Key": "issue-28-exact-boundary-message",
     }
     boundary_payload = {
@@ -4440,7 +4369,6 @@ def main() -> None:
     with customer_browser_client(spring_url) as client:
         queue_after_close = client.get(
             f"{spring_url}/api/support/workbench/snapshot",
-            headers={"X-Synthetic-Support-Id": "support-demo"},
         )
         expect_status(queue_after_close, 200)
         assert str(exact_boundary_id) not in {
@@ -4455,7 +4383,6 @@ def main() -> None:
         closed_follow_up = client.post(
             f"{spring_url}/api/customer/tickets/{exact_boundary_id}/replies",
             headers={
-                "X-Synthetic-Customer-Id": "customer-demo",
                 "Idempotency-Key": "issue-28-closed-message",
             },
             json={

@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RootApplication } from "./RootApplication";
+import { LEGACY_ROUTE_REDIRECTS } from "./workspaceRegistry";
 import {
   announceHumanSessionChange,
   resetHumanSessionLifecycleForTests,
@@ -46,6 +47,13 @@ const dualRole: Session = {
 };
 
 describe("Issue #73 静态路由与两个界面壳", () => {
+  it("Issue #79 只在静态路由注册表保留两个弃用重定向", () => {
+    expect(LEGACY_ROUTE_REDIRECTS).toEqual([
+      { path: "/support", to: "/internal/support", deprecated: true },
+      { path: "/approver", to: "/internal/approvals", deprecated: true },
+    ]);
+  });
+
   afterEach(() => {
     cleanup();
     resetHumanSessionLifecycleForTests();
@@ -318,16 +326,6 @@ function mockSession(session: Session) {
     }
     if (path === "/api/approver/compensation-proposals") {
       return new Response(JSON.stringify([]), { status: 200 });
-    }
-    if (path === "/api/demo/session") {
-      if (session.capabilities.includes("SUPPORT_WORKBENCH_ACCESS")) {
-        return Response.json({ id: "support-demo", role: "SUPPORT", label: "客服演示入口" });
-      }
-      return Response.json({
-        id: "approver-demo",
-        role: "APPROVER",
-        label: "审批演示入口",
-      });
     }
     return new Response(null, { status: 503 });
   });
