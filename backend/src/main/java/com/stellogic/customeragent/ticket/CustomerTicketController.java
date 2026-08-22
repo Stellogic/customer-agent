@@ -3,11 +3,11 @@ package com.stellogic.customeragent.ticket;
 import com.stellogic.customeragent.stream.AuthorizedSsePollingStream;
 import java.time.Instant;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,9 +20,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RestController
 @RequestMapping("/api/customer/tickets")
 public final class CustomerTicketController {
-    static final String CUSTOMER_HEADER = "X-Synthetic-Customer-Id";
-    private static final Set<String> SYNTHETIC_CUSTOMERS =
-            Set.of("customer-demo", "customer-other-demo");
     private final CustomerTicketService service;
 
     public CustomerTicketController(CustomerTicketService service) {
@@ -31,10 +28,10 @@ public final class CustomerTicketController {
 
     @PostMapping
     ResponseEntity<CreateTicketResponse> create(
-            @RequestHeader(value = CUSTOMER_HEADER, required = false) String customerId,
+            Authentication authentication,
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @RequestBody CreateTicketRequest request) {
-        requireIdentity(customerId);
+        String customerId = authentication.getName();
         requireText(requestId, "缺少稳定请求身份");
         requireText(request.orderReference(), "缺少订单编号");
         requireText(request.description(), "缺少问题描述");
@@ -51,20 +48,16 @@ public final class CustomerTicketController {
     }
 
     @GetMapping("/{ticketId}")
-    SnapshotResponse snapshot(
-            @RequestHeader(value = CUSTOMER_HEADER, required = false) String customerId,
-            @PathVariable UUID ticketId) {
-        requireIdentity(customerId);
-        return SnapshotResponse.from(service.snapshot(customerId.trim(), ticketId));
+    SnapshotResponse snapshot(Authentication authentication, @PathVariable UUID ticketId) {
+        return SnapshotResponse.from(service.snapshot(authentication.getName(), ticketId));
     }
 
     @GetMapping(value = "/{ticketId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     SseEmitter events(
-            @RequestHeader(value = CUSTOMER_HEADER, required = false) String customerId,
+            Authentication authentication,
             @RequestHeader(value = "Last-Event-ID", required = false) String cursor,
             @PathVariable UUID ticketId) {
-        requireIdentity(customerId);
-        String owner = customerId.trim();
+        String owner = authentication.getName();
         return AuthorizedSsePollingStream.open(
                 "customer-ticket-events-" + ticketId,
                 250,
@@ -94,12 +87,6 @@ public final class CustomerTicketController {
                                 .data(event.publicData());
                     }
                 });
-    }
-
-    private static void requireIdentity(String customerId) {
-        if (customerId == null || !SYNTHETIC_CUSTOMERS.contains(customerId.trim())) {
-            throw new CustomerAuthenticationException();
-        }
     }
 
     private static void requireText(String value, String message) {

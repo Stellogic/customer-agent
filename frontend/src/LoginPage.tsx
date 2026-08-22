@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { CurrentSession } from "./authContract";
+import { loadCsrfToken, type CsrfToken } from "./csrf";
 import { loadCurrentSession, loadOptionalCurrentSession } from "./session";
 
 type LoginAudience = "customer" | "internal";
-type CsrfToken = { token: string; headerName: string };
 type DemoAccount = {
   username: string;
   displayName: string;
@@ -28,7 +28,7 @@ export function LoginPage({
 
   useEffect(() => {
     let active = true;
-    void Promise.all([loadCsrf(), loadDemoAccounts(), loadOptionalCurrentSession()])
+    void Promise.all([loadCsrfToken(), loadDemoAccounts(), loadOptionalCurrentSession()])
       .then(([nextCsrf, accounts, restoredSession]) => {
         if (!active) return;
         setCsrf(nextCsrf);
@@ -70,7 +70,7 @@ export function LoginPage({
         body: new URLSearchParams({ username, password }),
       });
       if (!response.ok) throw new Error("login rejected");
-      const [nextCsrf, session] = await Promise.all([loadCsrf(), loadCurrentSession()]);
+      const [nextCsrf, session] = await Promise.all([loadCsrfToken(), loadCurrentSession()]);
       setCsrf(nextCsrf);
       if (onAuthenticated) onAuthenticated(session);
       else setCurrent(session);
@@ -93,7 +93,7 @@ export function LoginPage({
         headers: { [csrf.headerName]: csrf.token },
       });
       if (!response.ok) throw new Error("logout rejected");
-      setCsrf(await loadCsrf());
+      setCsrf(await loadCsrfToken());
       setCurrent(undefined);
       setUsername("");
       setPassword("");
@@ -178,17 +178,6 @@ export function LoginPage({
   );
 }
 
-async function loadCsrf(): Promise<CsrfToken> {
-  const response = await fetch("/api/auth/csrf", {
-    credentials: "same-origin",
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error("csrf unavailable");
-  const value = (await response.json()) as unknown;
-  if (!isCsrfToken(value)) throw new Error("invalid csrf response");
-  return value;
-}
-
 async function loadDemoAccounts(): Promise<DemoAccount[]> {
   const response = await fetch("/api/auth/demo-accounts", {
     credentials: "same-origin",
@@ -198,11 +187,6 @@ async function loadDemoAccounts(): Promise<DemoAccount[]> {
   const value = (await response.json()) as unknown;
   if (!Array.isArray(value)) return [];
   return value.filter(isDemoAccount);
-}
-
-function isCsrfToken(value: unknown): value is CsrfToken {
-  if (!isRecord(value)) return false;
-  return typeof value.token === "string" && typeof value.headerName === "string";
 }
 
 function isDemoAccount(value: unknown): value is DemoAccount {

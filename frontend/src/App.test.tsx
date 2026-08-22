@@ -2,6 +2,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
+vi.mock("./csrf", () => ({
+  loadCsrfToken: async () => ({ token: "customer-csrf", headerName: "X-CSRF-TOKEN" }),
+}));
+
 describe("客户帮助中心", () => {
   afterEach(() => {
     cleanup();
@@ -65,6 +69,9 @@ describe("客户帮助中心", () => {
     expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
     expect(screen.getByLabelText("订单确认码")).toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    const createHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    expect(createHeaders.get("X-CSRF-TOKEN")).toBe("customer-csrf");
+    expect(createHeaders.get("X-Synthetic-Customer-Id")).toBeNull();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/customer/tickets/ticket-13");
     expect(fetchMock.mock.calls[2][0]).toBe("/api/customer/tickets/ticket-13/events");
   });

@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -34,7 +35,7 @@ class CustomerTicketApiTest {
 
         mvc.perform(
                         post("/api/customer/tickets")
-                                .header("X-Synthetic-Customer-Id", "customer-demo")
+                                .principal(customer("customer-demo"))
                                 .header("Idempotency-Key", "request-13")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -53,7 +54,7 @@ class CustomerTicketApiTest {
 
         mvc.perform(
                         post("/api/customer/tickets")
-                                .header("X-Synthetic-Customer-Id", "customer-demo")
+                                .principal(customer("customer-demo"))
                                 .header("Idempotency-Key", "request-13")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -90,7 +91,7 @@ class CustomerTicketApiTest {
 
         mvc.perform(
                         get("/api/customer/tickets/{ticketId}", TICKET_ID)
-                                .header("X-Synthetic-Customer-Id", "customer-demo"))
+                                .principal(customer("customer-demo")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.view").value("CUSTOMER_PUBLIC"))
                 .andExpect(jsonPath("$.schema").value("customer-public-v1"))
@@ -105,7 +106,7 @@ class CustomerTicketApiTest {
 
         mvc.perform(
                         get("/api/customer/tickets/{ticketId}", TICKET_ID)
-                                .header("X-Synthetic-Customer-Id", "customer-other-demo"))
+                                .principal(customer("customer-other-demo")))
                 .andExpect(status().isNotFound());
     }
 
@@ -134,7 +135,7 @@ class CustomerTicketApiTest {
 
         mvc.perform(
                         get("/api/customer/tickets/{ticketId}/events", TICKET_ID)
-                                .header("X-Synthetic-Customer-Id", "customer-demo")
+                                .principal(customer("customer-demo"))
                                 .header("Last-Event-ID", "customer-public-v1:0"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
@@ -167,7 +168,7 @@ class CustomerTicketApiTest {
 
         mvc.perform(
                         get("/api/customer/tickets/{ticketId}/events", TICKET_ID)
-                                .header("X-Synthetic-Customer-Id", "customer-demo")
+                                .principal(customer("customer-demo"))
                                 .header("Last-Event-ID", "customer-public-v0:9"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("SNAPSHOT_REQUIRED"));
@@ -180,8 +181,12 @@ class CustomerTicketApiTest {
 
         mvc.perform(
                         get("/api/customer/tickets/{ticketId}/events", TICKET_ID)
-                                .header("X-Synthetic-Customer-Id", "customer-other-demo")
+                                .principal(customer("customer-other-demo"))
                                 .header("Last-Event-ID", "customer-public-v1:2"))
                 .andExpect(status().isNotFound());
+    }
+
+    private UsernamePasswordAuthenticationToken customer(String id) {
+        return UsernamePasswordAuthenticationToken.authenticated(id, "n/a", List.of());
     }
 }

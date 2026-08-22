@@ -4,6 +4,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,8 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/customer/tickets")
 public final class CustomerReplyController {
-    private static final Set<String> SYNTHETIC_CUSTOMERS =
-            Set.of("customer-demo", "customer-other-demo");
     private static final Set<String> ISSUE_KINDS = Set.of("LOGISTICS_DELAY", "OTHER");
     private final ClosureService service;
 
@@ -25,13 +24,10 @@ public final class CustomerReplyController {
 
     @PostMapping("/{ticketId}/replies")
     ResponseEntity<ReplyResponse> reply(
-            @RequestHeader(value = "X-Synthetic-Customer-Id", required = false) String customerId,
+            Authentication authentication,
             @RequestHeader(value = "Idempotency-Key", required = false) String messageId,
             @PathVariable UUID ticketId,
             @RequestBody ReplyRequest request) {
-        if (customerId == null || !SYNTHETIC_CUSTOMERS.contains(customerId.trim())) {
-            throw new ClosureAuthenticationException();
-        }
         requireText(messageId, "缺少稳定消息身份");
         requireText(request.orderReference(), "缺少订单编号");
         requireText(request.issueKind(), "缺少问题类型");
@@ -42,7 +38,7 @@ public final class CustomerReplyController {
         CustomerReplyResult result =
                 service.reply(
                         new CustomerReplyCommand(
-                                customerId.trim(),
+                                authentication.getName(),
                                 ticketId,
                                 messageId.trim(),
                                 request.orderReference().trim(),
