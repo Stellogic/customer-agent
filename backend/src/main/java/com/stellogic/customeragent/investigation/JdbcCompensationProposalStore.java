@@ -25,6 +25,19 @@ class JdbcCompensationProposalStore {
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
                 content.orderReference() + "\nLOGISTICS_DELAY");
+        List<UUID> existingProposalIds =
+                jdbc.query(
+                        "select distinct proposal_id from compensation_proposal_revision "
+                                + "where order_reference = ? and reason_code = 'LOGISTICS_DELAY' "
+                                + "and status in ('PENDING_APPROVAL', 'APPROVED')",
+                        (rs, row) -> rs.getObject(1, UUID.class),
+                        content.orderReference());
+        if (!existingProposalIds.isEmpty()) {
+            jdbc.query(
+                    "select pg_advisory_xact_lock(hashtextextended(?, 0))",
+                    rs -> null,
+                    existingProposalIds.getFirst() + "\nPROPOSAL_SUPPORT_PARTICIPANT_LINEAGE");
+        }
         Instant now = expiry.expireDueForOrder(content.orderReference());
         List<ActiveProposal> active =
                 jdbc.query(

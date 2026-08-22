@@ -59,16 +59,20 @@ class JdbcApprovalServiceTest {
                         contains("p.expires_at > ?"),
                         any(RowMapper.class),
                         eq(Timestamp.from(afterWait)),
-                        eq(Timestamp.from(afterWait)));
+                        eq(Timestamp.from(afterWait)),
+                        eq("approver-demo"));
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         org.mockito.Mockito.verify(jdbc)
                 .query(
                         sql.capture(),
                         any(RowMapper.class),
                         eq(Timestamp.from(afterWait)),
-                        eq(Timestamp.from(afterWait)));
+                        eq(Timestamp.from(afterWait)),
+                        eq("approver-demo"));
         org.assertj.core.api.Assertions.assertThat(sql.getValue())
                 .contains("p.expires_at > ?")
-                .contains("l.expires_at > ?");
+                .contains("l.expires_at > ?")
+                .contains("compensation_proposal_revision_support_participant")
+                .contains("participant.support_id = ?");
     }
 }

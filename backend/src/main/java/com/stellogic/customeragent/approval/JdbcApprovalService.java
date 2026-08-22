@@ -72,6 +72,8 @@ class JdbcApprovalService implements ApprovalService {
                         + "where p.status = 'PENDING_APPROVAL' and p.expires_at > ? "
                         + "and not exists (select 1 from approval_lease l where l.proposal_revision_id = p.id "
                         + "and l.status = 'ACTIVE' and l.expires_at > ?) "
+                        + "and not exists (select 1 from compensation_proposal_revision_support_participant participant "
+                        + "where participant.proposal_revision_id = p.id and participant.support_id = ?) "
                         + "order by p.created_at, p.id",
                 (rs, row) ->
                         new ApprovalModels.QueueItem(
@@ -81,7 +83,8 @@ class JdbcApprovalService implements ApprovalService {
                                 rs.getTimestamp(4).toInstant(),
                                 rs.getTimestamp(5).toInstant()),
                 now,
-                now);
+                now,
+                approverId);
     }
 
     @Override
@@ -95,6 +98,9 @@ class JdbcApprovalService implements ApprovalService {
                 StableParameterDigest.sha256(
                         command.revisionId().toString(), Integer.toString(leaseSeconds));
         lockRequest(command.approverId(), command.requestId(), "APPROVAL_CLAIM");
+        lockParticipantPolicy(command.revisionId());
+        lockProposal(command.revisionId());
+        requireNotSupportParticipant(command.revisionId(), command.approverId());
         List<ClaimReplay> existing =
                 jdbc.query(
                         "select parameter_digest, proposal_revision_id, lease_token, lease_version, expires_at "
@@ -213,7 +219,9 @@ class JdbcApprovalService implements ApprovalService {
     @Override
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public ApprovalModels.ApprovalView view(ApprovalModels.ViewCommand command) {
+        lockParticipantPolicy(command.revisionId());
         lockProposal(command.revisionId());
+        requireNotSupportParticipant(command.revisionId(), command.approverId());
         List<ViewRow> rows =
                 jdbc.query(
                         "select p.ticket_id, p.revision_number, p.content_digest, p.order_reference, p.reason_code, "
@@ -504,6 +512,8 @@ class JdbcApprovalService implements ApprovalService {
                         Long.toString(command.leaseVersion()),
                         command.internalReason());
         lockRequest(command.approverId(), command.requestId(), "PROPOSAL_DECISION");
+        lockParticipantPolicy(command.revisionId());
+        requireNotSupportParticipant(command.revisionId(), command.approverId());
         List<DecisionReplay> existing =
                 jdbc.query(
                         "select r.parameter_digest, r.proposal_revision_id, r.proposal_revision, r.decision_type "
@@ -561,6 +571,7 @@ class JdbcApprovalService implements ApprovalService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
         }
         DecisionProposal proposal = proposals.getFirst();
+        requireNotSupportParticipant(command.revisionId(), command.approverId());
         Instant now = clock.instant();
         List<DecisionLease> leases =
                 jdbc.query(
@@ -653,6 +664,8 @@ class JdbcApprovalService implements ApprovalService {
                         Long.toString(command.leaseVersion()),
                         normalizedNote);
         lockRequest(command.approverId(), command.requestId(), "PROPOSAL_DECISION");
+        lockParticipantPolicy(command.revisionId());
+        requireNotSupportParticipant(command.revisionId(), command.approverId());
         List<ApprovalReplay> existing =
                 jdbc.query(
                         "select r.parameter_digest, r.proposal_revision_id, r.proposal_revision, r.decision_type, "
@@ -746,6 +759,7 @@ class JdbcApprovalService implements ApprovalService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
         }
         ApprovalProposal proposal = proposals.getFirst();
+        requireNotSupportParticipant(command.revisionId(), command.approverId());
         Instant now = clock.instant();
         List<DecisionLease> leases =
                 jdbc.query(
@@ -911,6 +925,26 @@ class JdbcApprovalService implements ApprovalService {
                 "select id from compensation_proposal_revision where id = ? for update",
                 (rs, row) -> rs.getObject(1, UUID.class),
                 revisionId);
+    }
+
+    private void lockParticipantPolicy(UUID revisionId) {
+        jdbc.query(
+                "select pg_advisory_xact_lock(hashtextextended(?, 0))",
+                rs -> null,
+                revisionId + "\nPROPOSAL_REVISION_SUPPORT_PARTICIPANT");
+    }
+
+    private void requireNotSupportParticipant(UUID revisionId, String approverId) {
+        Integer participantCount =
+                jdbc.queryForObject(
+                        "select count(*) from compensation_proposal_revision_support_participant "
+                                + "where proposal_revision_id = ? and support_id = ?",
+                        Integer.class,
+                        revisionId,
+                        approverId);
+        if (participantCount != null && participantCount > 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
+        }
     }
 
     private void rejectMissingCurrentLease(UUID revisionId, String approverId) {
