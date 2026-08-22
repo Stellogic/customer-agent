@@ -14,7 +14,7 @@ describe("审批视图授权撤销", () => {
 
   it("连接期间租约被撤销后立即清除审批证据和操作并返回队列", async () => {
     let closeStream: (() => void) | undefined;
-    globalThis.history.replaceState(null, "", `/approver?revision=${REVISION_ID}`);
+    globalThis.history.replaceState(null, "", `/internal/approvals?revision=${REVISION_ID}`);
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
         Response.json([
@@ -137,7 +137,7 @@ describe("审批视图授权撤销", () => {
   });
 
   it("旧页面 URL 不会自动领取新租约", async () => {
-    globalThis.history.replaceState(null, "", `/approver?revision=${REVISION_ID}`);
+    globalThis.history.replaceState(null, "", `/internal/approvals?revision=${REVISION_ID}`);
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json([]));
 
     render(<ApprovalWorkbench approverId="approver-demo" />);

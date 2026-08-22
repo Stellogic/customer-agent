@@ -1,14 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
+import type { CurrentSession } from "./authContract";
+import { loadCurrentSession, loadOptionalCurrentSession } from "./session";
 
 type LoginAudience = "customer" | "internal";
-const HUMAN_ROLES = ["CUSTOMER", "SUPPORT", "APPROVER"] as const;
-const HUMAN_CAPABILITIES = [
-  "CUSTOMER_HELP_ACCESS",
-  "SUPPORT_WORKBENCH_ACCESS",
-  "APPROVAL_WORKBENCH_ACCESS",
-] as const;
-type HumanRole = (typeof HUMAN_ROLES)[number];
-type HumanCapability = (typeof HUMAN_CAPABILITIES)[number];
 type CsrfToken = { token: string; headerName: string };
 type DemoAccount = {
   username: string;
@@ -16,15 +10,13 @@ type DemoAccount = {
   subjectType: "CUSTOMER" | "INTERNAL";
   password: string;
 };
-type CurrentSession = {
-  id: string;
-  displayName: string;
-  subjectType: "CUSTOMER" | "INTERNAL";
-  roles: HumanRole[];
-  capabilities: HumanCapability[];
-};
-
-export function LoginPage({ audience }: { audience: LoginAudience }) {
+export function LoginPage({
+  audience,
+  onAuthenticated,
+}: {
+  audience: LoginAudience;
+  onAuthenticated?: (session: CurrentSession) => void;
+}) {
   const [csrf, setCsrf] = useState<CsrfToken>();
   const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([]);
   const [username, setUsername] = useState("");
@@ -40,7 +32,8 @@ export function LoginPage({ audience }: { audience: LoginAudience }) {
       .then(([nextCsrf, accounts, restoredSession]) => {
         if (!active) return;
         setCsrf(nextCsrf);
-        setCurrent(restoredSession);
+        if (restoredSession && onAuthenticated) onAuthenticated(restoredSession);
+        else setCurrent(restoredSession);
         setDemoAccounts(
           accounts.filter((account) =>
             audience === "customer"
@@ -59,7 +52,7 @@ export function LoginPage({ audience }: { audience: LoginAudience }) {
     return () => {
       active = false;
     };
-  }, [audience]);
+  }, [audience, onAuthenticated]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,7 +72,8 @@ export function LoginPage({ audience }: { audience: LoginAudience }) {
       if (!response.ok) throw new Error("login rejected");
       const [nextCsrf, session] = await Promise.all([loadCsrf(), loadCurrentSession()]);
       setCsrf(nextCsrf);
-      setCurrent(session);
+      if (onAuthenticated) onAuthenticated(session);
+      else setCurrent(session);
       setPassword("");
     } catch {
       setError("用户名或密码错误，请重新输入。");
@@ -206,32 +200,6 @@ async function loadDemoAccounts(): Promise<DemoAccount[]> {
   return value.filter(isDemoAccount);
 }
 
-async function loadCurrentSession(): Promise<CurrentSession> {
-  const response = await fetchCurrentSession();
-  if (!response.ok) throw new Error("session unavailable");
-  return readCurrentSession(response);
-}
-
-async function loadOptionalCurrentSession(): Promise<CurrentSession | undefined> {
-  const response = await fetchCurrentSession();
-  if (response.status === 401) return undefined;
-  if (!response.ok) throw new Error("session unavailable");
-  return readCurrentSession(response);
-}
-
-function fetchCurrentSession(): Promise<Response> {
-  return fetch("/api/auth/session", {
-    credentials: "same-origin",
-    cache: "no-store",
-  });
-}
-
-async function readCurrentSession(response: Response): Promise<CurrentSession> {
-  const value = (await response.json()) as unknown;
-  if (!isCurrentSession(value)) throw new Error("invalid session response");
-  return value;
-}
-
 function isCsrfToken(value: unknown): value is CsrfToken {
   if (!isRecord(value)) return false;
   return typeof value.token === "string" && typeof value.headerName === "string";
@@ -247,31 +215,6 @@ function isDemoAccount(value: unknown): value is DemoAccount {
   );
 }
 
-function isCurrentSession(value: unknown): value is CurrentSession {
-  if (!isRecord(value)) return false;
-  return (
-    Object.keys(value).every((key) =>
-      ["id", "displayName", "subjectType", "roles", "capabilities"].includes(key),
-    ) &&
-    typeof value.id === "string" &&
-    typeof value.displayName === "string" &&
-    (value.subjectType === "CUSTOMER" || value.subjectType === "INTERNAL") &&
-    isHumanRoleArray(value.roles) &&
-    isHumanCapabilityArray(value.capabilities)
-  );
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isHumanRoleArray(value: unknown): value is HumanRole[] {
-  return Array.isArray(value) && value.every((entry) => HUMAN_ROLES.includes(entry as HumanRole));
-}
-
-function isHumanCapabilityArray(value: unknown): value is HumanCapability[] {
-  return (
-    Array.isArray(value) &&
-    value.every((entry) => HUMAN_CAPABILITIES.includes(entry as HumanCapability))
-  );
 }

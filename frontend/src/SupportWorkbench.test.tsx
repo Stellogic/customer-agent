@@ -14,9 +14,20 @@ describe("客服共享队列工作台", () => {
   });
 
   it("只在客服路由读取独立权威快照并呈现两种最小摘要", async () => {
-    globalThis.history.replaceState(null, "", "/support");
+    globalThis.history.replaceState(null, "", "/internal/support");
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json({ id: "support-demo", role: "SUPPORT" }))
+      .mockResolvedValueOnce(
+        Response.json({
+          id: "session-support-person",
+          displayName: "演示客服",
+          subjectType: "INTERNAL",
+          roles: ["SUPPORT"],
+          capabilities: ["SUPPORT_WORKBENCH_ACCESS"],
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ id: "support-demo", role: "SUPPORT", label: "客服演示入口" }),
+      )
       .mockResolvedValueOnce(
         snapshotResponse(
           "support-workbench-v1:7",
@@ -37,17 +48,31 @@ describe("客服共享队列工作台", () => {
     expect(
       screen.queryByText(/CUSTOMER_REQUESTED|AGENT_HUMAN_HANDOFF|调查摘要/),
     ).not.toBeInTheDocument();
-    expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe("/api/demo/session");
-    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe("/api/support/workbench/snapshot");
+    expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe("/api/auth/session");
+    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe("/api/demo/session");
+    expect(vi.mocked(globalThis.fetch).mock.calls[2]?.[0]).toBe("/api/support/workbench/snapshot");
+    expect(
+      new Headers(vi.mocked(globalThis.fetch).mock.calls[2]?.[1]?.headers).get(
+        "X-Synthetic-Support-Id",
+      ),
+    ).toBe("support-demo");
   });
 
   it("客户或审批人直接访问客服 URL 不会被自动提升为客服", async () => {
-    globalThis.history.replaceState(null, "", "/support");
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(null, { status: 401 }));
+    globalThis.history.replaceState(null, "", "/internal/support");
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      Response.json({
+        id: "approver-demo",
+        displayName: "演示审批人",
+        subjectType: "INTERNAL",
+        roles: ["APPROVER"],
+        capabilities: ["APPROVAL_WORKBENCH_ACCESS"],
+      }),
+    );
 
     render(<RootApplication />);
 
-    expect(await screen.findByRole("heading", { name: "无权访问客服工作台" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "403" })).toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalledWith(
       "/api/support/workbench/snapshot",

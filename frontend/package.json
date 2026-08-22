@@ -17,8 +17,11 @@
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build:bundle"
   },
   "dependencies": {
+    "@ant-design/pro-components": "3.1.14-6",
+    "antd": "6.6.1",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "react-router-dom": "7.18.2"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
