@@ -58,7 +58,7 @@ public final class SupportWorkbenchController {
         return AuthorizedSsePollingStream.open(
                 "support-workbench-events",
                 250,
-                60_000L,
+                AuthorizedSsePollingStream.MAX_AUTHORIZATION_STALENESS_MILLIS,
                 cursor,
                 new AuthorizedSsePollingStream.Source<SupportWorkbenchEvent>() {
                     @Override

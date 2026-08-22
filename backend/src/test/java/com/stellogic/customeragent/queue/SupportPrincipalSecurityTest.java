@@ -2,6 +2,7 @@ package com.stellogic.customeragent.queue;
 
 import static com.stellogic.customeragent.identity.HumanSessionTestClient.login;
 import static com.stellogic.customeragent.identity.HumanSessionTestClient.token;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -150,6 +151,62 @@ class SupportPrincipalSecurityTest {
                 .andExpect(status().isCreated());
 
         verify(service).claim("support-demo", TICKET_ID);
+    }
+
+    @Test
+    void replacingCustomerWithSupportRotatesCsrfAndRejectsTheCustomersOldToken() throws Exception {
+        MvcResult anonymousCsrf =
+                mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andReturn();
+        MockHttpSession anonymous = (MockHttpSession) anonymousCsrf.getRequest().getSession(false);
+        MvcResult customerLogin =
+                mvc.perform(
+                                post("/api/auth/login")
+                                        .session(anonymous)
+                                        .header("X-CSRF-TOKEN", token(json, anonymousCsrf))
+                                        .param("username", "customer-demo")
+                                        .param("password", "local-demo-password"))
+                        .andExpect(status().isNoContent())
+                        .andReturn();
+        MockHttpSession customer = (MockHttpSession) customerLogin.getRequest().getSession(false);
+        MvcResult customerCsrf =
+                mvc.perform(get("/api/auth/csrf").session(customer))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        String customerToken = token(json, customerCsrf);
+
+        MvcResult supportLogin =
+                mvc.perform(
+                                post("/api/auth/login")
+                                        .session(customer)
+                                        .header("X-CSRF-TOKEN", customerToken)
+                                        .param("username", "support-demo")
+                                        .param("password", "local-demo-password"))
+                        .andExpect(status().isNoContent())
+                        .andReturn();
+        MockHttpSession support = (MockHttpSession) supportLogin.getRequest().getSession(false);
+        MvcResult supportCsrf =
+                mvc.perform(get("/api/auth/csrf").session(support))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        String supportToken = token(json, supportCsrf);
+        assertThat(supportToken).isNotEqualTo(customerToken);
+
+        when(service.claim("support-demo", TICKET_ID))
+                .thenReturn(new SupportAssignmentClaim(TICKET_ID, "support-demo", false));
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/claims", TICKET_ID)
+                                .session(support)
+                                .header("X-CSRF-TOKEN", customerToken))
+                .andExpect(status().isForbidden());
+        MvcResult refreshedSupportCsrf =
+                mvc.perform(get("/api/auth/csrf").session(support))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/claims", TICKET_ID)
+                                .session(support)
+                                .header("X-CSRF-TOKEN", token(json, refreshedSupportCsrf)))
+                .andExpect(status().isCreated());
     }
 
     @TestConfiguration(proxyBeanMethods = false)

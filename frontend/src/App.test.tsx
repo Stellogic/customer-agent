@@ -41,7 +41,7 @@ describe("客户帮助中心", () => {
         ),
       )
       .mockResolvedValueOnce(
-        new Response(
+        streamResponse(
           publicEvent("customer-public-v1:3", "PUBLIC_MESSAGE_APPENDED", {
             author: "SUPPORT",
             body: "正在核对物流轨迹",
@@ -55,7 +55,6 @@ describe("客户帮助中心", () => {
                 question: "请回复订单确认码（A 或 B）。",
               },
             }),
-          { status: 200, headers: { "Content-Type": "text/event-stream" } },
         ),
       );
 
@@ -124,7 +123,7 @@ describe("客户帮助中心", () => {
         return new Response(JSON.stringify({ status: "PENDING", replayed: true }), { status: 200 });
       }
       if (url.endsWith("/events")) {
-        return new Response("", { status: 200, headers: { "Content-Type": "text/event-stream" } });
+        return openEventResponse();
       }
       throw new Error(`unexpected request: ${url}`);
     });
@@ -534,7 +533,7 @@ describe("客户帮助中心", () => {
         });
       }
       if (url.endsWith("/events")) {
-        return new Response("", { status: 200, headers: { "Content-Type": "text/event-stream" } });
+        return openEventResponse();
       }
       throw new Error(`unexpected request: ${url}`);
     });
@@ -584,13 +583,12 @@ describe("客户帮助中心", () => {
         ),
       )
       .mockResolvedValueOnce(
-        new Response(
+        streamResponse(
           publicEvent("customer-public-v1:7", "PUBLIC_MESSAGE_APPENDED", {
             author: "AGENT",
             body: "不应展示的旧代次结论",
             sentAt: "2026-08-09T00:02:00Z",
           }),
-          { status: 200, headers: { "Content-Type": "text/event-stream" } },
         ),
       );
 
@@ -744,7 +742,7 @@ describe("客户帮助中心", () => {
         );
       }
       if (url.endsWith("/events")) {
-        return new Response("", { status: 200, headers: { "Content-Type": "text/event-stream" } });
+        return openEventResponse();
       }
       throw new Error(`unexpected request: ${url}`);
     });
@@ -966,10 +964,21 @@ function publicEvent(id: string, type: string, payload: unknown, generation = 1)
 }
 
 function eventResponse(events: string[]) {
-  return new Response(events.join(""), {
-    status: 200,
-    headers: { "Content-Type": "text/event-stream" },
-  });
+  return streamResponse(events.join(""));
+}
+
+function streamResponse(value: string) {
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        if (value) controller.enqueue(new TextEncoder().encode(value));
+      },
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream" },
+    },
+  );
 }
 
 function openEventResponse() {

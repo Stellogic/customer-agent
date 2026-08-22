@@ -9,7 +9,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpSession;
@@ -23,6 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 @WebMvcTest({AuthSessionController.class, DemoAccountController.class})
 @Import({HumanSecurityConfiguration.class, LocalDemoHumanAccountsConfiguration.class})
 @ActiveProfiles("local-demo")
+@ExtendWith(OutputCaptureExtension.class)
 class HumanSessionSecurityTest {
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper json;
@@ -187,6 +191,7 @@ class HumanSessionSecurityTest {
                 mvc.perform(get("/api/auth/csrf").session(customerSession))
                         .andExpect(status().isOk())
                         .andReturn();
+        String customerToken = token(customerCsrf);
 
         MvcResult supportLogin =
                 mvc.perform(
@@ -199,6 +204,12 @@ class HumanSessionSecurityTest {
                         .andReturn();
         MockHttpSession supportSession =
                 (MockHttpSession) supportLogin.getRequest().getSession(false);
+        MvcResult supportCsrf =
+                mvc.perform(get("/api/auth/csrf").session(supportSession))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        String supportToken = token(supportCsrf);
+        assertThat(supportToken).isNotEqualTo(customerToken);
 
         mvc.perform(get("/api/auth/session").session(supportSession))
                 .andExpect(status().isOk())
@@ -208,6 +219,53 @@ class HumanSessionSecurityTest {
                 .andExpect(jsonPath("$.roles[0]").value("SUPPORT"))
                 .andExpect(jsonPath("$.capabilities.length()").value(1))
                 .andExpect(jsonPath("$.capabilities[0]").value("SUPPORT_WORKBENCH_ACCESS"));
+    }
+
+    @Test
+    void authenticationLifecycleWritesStructuredSecurityLogsWithoutCredentialsOrPayload(
+            CapturedOutput output) throws Exception {
+        MvcResult csrf = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andReturn();
+        MockHttpSession session = (MockHttpSession) csrf.getRequest().getSession(false);
+
+        mvc.perform(
+                        post("/api/auth/login")
+                                .session(session)
+                                .header("X-CSRF-TOKEN", token(csrf))
+                                .param("username", "customer-demo")
+                                .param("password", "do-not-log-me-78"))
+                .andExpect(status().isUnauthorized());
+
+        MvcResult refreshedCsrf =
+                mvc.perform(get("/api/auth/csrf").session(session))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        MvcResult login =
+                mvc.perform(
+                                post("/api/auth/login")
+                                        .session(session)
+                                        .header("X-CSRF-TOKEN", token(refreshedCsrf))
+                                        .param("username", "customer-demo")
+                                        .param("password", "local-demo-password"))
+                        .andExpect(status().isNoContent())
+                        .andReturn();
+        MockHttpSession authenticated = (MockHttpSession) login.getRequest().getSession(false);
+        MvcResult logoutCsrf =
+                mvc.perform(get("/api/auth/csrf").session(authenticated))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        mvc.perform(
+                        post("/api/auth/logout")
+                                .session(authenticated)
+                                .header("X-CSRF-TOKEN", token(logoutCsrf)))
+                .andExpect(status().isNoContent());
+
+        assertThat(output)
+                .contains("security_event=human_login outcome=failure")
+                .contains("security_event=human_login outcome=success subject_id=customer-demo")
+                .contains("security_event=human_logout outcome=success subject_id=customer-demo")
+                .doesNotContain("do-not-log-me-78")
+                .doesNotContain("local-demo-password")
+                .doesNotContain(token(logoutCsrf));
     }
 
     private void assertProjection(

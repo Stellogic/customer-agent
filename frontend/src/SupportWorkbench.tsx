@@ -7,6 +7,7 @@ import {
   type SseEvent,
 } from "./streamProtocol";
 import { loadCsrfToken } from "./csrf";
+import { humanSessionFetch } from "./humanSessionLifecycle";
 
 const SUPPORT_SCHEMA = "support-workbench-v1" as const;
 const lifecycleStates = [
@@ -70,17 +71,23 @@ export function SupportWorkbench() {
   const [actionError, setActionError] = useState("");
   const snapshotRef = useRef<WorkbenchSnapshot | null>(null);
   const streamController = useRef<AbortController | null>(null);
+  const reconnectTimer = useRef<number | null>(null);
 
   useEffect(() => {
     void loadSnapshot("loading");
-    return () => streamController.current?.abort();
+    return () => {
+      streamController.current?.abort();
+      if (reconnectTimer.current !== null) globalThis.clearTimeout(reconnectTimer.current);
+    };
   }, []);
 
   async function loadSnapshot(status: "loading" | "syncing" | "resetting" = "syncing") {
     streamController.current?.abort();
+    if (reconnectTimer.current !== null) globalThis.clearTimeout(reconnectTimer.current);
+    reconnectTimer.current = null;
     setConnection(status);
     try {
-      const response = await fetch("/api/support/workbench/snapshot", {
+      const response = await humanSessionFetch("/api/support/workbench/snapshot", {
         credentials: "same-origin",
         cache: "no-store",
       });
@@ -100,7 +107,7 @@ export function SupportWorkbench() {
     const controller = new AbortController();
     streamController.current = controller;
     try {
-      const response = await fetch("/api/support/workbench/events", {
+      const response = await humanSessionFetch("/api/support/workbench/events", {
         headers: { "Last-Event-ID": cursor, Accept: "text/event-stream" },
         credentials: "same-origin",
         cache: "no-store",
@@ -119,8 +126,16 @@ export function SupportWorkbench() {
     } catch {
       // The last snapshot stays visible but is explicitly marked stale.
     }
-    if (!controller.signal.aborted && streamController.current === controller)
-      setConnection("stale");
+    if (!controller.signal.aborted && streamController.current === controller) {
+      snapshotRef.current = null;
+      setSnapshot(null);
+      setDetails(null);
+      setConnection("syncing");
+      reconnectTimer.current = globalThis.setTimeout(() => {
+        reconnectTimer.current = null;
+        if (streamController.current === controller) void loadSnapshot("syncing");
+      }, 250);
+    }
   }
 
   async function recoverFromSnapshot(controller: AbortController) {
@@ -199,13 +214,13 @@ export function SupportWorkbench() {
     setActionError("");
     try {
       const csrf = await loadCsrfToken();
-      const claim = await fetch(`/api/support/workbench/tickets/${ticketId}/claims`, {
+      const claim = await humanSessionFetch(`/api/support/workbench/tickets/${ticketId}/claims`, {
         method: "POST",
         credentials: "same-origin",
         headers: { [csrf.headerName]: csrf.token },
       });
       if (!claim.ok) throw new Error("claim rejected");
-      const detailResponse = await fetch(`/api/support/workbench/tickets/${ticketId}`, {
+      const detailResponse = await humanSessionFetch(`/api/support/workbench/tickets/${ticketId}`, {
         credentials: "same-origin",
         cache: "no-store",
       });

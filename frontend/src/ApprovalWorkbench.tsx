@@ -7,6 +7,7 @@ import {
   type SseEvent,
 } from "./streamProtocol";
 import { loadCsrfToken } from "./csrf";
+import { humanSessionFetch } from "./humanSessionLifecycle";
 
 const APPROVAL_SCHEMA = "approval-view-v1" as const;
 
@@ -65,7 +66,7 @@ export function ApprovalWorkbench() {
 
   async function loadQueue() {
     try {
-      const response = await fetch("/api/approver/compensation-proposals", {
+      const response = await humanSessionFetch("/api/approver/compensation-proposals", {
         credentials: "same-origin",
         cache: "no-store",
       });
@@ -84,16 +85,19 @@ export function ApprovalWorkbench() {
     setStatus("正在领取审批责任…");
     try {
       const csrf = await loadCsrfToken();
-      const response = await fetch(`/api/approver/compensation-proposals/${revisionId}/claims`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          [csrf.headerName]: csrf.token,
-          "Content-Type": "application/json",
-          "Idempotency-Key": globalThis.crypto.randomUUID(),
+      const response = await humanSessionFetch(
+        `/api/approver/compensation-proposals/${revisionId}/claims`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            [csrf.headerName]: csrf.token,
+            "Content-Type": "application/json",
+            "Idempotency-Key": globalThis.crypto.randomUUID(),
+          },
+          body: JSON.stringify({ requestedLeaseSeconds: 900 }),
         },
-        body: JSON.stringify({ requestedLeaseSeconds: 900 }),
-      });
+      );
       if (!response.ok) throw new Error("claim rejected");
       const lease = (await response.json()) as unknown;
       if (!isLease(lease)) throw new Error("invalid lease");
@@ -107,7 +111,7 @@ export function ApprovalWorkbench() {
 
   async function loadApprovalView(lease: Lease) {
     try {
-      const response = await fetch(
+      const response = await humanSessionFetch(
         `/api/approver/compensation-proposals/${lease.proposalRevisionId}/approval-view`,
         {
           headers: leaseHeaders(lease),
@@ -140,7 +144,7 @@ export function ApprovalWorkbench() {
     const controller = new AbortController();
     streamController.current = controller;
     try {
-      const response = await fetch(
+      const response = await humanSessionFetch(
         `/api/approver/compensation-proposals/${lease.proposalRevisionId}/approval-view/events`,
         {
           headers: { ...leaseHeaders(lease), "Last-Event-ID": cursor, Accept: "text/event-stream" },
@@ -208,7 +212,7 @@ export function ApprovalWorkbench() {
           };
     try {
       const csrf = await loadCsrfToken();
-      const response = await fetch(
+      const response = await humanSessionFetch(
         `/api/approver/compensation-proposals/${lease.proposalRevisionId}/${decision}`,
         {
           method: "POST",
@@ -236,7 +240,7 @@ export function ApprovalWorkbench() {
     if (!lease) return;
     try {
       const csrf = await loadCsrfToken();
-      const response = await fetch(
+      const response = await humanSessionFetch(
         `/api/approver/compensation-proposals/${lease.proposalRevisionId}/release`,
         {
           method: "POST",

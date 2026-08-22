@@ -61,7 +61,7 @@ public final class CustomerTicketController {
         return AuthorizedSsePollingStream.open(
                 "customer-ticket-events-" + ticketId,
                 250,
-                60_000L,
+                AuthorizedSsePollingStream.MAX_AUTHORIZATION_STALENESS_MILLIS,
                 cursor,
                 new AuthorizedSsePollingStream.Source<CustomerPublicEvent>() {
                     @Override

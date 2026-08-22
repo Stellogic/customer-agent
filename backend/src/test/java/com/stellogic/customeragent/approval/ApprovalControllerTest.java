@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 class ApprovalControllerTest {
     private static final UUID REVISION_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
@@ -212,6 +213,17 @@ class ApprovalControllerTest {
                 .andExpect(request().asyncStarted());
 
         verify(service, timeout(1_000).atLeast(3)).requireCurrentView(any());
+    }
+
+    @Test
+    void humanApprovalStreamHasAServerEnforcedSixtySecondAuthorizationWindow() {
+        when(service.events(any(), any())).thenReturn(List.of());
+        SseEmitter emitter =
+                new ApprovalController(service)
+                        .events(approver(), LEASE_TOKEN, 1L, "approval-view-v1:0", REVISION_ID);
+
+        org.assertj.core.api.Assertions.assertThat(emitter.getTimeout()).isEqualTo(60_000L);
+        emitter.complete();
     }
 
     @Test

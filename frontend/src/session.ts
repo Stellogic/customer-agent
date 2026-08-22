@@ -1,5 +1,6 @@
 import { createContext, use } from "react";
-import type { CurrentSession } from "./authContract";
+import { parseCurrentSession, type CurrentSession } from "./authContract";
+import { humanSessionFetch } from "./humanSessionLifecycle";
 
 const SessionContext = createContext<CurrentSession | null>(null);
 
@@ -13,7 +14,7 @@ export const CurrentSessionContext = {
 };
 
 export async function loadOptionalCurrentSession(): Promise<CurrentSession | undefined> {
-  const response = await fetch("/api/auth/session", {
+  const response = await humanSessionFetch("/api/auth/session", {
     credentials: "same-origin",
     cache: "no-store",
   });
@@ -29,31 +30,7 @@ export async function loadCurrentSession(): Promise<CurrentSession> {
 }
 
 async function readCurrentSession(response: Response): Promise<CurrentSession> {
-  const value = (await response.json()) as unknown;
-  if (!isCurrentSession(value)) throw new Error("invalid session response");
-  return value;
-}
-
-function isCurrentSession(value: unknown): value is CurrentSession {
-  if (!isRecord(value)) return false;
-  return (
-    Object.keys(value).every((key) =>
-      ["id", "displayName", "subjectType", "roles", "capabilities"].includes(key),
-    ) &&
-    typeof value.id === "string" &&
-    typeof value.displayName === "string" &&
-    (value.subjectType === "CUSTOMER" || value.subjectType === "INTERNAL") &&
-    Array.isArray(value.roles) &&
-    value.roles.every((entry) => ["CUSTOMER", "SUPPORT", "APPROVER"].includes(String(entry))) &&
-    Array.isArray(value.capabilities) &&
-    value.capabilities.every((entry) =>
-      ["CUSTOMER_HELP_ACCESS", "SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS"].includes(
-        String(entry),
-      ),
-    )
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  const session = parseCurrentSession(await response.json());
+  if (!session) throw new Error("invalid session response");
+  return session;
 }
