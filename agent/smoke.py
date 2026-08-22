@@ -1211,6 +1211,420 @@ def main() -> None:
             )
         return fixture_ticket_id, fixture_generation_id, fixture_revision_id
 
+    def record_support_participation(
+        ticket_id: uuid.UUID, revision_id: uuid.UUID, support_id: str, event_type: str
+    ) -> None:
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            participant_proposal_id = connection.execute(
+                "select proposal_id from compensation_proposal_revision where id = %s",
+                (revision_id,),
+            ).fetchone()[0]
+            # Production content-action writers must lock before the audit INSERT so a waiter
+            # starts that statement with a fresh READ COMMITTED snapshot. Locking only inside
+            # the trigger would serialize writers but retain the INSERT statement's old snapshot.
+            connection.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"{participant_proposal_id}\nPROPOSAL_SUPPORT_PARTICIPANT_LINEAGE",),
+            )
+            connection.execute(
+                "insert into audit_event "
+                "(ticket_id, event_type, actor_id, occurred_at, subject_type, subject_id) "
+                "values (%s, %s, %s, clock_timestamp(), "
+                "'COMPENSATION_PROPOSAL_REVISION', %s)",
+                (ticket_id, event_type, support_id, revision_id),
+            )
+
+    participant_digest = "7" * 64
+    participant_ticket_id, participant_generation_id, participant_revision_id = (
+        seed_pending_decision_fixture(
+            "ORDER-DELAY-CANCELLED", participant_digest, "禁止自审继承验收"
+        )
+    )
+    record_support_participation(
+        participant_ticket_id,
+        participant_revision_id,
+        "internal-demo",
+        "COMPENSATION_PROPOSAL_REVISION_CREATED_BY_SUPPORT",
+    )
+    record_support_participation(
+        participant_ticket_id,
+        participant_revision_id,
+        "internal-demo",
+        "COMPENSATION_PROPOSAL_REVISION_SUBMITTED_BY_SUPPORT",
+    )
+    derived_revision_id = uuid.uuid4()
+    derived_generation_id = uuid.uuid4()
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        proposal_id = connection.execute(
+            "select proposal_id from compensation_proposal_revision where id = %s",
+            (participant_revision_id,),
+        ).fetchone()[0]
+        connection.execute(
+            "update compensation_proposal_revision set status = 'SUPERSEDED' where id = %s",
+            (participant_revision_id,),
+        )
+        connection.execute(
+            "update agent_processing_generation set status = 'SUPERSEDED' where id = %s",
+            (participant_generation_id,),
+        )
+        connection.execute(
+            "insert into agent_processing_generation "
+            "(id, ticket_id, generation_number, thread_id, status, created_at) "
+            "values (%s, %s, 2, %s, 'ACTIVE', '2026-08-09T13:58:00Z')",
+            (derived_generation_id, participant_ticket_id, uuid.uuid4()),
+        )
+        connection.execute(
+            "insert into compensation_proposal_revision "
+            "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, "
+            "delay_hours, delay_seconds, compensation_method, amount, reason_code, "
+            "evidence_references, policy_version, content_digest, status, created_at, expires_at) "
+            "select %s, proposal_id, 2, ticket_id, order_reference, %s, delay_hours, "
+            "delay_seconds, compensation_method, amount, reason_code, evidence_references, "
+            "policy_version, %s, 'PENDING_APPROVAL', "
+            "'2026-08-09T13:58:00Z', '2026-08-10T13:58:00Z' "
+            "from compensation_proposal_revision where id = %s",
+            (derived_revision_id, derived_generation_id, "8" * 64, participant_revision_id),
+        )
+        connection.execute(
+            "insert into approval_evidence_snapshot "
+            "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "
+            "total_available_compensation_amount, active_reservation_amount, "
+            "remaining_available_compensation_amount, paid, cancelled, fully_refunded, "
+            "existing_compensation, evidence_references, captured_at) "
+            "select %s, order_reference, delay_hours, delay_seconds, paid_amount, "
+            "total_available_compensation_amount, active_reservation_amount, "
+            "remaining_available_compensation_amount, paid, cancelled, fully_refunded, "
+            "existing_compensation, evidence_references, captured_at "
+            "from approval_evidence_snapshot where proposal_revision_id = %s",
+            (derived_revision_id, participant_revision_id),
+        )
+        assert connection.execute(
+            "select support_id from compensation_proposal_revision_support_participant "
+            "where proposal_revision_id = %s",
+            (derived_revision_id,),
+        ).fetchall() == [("internal-demo",)]
+        assert (
+            connection.execute(
+                "select count(*) from compensation_proposal_revision_support_participant "
+                "where proposal_revision_id = %s and support_id = 'internal-demo'",
+                (participant_revision_id,),
+            ).fetchone()[0]
+            == 1
+        )
+
+    lineage_race_revision_id = uuid.uuid4()
+    lineage_race_generation_id = uuid.uuid4()
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "update compensation_proposal_revision set status = 'SUPERSEDED' where id = %s",
+            (derived_revision_id,),
+        )
+        connection.execute(
+            "update agent_processing_generation set status = 'SUPERSEDED' where id = %s",
+            (derived_generation_id,),
+        )
+        connection.execute(
+            "insert into agent_processing_generation "
+            "(id, ticket_id, generation_number, thread_id, status, created_at) "
+            "values (%s, %s, 3, %s, 'ACTIVE', '2026-08-09T13:59:00Z')",
+            (lineage_race_generation_id, participant_ticket_id, uuid.uuid4()),
+        )
+
+    lineage_barrier = threading.Barrier(2)
+
+    def derive_lineage_revision() -> None:
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            lineage_barrier.wait()
+            connection.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"{proposal_id}\nPROPOSAL_SUPPORT_PARTICIPANT_LINEAGE",),
+            )
+            connection.execute(
+                "select id from compensation_proposal_revision where id = %s for update",
+                (derived_revision_id,),
+            )
+            connection.execute(
+                "insert into compensation_proposal_revision "
+                "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, "
+                "delay_hours, delay_seconds, compensation_method, amount, reason_code, "
+                "evidence_references, policy_version, content_digest, status, created_at, "
+                "expires_at) "
+                "select %s, proposal_id, 3, ticket_id, order_reference, %s, delay_hours, "
+                "delay_seconds, compensation_method, amount, reason_code, evidence_references, "
+                "policy_version, %s, 'PENDING_APPROVAL', "
+                "'2026-08-09T13:59:00Z', '2026-08-10T13:59:00Z' "
+                "from compensation_proposal_revision where id = %s",
+                (
+                    lineage_race_revision_id,
+                    lineage_race_generation_id,
+                    "9" * 64,
+                    derived_revision_id,
+                ),
+            )
+
+    def append_ancestor_participant() -> None:
+        lineage_barrier.wait()
+        record_support_participation(
+            participant_ticket_id,
+            participant_revision_id,
+            "late-lineage-support",
+            "COMPENSATION_PROPOSAL_REVISION_MODIFIED_BY_SUPPORT",
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        derive_future = executor.submit(derive_lineage_revision)
+        participant_future = executor.submit(append_ancestor_participant)
+        derive_future.result(timeout=20)
+        participant_future.result(timeout=20)
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into approval_evidence_snapshot "
+            "(proposal_revision_id, order_reference, delay_hours, delay_seconds, paid_amount, "
+            "total_available_compensation_amount, active_reservation_amount, "
+            "remaining_available_compensation_amount, paid, cancelled, fully_refunded, "
+            "existing_compensation, evidence_references, captured_at) "
+            "select %s, order_reference, delay_hours, delay_seconds, paid_amount, "
+            "total_available_compensation_amount, active_reservation_amount, "
+            "remaining_available_compensation_amount, paid, cancelled, fully_refunded, "
+            "existing_compensation, evidence_references, captured_at "
+            "from approval_evidence_snapshot where proposal_revision_id = %s",
+            (lineage_race_revision_id, derived_revision_id),
+        )
+        assert connection.execute(
+            "select support_id from compensation_proposal_revision_support_participant "
+            "where proposal_revision_id = %s order by support_id",
+            (lineage_race_revision_id,),
+        ).fetchall() == [("internal-demo",), ("late-lineage-support",)]
+    derived_revision_id = lineage_race_revision_id
+
+    independent_digest = "6" * 64
+    independent_ticket_id, _, independent_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-UNPAID", independent_digest, "独立提案与负责客服资格验收"
+    )
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into support_assignment "
+            "(id, ticket_id, support_id, status, assigned_at) "
+            "values (%s, %s, 'internal-demo', 'ACTIVE', clock_timestamp())",
+            (uuid.uuid4(), independent_ticket_id),
+        )
+        assert (
+            connection.execute(
+                "select count(*) from compensation_proposal_revision_support_participant "
+                "where proposal_revision_id = %s",
+                (independent_revision_id,),
+            ).fetchone()[0]
+            == 0
+        )
+
+    with httpx.Client(timeout=20.0) as dual_client:
+        login_human(
+            dual_client,
+            spring_url,
+            "internal-demo",
+            ["SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS"],
+        )
+        dual_queue = dual_client.get(f"{spring_url}/api/approver/compensation-proposals")
+        expect_status(dual_queue, 200)
+        dual_queue_ids = {item["proposalRevisionId"] for item in dual_queue.json()}
+        assert str(derived_revision_id) not in dual_queue_ids
+        assert str(independent_revision_id) in dual_queue_ids
+
+        forbidden_claim = dual_client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{derived_revision_id}/claims",
+            headers={"Idempotency-Key": f"participant-claim-{uuid.uuid4()}"},
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(forbidden_claim, 404)
+
+        eligible_claim = dual_client.post(
+            f"{spring_url}/api/approver/compensation-proposals/{independent_revision_id}/claims",
+            headers={"Idempotency-Key": f"eligible-claim-{uuid.uuid4()}"},
+            json={"requestedLeaseSeconds": 900},
+        )
+        expect_status(eligible_claim, 201)
+        eligible_lease = eligible_claim.json()
+        eligible_rejection_request_id = f"eligible-reject-{uuid.uuid4()}"
+        eligible_rejection_url = (
+            f"{spring_url}/api/approver/compensation-proposals/{independent_revision_id}/reject"
+        )
+        eligible_rejection_body = {
+            "proposalRevision": 1,
+            "contentDigest": independent_digest,
+            "internalReason": "未参与提案内容，仍有审批资格",
+        }
+        eligible_rejection = dual_client.post(
+            eligible_rejection_url,
+            headers={
+                "Idempotency-Key": eligible_rejection_request_id,
+                "X-Approval-Lease-Token": eligible_lease["leaseToken"],
+                "X-Approval-Lease-Version": str(eligible_lease["leaseVersion"]),
+            },
+            json=eligible_rejection_body,
+        )
+        expect_status(eligible_rejection, 200)
+        record_support_participation(
+            independent_ticket_id,
+            independent_revision_id,
+            "internal-demo",
+            "COMPENSATION_PROPOSAL_REVISION_SUBMITTED_BY_SUPPORT",
+        )
+        forbidden_decision_replay = dual_client.post(
+            eligible_rejection_url,
+            headers={
+                "Idempotency-Key": eligible_rejection_request_id,
+                "X-Approval-Lease-Token": eligible_lease["leaseToken"],
+                "X-Approval-Lease-Version": str(eligible_lease["leaseVersion"]),
+            },
+            json=eligible_rejection_body,
+        )
+        expect_status(forbidden_decision_replay, 404)
+
+    for decision, order_reference, content_digest in (
+        ("approve", "ORDER-DELAY-REFUNDED", "4" * 64),
+        ("reject", "ORDER-DELAY-COMPENSATED", "5" * 64),
+    ):
+        decision_ticket_id, _, decision_revision_id = seed_pending_decision_fixture(
+            order_reference, content_digest, f"参与后禁止{decision}验收"
+        )
+        with httpx.Client(timeout=20.0) as dual_client:
+            login_human(
+                dual_client,
+                spring_url,
+                "internal-demo",
+                ["SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS"],
+            )
+            claim_request_id = f"pre-participation-{uuid.uuid4()}"
+            claim_url = (
+                f"{spring_url}/api/approver/compensation-proposals/{decision_revision_id}/claims"
+            )
+            claim = dual_client.post(
+                claim_url,
+                headers={"Idempotency-Key": claim_request_id},
+                json={"requestedLeaseSeconds": 900},
+            )
+            expect_status(claim, 201)
+            lease = claim.json()
+            record_support_participation(
+                decision_ticket_id,
+                decision_revision_id,
+                "internal-demo",
+                "COMPENSATION_PROPOSAL_REVISION_MODIFIED_BY_SUPPORT",
+            )
+            forbidden_claim_replay = dual_client.post(
+                claim_url,
+                headers={"Idempotency-Key": claim_request_id},
+                json={"requestedLeaseSeconds": 900},
+            )
+            expect_status(forbidden_claim_replay, 404)
+            rejected_decision = dual_client.post(
+                f"{spring_url}/api/approver/compensation-proposals/{decision_revision_id}/{decision}",
+                headers={
+                    "Idempotency-Key": f"post-participation-{uuid.uuid4()}",
+                    "X-Approval-Lease-Token": lease["leaseToken"],
+                    "X-Approval-Lease-Version": str(lease["leaseVersion"]),
+                },
+                json={
+                    "proposalRevision": 1,
+                    "contentDigest": content_digest,
+                    **(
+                        {"internalReason": "不得自审"}
+                        if decision == "reject"
+                        else {"internalNote": "不得自审"}
+                    ),
+                },
+            )
+            expect_status(rejected_decision, 404)
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            assert (
+                connection.execute(
+                    "select status from approval_lease where proposal_revision_id = %s",
+                    (decision_revision_id,),
+                ).fetchone()[0]
+                == "REVOKED"
+            )
+            assert (
+                connection.execute(
+                    "select count(*) from proposal_decision where proposal_revision_id = %s",
+                    (decision_revision_id,),
+                ).fetchone()[0]
+                == 0
+            )
+            connection.execute(
+                "update compensation_proposal_revision set status = 'SUPERSEDED' where id = %s",
+                (decision_revision_id,),
+            )
+
+    participant_race_ticket_id, _, race_revision_id = seed_pending_decision_fixture(
+        "ORDER-DELAY-LOW-ALLOWANCE", "3" * 64, "参与事实与领取竞争验收"
+    )
+    participant_claim_barrier = threading.Barrier(2)
+
+    def race_participant_claim() -> int:
+        with httpx.Client(timeout=20.0) as dual_client:
+            login_human(
+                dual_client,
+                spring_url,
+                "internal-demo",
+                ["SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS"],
+            )
+            participant_claim_barrier.wait()
+            return dual_client.post(
+                f"{spring_url}/api/approver/compensation-proposals/{race_revision_id}/claims",
+                headers={"Idempotency-Key": f"participant-race-{uuid.uuid4()}"},
+                json={"requestedLeaseSeconds": 900},
+            ).status_code
+
+    def race_participation_fact() -> None:
+        participant_claim_barrier.wait()
+        record_support_participation(
+            participant_race_ticket_id,
+            race_revision_id,
+            "internal-demo",
+            "COMPENSATION_PROPOSAL_REVISION_MODIFIED_BY_SUPPORT",
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        claim_future = executor.submit(race_participant_claim)
+        participant_future = executor.submit(race_participation_fact)
+        participant_future.result(timeout=20)
+        assert claim_future.result(timeout=20) in (201, 404)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert (
+            connection.execute(
+                "select count(*) from compensation_proposal_revision_support_participant "
+                "where proposal_revision_id = %s and support_id = 'internal-demo'",
+                (race_revision_id,),
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            connection.execute(
+                "select count(*) from approval_lease where proposal_revision_id = %s "
+                "and status = 'ACTIVE'",
+                (race_revision_id,),
+            ).fetchone()[0]
+            == 0
+        )
+        connection.execute(
+            "update compensation_proposal_revision set status = 'SUPERSEDED' where id = %s",
+            (race_revision_id,),
+        )
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert (
+            connection.execute(
+                "select count(*) from approval_lease where proposal_revision_id = %s",
+                (derived_revision_id,),
+            ).fetchone()[0]
+            == 0
+        )
+        connection.execute(
+            "update compensation_proposal_revision set status = 'SUPERSEDED' where id = %s",
+            (derived_revision_id,),
+        )
+
     reserved_request = f"issue-55-{uuid.uuid4()}"
     with customer_browser_client(spring_url) as client:
         reserved_ticket = client.post(

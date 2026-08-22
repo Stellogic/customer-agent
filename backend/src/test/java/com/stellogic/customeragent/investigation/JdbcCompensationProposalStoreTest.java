@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.investigation;
 
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 class JdbcCompensationProposalStoreTest {
@@ -20,6 +22,13 @@ class JdbcCompensationProposalStoreTest {
         CompensationProposalExpiry expiry =
                 org.mockito.Mockito.mock(CompensationProposalExpiry.class);
         Instant lockProtectedNow = Instant.parse("2026-08-09T14:00:00Z");
+        UUID existingProposalId = UUID.randomUUID();
+        when(jdbc.query(
+                        org.mockito.ArgumentMatchers.contains("select distinct proposal_id"),
+                        org.mockito.ArgumentMatchers
+                                .<org.springframework.jdbc.core.RowMapper<UUID>>any(),
+                        org.mockito.ArgumentMatchers.eq("ORDER-DELAY-001")))
+                .thenReturn(List.of(existingProposalId));
         when(expiry.expireDueForOrder("ORDER-DELAY-001")).thenReturn(lockProtectedNow);
         var store = new JdbcCompensationProposalStore(jdbc, expiry);
 
@@ -44,6 +53,24 @@ class JdbcCompensationProposalStoreTest {
                         false));
 
         verify(expiry).expireDueForOrder("ORDER-DELAY-001");
+        InOrder lockOrder = inOrder(jdbc, expiry);
+        lockOrder
+                .verify(jdbc)
+                .query(
+                        org.mockito.ArgumentMatchers.contains("select distinct proposal_id"),
+                        org.mockito.ArgumentMatchers
+                                .<org.springframework.jdbc.core.RowMapper<UUID>>any(),
+                        org.mockito.ArgumentMatchers.eq("ORDER-DELAY-001"));
+        lockOrder
+                .verify(jdbc)
+                .query(
+                        org.mockito.ArgumentMatchers.contains(
+                                "pg_advisory_xact_lock(hashtextextended"),
+                        org.mockito.ArgumentMatchers
+                                .<org.springframework.jdbc.core.ResultSetExtractor<Void>>any(),
+                        org.mockito.ArgumentMatchers.eq(
+                                existingProposalId + "\nPROPOSAL_SUPPORT_PARTICIPANT_LINEAGE"));
+        lockOrder.verify(expiry).expireDueForOrder("ORDER-DELAY-001");
         ArgumentCaptor<Object[]> arguments = ArgumentCaptor.forClass(Object[].class);
         verify(jdbc, atLeastOnce())
                 .update(

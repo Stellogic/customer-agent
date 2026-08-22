@@ -93,7 +93,7 @@ describe("Issue #73 静态路由与两个界面壳", () => {
     }
   });
 
-  it("双角色内部默认页只展示两个 capability 入口且不预读业务数据", async () => {
+  it("Issue #77 双角色内部默认页只展示两个 capability 入口且不预读业务数据", async () => {
     globalThis.history.replaceState(null, "", "/internal");
     const fetchMock = mockSession(dualRole);
 
