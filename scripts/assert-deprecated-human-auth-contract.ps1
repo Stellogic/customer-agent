@@ -1,9 +1,9 @@
 $ErrorActionPreference = "Stop"
 
 $legacyHeaders = 'X-Synthetic-(Customer|Support|Approver)-Id'
-$headerMatches = @(& rg -n -i $legacyHeaders .)
+$headerMatches = @(& git grep -n -i -E $legacyHeaders -- .)
 if ($LASTEXITCODE -notin @(0, 1)) {
-    throw "扫描仓库旧人工身份头失败，rg exit code: $LASTEXITCODE"
+    throw "扫描仓库旧人工身份头失败，git grep exit code: $LASTEXITCODE"
 }
 $negativeHeaderTestAllowlist = @(
     'backend/src/test/java/com/stellogic/customeragent/ticket/CustomerTicketPrincipalSecurityTest.java',
@@ -23,9 +23,9 @@ if ($unexpectedHeaderMatches.Count -gt 0) {
     throw "旧人工身份头只允许存在于明确的伪造攻击或不发送断言中：`n$($unexpectedHeaderMatches -join "`n")"
 }
 
-$legacyEntryMatches = @(& rg -n -i '/api/demo|synthetic-demo-session' .)
+$legacyEntryMatches = @(& git grep -n -i -E '/api/demo|synthetic-demo-session' -- .)
 if ($LASTEXITCODE -notin @(0, 1)) {
-    throw "扫描旧身份入口失败，rg exit code: $LASTEXITCODE"
+    throw "扫描旧身份入口失败，git grep exit code: $LASTEXITCODE"
 }
 $legacyEntryAllowlist = @(
     'docs/decisions/0002-static-react-shell-stack.md',
