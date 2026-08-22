@@ -2,6 +2,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApprovalWorkbench } from "./ApprovalWorkbench";
 
+vi.mock("./csrf", () => ({
+  loadCsrfToken: async () => ({ token: "approval-csrf", headerName: "X-CSRF-TOKEN" }),
+}));
+
 const REVISION_ID = "27000000-0000-0000-0000-000000000001";
 const LEASE_TOKEN = "27000000-0000-0000-0000-000000000002";
 
@@ -53,10 +57,16 @@ describe("审批视图授权撤销", () => {
       )
       .mockResolvedValueOnce(new Response(null, { status: 403 }));
 
-    render(<ApprovalWorkbench approverId="approver-demo" />);
+    render(<ApprovalWorkbench />);
 
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
     expect(await screen.findByText("order:ORDER-DELAY-001")).toBeInTheDocument();
+    const claimRequest = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.find(([input]) => String(input).endsWith("/claims"))?.[1];
+    const claimHeaders = new Headers(claimRequest?.headers);
+    expect(claimHeaders.get("X-CSRF-TOKEN")).toBe("approval-csrf");
+    expect(claimHeaders.has("X-Synthetic-Approver-Id")).toBe(false);
     expect(screen.getByRole("button", { name: "批准补偿" })).toBeInTheDocument();
     closeStream?.();
     await waitFor(() =>
@@ -114,7 +124,7 @@ describe("审批视图授权撤销", () => {
       .mockResolvedValueOnce(Response.json({ ...approvalSnapshot(), cursor: "approval-view-v1:2" }))
       .mockResolvedValueOnce(openStream());
 
-    render(<ApprovalWorkbench approverId="approver-demo" />);
+    render(<ApprovalWorkbench />);
 
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
     expect(await screen.findByText("order:ORDER-DELAY-001")).toBeInTheDocument();
@@ -140,13 +150,68 @@ describe("审批视图授权撤销", () => {
     globalThis.history.replaceState(null, "", `/internal/approvals?revision=${REVISION_ID}`);
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json([]));
 
-    render(<ApprovalWorkbench approverId="approver-demo" />);
+    render(<ApprovalWorkbench />);
 
     expect(
       await screen.findByRole("heading", { level: 1, name: "待审批补偿" }),
     ).toBeInTheDocument();
     expect(globalThis.location.search).toBe("");
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("释放审批使用当前 Session 的 CSRF 和租约围栏且不发送合成审批人", async () => {
+    let queueReads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/approver/compensation-proposals") {
+        queueReads += 1;
+        return Response.json(
+          queueReads === 1
+            ? [
+                {
+                  proposalRevisionId: REVISION_ID,
+                  compensationMethod: "COUPON",
+                  amount: 20,
+                  submittedAt: "2026-08-11T03:00:00Z",
+                  expiresAt: "2026-08-12T03:00:00Z",
+                },
+              ]
+            : [],
+        );
+      }
+      if (path.endsWith("/claims")) {
+        return Response.json(
+          {
+            proposalRevisionId: REVISION_ID,
+            leaseToken: LEASE_TOKEN,
+            leaseVersion: 1,
+            expiresAt: "2026-08-11T03:15:00Z",
+            replayed: false,
+          },
+          { status: 201 },
+        );
+      }
+      if (path.endsWith("/approval-view")) return Response.json(approvalSnapshot());
+      if (path.endsWith("/approval-view/events")) return openStream();
+      if (path.endsWith("/release")) {
+        return Response.json({ proposalRevisionId: REVISION_ID, released: true, replayed: false });
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<ApprovalWorkbench />);
+    fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
+    fireEvent.click(await screen.findByRole("button", { name: "释放审批" }));
+
+    expect(await screen.findByText("审批责任已释放，已返回队列。")).toBeInTheDocument();
+    const releaseRequest = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.find(([input]) => String(input).endsWith("/release"))?.[1];
+    const releaseHeaders = new Headers(releaseRequest?.headers);
+    expect(releaseHeaders.get("X-CSRF-TOKEN")).toBe("approval-csrf");
+    expect(releaseHeaders.get("X-Approval-Lease-Token")).toBe(LEASE_TOKEN);
+    expect(releaseHeaders.get("X-Approval-Lease-Version")).toBe("1");
+    expect(releaseHeaders.has("X-Synthetic-Approver-Id")).toBe(false);
   });
 
   it("旧事件被忽略而序号缺口和非法 payload 触发完整快照重置", async () => {
@@ -190,7 +255,7 @@ describe("审批视图授权撤销", () => {
       .mockResolvedValueOnce(Response.json({ ...approvalSnapshot(), cursor: "approval-view-v1:4" }))
       .mockResolvedValueOnce(openStream());
 
-    render(<ApprovalWorkbench approverId="approver-demo" />);
+    render(<ApprovalWorkbench />);
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
 
     await waitFor(() =>

@@ -3,7 +3,7 @@ package com.stellogic.customeragent.approval;
 import java.util.List;
 
 interface ApprovalService {
-    List<ApprovalModels.QueueItem> queue();
+    List<ApprovalModels.QueueItem> queue(String approverId);
 
     ApprovalModels.LeaseResult claim(ApprovalModels.ClaimCommand command);
 

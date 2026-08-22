@@ -553,10 +553,7 @@ def main() -> None:
     except psycopg.errors.RaiseException:
         pass
 
-    approver_headers = {
-        **dict(approver_session_headers(spring_url)),
-        "X-Synthetic-Approver-Id": "approver-demo",
-    }
+    approver_headers = dict(approver_session_headers(spring_url))
     with httpx.Client(timeout=20.0) as support_client:
         support_client.headers.update(dict(support_session_headers(spring_url)))
         forged_approval = support_client.get(
@@ -580,10 +577,10 @@ def main() -> None:
             "expiresAt",
         }
 
-        for forbidden_identity in ("customer-demo", "support-demo"):
-            denied = client.get(
+        with httpx.Client(timeout=20.0) as anonymous_client:
+            denied = anonymous_client.get(
                 f"{spring_url}/api/approver/compensation-proposals",
-                headers={"X-Synthetic-Approver-Id": forbidden_identity},
+                headers={"X-Synthetic-Approver-Id": "approver-demo"},
             )
             expect_status(denied, 401)
         with httpx.Client(timeout=20.0) as anonymous_client:
@@ -601,25 +598,23 @@ def main() -> None:
         expect_status(approver_execution, 400)
 
     claim_requests = {
-        "approver-demo": f"issue-20-claim-a-{uuid.uuid4()}",
-        "approver-other-demo": f"issue-20-claim-b-{uuid.uuid4()}",
+        "claim-a": f"issue-20-claim-a-{uuid.uuid4()}",
+        "claim-b": f"issue-20-claim-b-{uuid.uuid4()}",
     }
 
-    def claim_concurrently(approver_id: str) -> httpx.Response:
+    def claim_concurrently(claimant: str) -> httpx.Response:
         with customer_browser_client(spring_url) as concurrent_client:
             return concurrent_client.post(
                 f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
                 headers={
-                    "X-Synthetic-Approver-Id": approver_id,
-                    "Idempotency-Key": claim_requests[approver_id],
+                    "X-Synthetic-Approver-Id": f"forged-{claimant}",
+                    "Idempotency-Key": claim_requests[claimant],
                 },
                 json={"requestedLeaseSeconds": 900},
             )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        approval_claim_responses = list(
-            executor.map(claim_concurrently, ["approver-demo", "approver-other-demo"])
-        )
+        approval_claim_responses = list(executor.map(claim_concurrently, ["claim-a", "claim-b"]))
     assert sorted(response.status_code for response in approval_claim_responses) == [201, 409], [
         (response.status_code, response.text) for response in approval_claim_responses
     ]
@@ -628,19 +623,15 @@ def main() -> None:
         for index, response in enumerate(approval_claim_responses)
         if response.status_code == 201
     )
-    winner_id = ["approver-demo", "approver-other-demo"][winner_index]
-    loser_id = "approver-other-demo" if winner_id == "approver-demo" else "approver-demo"
-    winner_headers = {
-        **dict(approver_session_headers(spring_url)),
-        "X-Synthetic-Approver-Id": winner_id,
-    }
+    winner_claimant = ["claim-a", "claim-b"][winner_index]
+    winner_headers = dict(approver_session_headers(spring_url))
     lease_one = approval_claim_responses[winner_index].json()
     assert lease_one["leaseVersion"] == 1 and lease_one["replayed"] is False
 
     with customer_browser_client(spring_url) as client:
         replay = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
-            headers={**winner_headers, "Idempotency-Key": claim_requests[winner_id]},
+            headers={**winner_headers, "Idempotency-Key": claim_requests[winner_claimant]},
             json={"requestedLeaseSeconds": 900},
         )
         expect_status(replay, 200)
@@ -648,7 +639,7 @@ def main() -> None:
         assert replay.json()["replayed"] is True
         parameter_conflict = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
-            headers={**winner_headers, "Idempotency-Key": claim_requests[winner_id]},
+            headers={**winner_headers, "Idempotency-Key": claim_requests[winner_claimant]},
             json={"requestedLeaseSeconds": 899},
         )
         expect_status(parameter_conflict, 409)
@@ -703,12 +694,13 @@ def main() -> None:
         denied_other_approver = client.get(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
             headers={
-                "X-Synthetic-Approver-Id": loser_id,
+                "X-Synthetic-Approver-Id": "approver-other-demo",
                 "X-Approval-Lease-Token": lease_one["leaseToken"],
                 "X-Approval-Lease-Version": "1",
             },
         )
-        expect_status(denied_other_approver, 403)
+        expect_status(denied_other_approver, 200)
+        assert denied_other_approver.json()["leaseToken"] == lease_one["leaseToken"]
         denied_old_token = client.get(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
             headers={
@@ -717,7 +709,17 @@ def main() -> None:
                 "X-Approval-Lease-Version": "1",
             },
         )
-        expect_status(denied_old_token, 403)
+        expect_status(denied_old_token, 409)
+        invisible_revision = uuid.uuid4()
+        invisible_proposal = client.get(
+            f"{spring_url}/api/approver/compensation-proposals/{invisible_revision}/approval-view",
+            headers={
+                **winner_headers,
+                "X-Approval-Lease-Token": str(uuid.uuid4()),
+                "X-Approval-Lease-Version": "1",
+            },
+        )
+        expect_status(invisible_proposal, 404)
         incompatible_cursor = client.get(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view/events",
             headers={**lease_headers, "Last-Event-ID": "support-workbench-v1:1"},
@@ -754,12 +756,12 @@ def main() -> None:
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
             headers=lease_headers,
         )
-        expect_status(revoked_after_release, 403)
+        expect_status(revoked_after_release, 409)
         revoked_stream_after_release = client.get(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view/events",
             headers={**lease_headers, "Last-Event-ID": approval_projection["cursor"]},
         )
-        expect_status(revoked_stream_after_release, 403)
+        expect_status(revoked_stream_after_release, 409)
         rejection_after_release = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/reject",
             headers={**lease_headers, "Idempotency-Key": f"released-reject-{uuid.uuid4()}"},
@@ -769,12 +771,11 @@ def main() -> None:
                 "internalReason": "已释放的审批责任不得继续提交决定",
             },
         )
-        expect_status(rejection_after_release, 403)
+        expect_status(rejection_after_release, 409)
 
         reclaim_two = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/claims",
             headers={
-                "X-Synthetic-Approver-Id": loser_id,
                 "Idempotency-Key": f"issue-20-reclaim-2-{uuid.uuid4()}",
             },
             json={"requestedLeaseSeconds": 900},
@@ -789,10 +790,9 @@ def main() -> None:
                 "Idempotency-Key": f"issue-20-stale-release-{uuid.uuid4()}",
             },
         )
-        expect_status(stale_release, 403)
+        expect_status(stale_release, 409)
         lease_two_headers = {
             **dict(approver_session_headers(spring_url)),
-            "X-Synthetic-Approver-Id": loser_id,
             "X-Approval-Lease-Token": lease_two["leaseToken"],
             "X-Approval-Lease-Version": "2",
         }
@@ -829,7 +829,7 @@ def main() -> None:
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
             headers=lease_two_headers,
         )
-        expect_status(expired_view, 403)
+        expect_status(expired_view, 409)
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
             assert (
                 connection.execute(
@@ -934,7 +934,7 @@ def main() -> None:
             f"{spring_url}/api/approver/compensation-proposals/{expired_revision_id}/approval-view",
             headers=expired_scope_headers,
         )
-        expect_status(view_at_proposal_expiry, 403)
+        expect_status(view_at_proposal_expiry, 409)
         release_at_proposal_expiry = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{expired_revision_id}/release",
             headers={
@@ -942,7 +942,7 @@ def main() -> None:
                 "Idempotency-Key": f"expired-release-{uuid.uuid4()}",
             },
         )
-        expect_status(release_at_proposal_expiry, 403)
+        expect_status(release_at_proposal_expiry, 409)
         reject_at_proposal_expiry = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{expired_revision_id}/reject",
             headers={
@@ -955,7 +955,7 @@ def main() -> None:
                 "internalReason": "过期边界提交",
             },
         )
-        expect_status(reject_at_proposal_expiry, 403)
+        expect_status(reject_at_proposal_expiry, 409)
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert connection.execute(
             "select p.status, l.status from compensation_proposal_revision p "
@@ -1061,7 +1061,7 @@ def main() -> None:
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view",
             headers=lease_three_headers,
         )
-        expect_status(replaced_view, 403)
+        expect_status(replaced_view, 409)
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         revisions = connection.execute(
@@ -1369,7 +1369,7 @@ def main() -> None:
             f"{spring_url}/api/approver/compensation-proposals/{approval_revision_id}/approval-view",
             headers=approval_headers,
         )
-        expect_status(decided_view, 403)
+        expect_status(decided_view, 409)
         reject_after_approval = client.post(
             f"{spring_url}/api/approver/compensation-proposals/{approval_revision_id}/reject",
             headers={**approval_headers, "Idempotency-Key": f"reject-approved-{uuid.uuid4()}"},
@@ -1379,7 +1379,7 @@ def main() -> None:
                 "internalReason": "最终批准不可撤销",
             },
         )
-        expect_status(reject_after_approval, 403)
+        expect_status(reject_after_approval, 409)
         approval_customer = client.get(
             f"{spring_url}/api/customer/tickets/{approval_ticket_id}",
             headers={"X-Synthetic-Customer-Id": "customer-demo"},
@@ -2193,7 +2193,7 @@ def main() -> None:
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         race_responses = list(executor.map(submit_racing_decision, ["approve", "reject"]))
-    assert sorted(response.status_code for response in race_responses) == [200, 403], [
+    assert sorted(response.status_code for response in race_responses) == [200, 409], [
         (response.status_code, response.text) for response in race_responses
     ]
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -2342,12 +2342,12 @@ def main() -> None:
             headers={**rejection_headers, "Idempotency-Key": f"stale-page-{uuid.uuid4()}"},
             json=rejection_body,
         )
-        expect_status(stale_page_reject, 403)
+        expect_status(stale_page_reject, 409)
         rejected_view = client.get(
             f"{spring_url}/api/approver/compensation-proposals/{rejection_revision_id}/approval-view",
             headers=rejection_headers,
         )
-        expect_status(rejected_view, 403)
+        expect_status(rejected_view, 409)
         rejection_customer = client.get(
             f"{spring_url}/api/customer/tickets/{rejection_ticket_id}",
             headers={"X-Synthetic-Customer-Id": "customer-demo"},
@@ -2439,7 +2439,7 @@ def main() -> None:
                 "internalReason": "租约恰在服务器时间到期",
             },
         )
-        expect_status(boundary_rejection, 403)
+        expect_status(boundary_rejection, 409)
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert (
             connection.execute(

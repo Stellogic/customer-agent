@@ -9,4 +9,8 @@ public final class HumanTestPrincipals {
     public static UsernamePasswordAuthenticationToken support() {
         return UsernamePasswordAuthenticationToken.authenticated("support-demo", "n/a", List.of());
     }
+
+    public static UsernamePasswordAuthenticationToken approver() {
+        return UsernamePasswordAuthenticationToken.authenticated("approver-demo", "n/a", List.of());
+    }
 }

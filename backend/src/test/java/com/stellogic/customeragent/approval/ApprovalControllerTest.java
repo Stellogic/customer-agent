@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.approval;
 
+import static com.stellogic.customeragent.identity.HumanTestPrincipals.approver;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -28,11 +29,13 @@ class ApprovalControllerTest {
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private final ApprovalService service = org.mockito.Mockito.mock(ApprovalService.class);
     private final MockMvc mvc =
-            MockMvcBuilders.standaloneSetup(new ApprovalController(service)).build();
+            MockMvcBuilders.standaloneSetup(new ApprovalController(service))
+                    .defaultRequest(get("/").principal(approver()))
+                    .build();
 
     @Test
     void approverQueueExposesOnlyTheMinimalProjection() throws Exception {
-        when(service.queue())
+        when(service.queue("approver-demo"))
                 .thenReturn(
                         List.of(
                                 new ApprovalModels.QueueItem(
@@ -156,6 +159,15 @@ class ApprovalControllerTest {
                 .andExpect(jsonPath("$.publicMessages").doesNotExist())
                 .andExpect(jsonPath("$.internalNotes").doesNotExist())
                 .andExpect(jsonPath("$.execution").doesNotExist());
+    }
+
+    @Test
+    void approvalViewWithoutLeaseFencingCredentialsReturnsConflict() throws Exception {
+        mvc.perform(
+                        get(
+                                "/api/approver/compensation-proposals/{revisionId}/approval-view",
+                                REVISION_ID))
+                .andExpect(status().isConflict());
     }
 
     @Test
@@ -303,17 +315,5 @@ class ApprovalControllerTest {
                                 """
                                                 .formatted(CONTENT_DIGEST)))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void customerOrSupportIdentityCannotUseApproverEndpoints() throws Exception {
-        mvc.perform(
-                        get("/api/approver/compensation-proposals")
-                                .header("X-Synthetic-Approver-Id", "support-demo"))
-                .andExpect(status().isUnauthorized());
-        mvc.perform(
-                        get("/api/approver/compensation-proposals")
-                                .header("X-Synthetic-Approver-Id", "customer-demo"))
-                .andExpect(status().isUnauthorized());
     }
 }
