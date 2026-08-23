@@ -17,10 +17,11 @@ $negativeHeaderTestAllowlist = @(
 )
 $unexpectedHeaderMatches = @($headerMatches | Where-Object {
     $normalized = ($_ -split ':', 2)[0].TrimStart('.', '/', '\').Replace('\', '/')
-    $normalized -notin $negativeHeaderTestAllowlist
+    $normalized -notin $negativeHeaderTestAllowlist -and
+        -not $normalized.StartsWith('docs/specs/', [System.StringComparison]::Ordinal)
 })
 if ($unexpectedHeaderMatches.Count -gt 0) {
-    throw "旧人工身份头只允许存在于明确的伪造攻击或不发送断言中：`n$($unexpectedHeaderMatches -join "`n")"
+    throw "旧人工身份头只允许存在于明确的伪造攻击、不发送断言或只读历史规格镜像中：`n$($unexpectedHeaderMatches -join "`n")"
 }
 
 $legacyEntryMatches = @(& git grep -n -i -E '/api/demo|synthetic-demo-session' -- .)
