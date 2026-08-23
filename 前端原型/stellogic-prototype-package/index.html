@@ -1,0 +1,1113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <meta name="theme-color" content="#0c3b2e" />
+  <title>Stellogic Customer Support Agent · HTML 高保真交互原型</title>
+  <style>
+    :root {
+      --forest-1000:#06251d;
+      --forest-950:#082d23;
+      --forest-900:#0b382b;
+      --forest-850:#104433;
+      --forest-800:#14523e;
+      --forest-700:#1b654b;
+      --forest-600:#24775a;
+      --forest-500:#328b69;
+      --forest-300:#8bb9a3;
+      --forest-200:#bed8ca;
+      --forest-100:#e4efe9;
+      --forest-50:#f2f8f4;
+      --ivory:#f7f4ec;
+      --ivory-2:#fbfaf6;
+      --surface:#fffefa;
+      --surface-strong:#ffffff;
+      --canvas:#f2f4f2;
+      --ink:#14231e;
+      --ink-2:#26352f;
+      --muted:#68746f;
+      --muted-2:#909b96;
+      --line:#dde3df;
+      --line-strong:#cfd8d3;
+      --blue:#3977c6;
+      --blue-soft:#eaf2fd;
+      --orange:#d87920;
+      --orange-soft:#fff2e3;
+      --red:#d34f4b;
+      --red-soft:#fdeceb;
+      --green:#2a8a5b;
+      --green-soft:#eaf6ef;
+      --yellow:#b88618;
+      --yellow-soft:#fff8dd;
+      --shadow-xs:0 1px 2px rgba(9, 42, 31, .04);
+      --shadow-sm:0 8px 24px rgba(9, 42, 31, .06);
+      --shadow-md:0 18px 42px rgba(9, 42, 31, .09);
+      --shadow-lg:0 28px 80px rgba(9, 42, 31, .14);
+      --radius-sm:10px;
+      --radius:16px;
+      --radius-lg:22px;
+      --sidebar-w:224px;
+      --topbar-h:66px;
+      --font-sans:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif;
+      --font-display:"Iowan Old Style","Songti SC","STSong","Noto Serif CJK SC",Georgia,serif;
+    }
+
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;font-family:var(--font-sans);color:var(--ink);background:var(--canvas);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+    button,input,textarea,select{font:inherit}
+    button{cursor:pointer}
+    a{color:inherit;text-decoration:none}
+    svg{display:block}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    .hidden{display:none!important}
+
+    /* Shared primitives */
+    .brand{display:flex;align-items:center;gap:11px;min-width:0}
+    .brand-mark{width:32px;height:32px;flex:0 0 auto}
+    .brand-copy{display:flex;flex-direction:column;line-height:1.1;min-width:0}
+    .brand-name{font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-.5px;white-space:nowrap}
+    .brand-sub{font-size:11px;color:var(--muted);margin-top:5px;white-space:nowrap}
+    .brand-on-dark .brand-name{color:white}
+    .brand-on-dark .brand-sub{color:rgba(255,255,255,.62)}
+
+    .icon{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+    .icon-sm{width:15px;height:15px}
+    .icon-lg{width:24px;height:24px}
+    .icon-xl{width:34px;height:34px}
+
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:10px;padding:10px 16px;min-height:40px;font-weight:650;color:var(--ink);background:white;transition:.18s ease;white-space:nowrap;box-shadow:var(--shadow-xs)}
+    .btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+    .btn:active{transform:translateY(0)}
+    .btn-primary{background:var(--forest-900);border-color:var(--forest-900);color:white}
+    .btn-primary:hover{background:var(--forest-800);border-color:var(--forest-800)}
+    .btn-outline{border-color:var(--forest-300);color:var(--forest-800);background:rgba(255,255,255,.72)}
+    .btn-ghost{border-color:var(--line);background:white;color:var(--ink-2)}
+    .btn-danger{background:var(--red);border-color:var(--red);color:white}
+    .btn-warning{background:var(--orange);border-color:var(--orange);color:white}
+    .btn-sm{min-height:34px;padding:7px 11px;border-radius:9px;font-size:13px}
+    .btn-lg{min-height:48px;padding:12px 20px;border-radius:12px;font-size:15px}
+    .btn-block{width:100%}
+    .btn-icon{width:40px;padding:0}
+    .btn[disabled]{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
+
+    .chip,.badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;border:1px solid var(--line);padding:6px 10px;font-size:12px;font-weight:650;background:white;color:var(--ink-2);white-space:nowrap}
+    .chip-soft{background:var(--forest-50);border-color:var(--forest-100);color:var(--forest-800)}
+    .badge{padding:4px 8px;border-radius:7px;font-weight:700}
+    .badge-green{background:var(--green-soft);border-color:#c7e7d3;color:#21754d}
+    .badge-blue{background:var(--blue-soft);border-color:#cfe0f7;color:#2f67ab}
+    .badge-orange{background:var(--orange-soft);border-color:#f3d8b8;color:#b56519}
+    .badge-red{background:var(--red-soft);border-color:#f2c9c7;color:#bd403c}
+    .badge-yellow{background:var(--yellow-soft);border-color:#f1df9d;color:#946c11}
+    .status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(42,138,91,.11)}
+    .status-dot.orange{background:var(--orange);box-shadow:0 0 0 4px rgba(216,121,32,.12)}
+    .status-dot.red{background:var(--red);box-shadow:0 0 0 4px rgba(211,79,75,.12)}
+    .status-dot.blue{background:var(--blue);box-shadow:0 0 0 4px rgba(57,119,198,.12)}
+
+    .card{background:rgba(255,254,250,.94);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm)}
+    .card-plain{background:white;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-xs)}
+    .card-pad{padding:20px}
+    .card-pad-lg{padding:26px}
+    .section-title{font-size:16px;font-weight:750;color:var(--ink);margin:0 0 12px}
+    .eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--forest-700);font-weight:800}
+    .display-title{font-family:var(--font-display);font-size:54px;line-height:1.05;letter-spacing:-1.9px;font-weight:600;margin:8px 0 12px;color:#10241d}
+    .page-title{font-family:var(--font-display);font-size:44px;line-height:1.1;letter-spacing:-1.2px;font-weight:600;margin:0;color:#10241d}
+    .subtle{color:var(--muted)}
+    .muted{color:var(--muted-2)}
+    .divider{height:1px;background:var(--line);margin:18px 0}
+    .stack{display:flex;flex-direction:column;gap:12px}
+    .row{display:flex;align-items:center;gap:10px}
+    .row-between{display:flex;align-items:center;justify-content:space-between;gap:14px}
+    .wrap{flex-wrap:wrap}
+    .grow{flex:1;min-width:0}
+    .text-right{text-align:right}
+    .link{color:var(--forest-700);font-weight:650}
+    .link:hover{text-decoration:underline}
+    .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+    .small{font-size:12px}
+    .tiny{font-size:11px}
+    .danger{color:var(--red)}
+    .warning{color:var(--orange)}
+    .success{color:var(--green)}
+
+    .input,.textarea,.select-control{width:100%;border:1px solid var(--line-strong);background:#fff;border-radius:10px;min-height:44px;padding:10px 13px;color:var(--ink);outline:none;transition:.16s ease}
+    .input:focus,.textarea:focus,.select-control:focus{border-color:var(--forest-500);box-shadow:0 0 0 3px rgba(50,139,105,.12)}
+    .textarea{min-height:130px;resize:vertical}
+    .field{display:flex;flex-direction:column;gap:7px}
+    .field label{font-weight:700;color:var(--ink-2)}
+    .input-wrap{position:relative}
+    .input-wrap .input{padding-left:41px}
+    .input-prefix{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted-2)}
+
+    .notice{display:flex;gap:12px;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:var(--ivory-2)}
+    .notice-success{background:var(--green-soft);border-color:#c9e4d3}
+    .notice-warning{background:var(--orange-soft);border-color:#f0d2ad}
+    .notice-danger{background:var(--red-soft);border-color:#efc8c6}
+    .notice-blue{background:var(--blue-soft);border-color:#ccdef6}
+
+    /* Customer shell */
+    .customer-page{min-height:100vh;background:
+      radial-gradient(circle at 90% 12%, rgba(174,211,190,.30), transparent 26%),
+      radial-gradient(circle at 12% 88%, rgba(235,226,198,.27), transparent 27%),
+      linear-gradient(180deg,#fffefb 0%,#faf8f1 100%)}
+    .customer-header{height:70px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;border-bottom:1px solid rgba(210,218,213,.72);background:rgba(255,255,255,.78);backdrop-filter:blur(16px);position:sticky;top:0;z-index:20}
+    .customer-header-left,.customer-nav,.customer-header-right{display:flex;align-items:center;gap:26px}
+    .customer-nav a{font-weight:700;color:var(--ink-2);padding:23px 2px 21px;position:relative}
+    .customer-nav a.active:after{content:"";position:absolute;left:10%;right:10%;bottom:0;height:3px;border-radius:3px;background:var(--forest-800)}
+    .avatar{width:38px;height:38px;border-radius:50%;background:var(--forest-900);color:white;display:grid;place-items:center;font-weight:800;box-shadow:0 0 0 4px var(--forest-50)}
+    .customer-main{max-width:1480px;margin:0 auto;padding:48px 56px 34px}
+    .customer-auth .customer-main{max-width:1500px;padding-top:58px}
+
+    .auth-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(460px,.8fr);gap:72px;align-items:center;min-height:calc(100vh - 160px)}
+    .auth-story{padding-left:12px}
+    .auth-story h1{font-family:var(--font-display);font-size:58px;line-height:1.2;letter-spacing:-2px;font-weight:600;margin:28px 0 20px;color:#142822;max-width:820px}
+    .feature-list{display:flex;flex-direction:column;gap:22px;margin-top:34px;max-width:670px}
+    .feature-row{display:grid;grid-template-columns:54px 1fr;gap:16px;align-items:center}
+    .feature-icon{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#edf5ef,#f9f6e9);color:var(--forest-700);border:1px solid var(--forest-100)}
+    .feature-row strong{display:block;font-size:17px;margin-bottom:3px}
+    .auth-card{padding:36px 40px;background:rgba(255,255,255,.84);backdrop-filter:blur(18px);border:1px solid rgba(207,216,211,.92);border-radius:22px;box-shadow:var(--shadow-lg)}
+    .auth-card h2{font-family:var(--font-display);font-size:38px;margin:0 0 4px;font-weight:600}
+    .auth-fields{display:flex;flex-direction:column;gap:17px;margin-top:28px}
+    .demo-zone{margin-top:22px;padding-top:20px;border-top:1px solid var(--line);text-align:center}
+    .security-ribbon{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:34px;padding:15px 18px;border:1px solid #e4e0d4;background:rgba(255,252,244,.78);border-radius:12px;max-width:670px}
+
+    .help-hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(500px,.8fr);gap:70px;align-items:start;padding:18px 0 32px}
+    .help-copy{padding-top:26px}
+    .help-copy .display-title{font-size:60px;max-width:760px;line-height:1.16}
+    .hero-lead{font-size:17px;line-height:1.9;color:var(--ink-2);max-width:700px;margin-top:26px}
+    .trust-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid #e6e2d7;border-radius:14px;background:rgba(255,252,244,.76);margin-top:36px;max-width:760px;overflow:hidden}
+    .trust-item{padding:16px 18px;display:flex;gap:12px;align-items:center;min-width:0}
+    .trust-item+.trust-item{border-left:1px solid #e7e3d8}
+    .trust-icon{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--forest-100);color:var(--forest-700);flex:0 0 auto}
+    .help-form-card{padding:30px 32px;background:rgba(255,255,255,.86);backdrop-filter:blur(18px);border:1px solid var(--line-strong);border-radius:20px;box-shadow:var(--shadow-md)}
+    .help-form-card h2{font-family:var(--font-display);font-size:30px;margin:0 0 18px;font-weight:600}
+    .or-divider{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;color:var(--muted);margin:17px 0}
+    .or-divider:before,.or-divider:after{content:"";height:1px;background:var(--line)}
+    .feature-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:24px}
+    .feature-card{padding:24px;border:1px solid #e6e1d5;background:rgba(255,252,244,.72);border-radius:16px;display:grid;grid-template-columns:76px 1fr;gap:18px;align-items:center}
+    .feature-card .feature-icon{width:76px;height:76px}
+    .feature-card h3{margin:0 0 5px;font-size:18px}
+    .tip-bar{margin-top:18px;padding:14px 18px;display:flex;gap:13px;align-items:center;border:1px solid #e7e2d5;border-radius:12px;background:rgba(255,252,244,.76)}
+
+    .breadcrumb{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px;margin-bottom:20px}
+    .ticket-page-grid{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:22px;align-items:start}
+    .ticket-hero-card{padding:24px 26px}
+    .ticket-id-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+    .ticket-id{font-family:var(--font-display);font-size:28px;font-weight:600;letter-spacing:-.3px}
+    .timeline-steps{display:grid;grid-template-columns:repeat(4,1fr);position:relative;margin:24px 0 18px}
+    .timeline-steps:before{content:"";position:absolute;top:19px;left:10%;right:10%;height:2px;background:var(--line)}
+    .step{text-align:center;position:relative;z-index:1}
+    .step-node{width:40px;height:40px;border-radius:50%;background:white;border:2px solid var(--line-strong);display:grid;place-items:center;margin:0 auto 8px;color:var(--muted)}
+    .step.done .step-node{border-color:var(--green);color:var(--green);background:var(--green-soft)}
+    .step.active .step-node{border-color:var(--forest-700);background:var(--forest-700);color:white;box-shadow:0 0 0 7px rgba(36,119,90,.10)}
+    .step.warning-step .step-node{border-color:var(--orange);background:var(--orange-soft);color:var(--orange)}
+    .step strong{display:block;font-size:13px}
+    .step span{font-size:12px;color:var(--muted)}
+    .issue-card,.order-card,.activity-card,.conversation-card,.composer-card{padding:20px 22px}
+    .order-summary{display:grid;grid-template-columns:72px 1fr auto;gap:18px;align-items:center}
+    .product-thumb{width:68px;height:68px;border-radius:14px;background:linear-gradient(145deg,#eef0ed,#dbe1de);border:1px solid #d9e0dc;display:grid;place-items:center;color:var(--forest-800)}
+    .activity-list{display:flex;flex-direction:column;gap:0}
+    .activity-item{display:grid;grid-template-columns:34px 1fr auto;gap:12px;position:relative;padding:10px 0}
+    .activity-item:not(:last-child):before{content:"";position:absolute;left:16px;top:42px;bottom:-2px;width:1px;background:#cfe2d6}
+    .activity-icon{width:34px;height:34px;border-radius:50%;background:var(--green-soft);color:var(--green);display:grid;place-items:center;border:1px solid #c8e2d2}
+    .activity-item.pending .activity-icon{background:#f6f7f6;color:var(--muted-2);border-color:var(--line)}
+    .activity-item.warning-item .activity-icon{background:var(--orange-soft);color:var(--orange);border-color:#efd0a8}
+    .ticket-side{display:flex;flex-direction:column;gap:18px}
+    .progress-card{text-align:center;padding:26px 24px}
+    .ai-orb{width:110px;height:110px;border-radius:50%;margin:0 auto 18px;display:grid;place-items:center;background:radial-gradient(circle,#fff 2%,#e5f3e9 55%,#f7fbf8 70%);color:var(--forest-700);position:relative}
+    .ai-orb:after{content:"";position:absolute;inset:12px;border-radius:50%;border:1px dashed rgba(36,119,90,.28)}
+    .ai-orb .icon{width:42px;height:42px;z-index:1}
+    .banner-large{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 26px;border-radius:16px;border:1px solid #efd2ad;background:linear-gradient(90deg,#fff7ec,#fffaf2)}
+    .conversation-tabs{display:flex;gap:28px;border-bottom:1px solid var(--line);padding:0 20px}
+    .conversation-tab{padding:16px 0 13px;font-weight:700;color:var(--muted);position:relative}
+    .conversation-tab.active{color:var(--ink)}
+    .conversation-tab.active:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:var(--forest-800);border-radius:3px}
+    .message{display:grid;grid-template-columns:34px 1fr auto;gap:12px;padding:17px 18px;border:1px solid var(--line);border-radius:13px;background:#fff}
+    .message-avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--forest-50);color:var(--forest-700)}
+    .message.human{background:linear-gradient(135deg,#eef7f1,#f8fbf8)}
+    .message.customer{background:#fffdfa}
+    .composer-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;flex-wrap:wrap}
+    .ticket-summary-list{display:flex;flex-direction:column;gap:14px}
+    .summary-kv{display:grid;grid-template-columns:90px 1fr;gap:10px;font-size:13px}
+    .mini-timeline{display:flex;flex-direction:column;gap:15px}
+    .mini-step{display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:start;position:relative}
+    .mini-step:not(:last-child):after{content:"";position:absolute;left:8px;top:20px;bottom:-12px;width:1px;background:var(--line)}
+    .mini-dot{width:17px;height:17px;border-radius:50%;border:2px solid var(--line-strong);background:white;margin-top:2px;z-index:1}
+    .mini-step.done .mini-dot{border-color:var(--green);background:var(--green-soft);box-shadow:inset 0 0 0 4px white}
+    .mini-step.active .mini-dot{border-color:var(--orange);background:var(--orange-soft);box-shadow:inset 0 0 0 4px white}
+
+    /* Internal shell */
+    .internal-shell{min-height:100vh;display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr);background:var(--canvas)}
+    .sidebar{background:linear-gradient(180deg,#082f25 0%,#0b3d2f 58%,#092d24 100%);color:white;height:100vh;position:sticky;top:0;padding:20px 12px 14px;display:flex;flex-direction:column;z-index:30;box-shadow:4px 0 20px rgba(5,30,23,.08)}
+    .sidebar .brand{padding:2px 8px 22px}
+    .sidebar-nav{display:flex;flex-direction:column;gap:6px}
+    .side-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;color:rgba(255,255,255,.76);font-weight:650;transition:.16s ease}
+    .side-item:hover{background:rgba(255,255,255,.07);color:white}
+    .side-item.active{background:linear-gradient(90deg,rgba(66,152,111,.28),rgba(53,132,98,.18));color:white;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}
+    .side-label{padding:20px 12px 8px;color:rgba(255,255,255,.42);font-size:12px;letter-spacing:.06em}
+    .side-divider{height:1px;background:rgba(255,255,255,.12);margin:14px 8px 3px}
+    .sidebar-footer{margin-top:auto;padding-top:16px;border-top:1px solid rgba(255,255,255,.12)}
+    .internal-main{min-width:0}
+    .internal-topbar{height:var(--topbar-h);display:flex;align-items:center;justify-content:space-between;padding:0 26px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.90);backdrop-filter:blur(14px);position:sticky;top:0;z-index:25}
+    .topbar-left,.topbar-right{display:flex;align-items:center;gap:12px;min-width:0}
+    .workspace-select{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:white;font-weight:700;box-shadow:var(--shadow-xs)}
+    .topbar-avatar{display:flex;align-items:center;gap:8px;padding-left:10px;border-left:1px solid var(--line)}
+    .topbar-avatar .avatar{width:34px;height:34px}
+    .internal-content{padding:28px 34px 44px;max-width:1760px;margin:0 auto}
+    .internal-page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:22px}
+    .internal-page-header p{margin:8px 0 0;color:var(--muted)}
+    .header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .metrics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:18px}
+    .metric-card{padding:20px 22px;min-height:140px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+    .metric-card.compact{min-height:132px}
+    .metric-top{display:flex;align-items:start;justify-content:space-between;gap:12px}
+    .metric-label{font-weight:700;color:var(--ink-2)}
+    .metric-number{font-family:var(--font-display);font-size:42px;line-height:1;margin-top:8px}
+    .spark{height:44px;width:132px}
+    .support-layout{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:18px;align-items:start}
+    .queue-panel{overflow:hidden}
+    .filter-bar{display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--line);background:#fff}
+    .filter-control{display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:white;border-radius:9px;padding:8px 10px;min-height:38px;color:var(--ink-2);white-space:nowrap}
+    .filter-search{position:relative;flex:1;min-width:180px}
+    .filter-search input{width:100%;min-height:38px;border:1px solid var(--line);border-radius:9px;padding:8px 12px 8px 38px;outline:none}
+    .filter-search .icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted-2)}
+    .table-scroll{overflow:auto}
+    table{width:100%;border-collapse:collapse;min-width:880px}
+    th{text-align:left;color:var(--muted);font-size:12px;font-weight:750;padding:12px 14px;background:#fafbf9;border-bottom:1px solid var(--line);white-space:nowrap}
+    td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+    tbody tr{background:white;transition:.14s ease}
+    tbody tr:hover{background:#f7faf8}
+    tbody tr.selected{background:#eef6f1}
+    tbody tr[data-action]{cursor:pointer}
+    .ticket-cell{display:flex;align-items:flex-start;gap:10px}
+    .ticket-dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin-top:7px;flex:0 0 auto}
+    .ticket-dot.orange{background:#eea23f}
+    .ticket-dot.blue{background:#4c8de0}
+    .table-footer{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:white}
+    .pagination{display:flex;align-items:center;gap:5px}
+    .page-btn{width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--ink)}
+    .page-btn.active{background:var(--forest-900);color:white}
+    .detail-drawer{position:sticky;top:calc(var(--topbar-h) + 18px);max-height:calc(100vh - var(--topbar-h) - 44px);overflow:auto}
+    .drawer-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:16px;border-bottom:1px solid var(--line)}
+    .drawer-section{padding:17px 0;border-bottom:1px solid var(--line)}
+    .drawer-section:last-child{border-bottom:0}
+    .drawer-actions{position:sticky;bottom:-20px;background:linear-gradient(180deg,rgba(255,254,250,.2),#fffefa 30%);padding-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .recommend-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+    .recommend-item{padding:12px 13px;display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;background:white}
+    .recommend-item+.recommend-item{border-top:1px solid var(--line)}
+    .recommend-index{width:22px;height:22px;border-radius:50%;background:var(--forest-100);color:var(--forest-800);display:grid;place-items:center;font-size:11px;font-weight:800}
+
+    .ticket-header-internal{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:18px}
+    .ticket-header-meta{display:flex;gap:20px;flex-wrap:wrap;color:var(--muted);margin-top:6px}
+    .owner-blocks{display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:flex-end}
+    .owner-card{display:flex;align-items:center;gap:9px;padding:8px 10px;border-left:1px solid var(--line)}
+    .tabs{display:flex;align-items:center;gap:28px;padding:0 16px;border-bottom:1px solid var(--line);background:white;border-radius:12px 12px 0 0}
+    .tab{padding:14px 0 12px;color:var(--muted);font-weight:700;position:relative}
+    .tab.active{color:var(--ink)}
+    .tab.active:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:var(--forest-900);border-radius:3px}
+    .ticket-workspace{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr) minmax(290px,.72fr);gap:16px;align-items:start}
+    .workspace-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+    .reply-box{padding:16px 18px}
+    .reply-editor{min-height:110px;border:1px solid var(--line);border-radius:10px;padding:13px;color:var(--muted-2);background:white}
+    .editor-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+    .toolbar-icons{display:flex;align-items:center;gap:6px;color:var(--muted)}
+    .tool-btn{width:32px;height:32px;border:0;background:transparent;border-radius:8px;color:inherit;display:grid;place-items:center}
+    .tool-btn:hover{background:var(--forest-50);color:var(--forest-700)}
+    .ai-summary .summary-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+    .bullet-row{display:grid;grid-template-columns:9px 1fr;gap:9px;align-items:start}
+    .bullet-row:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green);margin-top:7px}
+    .action-list{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:10px}
+    .action-row{display:grid;grid-template-columns:20px 1fr auto;gap:9px;align-items:center;padding:10px 11px;background:white}
+    .action-row+.action-row{border-top:1px solid var(--line)}
+    .detail-list{display:flex;flex-direction:column;gap:10px}
+    .kv{display:grid;grid-template-columns:94px 1fr;gap:10px;color:var(--ink-2)}
+    .kv>span:first-child{color:var(--muted)}
+    .logistics-track{display:flex;flex-direction:column;gap:11px;margin-top:10px}
+    .logistics-row{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center}
+    .check-dot{width:17px;height:17px;border-radius:50%;background:var(--green);color:white;display:grid;place-items:center}
+
+    .approval-table table{min-width:1210px}
+    .amount{font-size:16px;font-weight:800;color:var(--ink)}
+    .lease-time{font-variant-numeric:tabular-nums;font-weight:800;color:var(--orange)}
+    .lease-time.danger{color:var(--red)}
+    .approval-detail-grid{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:18px;align-items:start}
+    .approval-summary{padding:20px 22px;margin-bottom:14px}
+    .summary-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;margin-top:16px}
+    .summary-metric{padding:0 18px;border-left:1px solid var(--line)}
+    .summary-metric:first-child{border-left:0;padding-left:0}
+    .summary-metric:last-child{padding-right:0}
+    .summary-metric .value{font-size:17px;font-weight:800;margin-top:5px}
+    .summary-metric .value.amount-big{font-family:var(--font-display);font-size:32px;color:var(--green)}
+    .evidence-stack{display:flex;flex-direction:column;gap:12px}
+    .evidence-card{padding:18px 20px;display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:16px;align-items:start}
+    .evidence-icon{width:40px;height:40px;border-radius:12px;background:var(--forest-50);color:var(--forest-700);display:grid;place-items:center}
+    .evidence-content h3{margin:0 0 5px;font-size:17px}
+    .evidence-side{min-width:180px;padding-left:18px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+    .decision-panel{position:sticky;top:calc(var(--topbar-h) + 18px);display:flex;flex-direction:column;gap:12px}
+    .ai-recommend{padding:20px}
+    .recommend-highlight{padding:18px;border-radius:14px;border:1px solid #cce6d5;background:linear-gradient(135deg,#eff8f2,#fbfdfb)}
+    .decision-actions{padding:16px}
+    .decision-actions .btn{width:100%;margin-bottom:9px;min-height:48px}
+    .decision-actions .btn:last-child{margin-bottom:0}
+
+    .role-select-page{min-height:100vh;background:linear-gradient(180deg,#f5f7f5,#eef3ef);display:flex;flex-direction:column}
+    .role-select-body{flex:1;display:grid;place-items:center;padding:60px 24px}
+    .role-select-wrap{width:min(980px,100%);text-align:center}
+    .role-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;margin-top:34px;text-align:left}
+    .role-card{padding:28px;position:relative;overflow:hidden;transition:.18s ease}
+    .role-card:before{content:"";position:absolute;width:140px;height:140px;border-radius:50%;right:-40px;top:-50px;background:rgba(65,145,105,.09)}
+    .role-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
+    .role-icon{width:58px;height:58px;border-radius:17px;display:grid;place-items:center;background:var(--forest-100);color:var(--forest-800)}
+    .role-card h2{font-family:var(--font-display);font-size:30px;margin:18px 0 4px;font-weight:600}
+    .capability-list{display:flex;flex-direction:column;gap:9px;margin:20px 0}
+    .capability{display:flex;align-items:center;gap:9px;color:var(--ink-2)}
+
+    .internal-login{min-height:100vh;display:grid;grid-template-columns:minmax(440px,.85fr) minmax(520px,1.15fr);background:#f3f5f3}
+    .internal-login-story{background:linear-gradient(160deg,#062a21,#0d4937);color:white;padding:52px 56px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+    .internal-login-story:after{content:"";position:absolute;width:520px;height:520px;border-radius:50%;right:-210px;bottom:-170px;border:1px solid rgba(255,255,255,.12);box-shadow:0 0 0 70px rgba(255,255,255,.025),0 0 0 150px rgba(255,255,255,.018)}
+    .internal-login-story h1{font-family:var(--font-display);font-size:54px;line-height:1.14;font-weight:600;letter-spacing:-1.5px;margin:auto 0 20px;max-width:560px}
+    .internal-login-story p{max-width:520px;color:rgba(255,255,255,.72);font-size:16px}
+    .internal-login-story .security-points{margin-top:38px;display:grid;grid-template-columns:repeat(2,1fr);gap:14px;z-index:1}
+    .security-point{padding:14px;border:1px solid rgba(255,255,255,.13);border-radius:12px;background:rgba(255,255,255,.045)}
+    .internal-login-form-area{display:grid;place-items:center;padding:48px}
+    .internal-login-card{width:min(520px,100%);padding:34px 38px}
+    .demo-role-buttons{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}
+    .demo-role-buttons .wide{grid-column:1/-1}
+
+    /* State gallery & errors */
+    .state-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+    .state-card{padding:20px;min-height:210px;display:flex;flex-direction:column;justify-content:space-between}
+    .state-visual{min-height:104px;display:grid;place-items:center;padding:12px;border-radius:12px;background:#fafbf9;border:1px dashed var(--line-strong)}
+    .skeleton{width:100%;display:flex;flex-direction:column;gap:10px}
+    .skeleton-line{height:12px;border-radius:6px;background:linear-gradient(90deg,#e7ebe8 20%,#f5f7f5 45%,#e7ebe8 70%);background-size:200% 100%;animation:shimmer 1.35s infinite}
+    @keyframes shimmer{to{background-position:-200% 0}}
+    .error-page{min-height:100vh;display:grid;place-items:center;background:linear-gradient(180deg,#f8faf8,#eef2ef);padding:30px}
+    .error-wrap{text-align:center;max-width:700px}
+    .error-code{font-family:var(--font-display);font-size:128px;line-height:.9;color:var(--forest-900);margin:0}
+    .error-wrap h1{font-family:var(--font-display);font-size:42px;font-weight:600;margin:14px 0 8px}
+    .error-wrap p{color:var(--muted);font-size:16px}
+
+    /* Prototype chrome */
+    #prototype-toggle{position:fixed;right:22px;bottom:22px;z-index:1000;border:0;border-radius:999px;background:#102d24;color:white;padding:12px 17px;display:flex;align-items:center;gap:8px;box-shadow:0 16px 36px rgba(8,45,35,.28);font-weight:750}
+    #prototype-panel{position:fixed;right:22px;bottom:78px;width:min(390px,calc(100vw - 32px));max-height:min(720px,calc(100vh - 100px));overflow:auto;background:rgba(255,255,255,.97);backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-lg);z-index:999;padding:16px;display:none}
+    #prototype-panel.open{display:block;animation:panelIn .18s ease}
+    @keyframes panelIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+    .prototype-section{margin-top:14px}
+    .prototype-section-title{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 7px 5px}
+    .prototype-routes{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .route-btn{border:1px solid var(--line);background:white;border-radius:10px;text-align:left;padding:9px 10px;font-size:12px;color:var(--ink-2);transition:.14s ease}
+    .route-btn:hover,.route-btn.active{border-color:var(--forest-300);background:var(--forest-50);color:var(--forest-800)}
+    #toast-root{position:fixed;right:24px;top:82px;z-index:1200;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+    .toast{min-width:300px;max-width:420px;padding:13px 15px;border-radius:12px;color:var(--ink);background:white;border:1px solid var(--line);box-shadow:var(--shadow-md);display:flex;gap:11px;align-items:flex-start;animation:toastIn .2s ease}
+    .toast.success{border-left:4px solid var(--green)}
+    .toast.warning{border-left:4px solid var(--orange)}
+    .toast.error{border-left:4px solid var(--red)}
+    @keyframes toastIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+    #modal-root{position:fixed;inset:0;z-index:1300;display:none;place-items:center;background:rgba(6,35,27,.42);padding:20px;backdrop-filter:blur(3px)}
+    #modal-root.open{display:grid}
+    .modal{width:min(520px,100%);background:white;border-radius:18px;border:1px solid var(--line);box-shadow:var(--shadow-lg);padding:24px}
+    .modal h3{font-family:var(--font-display);font-size:28px;font-weight:600;margin:0 0 7px}
+    .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+
+    /* Responsive */
+    @media (max-width:1400px){
+      .customer-main{padding-left:38px;padding-right:38px}
+      .support-layout{grid-template-columns:minmax(0,1fr) 370px}
+      .ticket-workspace{grid-template-columns:minmax(0,1.05fr) minmax(310px,.9fr)}
+      .ticket-workspace>.workspace-col:last-child{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr)}
+      .ticket-workspace>.workspace-col:last-child>.card{height:100%}
+      .metrics-grid{grid-template-columns:repeat(2,1fr)}
+    }
+    @media (max-width:1180px){
+      :root{--sidebar-w:80px}
+      .sidebar .brand-copy,.side-item span,.side-label,.sidebar-footer span{display:none}
+      .sidebar .brand{justify-content:center;padding-left:0;padding-right:0}
+      .side-item{justify-content:center;padding:12px}
+      .sidebar-footer .side-item{justify-content:center}
+      .help-hero,.auth-grid{grid-template-columns:1fr;gap:34px}
+      .help-copy .display-title{font-size:50px}
+      .feature-cards{grid-template-columns:1fr}
+      .feature-card{grid-template-columns:70px 1fr}
+      .support-layout{grid-template-columns:1fr}
+      .detail-drawer{position:relative;top:0;max-height:none}
+      .approval-detail-grid{grid-template-columns:1fr}
+      .decision-panel{position:relative;top:0;display:grid;grid-template-columns:1fr 1fr}
+      .decision-panel>.card:last-child{grid-column:1/-1}
+      .summary-metrics{grid-template-columns:repeat(3,1fr);row-gap:18px}
+      .summary-metric:nth-child(4){border-left:0;padding-left:0}
+      .state-grid{grid-template-columns:repeat(2,1fr)}
+    }
+    @media (max-width:900px){
+      .customer-header{padding:0 18px}
+      .customer-nav{display:none}
+      .customer-main{padding:30px 20px}
+      .auth-story h1{font-size:44px}
+      .auth-card{padding:28px 24px}
+      .help-copy .display-title{font-size:44px}
+      .trust-strip{grid-template-columns:1fr}
+      .trust-item+.trust-item{border-left:0;border-top:1px solid #e7e3d8}
+      .ticket-page-grid{grid-template-columns:1fr}
+      .ticket-side{display:grid;grid-template-columns:1fr 1fr}
+      .internal-content{padding:22px 20px 36px}
+      .internal-topbar{padding:0 16px}
+      .topbar-right .chip:nth-child(-n+2){display:none}
+      .ticket-workspace{grid-template-columns:1fr}
+      .ticket-workspace>.workspace-col:last-child{display:flex;grid-column:auto}
+      .role-cards{grid-template-columns:1fr}
+      .internal-login{grid-template-columns:1fr}
+      .internal-login-story{min-height:460px}
+      .internal-login-form-area{padding:30px 20px}
+      .evidence-card{grid-template-columns:40px 1fr}
+      .evidence-side{grid-column:2;border-left:0;border-top:1px solid var(--line);padding:12px 0 0;min-width:0}
+    }
+    @media (max-width:720px){
+      .metrics-grid[style]{grid-template-columns:1fr!important;max-width:none!important}
+      :root{--sidebar-w:0px}
+      .sidebar{display:none}
+      .internal-shell{grid-template-columns:1fr}
+      .internal-page-header,.ticket-header-internal{align-items:flex-start;flex-direction:column}
+      .header-actions,.owner-blocks{justify-content:flex-start}
+      .metrics-grid{grid-template-columns:1fr}
+      .customer-header-right .chip{display:none}
+      .customer-header{height:64px}
+      .brand-name{font-size:21px}
+      .brand-sub{display:none}
+      .auth-story{padding-left:0}
+      .auth-story h1{font-size:38px}
+      .feature-list{gap:16px}
+      .feature-row{grid-template-columns:46px 1fr}
+      .feature-icon{width:46px;height:46px}
+      .security-ribbon{align-items:flex-start;flex-direction:column}
+      .help-copy .display-title{font-size:38px}
+      .feature-card{grid-template-columns:1fr}
+      .feature-card .feature-icon{width:58px;height:58px}
+      .ticket-side{grid-template-columns:1fr}
+      .timeline-steps{grid-template-columns:repeat(2,1fr);gap:20px}
+      .timeline-steps:before{display:none}
+      .order-summary{grid-template-columns:60px 1fr}
+      .order-summary>.link{grid-column:2}
+      .role-select-body{padding:34px 16px}
+      .internal-login-story{padding:34px 24px;min-height:400px}
+      .internal-login-story h1{font-size:40px}
+      .internal-login-story .security-points{grid-template-columns:1fr}
+      .internal-login-card{padding:26px 22px}
+      .demo-role-buttons{grid-template-columns:1fr}
+      .demo-role-buttons .wide{grid-column:auto}
+      .summary-metrics{grid-template-columns:1fr 1fr}
+      .summary-metric{border-left:0;padding:0;border-top:1px solid var(--line);padding-top:12px}
+      .summary-metric:first-child{border-top:0}
+      .decision-panel{display:flex}
+      .state-grid{grid-template-columns:1fr}
+      .filter-bar{flex-wrap:wrap}
+      .filter-search{order:-1;flex-basis:100%}
+      .display-title,.page-title{font-size:36px}
+      #prototype-toggle{right:14px;bottom:14px}
+      #prototype-panel{right:14px;bottom:68px}
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
+  <div id="modal-root" role="dialog" aria-modal="true" aria-hidden="true"></div>
+
+  <button id="prototype-toggle" type="button" aria-expanded="false" aria-controls="prototype-panel">
+    <span id="prototype-toggle-icon"></span>
+    原型导航
+  </button>
+  <aside id="prototype-panel" aria-label="原型页面导航">
+    <div class="row-between">
+      <div>
+        <strong>Stellogic 高保真原型</strong>
+        <div class="small subtle">点击页面名称快速切换</div>
+      </div>
+      <button class="btn btn-ghost btn-sm btn-icon" data-action="close-prototype" aria-label="关闭导航"><span data-icon="x"></span></button>
+    </div>
+    <div class="prototype-section">
+      <div class="prototype-section-title">客户侧</div>
+      <div class="prototype-routes">
+        <button class="route-btn" data-route="/help/login">客户登录</button>
+        <button class="route-btn" data-route="/help">帮助中心首页</button>
+        <button class="route-btn" data-route="/help/tickets/TKT-250823-0013">AI 调查中</button>
+        <button class="route-btn" data-route="/help/tickets/TKT-250823-0013/clarification">等待客户澄清</button>
+        <button class="route-btn" data-route="/help/tickets/TKT-250823-0013/human">人工客服处理中</button>
+      </div>
+    </div>
+    <div class="prototype-section">
+      <div class="prototype-section-title">内部工作台</div>
+      <div class="prototype-routes">
+        <button class="route-btn" data-route="/internal/login">内部人员登录</button>
+        <button class="route-btn" data-route="/internal">双角色选择</button>
+        <button class="route-btn" data-route="/internal/support">客服共享队列</button>
+        <button class="route-btn" data-route="/internal/support/tickets/TKT-250823-0013">客服工单详情</button>
+        <button class="route-btn" data-route="/internal/approvals">补偿审批队列</button>
+        <button class="route-btn" data-route="/internal/approvals/PRP-250823-0042">补偿审批详情</button>
+      </div>
+    </div>
+    <div class="prototype-section">
+      <div class="prototype-section-title">关键状态</div>
+      <div class="prototype-routes">
+        <button class="route-btn" data-route="/states">状态组件画廊</button>
+        <button class="route-btn" data-route="/403">403 页面</button>
+        <button class="route-btn" data-route="/404">404 页面</button>
+      </div>
+    </div>
+    <div class="notice notice-blue small" style="margin-top:14px">
+      <span data-icon="info"></span>
+      <div>这是单文件交互原型。页面数据均为模拟数据，不调用后端接口。</div>
+    </div>
+    <details class="small" style="margin-top:10px;color:var(--muted)"><summary style="cursor:pointer;font-weight:700;color:var(--ink)">Codex / Ant Design 实现映射</summary><div style="margin-top:8px;line-height:1.75">内部壳建议使用 <strong>ProLayout</strong>；队列使用 <strong>ProTable</strong>；领取前摘要使用 <strong>Drawer</strong>；进度使用 <strong>Steps / Timeline</strong>；事实与证据使用 <strong>Descriptions + Card</strong>；高风险写操作使用 <strong>Modal / Popconfirm</strong>；状态使用 <strong>Alert / Badge / Tag</strong>。客户工单的调查、澄清与人工处理可保留在现有 <code>/help</code> 路由中作为状态切片实现。</div></details>
+  </aside>
+
+  <script>
+    const tickets = [
+      {id:'TKT-250823-0013', order:'ORD-20260823-7842', issue:'物流长时间未更新，疑似丢件', priority:'高', wait:'1小时 32分', created:'14:32', actor:'系统自动分派', dot:'green', customer:'张先生', userId:'U10002345', type:'物流 / 配送问题', response:'15 分钟内', sla:'正常'},
+      {id:'TKT-250823-0012', order:'ORD-20260823-5517', issue:'商品破损，申请补发', priority:'中', wait:'56分', created:'13:58', actor:'系统自动分派', dot:'orange', customer:'李女士', userId:'U10004567', type:'售后 / 商品破损', response:'30 分钟内', sla:'正常'},
+      {id:'TKT-250823-0011', order:'ORD-20260823-3321', issue:'退款未到账，已超承诺时间', priority:'高', wait:'45分', created:'13:41', actor:'系统自动分派', dot:'green', customer:'王先生', userId:'U10005678', type:'退款 / 到账异常', response:'15 分钟内', sla:'临近超时'},
+      {id:'TKT-250823-0010', order:'ORD-20260823-2189', issue:'如何修改收货地址？', priority:'低', wait:'24分', created:'12:17', actor:'系统自动分派', dot:'blue', customer:'陈女士', userId:'U10003456', type:'订单 / 地址修改', response:'2 小时内', sla:'正常'},
+      {id:'TKT-250823-0009', order:'ORD-20260823-9941', issue:'发票信息有误，需要更正', priority:'中', wait:'18分', created:'11:35', actor:'系统自动分派', dot:'orange', customer:'周先生', userId:'U10007890', type:'发票 / 信息更正', response:'30 分钟内', sla:'正常'}
+    ];
+
+    const approvals = [
+      {id:'PRP-250823-0042', risk:'即将过期', riskType:'orange', customer:'张先生', uid:'10002345', ticket:'TKT-250823-0013', order:'ORD-20260823-7842', lease:'当前审批租约', amount:'¥ 150.00', method:'现金返还', methodType:'green', policy:'完全匹配', policyNote:'Spring 金额已锁定', submitted:'2026-08-23 14:18', source:'Agent 建议', remain:'01:14:32', remainNote:'剩余 1h', priority:'P1'},
+      {id:'PRP-250823-0041', risk:'高金额', riskType:'orange', customer:'李女士', uid:'10004567', ticket:'TKT-250823-0011', order:'ORD-20260823-3321', lease:'2026-10-02 到期', amount:'¥ 3,200.00', method:'优惠券', methodType:'orange', policy:'需人工审核', policyNote:'超过优惠券限额', submitted:'2026-08-23 13:58', source:'系统建议', remain:'12:16:07', remainNote:'剩余 12h', priority:'P2'},
+      {id:'PRP-250823-0040', risk:'常规', riskType:'green', customer:'王先生', uid:'10005678', ticket:'TKT-250823-0010', order:'ORD-20260823-5517', lease:'2026-11-18 到期', amount:'¥ 1,280.00', method:'补发', methodType:'green', policy:'符合自动化', policyNote:'可自动批准', submitted:'2026-08-23 13:41', source:'自动化建议', remain:'—', remainNote:'无需审批', priority:'P3'},
+      {id:'PRP-250822-0039', risk:'租约即将到期', riskType:'orange', customer:'陈女士', uid:'10003456', ticket:'TKT-250822-0098', order:'ORD-20260822-2289', lease:'2026-08-26 到期', amount:'¥ 4,800.00', method:'退款', methodType:'blue', policy:'需人工审核', policyNote:'涉及忠诚客户', submitted:'2026-08-22 18:07', source:'客服建议', remain:'35:12:44', remainNote:'剩余 35h', priority:'P2'},
+      {id:'PRP-250822-0038', risk:'常规', riskType:'green', customer:'周先生', uid:'10007890', ticket:'TKT-250822-0093', order:'ORD-20260822-9911', lease:'2026-12-05 到期', amount:'¥ 980.00', method:'优惠券', methodType:'orange', policy:'需人工审核', policyNote:'优惠券叠加校验', submitted:'2026-08-22 16:32', source:'客服建议', remain:'18:05:21', remainNote:'剩余 18h', priority:'P3'},
+      {id:'PRP-250822-0037', risk:'高风险', riskType:'red', customer:'吴女士', uid:'10006789', ticket:'TKT-250822-0087', order:'ORD-20260822-7744', lease:'2026-09-10 到期', amount:'¥ 7,200.00', method:'退款', methodType:'blue', policy:'需人工审核', policyNote:'多次申诉用户', submitted:'2026-08-22 15:48', source:'客服建议', remain:'08:22:10', remainNote:'剩余 8h', priority:'P1'}
+    ];
+
+    const appState = {
+      selectedTicket:'TKT-250823-0013',
+      connection:'synced',
+      clarificationSubmitted:false,
+      humanRequested:false,
+      modalConfirm:null
+    };
+
+    function icon(name, cls='icon'){
+      const paths = {
+        sparkle:'<path d="M12 2l1.4 4.1L17.5 7.5l-4.1 1.4L12 13l-1.4-4.1L6.5 7.5l4.1-1.4L12 2Z"/><path d="M5 14l.9 2.6L8.5 17.5l-2.6.9L5 21l-.9-2.6-2.6-.9 2.6-.9L5 14Z"/><path d="M19 13l.7 2.1 2.1.7-2.1.7L19 18.6l-.7-2.1-2.1-.7 2.1-.7L19 13Z"/>',
+        headset:'<path d="M4 13a8 8 0 0 1 16 0v5a2 2 0 0 1-2 2h-2v-7h4"/><path d="M4 13v7h4v-7H4Z"/><path d="M16 20c0 1.1-.9 2-2 2h-2"/>',
+        approval:'<path d="M9 11l2 2 4-4"/><path d="M5 3h14v18H5z"/><path d="M8 3V1h8v2"/>',
+        ticket:'<path d="M4 5h16v5a2 2 0 0 0 0 4v5H4v-5a2 2 0 0 0 0-4V5Z"/><path d="M9 8v8"/>',
+        clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        book:'<path d="M4 5a3 3 0 0 1 3-3h4v18H7a3 3 0 0 0-3 3V5Z"/><path d="M20 5a3 3 0 0 0-3-3h-4v18h4a3 3 0 0 1 3 3V5Z"/>',
+        template:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h6M7 16h8"/>',
+        users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+        grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+        chevronDown:'<path d="m6 9 6 6 6-6"/>',
+        chevronLeft:'<path d="m15 18-6-6 6-6"/>',
+        chevronRight:'<path d="m9 18 6-6-6-6"/>',
+        refresh:'<path d="M20 6v6h-6"/><path d="M4 18v-6h6"/><path d="M18.5 9A7 7 0 0 0 6.2 5.2L4 7"/><path d="M5.5 15A7 7 0 0 0 17.8 18.8L20 17"/>',
+        bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>',
+        user:'<circle cx="12" cy="8" r="4"/><path d="M4 22a8 8 0 0 1 16 0"/>',
+        logout:'<path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 3h7v18h-7"/>',
+        search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+        filter:'<path d="M4 5h16M7 12h10M10 19h4"/>',
+        more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+        pin:'<path d="m12 17-4 4"/><path d="M5 7l12 12"/><path d="m15 3 6 6-4 4-6-6 4-4Z"/>',
+        x:'<path d="m6 6 12 12M18 6 6 18"/>',
+        info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+        check:'<path d="m5 12 4 4L19 6"/>',
+        shield:'<path d="M12 2 20 5v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5l8-3Z"/><path d="m9 12 2 2 4-4"/>',
+        lock:'<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+        robot:'<rect x="5" y="7" width="14" height="11" rx="4"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/><path d="M3 11h2M19 11h2"/>',
+        package:'<path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="m3 8 9 5v9l-9-5V8ZM21 8l-9 5v9l9-5V8Z"/><path d="M7.5 5.5 16.5 10.5"/>',
+        upload:'<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/>',
+        paperclip:'<path d="m21.4 11.6-8.9 8.9a6 6 0 0 1-8.5-8.5l9.6-9.6a4 4 0 0 1 5.7 5.7l-9.6 9.6a2 2 0 0 1-2.8-2.8l8.9-8.9"/>',
+        send:'<path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/>',
+        external:'<path d="M14 3h7v7M10 14 21 3"/><path d="M21 14v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h6"/>',
+        copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><rect x="4" y="4" width="11" height="11" rx="2"/>',
+        edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z"/>',
+        calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+        download:'<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/>',
+        warning:'<path d="M10.3 2.7 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
+        image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>',
+        link:'<path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/>',
+        smile:'<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/>',
+        tag:'<path d="M20 12 12 20 4 12V4h8l8 8Z"/><circle cx="8.5" cy="8.5" r="1.5"/>',
+        arrowRight:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+        home:'<path d="m3 11 9-8 9 8v10h-6v-6H9v6H3V11Z"/>',
+        mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>'
+      };
+      return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${paths[name]||paths.info}</svg>`;
+    }
+
+    function logoMark(){
+      return `<svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="2.2" fill="#d7df69"/>
+        <circle cx="8" cy="12" r="2" fill="#91c789"/>
+        <circle cx="30" cy="9" r="2" fill="#d7df69"/>
+        <circle cx="32" cy="28" r="2" fill="#91c789"/>
+        <circle cx="10" cy="31" r="2" fill="#d7df69"/>
+        <path d="M9 12 20 20 30 9M20 20l12 8M20 20 10 31M20 7v26M7 20h26" stroke="#6dad86" stroke-width="1.4" fill="none"/>
+        <path d="m20 6 1.3 3.8L25 11l-3.7 1.2L20 16l-1.3-3.8L15 11l3.7-1.2L20 6Z" fill="#d9e567"/>
+      </svg>`;
+    }
+
+    function brand(dark=false, sub='Customer Support Agent'){
+      return `<div class="brand ${dark?'brand-on-dark':''}">${logoMark()}<div class="brand-copy"><div class="brand-name">Stellogic</div><div class="brand-sub">${sub}</div></div></div>`;
+    }
+
+    function badge(text,type='green'){
+      return `<span class="badge badge-${type}">${text}</span>`;
+    }
+
+    function sparkline(type='green'){
+      const stroke = type==='red' ? '#e55c55' : type==='orange' ? '#e7953b' : '#5d9e79';
+      const fill = type==='red' ? 'rgba(229,92,85,.10)' : type==='orange' ? 'rgba(231,149,59,.10)' : 'rgba(93,158,121,.10)';
+      return `<svg class="spark" viewBox="0 0 132 44" aria-hidden="true"><path d="M2 37H130" stroke="#dfe6e1" stroke-dasharray="3 4"/><path d="M2 35 C14 34,18 25,28 30 S46 17,57 26 S73 33,84 25 S101 21,111 31 S124 27,130 30 L130 42 L2 42 Z" fill="${fill}"/><path d="M2 35 C14 34,18 25,28 30 S46 17,57 26 S73 33,84 25 S101 21,111 31 S124 27,130 30" fill="none" stroke="${stroke}" stroke-width="1.6"/></svg>`;
+    }
+
+    function customerHeader(active='service', minimal=false){
+      return `<header class="customer-header">
+        <div class="customer-header-left">
+          ${brand(false,'帮助中心')}
+          ${minimal?'':`<nav class="customer-nav" aria-label="客户导航">
+            <a href="#/help" class="${active==='service'?'active':''}">客户服务</a>
+            <a href="javascript:void(0)" data-action="toast-info" class="${active==='docs'?'active':''}">帮助文档</a>
+          </nav>`}
+        </div>
+        <div class="customer-header-right">
+          ${minimal?`<button class="btn btn-ghost btn-sm" data-route="/help">${icon('chevronLeft','icon icon-sm')}返回帮助中心首页</button>`:`
+            <div class="row"><div class="avatar">Yi</div><strong>Yi</strong>${icon('chevronDown','icon icon-sm')}</div>
+            <button class="btn btn-ghost btn-sm" data-action="logout-customer">${icon('logout','icon icon-sm')}退出登录</button>`}
+        </div>
+      </header>`;
+    }
+
+    function sideNavItem(route, iconName, label, active){
+      return `<a class="side-item ${active?'active':''}" href="#${route}">${icon(iconName)}<span>${label}</span></a>`;
+    }
+
+    function internalSidebar(active='support'){
+      return `<aside class="sidebar">
+        ${brand(true)}
+        <nav class="sidebar-nav" aria-label="内部工作台导航">
+          ${sideNavItem('/internal/support','headset','客服工作区',active==='support')}
+          ${sideNavItem('/internal/approvals','approval','审批工作区',active==='approval')}
+          <div class="side-divider"></div>
+          <div class="side-label">快捷入口</div>
+          ${sideNavItem('/internal/support/ticket','ticket','我的工单',false)}
+          <a class="side-item" href="javascript:void(0)" data-action="toast-info">${icon('clock')}<span>SLA 监控</span></a>
+          <a class="side-item" href="javascript:void(0)" data-action="toast-info">${icon('book')}<span>知识库</span></a>
+          <a class="side-item" href="javascript:void(0)" data-action="toast-info">${icon('template')}<span>模板中心</span></a>
+        </nav>
+        <div class="sidebar-footer"><button class="side-item" style="width:100%;border:0;background:transparent" data-action="toast-info">${icon('chevronLeft')}<span>收起侧栏</span></button></div>
+      </aside>`;
+    }
+
+    function connectionChip(){
+      if(appState.connection==='disconnected') return `<span class="chip" style="background:var(--red-soft);border-color:#efc8c6;color:var(--red)"><span class="status-dot red"></span>实时连接已断开</span>`;
+      if(appState.connection==='syncing') return `<span class="chip" style="background:var(--blue-soft);border-color:#ccdef6;color:var(--blue)">${icon('refresh','icon icon-sm')}正在重新同步</span>`;
+      return `<span class="chip chip-soft"><span class="status-dot"></span>已同步</span>`;
+    }
+
+    function internalTopbar(role='客服专员'){
+      return `<header class="internal-topbar">
+        <div class="topbar-left">
+          <button class="workspace-select" data-route="/internal">${icon('grid','icon icon-sm')}统一内部工作台${icon('chevronDown','icon icon-sm')}</button>
+        </div>
+        <div class="topbar-right">
+          <span class="chip chip-soft">${role}</span>
+          <span class="chip"><span class="status-dot"></span>队列状态</span>
+          ${connectionChip()}
+          <button class="btn btn-ghost btn-sm" data-action="sync">${icon('refresh','icon icon-sm')}重新同步</button>
+          <button class="btn btn-ghost btn-icon" style="position:relative" data-action="toast-info" aria-label="通知">${icon('bell')}<span style="position:absolute;right:-3px;top:-5px;background:#ef3e33;color:white;border-radius:999px;font-size:10px;padding:2px 6px;border:2px solid white">8</span></button>
+          <div class="topbar-avatar"><div class="avatar">Yi</div><strong>Yi</strong>${icon('chevronDown','icon icon-sm')}</div>
+        </div>
+      </header>`;
+    }
+
+    function internalShell(active, role, content){
+      return `<div class="internal-shell">${internalSidebar(active)}<main class="internal-main">${internalTopbar(role)}<div class="internal-content">${content}</div></main></div>`;
+    }
+
+    function renderCustomerLogin(){
+      return `<div class="customer-page customer-auth">
+        ${customerHeader('',true)}
+        <main class="customer-main">
+          <div class="auth-grid">
+            <section class="auth-story">
+              <div class="eyebrow">客户登录</div>
+              <h1>登录后，轻松跟踪工单进度，<br>随时获取最新动态。</h1>
+              <p style="font-size:17px;color:var(--ink-2)">安全、透明、高效的支持体验，始终伴您左右。</p>
+              <div class="feature-list">
+                <div class="feature-row"><div class="feature-icon">${icon('ticket','icon icon-lg')}</div><div><strong>工单全程可追踪</strong><span class="subtle">随时查看工单状态、历史记录与处理进展，重要更新不错过。</span></div></div>
+                <div class="feature-row"><div class="feature-icon">${icon('lock','icon icon-lg')}</div><div><strong>数据安全有保障</strong><span class="subtle">采用 HttpOnly Session 保护机制，确保账号与数据安全可靠。</span></div></div>
+                <div class="feature-row"><div class="feature-icon">${icon('sparkle','icon icon-lg')}</div><div><strong>AI 调查 + 人工跟进</strong><span class="subtle">AI 高效排查问题，必要时由客服专家接手，确保问题妥善解决。</span></div></div>
+              </div>
+              <div class="security-ribbon"><div class="row">${icon('lock','icon icon-sm')}<span>我们已采用企业级安全措施保护您的数据安全与隐私。</span></div><a class="link" href="javascript:void(0)" data-action="toast-info">了解更多 →</a></div>
+            </section>
+            <section class="auth-card">
+              <h2>客户登录</h2>
+              <p class="subtle">欢迎回来！请输入您的账号信息以继续。</p>
+              <form class="auth-fields" data-form="customer-login">
+                <div class="field"><label for="customer-user">用户名</label><div class="input-wrap"><span class="input-prefix">${icon('user','icon icon-sm')}</span><input id="customer-user" class="input" name="username" autocomplete="username" placeholder="请输入用户名或邮箱"></div></div>
+                <div class="field"><label for="customer-pass">密码</label><div class="input-wrap"><span class="input-prefix">${icon('lock','icon icon-sm')}</span><input id="customer-pass" class="input" name="password" type="password" autocomplete="current-password" placeholder="请输入密码"></div></div>
+                <div class="row-between"><label class="row"><input type="checkbox">记住我</label><a class="link" href="javascript:void(0)" data-action="toast-info">忘记密码？</a></div>
+                <button class="btn btn-primary btn-lg btn-block" type="submit">登录</button>
+              </form>
+              <div class="small subtle" style="text-align:center;margin-top:12px">${icon('lock','icon icon-sm').replace('class="icon icon-sm"','class="icon icon-sm" style="display:inline-block;vertical-align:-3px"')} 登录即表示您同意我们的 <a class="link">隐私政策</a> 与 <a class="link">服务条款</a>。</div>
+              <div class="demo-zone"><strong>本地演示账号</strong><div class="small subtle">使用演示账号体验客户视角的工单跟踪流程。</div><div class="stack" style="margin-top:14px"><button class="btn btn-outline btn-block" data-action="fill-customer">${icon('user','icon icon-sm')}使用演示客户填充</button><button class="btn btn-outline btn-block" data-action="show-demo-credentials">${icon('info','icon icon-sm')}查看演示账号信息</button></div></div>
+            </section>
+          </div>
+        </main>
+      </div>`;
+    }
+
+    function renderHelpHome(){
+      return `<div class="customer-page">
+        ${customerHeader('service')}
+        <main class="customer-main">
+          <section class="help-hero">
+            <div class="help-copy">
+              <div class="eyebrow">Stellogic 帮助中心</div>
+              <h1 class="display-title">物流遇到问题？<br>我们从这里开始处理。</h1>
+              <p class="hero-lead">提交后，你将获得一个可追踪的服务工单。<br>我们的团队会尽快调查并回复，必要时会在同一工单中向你追加提问。</p>
+              <div class="trust-strip">
+                <div class="trust-item"><div class="trust-icon">${icon('check','icon icon-sm')}</div><div><strong>提交即生成工单</strong><div class="tiny subtle">全程可追踪，进度实时更新</div></div></div>
+                <div class="trust-item"><div class="trust-icon">${icon('shield','icon icon-sm')}</div><div><strong>信息安全保障</strong><div class="tiny subtle">数据加密，仅用于问题处理</div></div></div>
+                <div class="trust-item"><div class="trust-icon">${icon('clock','icon icon-sm')}</div><div><strong>通常 24 小时内回复</strong><div class="tiny subtle">复杂问题也会持续跟进</div></div></div>
+              </div>
+            </div>
+            <form class="help-form-card" data-form="create-ticket">
+              <h2>提交物流延迟问题</h2>
+              <div class="stack" style="gap:16px">
+                <div class="field"><label for="order-id">订单编号</label><input id="order-id" class="input" name="orderId" placeholder="例如：ORD-20260823-7842"></div>
+                <div class="field"><label for="issue-desc">问题描述</label><textarea id="issue-desc" class="textarea" name="description" placeholder="请尽可能详细描述您遇到的问题，包括物流状态、异常时间、影响等。"></textarea><div class="tiny subtle text-right">0 / 1000</div></div>
+                <button class="btn btn-primary btn-lg btn-block" type="submit">提交物流延迟问题</button>
+              </div>
+              <div class="or-divider">或</div>
+              <button class="btn btn-outline btn-block" type="button" data-route="/help/tickets/TKT-250823-0013">${icon('user','icon icon-sm')}输入工单号继续跟进</button>
+              <div class="small subtle" style="text-align:center;margin-top:14px">${icon('lock','icon icon-sm').replace('class="icon icon-sm"','class="icon icon-sm" style="display:inline-block;vertical-align:-3px"')} 我们已采用企业级安全措施保护你的数据安全。</div>
+            </form>
+          </section>
+          <section class="feature-cards">
+            <article class="feature-card"><div class="feature-icon">${icon('sparkle','icon icon-xl')}</div><div><h3>AI 自动调查 ${badge('更快响应','green')}</h3><p class="subtle">智能系统会即时分析你的物流异常，比以往更快定位问题根因。</p><a class="link" data-action="toast-info">了解更多 AI 如何帮助你 →</a></div></article>
+            <article class="feature-card"><div class="feature-icon">${icon('user','icon icon-xl')}</div><div><h3>人工客服接管 ${badge('专业支持','green')}</h3><p class="subtle">复杂或特殊情况将由专属客服跟进，确保问题被深入处理并获得答复。</p><a class="link" data-action="toast-info">我们的服务承诺 →</a></div></article>
+            <article class="feature-card"><div class="feature-icon">${icon('shield','icon icon-xl')}</div><div><h3>补偿审批可追踪 ${badge('透明可见','green')}</h3><p class="subtle">如涉及补偿或赔付，我们将全程记录审批进度，你可随时查看最新状态。</p><a class="link" data-action="toast-info">了解补偿流程 →</a></div></article>
+          </section>
+          <div class="tip-bar">${icon('info','icon icon-sm')}<strong>温馨提示</strong><span class="subtle">提交前，请确认订单编号准确。若系统无法找到对应订单，我们可能需要更多信息以继续处理，谢谢理解。</span></div>
+        </main>
+      </div>`;
+    }
+
+    function customerTicketHeader(statusText,statusType='blue'){
+      return `<div class="ticket-hero-card card">
+        <div class="ticket-id-row"><button class="btn btn-ghost btn-icon" data-route="/help">${icon('chevronLeft')}</button><div><div class="row wrap"><div class="ticket-id">TKT-250823-0013</div>${badge(statusText,statusType)}</div><div class="small subtle" style="margin-top:4px">最后更新：2026-08-23 15:42</div></div></div>
+      </div>`;
+    }
+
+    function customerTimeline(active='investigating'){
+      const clarification=active==='clarification',human=active==='human';
+      return `<div class="timeline-steps">
+        <div class="step done"><div class="step-node">${icon('check','icon icon-sm')}</div><strong>已创建</strong><span>8月23日 14:32</span></div>
+        <div class="step ${clarification||human?'done':'active'}"><div class="step-node">${icon('robot','icon icon-sm')}</div><strong>自动调查</strong><span>${clarification||human?'已完成初步调查':'AI 正在调查中'}</span></div>
+        <div class="step ${clarification?'warning-step':human?'done':''}"><div class="step-node">${clarification?icon('info','icon icon-sm'):human?icon('check','icon icon-sm'):icon('package','icon icon-sm')}</div><strong>${clarification?'等待补充信息':'核查物流'}</strong><span>${clarification?'需要你的回复':human?'已完成':'预计 16:30 前'}</span></div>
+        <div class="step ${human?'active':''}"><div class="step-node">${human?icon('headset','icon icon-sm'):icon('approval','icon icon-sm')}</div><strong>${human?'人工处理':'处理结果'}</strong><span>${human?'客服已接手':'预计 17:30 前'}</span></div>
+      </div>`;
+    }
+
+    function renderCustomerTicket(state='investigating'){
+      if(state==='clarification') return renderClarificationTicket();
+      if(state==='human') return renderHumanTicket();
+      return `<div class="customer-page">
+        ${customerHeader('service')}
+        <main class="customer-main">
+          <div class="breadcrumb"><a href="#/help">帮助中心</a>${icon('chevronRight','icon icon-sm')}<span>我的工单</span>${icon('chevronRight','icon icon-sm')}<strong>工单详情</strong></div>
+          <div class="ticket-page-grid">
+            <div class="stack">
+              ${customerTicketHeader('AI 正在调查','blue').replace('</div></div>','</div></div>'+customerTimeline('investigating'))}
+              <section class="issue-card card"><h3 class="section-title">您遇到的问题</h3><p>我的订单物流显示已签收，但我没有收到包裹，帮我查看一下物流轨迹和签收凭证。</p><div class="small subtle">创建时间：2026-08-23 14:32:10</div></section>
+              <section class="order-card card"><h3 class="section-title">${icon('package','icon icon-sm').replace('class="icon icon-sm"','class="icon icon-sm" style="display:inline-block;vertical-align:-3px"')} 订单信息</h3><div class="order-summary"><div class="product-thumb">${icon('package','icon icon-xl')}</div><div><div class="row wrap"><span class="subtle">订单号：</span><strong>ORD-20260823-7842</strong></div><div class="row wrap small" style="margin-top:8px"><span class="subtle">下单时间：</span><span>2026-08-20 10:43:21</span><span class="subtle" style="margin-left:20px">商品：</span><span>真无线降噪耳机 X1</span><span class="subtle" style="margin-left:20px">订单金额：</span><span>¥ 699.00</span></div></div><a class="link" data-action="toast-info">查看订单详情 →</a></div></section>
+              <section class="activity-card card"><h3 class="section-title">工单动态</h3><div class="activity-list">
+                <div class="activity-item"><div class="activity-icon">${icon('robot','icon icon-sm')}</div><div><strong class="success">已开始调查物流轨迹</strong><div class="small subtle">AI 已接收您的问题，正在调取物流轨迹信息。</div></div><div class="small subtle mono">2026-08-23 14:33</div></div>
+                <div class="activity-item"><div class="activity-icon">${icon('robot','icon icon-sm')}</div><div><strong class="success">正在核查承运商反馈</strong><div class="small subtle">AI 已联系承运商核实签收状态与签收凭证，请耐心等待。</div></div><div class="small subtle mono">2026-08-23 14:45</div></div>
+                <div class="activity-item pending"><div class="activity-icon">${icon('package','icon icon-sm')}</div><div><strong>已收集物流轨迹信息</strong><div class="small subtle">运输轨迹已收集完毕，AI 正在分析异常原因。</div></div><div class="small subtle mono">2026-08-23 14:40</div></div>
+              </div><div style="text-align:center;margin-top:8px"><button class="btn btn-ghost btn-sm" data-action="toast-info">查看更多 ${icon('chevronDown','icon icon-sm')}</button></div></section>
+            </div>
+            <aside class="ticket-side">
+              <section class="progress-card card"><h3 class="section-title" style="text-align:left">当前进展</h3><div class="ai-orb">${icon('robot','icon icon-xl')}</div><h2 style="margin:0;color:var(--forest-700)">AI 正在调查中</h2><p class="subtle">我们已开始为您核查物流轨迹和签收信息，请稍等片刻。</p><div class="divider"></div><div class="text-right" style="text-align:left"><strong>预计回复时间</strong><div style="font-size:25px;font-weight:800;color:var(--forest-800);margin-top:6px">16:30 前 <span class="small subtle" style="font-weight:400">预计 2 小时内回复</span></div><div style="margin-top:14px"><strong>下一步</strong><div class="subtle">核查物流信息与承运商反馈</div></div></div><button class="btn btn-outline btn-block" style="margin-top:18px" data-action="request-human">转人工处理</button></section>
+              <section class="card card-pad"><h3 class="section-title">需要帮助？</h3><p class="subtle">如果您希望与人工客服沟通，或有其他问题，随时联系我们。</p><button class="btn btn-outline btn-block" data-action="request-human">${icon('headset','icon icon-sm')}联系人工客服</button><div class="small subtle" style="margin-top:12px">服务时间：9:00 – 18:00（工作日）</div></section>
+            </aside>
+          </div>
+          <div class="tip-bar">${icon('shield','icon icon-sm')}我们已采用多重安全保障措施，严格保护您的信息与隐私安全。<a class="link" style="margin-left:auto" data-action="toast-info">了解更多安全保障 →</a></div>
+        </main>
+      </div>`;
+    }
+
+    function renderClarificationTicket(){
+      return `<div class="customer-page">
+        ${customerHeader('service')}
+        <main class="customer-main">
+          <div class="breadcrumb"><a href="#/help">帮助中心</a>${icon('chevronRight','icon icon-sm')}<span>我的工单</span>${icon('chevronRight','icon icon-sm')}<strong>等待补充信息</strong></div>
+          <div class="row-between wrap" style="margin-bottom:16px"><div><div class="row wrap"><div class="ticket-id">TKT-250823-0013</div>${badge(appState.clarificationSubmitted?'已收到补充信息':'等待你的补充信息',appState.clarificationSubmitted?'green':'orange')}</div><div class="small subtle" style="margin-top:5px">创建于 2026-08-23 14:32:10 · 订单号 ORD-20260823-7842</div></div></div>
+          <div class="banner-large"><div class="row" style="align-items:flex-start"><div class="feature-icon" style="width:42px;height:42px;background:var(--orange-soft);color:var(--orange)">${icon('warning')}</div><div><h2 style="margin:0 0 4px;font-size:20px">${appState.clarificationSubmitted?'补充信息已收到，调查即将继续':'我们需要你补充一些信息，以便继续处理'}</h2><p class="subtle" style="margin:0">${appState.clarificationSubmitted?'系统正在重新同步你的回复，并将继续同一次调查。':'AI 调查已暂停，等待你提供更多信息。补充信息后，我们将尽快继续调查并给你答复。'}</p></div></div>${icon('approval','icon icon-xl')}</div>
+          <div class="ticket-page-grid" style="margin-top:18px">
+            <div class="card" style="overflow:hidden">
+              <div class="conversation-tabs"><div class="conversation-tab active">对话与回复</div><div class="conversation-tab">工单详情</div></div>
+              <div class="stack" style="padding:20px">
+                <div class="message"><div class="message-avatar">${icon('sparkle','icon icon-sm')}</div><div><strong>系统</strong><p style="margin:5px 0 0">我们正在为你调查此问题，请稍等片刻。</p></div><div class="small subtle mono">08-23 14:32</div></div>
+                <div class="message"><div class="message-avatar">${icon('robot','icon icon-sm')}</div><div><strong>AI 调查助手</strong><p style="margin:6px 0">我们已查看你的订单与物流记录，目前需要你补充以下信息，以便继续推进：</p><ul style="margin:8px 0 0;padding-left:20px"><li>请确认收货联系人姓名、手机号是否正确？</li><li>包裹是否最终送达？如果未送达，请描述物流最后状态。</li></ul><p style="margin-bottom:0">完成后我们将尽快继续调查并回复你，谢谢！</p></div><div class="small subtle mono">08-23 14:41</div></div>
+                ${appState.clarificationSubmitted?`<div class="message customer"><div class="message-avatar">${icon('user','icon icon-sm')}</div><div><strong>你</strong><p style="margin:6px 0 0">收货人是张先生，手机号尾号 5678。包裹仍未收到，物流最后状态是“前台代签”，但前台没有找到。</p></div><div class="small subtle mono">刚刚</div></div>`:''}
+                <div class="composer-card card-plain"><h3 class="section-title">你的补充信息</h3><textarea id="clarification-text" class="textarea" ${appState.clarificationSubmitted?'disabled':''} placeholder="请详细说明你的情况，例如：收货联系人信息、是否收到包裹、物流最后状态等……">${appState.clarificationSubmitted?'收货人是张先生，手机号尾号 5678。包裹仍未收到，物流最后状态是“前台代签”，但前台没有找到。':''}</textarea><div class="row-between small subtle"><span>${icon('paperclip','icon icon-sm').replace('class="icon icon-sm"','class="icon icon-sm" style="display:inline-block;vertical-align:-3px"')} 添加附件（可选，支持图片、PDF 等，单个文件 ≤ 20MB）</span><span>0 / 1000</span></div><div class="composer-actions"><button class="btn btn-outline" data-action="request-human">${icon('user','icon icon-sm')}申请转人工</button><button class="btn btn-primary" data-action="submit-clarification" ${appState.clarificationSubmitted?'disabled':''}>${appState.clarificationSubmitted?'已提交':'提交补充信息'}</button></div></div>
+              </div>
+            </div>
+            <aside class="ticket-side">
+              <section class="card card-pad"><div class="row-between"><h3 class="section-title">工单摘要</h3><button class="btn btn-ghost btn-sm" data-action="toast-info">${icon('edit','icon icon-sm')}编辑</button></div><div class="ticket-summary-list"><div><strong>问题描述</strong><p class="small subtle">“我的订单物流信息已经超过 3 天没有更新，最后状态停留在‘已揽收’，希望尽快核实处理。”</p></div><div class="summary-kv"><span class="subtle">订单号</span><strong>ORD-20260823-7842</strong><span class="subtle">下单时间</span><span>2026-08-20 10:43:21</span><span class="subtle">SLA 承诺</span><span>15 分钟内响应</span></div></div></section>
+              <section class="card card-pad"><h3 class="section-title">处理进度</h3><div class="mini-timeline"><div class="mini-step done"><div class="mini-dot"></div><div><strong>工单已创建</strong><div class="small subtle">我们已收到你的问题</div></div><div class="small subtle">14:32</div></div><div class="mini-step done"><div class="mini-dot"></div><div><strong>AI 已展开调查</strong><div class="small subtle">正在分析物流与订单数据</div></div><div class="small subtle">14:34</div></div><div class="mini-step active"><div class="mini-dot"></div><div><strong class="warning">${appState.clarificationSubmitted?'正在恢复调查':'等待你的补充信息'}</strong><div class="small subtle">${appState.clarificationSubmitted?'系统正在同步回复':'AI 调查已暂停'}</div></div><div class="small subtle">14:41</div></div><div class="mini-step"><div class="mini-dot"></div><div><strong>等待进一步回复</strong><div class="small subtle">补充信息后将尽快回复</div></div></div></div></section>
+              <section class="card card-pad"><h3 class="section-title">需要更多帮助？</h3><p class="subtle">如果你希望与人工客服沟通，或问题紧急，欢迎申请转人工处理。</p><button class="btn btn-outline btn-block" data-action="request-human">申请转人工</button></section>
+            </aside>
+          </div>
+        </main>
+      </div>`;
+    }
+
+    function renderHumanTicket(){
+      return `<div class="customer-page">
+        ${customerHeader('service')}
+        <main class="customer-main">
+          <div class="breadcrumb"><a href="#/help">帮助中心</a>${icon('chevronRight','icon icon-sm')}<span>我的工单</span>${icon('chevronRight','icon icon-sm')}<strong>人工客服处理中</strong></div>
+          <div class="ticket-page-grid">
+            <div class="stack">
+              <section class="ticket-hero-card card"><div class="ticket-id-row"><button class="btn btn-ghost btn-icon" data-route="/help">${icon('chevronLeft')}</button><div><div class="row wrap"><div class="ticket-id">TKT-250823-0013</div>${badge('人工客服处理中','green')}</div><div class="small subtle" style="margin-top:4px">客服陈雪已于 15:48 接手 · 预计 30 分钟内回复</div></div></div>${customerTimeline('human')}</section>
+              <section class="conversation-card card"><h3 class="section-title">对话记录</h3><div class="stack"><div class="message"><div class="message-avatar">${icon('robot','icon icon-sm')}</div><div><strong>AI 调查助手</strong><p style="margin:5px 0 0">已完成订单和物流事实核查。因签收信息存在冲突，已将工单转交人工客服。</p></div><div class="small subtle">15:43</div></div><div class="message human"><div class="message-avatar">${icon('headset','icon icon-sm')}</div><div><strong>陈雪 · 客服专员</strong><p style="margin:5px 0 0">您好，我已经接手这个工单。正在联系承运商调取前台代签记录，预计 30 分钟内给您更新。</p></div><div class="small subtle">15:49</div></div></div></section>
+              <section class="composer-card card"><h3 class="section-title">回复客服</h3><textarea class="textarea" placeholder="补充新的情况，或直接回复客服……"></textarea><div class="composer-actions"><button class="btn btn-outline">${icon('paperclip','icon icon-sm')}添加附件</button><button class="btn btn-primary" data-action="send-customer-message">${icon('send','icon icon-sm')}发送回复</button></div></section>
+            </div>
+            <aside class="ticket-side"><section class="card card-pad"><div class="row"><div class="avatar">陈</div><div><strong style="font-size:16px">陈雪</strong><div class="small subtle">高级客服专员 · 简体中文支持组</div></div></div><div class="divider"></div><div class="kv"><span>当前状态</span><span>${badge('正在处理','green')}</span><span>预计回复</span><strong>16:20 前</strong><span>沟通方式</span><span>站内消息 + 邮件</span></div><button class="btn btn-outline btn-block" style="margin-top:18px" data-action="toast-info">查看服务承诺</button></section><section class="card card-pad"><h3 class="section-title">处理摘要</h3><div class="mini-timeline"><div class="mini-step done"><div class="mini-dot"></div><div><strong>AI 完成调查</strong><div class="small subtle">识别到签收记录冲突</div></div></div><div class="mini-step done"><div class="mini-dot"></div><div><strong>已转人工</strong><div class="small subtle">陈雪已领取工单</div></div></div><div class="mini-step active"><div class="mini-dot"></div><div><strong class="warning">联系承运商</strong><div class="small subtle">调取代签记录和凭证</div></div></div><div class="mini-step"><div class="mini-dot"></div><div><strong>给出处理结果</strong><div class="small subtle">核实后通知你</div></div></div></div></section></aside>
+          </div>
+        </main>
+      </div>`;
+    }
+
+    function renderInternalLogin(){
+      return `<div class="internal-login">
+        <section class="internal-login-story">${brand(true)}<div style="margin:auto 0"><div class="eyebrow" style="color:#8ec3a9">Secure session</div><h1>统一内部工作台，<br>让人工判断发生在正确的位置。</h1><p>客服与审批角色共用身份体系，但业务数据按能力和有效责任边界投影。登录后，系统只展示当前身份真正可访问的工作区。</p><div class="security-points"><div class="security-point"><strong>后端权威授权</strong><div class="small" style="color:rgba(255,255,255,.62)">菜单隐藏不等于权限，所有操作由 Spring Security 校验。</div></div><div class="security-point"><strong>可审计工作流</strong><div class="small" style="color:rgba(255,255,255,.62)">领取、转派、审批与异常恢复均记录审计事件。</div></div></div></div></section>
+        <section class="internal-login-form-area"><div class="internal-login-card card"><div class="eyebrow">内部工作人员登录</div><h2 style="font-family:var(--font-display);font-size:38px;margin:8px 0 4px;font-weight:600">欢迎回来</h2><p class="subtle">使用内部账号进入客服或补偿审批工作区。</p><form class="auth-fields" data-form="internal-login"><div class="field"><label for="staff-user">用户名</label><div class="input-wrap"><span class="input-prefix">${icon('user','icon icon-sm')}</span><input id="staff-user" class="input" name="username" placeholder="请输入内部账号"></div></div><div class="field"><label for="staff-pass">密码</label><div class="input-wrap"><span class="input-prefix">${icon('lock','icon icon-sm')}</span><input id="staff-pass" class="input" type="password" name="password" placeholder="请输入密码"></div></div><button class="btn btn-primary btn-lg btn-block" type="submit">登录内部工作台</button></form><div class="demo-zone"><strong>本地演示账号</strong><div class="small subtle">按钮只填充表单，仍需提交密码登录。</div><div class="demo-role-buttons"><button class="btn btn-outline" data-action="fill-staff-support">演示客服</button><button class="btn btn-outline" data-action="fill-staff-approver">演示审批人</button><button class="btn btn-outline wide" data-action="fill-staff-dual">演示双角色工作人员</button></div></div><div class="small subtle" style="margin-top:16px;text-align:center">${icon('lock','icon icon-sm').replace('class="icon icon-sm"','class="icon icon-sm" style="display:inline-block;vertical-align:-3px"')} 本系统使用同源 HttpOnly Session 与 CSRF 防护。</div></div></section>
+      </div>`;
+    }
+
+    function renderRoleSelect(){
+      return `<div class="role-select-page">
+        ${internalTopbar('双角色工作人员')}
+        <main class="role-select-body"><div class="role-select-wrap"><div class="eyebrow">Workspace selection</div><h1 class="page-title" style="font-size:50px;margin-top:8px">选择本次工作的角色视角</h1><p class="subtle" style="font-size:16px;margin-top:12px">选择页本身不会读取任何队列或审批数据。进入工作区后，系统才会按当前能力加载对应投影。</p><div class="role-cards">
+          <article class="role-card card"><div class="role-icon">${icon('headset','icon icon-xl')}</div><h2>客服工作区</h2><p class="subtle">查看共享队列、领取工单、与客户沟通并推进人工处理。</p><div class="capability-list"><div class="capability">${icon('check','icon icon-sm')}浏览裁剪后的共享队列摘要</div><div class="capability">${icon('check','icon icon-sm')}领取后查看完整工单与客户信息</div><div class="capability">${icon('check','icon icon-sm')}人工回复、转派、解决或转审批</div></div><button class="btn btn-primary btn-block" data-route="/internal/support">进入客服工作区 ${icon('arrowRight','icon icon-sm')}</button></article>
+          <article class="role-card card"><div class="role-icon">${icon('approval','icon icon-xl')}</div><h2>审批工作区</h2><p class="subtle">领取限时审批责任，核查政策证据并作出补偿决策。</p><div class="capability-list"><div class="capability">${icon('check','icon icon-sm')}查看待审批补偿摘要与风险</div><div class="capability">${icon('check','icon icon-sm')}领取后访问当前提案证据</div><div class="capability">${icon('check','icon icon-sm')}批准、驳回或释放审批责任</div></div><button class="btn btn-primary btn-block" data-route="/internal/approvals">进入审批工作区 ${icon('arrowRight','icon icon-sm')}</button></article>
+        </div><div class="small subtle" style="margin-top:20px">当前账号：Yi · 能力：support:workbench / compensation:approve</div></div></main>
+      </div>`;
+    }
+
+    function metricCard(label,number,sub,type='green',note=''){
+      return `<article class="metric-card card"><div class="metric-top"><div><div class="metric-label">${label}</div><div class="metric-number mono">${number}</div></div>${sparkline(type)}</div><div class="row-between small"><span class="${type==='red'?'danger':type==='orange'?'warning':'success'}">${sub}</span><span class="subtle">${note}</span></div></article>`;
+    }
+
+    function ticketPriorityBadge(priority){
+      return priority==='高'?badge('高','red'):priority==='中'?badge('中','orange'):badge('低','green');
+    }
+
+    function ticketRows(){
+      return tickets.map(t=>`<tr class="${appState.selectedTicket===t.id?'selected':''}" data-action="select-ticket" data-ticket="${t.id}" data-searchable="${t.id} ${t.order} ${t.issue} ${t.customer}"><td><div class="ticket-cell"><span class="ticket-dot ${t.dot==='green'?'':t.dot}"></span><div><strong>${t.id}</strong><div class="tiny subtle">创建于 ${t.created}</div></div></div></td><td>${t.order}</td><td>${t.issue}</td><td>${ticketPriorityBadge(t.priority)}</td><td class="mono">${t.wait}</td><td>${t.actor}<div class="tiny subtle">${t.created}</div></td><td><div class="row"><button class="btn btn-primary btn-sm" data-action="claim-ticket" data-ticket="${t.id}">领取</button><button class="tool-btn" data-action="toast-info">${icon('more')}</button></div></td></tr>`).join('');
+    }
+
+    function selectedTicketDetail(){
+      const t=tickets.find(x=>x.id===appState.selectedTicket)||tickets[0];
+      return `<aside class="detail-drawer card card-pad">
+        <div class="drawer-header"><div class="row"><strong style="font-size:16px">工单详情</strong>${badge('待接手','green')}</div><div class="row"><button class="tool-btn" data-action="toast-info">${icon('pin')}</button><button class="tool-btn" data-action="toast-info">${icon('x')}</button></div></div>
+        <div class="drawer-section"><div class="row wrap"><div class="ticket-id" style="font-size:25px">${t.id}</div>${ticketPriorityBadge(t.priority)}</div><div class="small subtle" style="margin-top:4px">创建于 2026-08-23 ${t.created}:10</div></div>
+        <div class="drawer-section"><div class="notice notice-blue small" style="margin-bottom:12px"><span data-icon="shield"></span><div>领取前仅展示脱敏摘要；完整身份、订单与沟通记录将在领取成功后开放。</div></div><h3 class="section-title">客户与订单</h3><div class="row-between"><div class="row"><div class="feature-icon" style="width:38px;height:38px">${icon('user','icon icon-sm')}</div><div><strong>${t.customer.slice(0,1)}**</strong><div class="tiny subtle">用户 ID：U****${t.userId.slice(-4)}</div></div></div><div><div class="tiny subtle">订单号</div><strong>${t.order.slice(0,8)}****${t.order.slice(-4)}</strong><div class="tiny subtle">领取后显示完整订单信息</div></div></div></div>
+        <div class="drawer-section"><h3 class="section-title">问题描述</h3><p>“我的订单物流信息已经超过 3 天没有更新了，最后状态还是停留在‘已揽收’。担心包裹丢失，希望尽快帮我核实处理，谢谢！”</p></div>
+        <div class="drawer-section"><h3 class="section-title">工单元数据</h3><div class="detail-list"><div class="kv"><span>工单来源</span><span>客户帮助中心</span></div><div class="kv"><span>工单类型</span><span>${t.type}</span></div><div class="kv"><span>紧急程度</span><span>${ticketPriorityBadge(t.priority)}</span></div><div class="kv"><span>预计响应</span><span>${t.response}</span></div><div class="kv"><span>SLA 状态</span><span class="row"><span class="status-dot ${t.sla==='临近超时'?'orange':''}"></span>${t.sla}</span></div></div></div>
+        <div class="drawer-section"><h3 class="section-title">推荐下一步操作</h3><div class="recommend-list"><div class="recommend-item"><div class="recommend-index">1</div><div><strong>在 Spring 中核查物流轨迹与节点状态</strong><div class="tiny subtle">查看最新物流信息与承运商反馈。</div></div><button class="btn btn-outline btn-sm" data-action="toast-info">去核查</button></div><div class="recommend-item"><div class="recommend-index">2</div><div><strong>联系客户确认补充信息</strong><div class="tiny subtle">核实地址和联系方式。</div></div><button class="btn btn-outline btn-sm" data-action="toast-info">联系</button></div></div></div>
+        <div class="drawer-actions"><button class="btn btn-primary" data-action="claim-ticket" data-ticket="${t.id}">领取并处理</button><button class="btn btn-outline" data-action="toast-info">转派工单</button></div>
+      </aside>`;
+    }
+
+    function renderSupportQueue(){
+      const content=`<div class="internal-page-header"><div><div class="eyebrow">Support workbench</div><h1 class="page-title">客服共享队列</h1><p>发现需要人工关注的客服工单；领取前仅展示裁剪后的队列摘要。</p></div><div class="header-actions"><span class="chip chip-soft">${icon('check','icon icon-sm')}队列已与 Spring 权威状态同步</span><button class="btn btn-primary" data-action="sync">${icon('refresh','icon icon-sm')}重新同步队列</button></div></div>
+      <div class="metrics-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));max-width:940px"><article class="metric-card card"><div class="metric-top"><div><div class="eyebrow">Shared</div><div style="font-family:var(--font-display);font-size:27px;margin-top:6px">待接手工单</div><div class="small subtle">转人工与其他共享队列条目</div></div><div class="metric-number">26</div></div><div class="row-between"><span class="success">较昨日 -4 ↓</span>${sparkline('green')}</div></article><article class="metric-card card"><div class="metric-top"><div><div class="eyebrow" style="color:var(--red)">Escalation</div><div style="font-family:var(--font-display);font-size:27px;margin-top:6px">SLA 违约升级</div><div class="small subtle">已发生 SLA 违约，需要提高关注</div></div><div class="metric-number">8</div></div><div class="row-between"><span class="danger">较昨日 +2 ↑</span>${sparkline('red')}</div></article></div>
+      <div class="support-layout"><section class="queue-panel card"><div class="filter-bar"><button class="filter-control" data-action="toast-info">全部状态 ${icon('chevronDown','icon icon-sm')}</button><button class="filter-control" data-action="toast-info">全部优先级 ${icon('chevronDown','icon icon-sm')}</button><div class="filter-search">${icon('search')}<input id="queue-search" placeholder="搜索工单号 / 订单号 / 用户名 / 问题关键词"></div><button class="filter-control" data-action="toast-info">${icon('filter','icon icon-sm')}筛选</button><span class="small subtle" id="queue-count">共 26 条</span></div><div class="table-scroll"><table><thead><tr><th>工单</th><th>订单号</th><th>问题摘要</th><th>优先级</th><th>等待时长</th><th>最新操作人</th><th>操作</th></tr></thead><tbody id="queue-body">${ticketRows()}</tbody></table></div><div class="table-footer"><span class="small subtle">1–5 / 26</span><div class="pagination"><button class="page-btn">‹</button><button class="page-btn active">1</button><button class="page-btn">2</button><button class="page-btn">3</button><button class="page-btn">4</button><button class="page-btn">5</button><button class="page-btn">›</button></div><button class="filter-control">10 条/页 ${icon('chevronDown','icon icon-sm')}</button></div></section>${selectedTicketDetail()}</div>`;
+      return internalShell('support','客服专员',content);
+    }
+
+    function renderSupportTicket(){
+      const content=`<div class="ticket-header-internal"><div><button class="btn btn-ghost btn-sm" data-route="/internal/support">${icon('chevronLeft','icon icon-sm')}返回工单列表</button><div class="row wrap" style="margin-top:10px"><h1 class="page-title" style="font-size:36px">TKT-250823-0013</h1>${badge('高优先级','red')}</div><div class="ticket-header-meta"><span>订单号：ORD-20260823-7842</span><span>渠道：客户门户</span><span>创建于：2026-08-23 14:32:10</span></div></div><div class="owner-blocks"><div class="owner-card"><div><div class="tiny subtle">当前负责人</div><div class="row"><div class="avatar" style="width:32px;height:32px">Yi</div><strong>Yi</strong></div></div><button class="btn btn-ghost btn-sm" data-action="toast-info">转派</button></div><div class="owner-card"><div><div class="tiny subtle">所属组</div><strong>简体中文支持组</strong></div></div><button class="btn btn-outline" data-route="/internal/approvals/PRP-250823-0042">转审批</button><button class="btn btn-ghost" data-action="toast-info">更多操作 ${icon('chevronDown','icon icon-sm')}</button><button class="btn btn-primary" data-action="resolve-ticket">标记已解决</button></div></div>
+      <div class="ticket-workspace"><div class="workspace-col"><section class="card" style="overflow:hidden"><div class="tabs"><div class="tab active">工作流</div><div class="tab">客户信息</div><div class="tab">工单日志</div><div class="tab">关联工单 (0)</div></div><div class="card-pad"><div class="row-between wrap"><strong>客户问题</strong><span class="small subtle">2026-08-23 14:32 · 来自客户门户</span></div><p style="font-size:16px">我的订单物流显示已签收，但我在 3 天内没有收到包裹，能否帮我核实一下？谢谢！</p><button class="btn btn-ghost btn-sm" data-action="toast-info">${icon('image','icon icon-sm')}物流截图.png <span class="subtle">320 KB</span></button></div></section><section class="card card-pad"><div class="row-between"><div class="row"><h3 class="section-title" style="margin:0">公开回复</h3><span class="chip">${icon('lock','icon icon-sm')}仅内部可见 ${icon('chevronDown','icon icon-sm')}</span></div><span class="small subtle">2026-08-23 14:35 · Yi</span></div><div class="message human" style="margin-top:14px;grid-template-columns:1fr"><div><p style="margin:0">您好，感谢您的联系。我已为您查询物流信息，包裹可能存在延迟扫描的情况，我们会尽快跟进并更新进展，请您耐心等待。</p><div class="row-between small subtle" style="margin-top:12px"><span>将通过 邮件 发送给客户 · 预览</span><span class="success">✓ 已读 · 08-23 14:36</span></div></div></div></section><section class="reply-box card"><div class="tabs" style="padding:0;border-radius:0;background:transparent"><div class="tab active">回复</div><div class="tab">内部备注</div></div><div class="reply-editor">输入回复内容，使用 / 快速插入模板、知识或宏命令</div><div class="editor-toolbar"><div class="toolbar-icons"><button class="tool-btn">T</button><button class="tool-btn">${icon('smile')}</button><button class="tool-btn">${icon('paperclip')}</button><button class="tool-btn">${icon('image')}</button><button class="tool-btn">${icon('link')}</button><button class="tool-btn">{ }</button></div><div class="row"><button class="btn btn-ghost btn-sm" data-action="toast-info">发送并转审批 ${icon('chevronDown','icon icon-sm')}</button><button class="btn btn-primary btn-sm" data-action="send-agent-reply">发送回复</button></div></div></section></div>
+      <div class="workspace-col"><section class="ai-summary card card-pad"><div class="row-between"><div class="row"><span class="feature-icon" style="width:32px;height:32px">${icon('sparkle','icon icon-sm')}</span><strong>AI 智能摘要</strong><span class="tiny subtle">Agent 生成 · Spring 事实校验</span></div><button class="btn btn-ghost btn-sm" data-action="toast-info">${icon('refresh','icon icon-sm')}重新生成</button></div><div class="divider"></div><strong>问题摘要</strong><p class="subtle">客户反馈订单显示已签收但未收到包裹，请求协助核实物流状态。</p><strong>关键信息</strong><div class="summary-list"><div class="bullet-row">下单时间：2026-08-19 10:25</div><div class="bullet-row">承运商：SF Express</div><div class="bullet-row">签收时间：2026-08-22 13:41</div><div class="bullet-row">签收人：代签（前台）</div><div class="bullet-row">当前状态：已签收（可能延迟扫描）</div></div><div class="divider"></div><strong>AI 建议操作</strong><div class="small subtle">基于相似案例与物流数据分析</div><div class="action-list"><div class="action-row">${icon('check','icon icon-sm')}<span>联系承运商确认签收人信息</span><button class="btn btn-outline btn-sm" data-action="toast-info">执行</button></div><div class="action-row">${icon('check','icon icon-sm')}<span>核实代签地点监控或门禁记录</span><button class="btn btn-outline btn-sm" data-action="toast-info">执行</button></div><div class="action-row">${icon('check','icon icon-sm')}<span>向客户发送延迟扫描说明模板</span><button class="btn btn-outline btn-sm" data-action="toast-info">插入回复</button></div><div class="action-row">${icon('check','icon icon-sm')}<span>若 48 小时内无新信息，建议发起理赔审核</span><button class="btn btn-outline btn-sm" data-route="/internal/approvals/PRP-250823-0042">转审批</button></div></div><div class="divider"></div><strong>相似案例参考</strong><div class="stack small" style="margin-top:10px"><div class="row-between"><span>TKT-250821-0098 · 包裹代签遗漏通知</span>${badge('已解决','green')}</div><div class="row-between"><span>TKT-250818-0055 · 延迟扫描导致未收到</span>${badge('已解决','green')}</div><div class="row-between"><span>TKT-250815-0021 · 签收人信息不清</span>${badge('已解决','green')}</div><a class="link" data-action="toast-info">查看全部 (12) →</a></div></section></div>
+      <div class="workspace-col"><section class="card card-pad"><h3 class="section-title">订单信息</h3><div class="row-between"><strong>ORD-20260823-7842</strong>${badge('已签收','green')}</div><div class="row" style="margin-top:12px"><div class="product-thumb" style="width:52px;height:52px">${icon('package')}</div><div class="grow"><strong>Stellogic 无线降噪耳机 A2</strong><div class="small subtle">星夜黑</div></div><strong>¥699.00 ×1</strong></div><div class="divider"></div><div class="kv"><span>支付金额</span><strong>¥699.00</strong><span>下单时间</span><span>2026-08-19 10:25</span></div></section><section class="card card-pad"><h3 class="section-title">物流信息</h3><div class="row-between"><span>SF Express · SF1234567890123</span><button class="tool-btn">${icon('copy')}</button></div><div class="logistics-track"><div class="logistics-row"><span class="check-dot">${icon('check','icon icon-sm')}</span><span>已揽收</span><span class="small subtle">2026-08-20 09:18</span></div><div class="logistics-row"><span class="check-dot">${icon('check','icon icon-sm')}</span><span>运输中</span><span class="small subtle">2026-08-21 11:07</span></div><div class="logistics-row"><span class="check-dot">${icon('check','icon icon-sm')}</span><span>已签收（代签：前台）</span><span class="small subtle">2026-08-22 13:41</span></div></div><a class="link small" data-action="toast-info">查看物流详情 →</a></section><section class="card card-pad"><h3 class="section-title">SLA 信息</h3><div class="kv"><span>响应 SLA</span><span>15 分钟内 ${badge('达标','green')}</span><span>解决 SLA</span><span>48 小时内 ${badge('剩余 21:36:12','orange')}</span></div></section><section class="card card-pad"><h3 class="section-title">客户信息</h3><div class="detail-list"><div class="row">${icon('user')}<strong>张先生</strong></div><div class="kv"><span>手机号</span><span>138****5678</span><span>邮箱</span><span>zhang****@example.com</span><span>累计订单</span><span>7 · 累计消费 ¥3,857.00</span><span>备注</span><span>VIP 客户，偏好邮件沟通</span></div></div><div class="row wrap" style="margin-top:14px"><button class="btn btn-ghost btn-sm" data-action="toast-info">联系客户</button><button class="btn btn-ghost btn-sm" data-action="toast-info">查看订单</button><button class="btn btn-ghost btn-sm" data-action="toast-info">查看物流</button></div></section></div></div>`;
+      return internalShell('support','客服专员',content);
+    }
+
+    function approvalRows(){
+      return approvals.map((a,i)=>`<tr data-searchable="${a.id} ${a.customer} ${a.ticket} ${a.order}"><td><input type="checkbox" aria-label="选择 ${a.id}"></td><td><strong>${a.id}</strong> ${badge(a.risk,a.riskType)}<div class="tiny subtle">客户：${a.customer} (UID: ${a.uid})</div></td><td><strong>${a.ticket}</strong>${i===0?` ${badge('紧急工单','red')}`:''}<div class="small">${a.order}</div><div class="tiny subtle">租约：${a.lease}</div></td><td><div class="amount">${a.amount}</div><div class="tiny subtle">申请：${a.amount}</div></td><td>${badge(a.method,a.methodType)}</td><td><strong>${a.policy}</strong><div class="tiny ${a.policy==='符合自动化'?'success':'subtle'}">${a.policyNote}</div></td><td>${a.submitted}<div class="tiny subtle">由 ${a.source}</div></td><td><div class="lease-time ${i===0||i===5?'danger':''}">${a.remain}</div><div class="tiny subtle">${a.remainNote}</div></td><td>${badge(a.priority,a.priority==='P1'?'red':a.priority==='P2'?'orange':'green')}</td><td><div class="row"><button class="btn ${i===2||i===4?'btn-ghost':'btn-primary'} btn-sm" data-route="/internal/approvals/PRP-250823-0042">${i===2||i===4?'查看详情':'领取审批'}</button><button class="tool-btn" data-action="toast-info">${icon('more')}</button></div></td></tr>`).join('');
+    }
+
+    function renderApprovalQueue(){
+      const content=`<div class="internal-page-header"><div><h1 class="page-title">待审批补偿</h1><p>处理客户补偿申请与建议，确保合规、准确、及时地完成审批。</p></div><span class="chip chip-soft">${icon('refresh','icon icon-sm')}数据每 60 秒自动刷新</span></div><div class="metrics-grid">${metricCard('待审批项','42','较昨日 -6','green')}${metricCard('即将过期的租约','7','将在 48 小时内到期','orange')}${metricCard('高风险 / 高金额','5','金额 ≥ ¥5,000 或高风险','red')}${metricCard('今日已审批','18','通过 15 · 拒绝 3','green')}</div><section class="approval-table card"><div class="filter-bar"><button class="filter-control" data-action="toast-info">全部状态 ${icon('chevronDown','icon icon-sm')}</button><button class="filter-control" data-action="toast-info">优先级 ${icon('chevronDown','icon icon-sm')}</button><button class="filter-control" data-action="toast-info">补偿类型 ${icon('chevronDown','icon icon-sm')}</button><button class="filter-control" data-action="toast-info">${icon('calendar','icon icon-sm')}提交时间：开始日期 → 结束日期</button><div class="filter-search">${icon('search')}<input id="approval-search" placeholder="搜索提案 ID / 工单号 / 客户 / 租约"></div><button class="filter-control" data-action="toast-info">${icon('filter','icon icon-sm')}更多筛选</button><button class="filter-control" data-action="toast-info">${icon('download','icon icon-sm')}导出</button></div><div class="table-scroll"><table><thead><tr><th><input type="checkbox"></th><th>提案信息</th><th>相关工单 / 租约</th><th>补偿金额</th><th>补偿方式</th><th>政策状态</th><th>提交时间</th><th>剩余审批时间</th><th>优先级</th><th>操作</th></tr></thead><tbody id="approval-body">${approvalRows()}</tbody></table></div><div class="table-footer"><span class="small subtle">共 42 项</span><div class="pagination"><button class="page-btn">‹</button><button class="page-btn active">1</button><button class="page-btn">2</button><button class="page-btn">3</button><button class="page-btn">4</button><button class="page-btn">5</button><button class="page-btn">›</button></div><button class="filter-control">10 条/页 ${icon('chevronDown','icon icon-sm')}</button></div></section>`;
+      return internalShell('approval','审批人员',content);
+    }
+
+    function evidenceCard(iconName,title,body,side){
+      return `<article class="evidence-card card"><div class="evidence-icon">${icon(iconName)}</div><div class="evidence-content"><h3>${title}</h3>${body}</div><div class="evidence-side">${side}</div></article>`;
+    }
+
+    function renderApprovalDetail(){
+      const content=`<div class="breadcrumb"><a href="#/internal/approvals">审批工作区</a>${icon('chevronRight','icon icon-sm')}<span>补偿审批</span>${icon('chevronRight','icon icon-sm')}<strong>PRP-250823-0042</strong></div><section class="approval-summary card"><div class="row wrap"><div><div class="small" style="font-weight:800">补偿审批详情</div><div class="row wrap"><h1 class="page-title" style="font-size:36px">PRP-250823-0042</h1>${badge('审批中','green')}</div></div></div><div class="summary-metrics"><div class="summary-metric"><div class="small subtle">关联工单</div><div class="value">TKT-250823-0013 ${icon('external','icon icon-sm').replace('class="icon icon-sm"','class="icon icon-sm" style="display:inline-block;vertical-align:-3px"')}</div></div><div class="summary-metric"><div class="small subtle">客户</div><div class="value">${icon('user','icon icon-sm').replace('class="icon icon-sm"','class="icon icon-sm" style="display:inline-block;vertical-align:-3px"')} 张先生</div><div class="tiny subtle">高价值客户</div></div><div class="summary-metric"><div class="small subtle">权威金额（Spring 规则）</div><div class="value amount-big">¥150.00 ${icon('shield','icon icon-sm').replace('class="icon icon-sm"','class="icon icon-sm" style="display:inline-block;vertical-align:-3px"')}</div><div class="tiny subtle">已锁定</div></div><div class="summary-metric"><div class="small subtle">补偿方式</div><div class="value">现金返还</div><div class="tiny subtle">原路退回</div></div><div class="summary-metric"><div class="small subtle">审批租约</div><div class="value">${badge('剩余 01:14:32','orange')}</div><div class="tiny subtle">超时将自动升级</div></div></div></section><div class="approval-detail-grid"><div class="evidence-stack">
+      ${evidenceCard('sparkle','提案摘要','<p class="subtle">因订单取消导致配送延迟并给客户带来不便，建议按照 Spring 延迟补偿规则提供现金返还作为补偿。</p>','<div><div class="tiny subtle">提案人</div><strong>AI Assistant</strong></div><div><div class="tiny subtle">提案时间</div><strong>2026-08-23 14:18</strong></div><button class="btn btn-ghost btn-sm" data-action="toast-info">查看提案日志</button>')}
+      ${evidenceCard('book','政策依据','<p>《Spring 延迟补偿政策 v2.3》3.2 配送延迟补偿</p><ul class="small subtle" style="margin:6px 0;padding-left:18px"><li>延迟超过 24 小时：订单金额的 10%，最高不超过 ¥150</li><li>适用范围：由 Stellogic 或承运商原因导致的物流延迟</li></ul>','<div><div class="tiny subtle">匹配结果</div><strong class="success">完全匹配</strong></div><div><div class="tiny subtle">适用条款</div><strong>3.2.1、3.2.2</strong></div><button class="btn btn-ghost btn-sm" data-action="toast-info">查看政策详情</button>')}
+      ${evidenceCard('clock','延迟事实','<div class="stack small"><div class="row"><span class="check-dot">'+icon('check','icon icon-sm')+'</span><span>2026-08-18 13:48 · 客户下单，承诺送达：2026-08-20</span></div><div class="row"><span class="check-dot">'+icon('check','icon icon-sm')+'</span><span>2026-08-20 09:15 · 订单状态更新为「延迟」，原因：承运商运力不足</span></div><div class="row"><span class="check-dot">'+icon('check','icon icon-sm')+'</span><span>2026-08-22 11:35 · 实际送达，延迟时长：52小时17分钟</span></div></div>','<div><div class="tiny subtle">延迟时长</div><strong class="danger">52小时17分钟</strong></div><div><div class="tiny subtle">责任判定</div><strong>Stellogic 侧 / 承运商</strong></div><button class="btn btn-ghost btn-sm" data-action="toast-info">查看物流轨迹</button>')}
+      ${evidenceCard('approval','资格检查','<div class="stack small"><div class="row"><span class="check-dot">'+icon('check','icon icon-sm')+'</span><span>订单金额 ≥ ¥10：是（订单金额 ¥328.00）</span></div><div class="row"><span class="check-dot">'+icon('check','icon icon-sm')+'</span><span>延迟时长 ≥ 24 小时：是（52小时17分钟）</span></div><div class="row"><span class="check-dot">'+icon('check','icon icon-sm')+'</span><span>近30天无重复补偿：是</span></div><div class="row"><span class="check-dot">'+icon('check','icon icon-sm')+'</span><span>非免责或不可抗力：是</span></div></div>','<div><div class="tiny subtle">检查结果</div><strong class="success">全部通过</strong></div><div><div class="tiny subtle">规则引擎</div><strong>Spring v2.3</strong></div><button class="btn btn-ghost btn-sm" data-action="toast-info">查看检查明细</button>')}
+      ${evidenceCard('users','客户沟通上下文','<div class="detail-list small"><div class="kv"><span>客户诉求</span><span>要求补偿，表达较强不满</span></div><div class="kv"><span>关键沟通</span><span>已解释延迟原因并致歉，客户希望获得合理补偿</span></div><div class="kv"><span>满意度趋势</span><span>近30天平均满意度：3.2 / 5（偏低）</span></div></div>','<div><div class="tiny subtle">沟通渠道</div><strong>在线客服</strong></div><div><div class="tiny subtle">最后沟通时间</div><strong>2026-08-23 14:12</strong></div><button class="btn btn-ghost btn-sm" data-action="toast-info">查看完整对话</button>')}
+      </div><aside class="decision-panel"><section class="ai-recommend card"><div class="row"><div class="feature-icon" style="width:42px;height:42px">${icon('sparkle')}</div><div><strong style="font-size:16px">AI 建议（辅助参考）</strong><div class="tiny subtle">由 Agent 基于事实与政策生成；权威金额由 Spring 锁定</div></div></div><div class="recommend-highlight" style="margin-top:14px"><div class="row">${icon('check')}<strong style="font-size:18px;color:var(--forest-700)">建议：批准补偿</strong></div><p class="small subtle">已满足延迟补偿政策的所有条件，且金额在规则上限内，建议批准。</p><div class="divider"></div><div class="small subtle">推荐金额（权威）</div><div style="font-family:var(--font-display);font-size:34px;color:var(--green);font-weight:700">¥150.00</div><div class="stack small" style="margin-top:10px"><div class="row">${icon('check','icon icon-sm')}延迟时长 52小时17分钟，超过 24 小时</div><div class="row">${icon('check','icon icon-sm')}符合《3.2 配送延迟补偿》条款</div><div class="row">${icon('check','icon icon-sm')}金额未超过上限（上限 ¥150.00）</div><div class="row">${icon('check','icon icon-sm')}高价值客户，建议维护体验</div></div></div><div class="notice notice-warning small" style="margin-top:12px">${icon('shield','icon icon-sm')}<div><strong>最终决定由审批人做出</strong><div>AI 建议仅供参考，请基于证据与政策独立判断。</div></div></div></section><section class="decision-actions card"><h3 class="section-title">审批操作</h3><button class="btn btn-primary" data-action="approve-compensation">${icon('check','icon icon-sm')}批准补偿</button><button class="btn btn-outline" data-action="reject-compensation">${icon('clock','icon icon-sm')}驳回并转人工</button><button class="btn btn-ghost" data-action="release-approval">${icon('approval','icon icon-sm')}释放审批责任</button><div class="field" style="margin-top:12px"><label>审批备注（选填）</label><textarea class="textarea" style="min-height:90px" placeholder="请输入审批备注，便于后续追溯……"></textarea></div><div class="row-between tiny subtle"><span>当前审批人：Yi</span><span>接收时间：2026-08-23 14:18:22</span></div></section></aside></div>`;
+      return internalShell('approval','审批人员',content);
+    }
+
+    function renderStates(){
+      const content=`<div class="internal-page-header"><div><div class="eyebrow">System states</div><h1 class="page-title">关键状态组件画廊</h1><p>为加载、空、错误、实时连接与高风险操作提供一致的可见反馈。</p></div><button class="btn btn-primary" data-action="sync">模拟重新同步</button></div><div class="state-grid">
+        <article class="state-card card"><div><strong>Loading · 首次加载</strong><p class="small subtle">保留页面骨架，避免布局跳动。</p></div><div class="state-visual"><div class="skeleton"><div class="skeleton-line" style="width:45%"></div><div class="skeleton-line"></div><div class="skeleton-line" style="width:75%"></div><div class="skeleton-line" style="width:88%"></div></div></div></article>
+        <article class="state-card card"><div><strong>Empty · 暂无队列条目</strong><p class="small subtle">说明原因，并提供刷新或返回动作。</p></div><div class="state-visual"><div style="text-align:center">${icon('ticket','icon icon-xl')}<div style="margin-top:8px"><strong>当前没有待处理工单</strong></div><div class="small subtle">新的转人工工单会实时出现在这里</div></div></div></article>
+        <article class="state-card card"><div><strong>Error · 数据加载失败</strong><p class="small subtle">保留上一次数据并明确是否过期。</p></div><div class="state-visual"><div class="notice notice-danger">${icon('warning')}<div><strong>队列刷新失败</strong><div class="small">仍显示 15:42 的缓存数据。</div></div></div></div></article>
+        <article class="state-card card"><div><strong>403 · 能力不足</strong><p class="small subtle">不泄露业务数据，仅解释当前身份边界。</p></div><div class="state-visual"><div style="text-align:center"><div style="font-family:var(--font-display);font-size:54px">403</div><div class="small subtle">当前身份没有进入此页面的 capability</div></div></div></article>
+        <article class="state-card card"><div><strong>404 · 资源不存在</strong><p class="small subtle">提供返回工作区或重新查找入口。</p></div><div class="state-visual"><div style="text-align:center">${icon('search','icon icon-xl')}<div style="margin-top:8px"><strong>没有找到该工单</strong></div><div class="small subtle">可能已删除、合并或编号有误</div></div></div></article>
+        <article class="state-card card"><div><strong>实时连接断开</strong><p class="small subtle">停止暗示数据实时，允许手动重试。</p></div><div class="state-visual"><div class="notice notice-danger">${icon('warning')}<div><strong>实时连接已断开</strong><div class="small">页面不会自动更新，当前数据可能已过期。</div></div></div></div></article>
+        <article class="state-card card"><div><strong>正在重新同步</strong><p class="small subtle">展示同步范围，避免用户重复操作。</p></div><div class="state-visual"><div class="notice notice-blue">${icon('refresh')}<div><strong>正在重新同步队列</strong><div class="small">正在核对 Spring 权威状态与本地投影。</div></div></div></div></article>
+        <article class="state-card card"><div><strong>审批责任过期</strong><p class="small subtle">立即移除证据和操作按钮。</p></div><div class="state-visual"><div class="notice notice-warning">${icon('clock')}<div><strong>审批责任已过期</strong><div class="small">此提案已退回队列，请重新领取后再查看证据。</div></div></div></div></article>
+        <article class="state-card card"><div><strong>操作成功</strong><p class="small subtle">明确结果、对象与下一步。</p></div><div class="state-visual"><div class="notice notice-success">${icon('check')}<div><strong>补偿已批准</strong><div class="small">¥150.00 已进入异步执行队列。</div></div></div></div></article>
+        <article class="state-card card"><div><strong>操作结果未知</strong><p class="small subtle">不要暗示失败，提供幂等查询入口。</p></div><div class="state-visual"><div class="notice notice-warning">${icon('info')}<div><strong>暂时无法确认操作结果</strong><div class="small">请不要重复提交，系统正在查询最终状态。</div></div></div></div></article>
+      </div>`;
+      return internalShell('support','双角色工作人员',content);
+    }
+
+    function renderError(code){
+      const is403=code==='403';
+      return `<main class="error-page"><div class="error-wrap"><div class="eyebrow">Access boundary</div><div class="error-code">${code}</div><h1>${is403?'当前身份无权访问此页面':'页面或资源不存在'}</h1><p>${is403?'系统不会向未授权身份加载工单详情、审批证据或内部备注。请切换到具有对应能力的账号，或返回你的工作区。':'链接可能已经失效，资源可能被合并，或输入的地址有误。你可以返回帮助中心或内部工作台继续操作。'}</p><div class="row" style="justify-content:center;margin-top:24px"><button class="btn btn-primary" data-route="${is403?'/internal':'/help'}">${is403?'返回工作区选择':'返回帮助中心'}</button><button class="btn btn-outline" data-route="/states">查看状态规范</button></div></div></main>`;
+    }
+
+    function currentRoute(){return (location.hash.slice(1)||'/help/login').split('?')[0]}
+
+    function render(){
+      const route=currentRoute();
+      let html='';
+      if(route==='/help/login') html=renderCustomerLogin();
+      else if(route==='/help') html=renderHelpHome();
+      else if(route==='/help/tickets/TKT-250823-0013' || route==='/help/ticket/investigating') html=renderCustomerTicket('investigating');
+      else if(route==='/help/tickets/TKT-250823-0013/clarification' || route==='/help/ticket/clarification') html=renderCustomerTicket('clarification');
+      else if(route==='/help/tickets/TKT-250823-0013/human' || route==='/help/ticket/human') html=renderCustomerTicket('human');
+      else if(route==='/internal/login') html=renderInternalLogin();
+      else if(route==='/internal') html=renderRoleSelect();
+      else if(route==='/internal/support') html=renderSupportQueue();
+      else if(route==='/internal/support/tickets/TKT-250823-0013' || route==='/internal/support/ticket') html=renderSupportTicket();
+      else if(route==='/internal/approvals') html=renderApprovalQueue();
+      else if(route==='/internal/approvals/PRP-250823-0042' || route==='/internal/approvals/detail') html=renderApprovalDetail();
+      else if(route==='/states') html=renderStates();
+      else if(route==='/403') html=renderError('403');
+      else html=renderError('404');
+      document.getElementById('app').innerHTML=html;
+      hydrateIcons(document.getElementById('app'));
+      updateRouteButtons();
+      window.scrollTo(0,0);
+    }
+
+    function hydrateIcons(root=document){
+      root.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=icon(el.getAttribute('data-icon'),el.getAttribute('data-icon-class')||'icon')});
+      const toggleIcon=document.getElementById('prototype-toggle-icon');
+      if(toggleIcon&&!toggleIcon.innerHTML) toggleIcon.innerHTML=icon('grid','icon icon-sm');
+    }
+
+    function navigate(route){
+      if(location.hash.slice(1)===route) render(); else location.hash=route;
+    }
+
+    function toast(message,type='success',detail=''){
+      const root=document.getElementById('toast-root');
+      const el=document.createElement('div');
+      el.className=`toast ${type}`;
+      const iconName=type==='error'?'warning':type==='warning'?'info':'check';
+      el.innerHTML=`${icon(iconName)}<div><strong>${message}</strong>${detail?`<div class="small subtle">${detail}</div>`:''}</div>`;
+      root.appendChild(el);
+      setTimeout(()=>{el.style.opacity='0';el.style.transform='translateY(-6px)';setTimeout(()=>el.remove(),180)},3200);
+    }
+
+    function showModal({title,body,confirmText='确认',confirmType='primary',onConfirm}){
+      const root=document.getElementById('modal-root');
+      appState.modalConfirm=onConfirm||null;
+      root.innerHTML=`<div class="modal"><h3>${title}</h3><p class="subtle">${body}</p><div class="modal-actions"><button class="btn btn-ghost" data-action="close-modal">取消</button><button class="btn btn-${confirmType}" data-action="confirm-modal">${confirmText}</button></div></div>`;
+      root.classList.add('open');root.setAttribute('aria-hidden','false');
+    }
+
+    function closeModal(){
+      const root=document.getElementById('modal-root');root.classList.remove('open');root.setAttribute('aria-hidden','true');root.innerHTML='';appState.modalConfirm=null;
+    }
+
+    function updateRouteButtons(){
+      const route=currentRoute();
+      document.querySelectorAll('.route-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.route===route));
+    }
+
+    document.addEventListener('click',e=>{
+      const routeEl=e.target.closest('[data-route]');
+      if(routeEl){e.preventDefault();navigate(routeEl.dataset.route);return}
+      const actionEl=e.target.closest('[data-action]');
+      if(!actionEl)return;
+      const action=actionEl.dataset.action;
+      if(action==='close-prototype'){document.getElementById('prototype-panel').classList.remove('open');document.getElementById('prototype-toggle').setAttribute('aria-expanded','false')}
+      else if(action==='toast-info') toast('这是原型中的占位交互','success','正式实现时连接真实页面、弹窗或后端接口。');
+      else if(action==='fill-customer'){document.getElementById('customer-user').value='demo.customer';document.getElementById('customer-pass').value='Customer@2026';toast('已填充演示客户账号')}
+      else if(action==='show-demo-credentials') showModal({title:'演示客户账号',body:'用户名：demo.customer<br>密码：Customer@2026<br><br>按钮仅填充表单，仍需点击“登录”。',confirmText:'知道了',onConfirm:closeModal});
+      else if(action==='logout-customer'){toast('已退出客户会话');setTimeout(()=>navigate('/help/login'),450)}
+      else if(action==='request-human'){appState.humanRequested=true;showModal({title:'申请转人工处理',body:'转人工后，当前 AI 调查结果会作为摘要交给客服，客户无需重新描述问题。是否继续？',confirmText:'确认转人工',onConfirm:()=>{closeModal();toast('已提交转人工请求');setTimeout(()=>navigate('/help/tickets/TKT-250823-0013/human'),500)}})}
+      else if(action==='submit-clarification'){const text=document.getElementById('clarification-text')?.value.trim();if(!text){toast('请先填写补充信息','warning');return}appState.clarificationSubmitted=true;toast('补充信息已提交','success','系统正在恢复同一次 Agent 调查。');render()}
+      else if(action==='send-customer-message'){toast('消息已发送','success','客服将在同一工单中看到你的回复。')}
+      else if(action==='fill-staff-support'){document.getElementById('staff-user').value='demo.support';document.getElementById('staff-pass').value='Support@2026';toast('已填充演示客服账号')}
+      else if(action==='fill-staff-approver'){document.getElementById('staff-user').value='demo.approver';document.getElementById('staff-pass').value='Approver@2026';toast('已填充演示审批账号')}
+      else if(action==='fill-staff-dual'){document.getElementById('staff-user').value='demo.dual';document.getElementById('staff-pass').value='DualRole@2026';toast('已填充双角色账号')}
+      else if(action==='sync'){
+        appState.connection='syncing';render();toast('正在重新同步','success','正在核对 Spring 权威状态与当前页面投影。');setTimeout(()=>{appState.connection='synced';render();toast('同步完成')},900)
+      }
+      else if(action==='select-ticket'){appState.selectedTicket=actionEl.dataset.ticket;render()}
+      else if(action==='claim-ticket'){appState.selectedTicket=actionEl.dataset.ticket||appState.selectedTicket;toast('工单已领取','success','完整工单详情权限已经生效。');setTimeout(()=>navigate('/internal/support/tickets/TKT-250823-0013'),450)}
+      else if(action==='send-agent-reply') toast('回复已发送','success','客户门户与邮件投影将实时更新。')
+      else if(action==='resolve-ticket') showModal({title:'标记工单已解决',body:'此操作将结束当前人工处理阶段并通知客户。请确认已经完成必要核查与沟通。',confirmText:'确认解决',onConfirm:()=>{closeModal();toast('工单已标记为解决')}})
+      else if(action==='approve-compensation') showModal({title:'批准补偿 ¥150.00',body:'批准后将创建异步补偿执行任务，并通知客户。该操作会记录审批人、政策版本与证据快照。',confirmText:'确认批准',onConfirm:()=>{closeModal();toast('补偿已批准','success','¥150.00 已进入异步执行队列。')}})
+      else if(action==='reject-compensation') showModal({title:'驳回并转人工',body:'提案将被驳回，工单转回人工客服。请在审批备注中说明驳回原因。',confirmText:'确认驳回',confirmType:'warning',onConfirm:()=>{closeModal();toast('提案已驳回并转人工','warning')}})
+      else if(action==='release-approval') showModal({title:'释放审批责任',body:'释放后证据与操作按钮会立即移除，提案重新进入共享审批队列。',confirmText:'确认释放',onConfirm:()=>{closeModal();toast('审批责任已释放')}})
+      else if(action==='close-modal') closeModal();
+      else if(action==='confirm-modal'){const fn=appState.modalConfirm;if(fn)fn();else closeModal()}
+    });
+
+    document.addEventListener('submit',e=>{
+      e.preventDefault();
+      const form=e.target;
+      if(form.dataset.form==='customer-login'){
+        const data=new FormData(form);if(!data.get('username')||!data.get('password')){toast('请输入用户名和密码','warning');return}toast('登录成功');setTimeout(()=>navigate('/help'),400)
+      }
+      if(form.dataset.form==='create-ticket'){
+        const data=new FormData(form);if(!data.get('orderId')||!data.get('description')){toast('请填写订单编号和问题描述','warning');return}toast('工单已创建','success','编号：TKT-250823-0013');setTimeout(()=>navigate('/help/tickets/TKT-250823-0013'),500)
+      }
+      if(form.dataset.form==='internal-login'){
+        const data=new FormData(form);if(!data.get('username')||!data.get('password')){toast('请输入内部账号和密码','warning');return}toast('内部身份验证成功');setTimeout(()=>navigate('/internal'),450)
+      }
+    });
+
+    document.addEventListener('input',e=>{
+      if(e.target.id==='queue-search'){
+        const q=e.target.value.trim().toLowerCase();let count=0;document.querySelectorAll('#queue-body tr').forEach(row=>{const match=row.dataset.searchable.toLowerCase().includes(q);row.style.display=match?'':'none';if(match)count++});const label=document.getElementById('queue-count');if(label)label.textContent=`当前显示 ${count} 条`;
+      }
+      if(e.target.id==='approval-search'){
+        const q=e.target.value.trim().toLowerCase();document.querySelectorAll('#approval-body tr').forEach(row=>{row.style.display=row.dataset.searchable.toLowerCase().includes(q)?'':'none'});
+      }
+    });
+
+    document.getElementById('prototype-toggle').addEventListener('click',()=>{
+      const panel=document.getElementById('prototype-panel');const open=panel.classList.toggle('open');document.getElementById('prototype-toggle').setAttribute('aria-expanded',String(open));
+    });
+    document.getElementById('modal-root').addEventListener('click',e=>{if(e.target.id==='modal-root')closeModal()});
+    window.addEventListener('hashchange',render);
+    hydrateIcons(document);
+    render();
+  </script>
+</body>
+</html>

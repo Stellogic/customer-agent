@@ -1,9 +1,9 @@
 # [规格] 统一客户帮助中心与内部工作台的登录、鉴权及路由
 
 > 来源：[https://github.com/Stellogic/customer-agent/issues/71](https://github.com/Stellogic/customer-agent/issues/71)
-> Issue 状态：OPEN
+> Issue 状态：CLOSED
 > 创建时间：2026-08-16T10:03:08Z
-> 最后更新时间：2026-08-16T10:03:08Z
+> 最后更新时间：2026-08-23T06:01:48Z
 > 同步日期：2026-08-23
 > 说明：本文件是 GitHub Issue 正文的只读镜像；项目仍以 GitHub Issue 为规格事实源。
 
