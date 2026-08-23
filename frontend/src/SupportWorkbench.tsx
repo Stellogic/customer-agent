@@ -7,6 +7,7 @@ import {
   type SseEvent,
 } from "./streamProtocol";
 import { loadCsrfToken } from "./csrf";
+import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 
 const SUPPORT_SCHEMA = "support-workbench-v1" as const;
@@ -284,17 +285,23 @@ export function SupportWorkbench() {
           <h1>客服共享队列</h1>
           <p className="lede">发现需要人工关注的客服工单；领取与完整人工处理不在当前切片中。</p>
         </div>
-        <div
+        <StatusNotice
           className={`connection-state ${connection}`}
+          tone={
+            connection === "live"
+              ? "success"
+              : connection === "loading" || connection === "syncing"
+                ? "busy"
+                : "danger"
+          }
           role={connection === "stale" || connection === "resetting" ? "alert" : "status"}
-          aria-live="polite"
         >
           {connection === "loading" && "正在读取权威快照…"}
           {connection === "syncing" && "正在从 Spring 权威快照重新同步…"}
           {connection === "resetting" && "事件流已失效；当前队列可能过期，正在重新读取权威快照…"}
           {connection === "live" && "队列已与 Spring 权威状态同步"}
           {connection === "stale" && "实时连接已断开；当前队列可能过期。"}
-        </div>
+        </StatusNotice>
       </header>
 
       <p className="authorization-note">队列可发现不等于工单详情授权</p>

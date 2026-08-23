@@ -136,8 +136,67 @@ describe("Issue #73 静态路由与两个界面壳", () => {
 
     render(<RootApplication />);
 
-    expect(await screen.findByRole("heading", { name: "403" })).toBeInTheDocument();
+    const heading = await screen.findByRole("heading", { name: "当前身份无权访问此页面" });
+    const boundary = heading.closest("main");
+    expect(boundary).not.toBeNull();
+    expect(within(boundary!).getByText("403")).toBeInTheDocument();
+    expect(within(boundary!).queryByText(/capability/i)).not.toBeInTheDocument();
+    expect(within(boundary!).getByRole("link", { name: "返回可访问工作区" })).toHaveAttribute(
+      "href",
+      "/internal/support",
+    );
     expect(globalThis.location.pathname).toBe("/internal/approvals");
+  });
+
+  it("未知路由只说明页面未找到且不增加业务资源线索", async () => {
+    globalThis.history.replaceState(null, "", "/internal/unknown-record");
+
+    render(<RootApplication />);
+
+    const heading = await screen.findByRole("heading", { name: "没有找到这个页面" });
+    const state = heading.closest("main");
+    expect(state).not.toBeNull();
+    expect(within(state!).getByText("404")).toBeInTheDocument();
+    expect(within(state!).queryByText(/工单|审批|资源/)).not.toBeInTheDocument();
+    expect(within(state!).getByRole("link", { name: "前往客户登录" })).toHaveAttribute(
+      "href",
+      "/help/login",
+    );
+    expect(within(state!).getByRole("link", { name: "前往内部登录" })).toHaveAttribute(
+      "href",
+      "/internal/login",
+    );
+  });
+
+  it("恢复身份时以可访问的忙碌状态保留稳定页面骨架", () => {
+    globalThis.history.replaceState(null, "", "/internal");
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => new Promise(() => undefined));
+
+    render(<RootApplication />);
+
+    const status = screen.getByRole("status", { name: "正在确认当前身份" });
+    const state = status.closest("main");
+    expect(state).not.toBeNull();
+    expect(state).toHaveAttribute("aria-busy", "true");
+    expect(within(state!).getByText("正在安全地恢复你的工作区…")).toBeInTheDocument();
+  });
+
+  it("身份恢复失败时提供非技术化说明和当前地址重载入口", async () => {
+    globalThis.history.replaceState(null, "", "/internal");
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network unavailable"));
+
+    render(<RootApplication />);
+
+    const heading = await screen.findByRole("heading", { name: "暂时无法进入工作区" });
+    const state = heading.closest("main");
+    expect(state).not.toBeNull();
+    expect(within(state!).getByRole("alert")).toHaveTextContent(
+      "当前身份暂时无法确认。请重新加载页面后再试。",
+    );
+    expect(within(state!).getByRole("link", { name: "重新加载当前页面" })).toHaveAttribute(
+      "href",
+      "/internal",
+    );
   });
 
   it("未登录内部路由只保留认可的站内 returnTo", async () => {
@@ -314,7 +373,9 @@ describe("Issue #73 静态路由与两个界面壳", () => {
     await waitFor(() => expect(sessionReads).toBeGreaterThanOrEqual(2));
     expect(customerSnapshotReads).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("通知丢失前的旧客户投影")).not.toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "403" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "当前身份无权访问此页面" }),
+    ).toBeInTheDocument();
   }, 60_000);
 });
 

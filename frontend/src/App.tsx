@@ -7,6 +7,7 @@ import {
   type SseEvent,
 } from "./streamProtocol";
 import { loadCsrfToken } from "./csrf";
+import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 
 const CUSTOMER_PUBLIC_SCHEMA = "customer-public-v1" as const;
@@ -455,9 +456,9 @@ export function App() {
           </label>
           <button disabled={submitting}>{submitting ? "正在提交…" : "提交物流延迟问题"}</button>
           {error && (
-            <p className="error" role="alert">
+            <StatusNotice className="error" role="alert" tone="danger">
               {error}
-            </p>
+            </StatusNotice>
           )}
         </form>
       ) : (
@@ -557,9 +558,9 @@ export function App() {
             )}
           <p className="recovery-note">刷新页面时，公开沟通会从 Spring 权威快照恢复。</p>
           {error && (
-            <p className="error" role="alert">
+            <StatusNotice className="error" role="alert" tone="danger">
               {error}
-            </p>
+            </StatusNotice>
           )}
         </section>
       )}

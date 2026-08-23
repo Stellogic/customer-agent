@@ -7,6 +7,7 @@ import {
   type SseEvent,
 } from "./streamProtocol";
 import { loadCsrfToken } from "./csrf";
+import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 
 const APPROVAL_SCHEMA = "approval-view-v1" as const;
@@ -25,6 +26,26 @@ type Lease = {
   leaseVersion: number;
   expiresAt: string;
 };
+type ApprovalStatus = {
+  message: string;
+  tone: "neutral" | "success" | "busy" | "warning" | "danger";
+};
+const APPROVAL_STATUS = {
+  queueLoading: { message: "正在读取待审批队列…", tone: "busy" },
+  queueRefreshed: { message: "待审批队列已刷新", tone: "success" },
+  queueUnavailable: { message: "待审批队列暂时不可用", tone: "danger" },
+  claiming: { message: "正在领取审批责任…", tone: "busy" },
+  authorityUnavailable: { message: "审批责任不可用，已返回队列。", tone: "danger" },
+  authorityEnded: { message: "审批责任已结束，证据和操作已移除。", tone: "warning" },
+  evidenceSynced: { message: "审批证据已与 Spring 权威状态同步", tone: "success" },
+  reconnecting: {
+    message: "审批连接已断开；正在按当前租约重新校验权威快照…",
+    tone: "warning",
+  },
+  returnedToQueue: { message: "审批责任已结束，已返回队列。", tone: "success" },
+  authorityExpired: { message: "审批责任已失效，证据和操作已移除。", tone: "danger" },
+  released: { message: "审批责任已释放，已返回队列。", tone: "success" },
+} as const satisfies Record<string, ApprovalStatus>;
 type ApprovalSnapshot = {
   view: "APPROVAL_VIEW";
   schema: typeof APPROVAL_SCHEMA;
@@ -50,7 +71,7 @@ type ApprovalSnapshot = {
 export function ApprovalWorkbench() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [snapshot, setSnapshot] = useState<ApprovalSnapshot | null>(null);
-  const [status, setStatus] = useState("正在读取待审批队列…");
+  const [status, setStatus] = useState<ApprovalStatus>(APPROVAL_STATUS.queueLoading);
   const streamController = useRef<AbortController | null>(null);
   const reconnectTimer = useRef<number | null>(null);
   const activeLease = useRef<Lease | null>(null);
@@ -74,15 +95,15 @@ export function ApprovalWorkbench() {
       const value = (await response.json()) as unknown;
       if (!Array.isArray(value) || !value.every(isQueueItem)) throw new Error("invalid queue");
       setQueue(value);
-      setStatus("待审批队列已刷新");
+      setStatus(APPROVAL_STATUS.queueRefreshed);
     } catch {
-      setStatus("待审批队列暂时不可用");
+      setStatus(APPROVAL_STATUS.queueUnavailable);
     }
   }
 
   async function claim(revisionId: string) {
     streamController.current?.abort();
-    setStatus("正在领取审批责任…");
+    setStatus(APPROVAL_STATUS.claiming);
     try {
       const csrf = await loadCsrfToken();
       const response = await humanSessionFetch(
@@ -105,7 +126,7 @@ export function ApprovalWorkbench() {
       globalThis.history.replaceState(null, "", `/internal/approvals?revision=${revisionId}`);
       await loadApprovalView(lease);
     } catch {
-      revokeLocalAuthority("审批责任不可用，已返回队列。");
+      revokeLocalAuthority(APPROVAL_STATUS.authorityUnavailable);
     }
   }
 
@@ -120,7 +141,7 @@ export function ApprovalWorkbench() {
         },
       );
       if (!response.ok) {
-        revokeLocalAuthority("审批责任已结束，证据和操作已移除。");
+        revokeLocalAuthority(APPROVAL_STATUS.authorityEnded);
         await loadQueue();
         return;
       }
@@ -134,7 +155,7 @@ export function ApprovalWorkbench() {
         throw new Error("incompatible approval snapshot");
       }
       setSnapshot(value);
-      setStatus("审批证据已与 Spring 权威状态同步");
+      setStatus(APPROVAL_STATUS.evidenceSynced);
       void consumeEvents(lease, value.cursor);
     } catch {
       scheduleRecovery(lease);
@@ -160,7 +181,7 @@ export function ApprovalWorkbench() {
         response.status === 404 ||
         response.status === 410
       ) {
-        revokeLocalAuthority("审批责任已结束，证据和操作已移除。");
+        revokeLocalAuthority(APPROVAL_STATUS.authorityEnded);
         return;
       }
       if (response.status === 409) {
@@ -189,7 +210,7 @@ export function ApprovalWorkbench() {
       return;
     setSnapshot(null);
     globalThis.history.replaceState(null, "", "/internal/approvals");
-    setStatus("审批连接已断开；正在按当前租约重新校验权威快照…");
+    setStatus(APPROVAL_STATUS.reconnecting);
     reconnectTimer.current = globalThis.setTimeout(() => {
       reconnectTimer.current = null;
       if (activeLease.current?.leaseToken === lease.leaseToken) void loadApprovalView(lease);
@@ -228,11 +249,11 @@ export function ApprovalWorkbench() {
         },
       );
       if (!response.ok) throw new Error("decision rejected");
-      revokeLocalAuthority("审批责任已结束，已返回队列。");
+      revokeLocalAuthority(APPROVAL_STATUS.returnedToQueue);
       await loadQueue();
-      setStatus("审批责任已结束，已返回队列。");
+      setStatus(APPROVAL_STATUS.returnedToQueue);
     } catch {
-      revokeLocalAuthority("审批责任已失效，证据和操作已移除。");
+      revokeLocalAuthority(APPROVAL_STATUS.authorityExpired);
     }
   }
 
@@ -254,22 +275,22 @@ export function ApprovalWorkbench() {
         },
       );
       if (!response.ok) throw new Error("release rejected");
-      revokeLocalAuthority("审批责任已释放，已返回队列。");
+      revokeLocalAuthority(APPROVAL_STATUS.released);
       await loadQueue();
-      setStatus("审批责任已释放，已返回队列。");
+      setStatus(APPROVAL_STATUS.released);
     } catch {
-      revokeLocalAuthority("审批责任已失效，证据和操作已移除。");
+      revokeLocalAuthority(APPROVAL_STATUS.authorityExpired);
     }
   }
 
-  function revokeLocalAuthority(message: string) {
+  function revokeLocalAuthority(nextStatus: ApprovalStatus) {
     streamController.current?.abort();
     streamController.current = null;
     if (reconnectTimer.current !== null) globalThis.clearTimeout(reconnectTimer.current);
     reconnectTimer.current = null;
     activeLease.current = null;
     setSnapshot(null);
-    setStatus(message);
+    setStatus(nextStatus);
     globalThis.history.replaceState(null, "", "/internal/approvals");
   }
 
@@ -280,7 +301,13 @@ export function ApprovalWorkbench() {
           <p className="eyebrow">APPROVAL VIEW</p>
           <h1>{snapshot ? "补偿提案审批" : "待审批补偿"}</h1>
         </div>
-        <p role="status">{status}</p>
+        <StatusNotice
+          className="approval-connection-state"
+          tone={status.tone}
+          role={status.tone === "danger" ? "alert" : "status"}
+        >
+          {status.message}
+        </StatusNotice>
       </header>
       {snapshot ? (
         <section className="queue-panel" aria-label="当前审批视图">
@@ -347,6 +374,7 @@ function isQueueItem(value: unknown): value is QueueItem {
     typeof value.expiresAt === "string"
   );
 }
+
 function isLease(value: unknown): value is Lease {
   return (
     isRecord(value) &&
