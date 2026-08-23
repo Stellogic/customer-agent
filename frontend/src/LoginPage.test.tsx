@@ -73,6 +73,13 @@ describe("人工身份登录基线", () => {
 
     render(<RootApplication />);
 
+    expect(await screen.findByRole("link", { name: "Stellogic 客户帮助中心" })).toHaveAttribute(
+      "href",
+      "/help/login",
+    );
+    expect(screen.getByRole("region", { name: "客户服务说明" })).toHaveTextContent(
+      "只呈现客户可见的信息",
+    );
     expect(await screen.findByRole("heading", { name: "客户登录" })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "使用演示客户填充" }));
     expect(screen.getByLabelText("用户名")).toHaveValue("customer-demo");
@@ -175,6 +182,13 @@ describe("人工身份登录基线", () => {
 
     render(<RootApplication />);
 
+    expect(await screen.findByRole("link", { name: "Stellogic 内部工作台" })).toHaveAttribute(
+      "href",
+      "/internal/login",
+    );
+    expect(screen.getByRole("region", { name: "内部工作说明" })).toHaveTextContent(
+      "客服与审批职责保持分离",
+    );
     expect(await screen.findByRole("heading", { name: "内部工作人员登录" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "使用演示客户填充" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "使用演示客服填充" }));

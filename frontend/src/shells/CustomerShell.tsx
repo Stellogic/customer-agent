@@ -1,14 +1,24 @@
 import { Layout } from "antd";
-import { Outlet } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
+import { Brand } from "../components/Brand";
 import { SessionLogoutButton } from "../SessionLogoutButton";
+import { CurrentSessionContext } from "../session";
 
 export default function CustomerShell() {
+  const session = CurrentSessionContext.use();
   return (
     <Layout className="customer-shell">
       <Layout.Header aria-label="客户帮助中心" className="customer-shell-header">
-        <a href="/help">Stellogic 帮助中心</a>
-        <span>客户服务</span>
-        <SessionLogoutButton />
+        <Brand audience="customer" to="/help" />
+        <nav aria-label="客户导航" className="customer-shell-nav">
+          <Link aria-current="page" to="/help">
+            帮助中心
+          </Link>
+        </nav>
+        <div className="shell-session">
+          <span>当前客户：{session.displayName}</span>
+          <SessionLogoutButton />
+        </div>
       </Layout.Header>
       <Layout.Content>
         <Outlet />

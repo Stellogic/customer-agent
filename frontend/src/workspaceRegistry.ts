@@ -23,6 +23,8 @@ export type InternalWorkspace = {
   path: `/internal/${string}`;
   menuLabel: string;
   cardLabel: string;
+  eyebrow: string;
+  description: string;
 };
 
 export const INTERNAL_WORKSPACES = [
@@ -32,6 +34,8 @@ export const INTERNAL_WORKSPACES = [
     path: INTERNAL_ROUTE_PATHS.support,
     menuLabel: "客服工作区",
     cardLabel: "客服工作区 · 调查与响应",
+    eyebrow: "SUPPORT",
+    description: "进入共享队列，查看当前职责允许的客服工作入口。",
   },
   {
     id: "approvals",
@@ -39,6 +43,8 @@ export const INTERNAL_WORKSPACES = [
     path: INTERNAL_ROUTE_PATHS.approvals,
     menuLabel: "审批工作区",
     cardLabel: "审批工作区 · 补偿审查",
+    eyebrow: "APPROVAL",
+    description: "进入待审批队列，查看当前职责允许的补偿审查入口。",
   },
 ] as const satisfies readonly InternalWorkspace[];
 

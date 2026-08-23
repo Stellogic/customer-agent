@@ -9,6 +9,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 $imageTag = if ($env:CUSTOMER_AGENT_IMAGE_TAG) { $env:CUSTOMER_AGENT_IMAGE_TAG } else { 'local' }
 $env:CUSTOMER_AGENT_IMAGE_TAG = $imageTag
+$frontendPort = if ($env:CUSTOMER_AGENT_FRONTEND_PORT) { $env:CUSTOMER_AGENT_FRONTEND_PORT } else { '4180' }
 $suiteName = if ($Reset) { 'FULL_RESET_GATE' } else { 'PERSISTENT_RERUN_SUITE' }
 Write-Host "smoke suite: $suiteName"
 if (-not $Reset) {
@@ -191,7 +192,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "React 实时验收失败，退出码: $LASTEXITCODE"
 }
 
-$status = Invoke-RestMethod -Uri 'http://127.0.0.1:4180/api/system/status'
+$status = Invoke-RestMethod -Uri "http://127.0.0.1:$frontendPort/api/system/status"
 if ($status.status -ne 'UP') {
     throw "Spring 状态投影不是 UP: $($status | ConvertTo-Json -Compress)"
 }
