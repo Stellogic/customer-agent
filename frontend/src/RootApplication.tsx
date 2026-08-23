@@ -1,6 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+import { ConfigProvider } from "antd";
 import {
   BrowserRouter,
+  Link,
   Navigate,
   Outlet,
   Route,
@@ -9,6 +11,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { LoginPage } from "./LoginPage";
+import { SystemState } from "./components/SystemState";
 import {
   defaultPathFor,
   hasCapability,
@@ -34,57 +37,73 @@ const INTERNAL_WORKSPACE_COMPONENTS = {
 
 export function RootApplication() {
   return (
-    <BrowserRouter>
-      <Suspense fallback={<RouteLoading />}>
-        <Routes>
-          <Route path={ROUTES.customerLogin} element={<LoginRoute audience="customer" />} />
-          <Route path={ROUTES.internalLogin} element={<LoginRoute audience="internal" />} />
-          {LEGACY_ROUTE_REDIRECTS.map((route) => (
-            <Route key={route.path} path={route.path} element={<LegacyRoute to={route.to} />} />
-          ))}
-          <Route element={<SessionGate />}>
-            <Route index element={<DefaultLanding />} />
-            <Route
-              path={ROUTES.customerHome}
-              element={
-                <CustomerBoundary>
-                  <CapabilityBoundary capability="CUSTOMER_HELP_ACCESS">
-                    <CustomerShell />
-                  </CapabilityBoundary>
-                </CustomerBoundary>
-              }
-            >
-              <Route index element={<CustomerWorkspace />} />
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: "#0b382b",
+          colorInfo: "#3977c6",
+          colorSuccess: "#2a8a5b",
+          colorWarning: "#d87920",
+          colorError: "#d34f4b",
+          colorText: "#14231e",
+          colorBgContainer: "#fffefa",
+          borderRadius: 10,
+          fontFamily: 'Aptos, "Microsoft YaHei UI", "PingFang SC", sans-serif',
+        },
+      }}
+    >
+      <BrowserRouter>
+        <Suspense fallback={<RouteLoading />}>
+          <Routes>
+            <Route path={ROUTES.customerLogin} element={<LoginRoute audience="customer" />} />
+            <Route path={ROUTES.internalLogin} element={<LoginRoute audience="internal" />} />
+            {LEGACY_ROUTE_REDIRECTS.map((route) => (
+              <Route key={route.path} path={route.path} element={<LegacyRoute to={route.to} />} />
+            ))}
+            <Route element={<SessionGate />}>
+              <Route index element={<DefaultLanding />} />
+              <Route
+                path={ROUTES.customerHome}
+                element={
+                  <CustomerBoundary>
+                    <CapabilityBoundary capability="CUSTOMER_HELP_ACCESS">
+                      <CustomerShell />
+                    </CapabilityBoundary>
+                  </CustomerBoundary>
+                }
+              >
+                <Route index element={<CustomerWorkspace />} />
+              </Route>
+              <Route
+                path={ROUTES.internalHome}
+                element={
+                  <InternalBoundary>
+                    <InternalShell />
+                  </InternalBoundary>
+                }
+              >
+                <Route index element={<InternalLanding />} />
+                {INTERNAL_WORKSPACES.map((workspace) => {
+                  const Workspace = INTERNAL_WORKSPACE_COMPONENTS[workspace.id];
+                  return (
+                    <Route
+                      key={workspace.id}
+                      path={workspace.id}
+                      element={
+                        <CapabilityBoundary capability={workspace.capability}>
+                          <Workspace />
+                        </CapabilityBoundary>
+                      }
+                    />
+                  );
+                })}
+              </Route>
             </Route>
-            <Route
-              path={ROUTES.internalHome}
-              element={
-                <InternalBoundary>
-                  <InternalShell />
-                </InternalBoundary>
-              }
-            >
-              <Route index element={<InternalLanding />} />
-              {INTERNAL_WORKSPACES.map((workspace) => {
-                const Workspace = INTERNAL_WORKSPACE_COMPONENTS[workspace.id];
-                return (
-                  <Route
-                    key={workspace.id}
-                    path={workspace.id}
-                    element={
-                      <CapabilityBoundary capability={workspace.capability}>
-                        <Workspace />
-                      </CapabilityBoundary>
-                    }
-                  />
-                );
-              })}
-            </Route>
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </ConfigProvider>
   );
 }
 
@@ -184,36 +203,75 @@ function CustomerBoundary({ children }: { children: ReactNode }) {
 
 function RouteLoading() {
   return (
-    <main className="route-state">
-      <p role="status">正在加载工作区…</p>
-    </main>
+    <SystemState
+      announcement="status"
+      announcementLabel="正在确认当前身份"
+      busy
+      description="正在安全地恢复你的工作区…"
+      eyebrow="SECURE SESSION"
+      title="正在确认当前身份"
+      variant="loading"
+    />
   );
 }
 
 function RouteError() {
+  const location = useLocation();
   return (
-    <main className="route-state">
-      <h1>无法恢复当前身份</h1>
-      <p role="alert">请刷新页面后重试。</p>
-    </main>
+    <SystemState
+      actions={
+        <a className="route-state-action" href={`${location.pathname}${location.search}`}>
+          重新加载当前页面
+        </a>
+      }
+      announcement="alert"
+      description="当前身份暂时无法确认。请重新加载页面后再试。"
+      eyebrow="CONNECTION CHECK"
+      title="暂时无法进入工作区"
+      variant="error"
+    />
   );
 }
 
 function Forbidden() {
+  const session = CurrentSessionContext.use();
   return (
-    <main className="route-state">
-      <p className="eyebrow">ACCESS BOUNDARY</p>
-      <h1>403</h1>
-      <p>当前身份没有进入此页面的 capability。</p>
-    </main>
+    <SystemState
+      actions={
+        <Link className="route-state-action" to={defaultPathFor(session)}>
+          返回可访问工作区
+        </Link>
+      }
+      code="403"
+      description="这里没有加载任何受保护内容。你可以返回当前身份可访问的工作区继续操作。"
+      eyebrow="ACCESS BOUNDARY"
+      title="当前身份无权访问此页面"
+      variant="forbidden"
+    />
   );
 }
 
 function NotFound() {
   return (
-    <main className="route-state">
-      <h1>404</h1>
-      <p>该地址不属于已知静态路由。</p>
-    </main>
+    <SystemState
+      actions={
+        <>
+          <Link className="route-state-action" to={ROUTES.customerLogin}>
+            前往客户登录
+          </Link>
+          <Link
+            className="route-state-action route-state-action-secondary"
+            to={ROUTES.internalLogin}
+          >
+            前往内部登录
+          </Link>
+        </>
+      }
+      code="404"
+      description="请检查地址，或从安全登录入口重新开始。"
+      eyebrow="WAYFINDING"
+      title="没有找到这个页面"
+      variant="not-found"
+    />
   );
 }

@@ -16,6 +16,14 @@ describe("审批视图授权撤销", () => {
     globalThis.history.replaceState(null, "", "/");
   });
 
+  it("状态图形不混入审批队列的权威可见文案", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json([]));
+
+    render(<ApprovalWorkbench />);
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/^待审批队列已刷新$/));
+  });
+
   it("连接期间租约被撤销后立即清除审批证据和操作并返回队列", async () => {
     let closeStream: (() => void) | undefined;
     globalThis.history.replaceState(null, "", `/internal/approvals?revision=${REVISION_ID}`);

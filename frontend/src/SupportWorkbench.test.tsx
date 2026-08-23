@@ -68,7 +68,9 @@ describe("客服共享队列工作台", () => {
 
     render(<RootApplication />);
 
-    expect(await screen.findByRole("heading", { name: "403" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "当前身份无权访问此页面" }),
+    ).toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalledWith(
       "/api/support/workbench/snapshot",

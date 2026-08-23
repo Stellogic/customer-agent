@@ -9,6 +9,57 @@ async function freshPage(context: BrowserContext, path: string) {
 }
 
 test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
+  test("桌面视口真实呈现加载、错误、404，并可用 Tab 看见焦点", async ({ browser }, testInfo) => {
+    const context = await newIssue80Context(browser, { viewport: { width: 1440, height: 900 } });
+
+    const notFound = await freshPage(context, "/not-a-business-resource");
+    await expect(notFound.getByRole("heading", { name: "没有找到这个页面" })).toBeVisible();
+    await expect(notFound.getByText("404", { exact: true })).toBeVisible();
+    await expect(notFound.getByRole("img", { name: "页面未找到" })).toBeVisible();
+    await notFound.keyboard.press("Tab");
+    const focusedLink = notFound.getByRole("link", { name: "前往客户登录" });
+    await expect(focusedLink).toBeFocused();
+    await expect(focusedLink).toHaveCSS("outline-style", "solid");
+    await notFound.screenshot({ path: testInfo.outputPath("desktop-404-and-keyboard-focus.png") });
+
+    const error = await context.newPage();
+    await error.route("**/api/auth/session", (route) =>
+      route.fulfill({ status: 503, body: "temporarily unavailable" }),
+    );
+    await error.goto("/help");
+    await expect(error.getByRole("heading", { name: "暂时无法进入工作区" })).toBeVisible();
+    await expect(error.getByRole("alert")).toContainText("当前身份暂时无法确认");
+    await expect(error.getByRole("img", { name: "身份确认失败" })).toBeVisible();
+
+    const loading = await context.newPage();
+    let releaseSession: (() => void) | undefined;
+    await loading.route("**/api/auth/session", async (route) => {
+      await new Promise<void>((resolve) => {
+        releaseSession = resolve;
+      });
+      await route.fulfill({ status: 401 });
+    });
+    await loading.goto("/help", { waitUntil: "domcontentloaded" });
+    const busyState = loading.locator("main[aria-busy='true']");
+    await expect(busyState).toBeVisible();
+    await expect(busyState.getByRole("status", { name: "正在确认当前身份" })).toBeVisible();
+    await expect(busyState.getByRole("img", { name: "正在加载身份" })).toBeVisible();
+    releaseSession?.();
+    await expect(loading).toHaveURL(/\/help\/login\?returnTo=%2Fhelp$/);
+    await context.close();
+  });
+
+  test("真实浏览器在客服事件流断开后显示重新同步状态", async ({ page }) => {
+    await page.route("**/api/support/workbench/events", (route) =>
+      route.fulfill({ status: 200, contentType: "text/event-stream", body: "" }),
+    );
+    await login(page, "internal", "support-demo");
+    await expect(page.getByRole("heading", { name: "客服共享队列" })).toBeVisible();
+    await expect(
+      page.getByRole("status").filter({ hasText: "正在从 Spring 权威快照重新同步" }),
+    ).toBeVisible();
+  });
+
   test("未登录直达客户和内部 URL 时进入对应登录页", async ({ browser }) => {
     const context = await newIssue80Context(browser);
     const customer = await freshPage(context, "/help");
@@ -80,7 +131,7 @@ test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
 
       if ("forbidden" in identity) {
         await page.goto(identity.forbidden);
-        await expect(page.getByRole("heading", { name: "403" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "当前身份无权访问此页面" })).toBeVisible();
       } else {
         await page.goto("/internal/support");
         await expect(page.getByRole("heading", { name: "客服共享队列" })).toBeVisible();
