@@ -27,6 +27,9 @@ public final class DelayCompensationPolicy {
         }
         BigDecimal amount =
                 paidAmount.multiply(REFUND_RATE).min(REFUND_CAP).setScale(2, RoundingMode.HALF_UP);
+        if (amount.signum() <= 0) {
+            return new Decision(false, Method.NONE, new BigDecimal("0.00"));
+        }
         return new Decision(true, Method.SIMULATED_PARTIAL_REFUND, amount);
     }
 
