@@ -75,4 +75,19 @@ class DelayCompensationPolicyTest {
         assertThat(policy.evaluate(Duration.ofHours(80), new BigDecimal("999.99")).amount())
                 .isEqualByComparingTo("50.00");
     }
+
+    @ParameterizedTest
+    @MethodSource("nonProposablePartialRefundAmounts")
+    void partialRefundRequiresAPositiveAmountAfterCentRounding(String paidAmount) {
+        DelayCompensationPolicy.Decision decision =
+                policy.evaluate(Duration.ofHours(80), new BigDecimal(paidAmount));
+
+        assertThat(decision.eligible()).isFalse();
+        assertThat(decision.method()).isEqualTo(DelayCompensationPolicy.Method.NONE);
+        assertThat(decision.amount()).isEqualByComparingTo("0.00");
+    }
+
+    static Stream<Arguments> nonProposablePartialRefundAmounts() {
+        return Stream.of(Arguments.of("0.00"), Arguments.of("-1.00"), Arguments.of("0.04"));
+    }
 }

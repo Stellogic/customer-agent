@@ -160,6 +160,28 @@ def main() -> None:
         )
         expect_status(denied_executor, 403)
 
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        delay_fact_constraints = connection.execute(
+            "select conname from pg_constraint where convalidated "
+            "and conname in ("
+            "'approval_evidence_proposal_delay_fkey', "
+            "'synthetic_order_delay_representations_consistent', "
+            "'compensation_proposal_delay_representations_consistent', "
+            "'compensation_proposal_revision_delay_identity', "
+            "'approval_evidence_delay_representations_consistent') order by conname"
+        ).fetchall()
+        assert delay_fact_constraints == [
+            ("approval_evidence_delay_representations_consistent",),
+            ("approval_evidence_proposal_delay_fkey",),
+            ("compensation_proposal_delay_representations_consistent",),
+            ("compensation_proposal_revision_delay_identity",),
+            ("synthetic_order_delay_representations_consistent",),
+        ]
+        assert connection.execute(
+            "select convalidated from pg_constraint "
+            "where conname = 'synthetic_order_paid_amount_check'"
+        ).fetchone() == (True,)
+
     request_id = f"smoke-{uuid.uuid4()}"
     ticket_payload = {
         "orderReference": "ORDER-INTAKE-ONLY",
@@ -461,6 +483,82 @@ def main() -> None:
             >= 8
         )
 
+    def assert_controlled_ineligible_proposal(order_reference: str) -> None:
+        ineligible_ticket_id = uuid.uuid4()
+        ineligible_generation_id = uuid.uuid4()
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            connection.execute(
+                "insert into support_ticket "
+                "(id, customer_id, order_reference, description, lifecycle_state, handling_mode, "
+                "created_at, first_responded_at) values "
+                "(%s, 'customer-demo', %s, 'non-proposable amount proof', "
+                "'INVESTIGATING', 'AGENT', "
+                "'2026-08-09T13:55:00Z', '2026-08-09T13:56:00Z')",
+                (ineligible_ticket_id, order_reference),
+            )
+            connection.execute(
+                "insert into agent_processing_generation "
+                "(id, ticket_id, generation_number, thread_id, status, created_at) "
+                "values (%s, %s, 1, %s, 'ACTIVE', '2026-08-09T13:56:00Z')",
+                (ineligible_generation_id, ineligible_ticket_id, uuid.uuid4()),
+            )
+
+        ineligible_headers = {
+            "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+            "X-Agent-Generation-Id": str(ineligible_generation_id),
+        }
+        with httpx.Client(timeout=20.0) as client:
+            facts = client.get(
+                f"{spring_url}/internal/agent/tickets/{ineligible_ticket_id}/generations/"
+                f"{ineligible_generation_id}/facts",
+                headers={
+                    **ineligible_headers,
+                    "X-Agent-Operation": "READ_INVESTIGATION_FACTS",
+                },
+            )
+            expect_status(facts, 200)
+            conclusion = client.post(
+                f"{spring_url}/internal/agent/tickets/{ineligible_ticket_id}/generations/"
+                f"{ineligible_generation_id}/conclusions",
+                headers={
+                    **ineligible_headers,
+                    "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
+                    "Idempotency-Key": f"{ineligible_generation_id}:submit-conclusion",
+                },
+                json={
+                    "compensationRequired": True,
+                    "reasonCode": "LOGISTICS_DELAY",
+                    "delayHours": facts.json()["delayHours"],
+                    "delaySeconds": facts.json()["delaySeconds"],
+                    "orderReference": order_reference,
+                    "evidenceRefs": facts.json()["evidenceRefs"],
+                    "suggestedMethod": "SIMULATED_PARTIAL_REFUND",
+                    "suggestedAmount": "999999.99",
+                },
+            )
+            expect_status(conclusion, 422)
+
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            assert (
+                connection.execute(
+                    "select count(*) from compensation_proposal_revision where ticket_id = %s",
+                    (ineligible_ticket_id,),
+                ).fetchone()[0]
+                == 0
+            )
+            assert (
+                connection.execute(
+                    "select count(*) from audit_event where ticket_id = %s "
+                    "and event_type = "
+                    "'AGENT_COMMAND_REJECTED_COMPENSATION_PROPOSAL_INELIGIBLE'",
+                    (ineligible_ticket_id,),
+                ).fetchone()[0]
+                == 1
+            )
+
+    assert_controlled_ineligible_proposal("ORDER-DELAY-ZERO-PAID")
+    assert_controlled_ineligible_proposal("ORDER-DELAY-ROUNDING-ZERO")
+
     proposal_request = f"issue-15-{uuid.uuid4()}"
     proposal_order_reference = "ORDER-DELAY-001"
     with customer_browser_client(spring_url) as client:
@@ -517,6 +615,55 @@ def main() -> None:
     )
     assert len(proposal_row[9]) == 64
     first_revision_id, proposal_id = proposal_row[:2]
+
+    reused_generation = uuid.uuid4()
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into agent_processing_generation "
+            "(id, ticket_id, generation_number, thread_id, status, created_at) "
+            "values (%s, %s, 2, %s, 'ACTIVE', now())",
+            (reused_generation, uuid.UUID(proposal_ticket_id), uuid.uuid4()),
+        )
+    reused_headers = {
+        "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+        "X-Agent-Generation-Id": str(reused_generation),
+    }
+    with httpx.Client(timeout=20.0) as client:
+        reused_facts = client.get(
+            f"{spring_url}/internal/agent/tickets/{proposal_ticket_id}/generations/"
+            f"{reused_generation}/facts",
+            headers={**reused_headers, "X-Agent-Operation": "READ_INVESTIGATION_FACTS"},
+        )
+        expect_status(reused_facts, 200)
+        reused = client.post(
+            f"{spring_url}/internal/agent/tickets/{proposal_ticket_id}/generations/"
+            f"{reused_generation}/conclusions",
+            headers={
+                **reused_headers,
+                "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
+                "Idempotency-Key": f"{reused_generation}:submit-conclusion",
+            },
+            json={
+                "compensationRequired": True,
+                "reasonCode": "LOGISTICS_DELAY",
+                "delayHours": 80,
+                "delaySeconds": 288000,
+                "orderReference": proposal_order_reference,
+                "evidenceRefs": reused_facts.json()["evidenceRefs"],
+                "suggestedMethod": "COUPON",
+                "suggestedAmount": "999999.99",
+            },
+        )
+        expect_status(reused, 200)
+        assert reused.json()["proposalRevisionId"] == str(first_revision_id)
+        assert reused.json()["proposalRevision"] == 1
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select count(*), min(content_digest), max(content_digest) "
+            "from compensation_proposal_revision where ticket_id = %s",
+            (uuid.UUID(proposal_ticket_id),),
+        ).fetchone() == (1, proposal_row[9], proposal_row[9])
 
     with customer_browser_client(spring_url) as client:
         customer_view = client.get(
@@ -658,9 +805,10 @@ def main() -> None:
         assert approval_projection["leaseToken"] == lease_one["leaseToken"]
         assert [event["eventType"] for event in approval_projection["responsibilityChain"]] == [
             "COMPENSATION_PROPOSAL_REVISION_CREATED",
+            "COMPENSATION_PROPOSAL_REVISION_REUSED",
             "APPROVAL_LEASE_CLAIMED",
         ]
-        assert approval_projection["responsibilityChain"][1]["leaseVersion"] == 1
+        assert approval_projection["responsibilityChain"][2]["leaseVersion"] == 1
         assert not any(
             field in approval_projection
             for field in (
@@ -992,16 +1140,45 @@ def main() -> None:
         assert error.diag.constraint_name == "one_active_logistics_compensation_intent"
 
     second_generation = uuid.uuid4()
+
+    try:
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            connection.execute(
+                "update synthetic_order set delay_hours = 81 where order_reference = %s",
+                (proposal_order_reference,),
+            )
+        raise AssertionError("spring_app unexpectedly changed an authoritative delay fact")
+    except psycopg.errors.InsufficientPrivilege:
+        pass
+
+    for inconsistent_column, inconsistent_value in (
+        ("delay_hours", 81),
+        ("delay_seconds", 291600),
+    ):
+        try:
+            with psycopg.connect(os.environ["SPRING_FIXTURE_DATABASE_URI"]) as connection:
+                connection.execute(
+                    f"update synthetic_order set {inconsistent_column} = %s "
+                    "where order_reference = %s",
+                    (inconsistent_value, proposal_order_reference),
+                )
+            raise AssertionError(
+                f"fixture role created inconsistent delay fact through {inconsistent_column}"
+            )
+        except psycopg.errors.CheckViolation as error:
+            assert error.diag.constraint_name == (
+                "synthetic_order_delay_representations_consistent"
+            )
+
     with psycopg.connect(os.environ["SPRING_FIXTURE_DATABASE_URI"]) as connection:
         connection.execute(
-            "update synthetic_order set delay_hours = 81, delay_seconds = 291600 "
-            "where order_reference = %s",
+            "update synthetic_order set delay_seconds = 288001 where order_reference = %s",
             (proposal_order_reference,),
         )
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         connection.execute(
             "insert into agent_processing_generation (id, ticket_id, generation_number, thread_id, status, created_at) "
-            "values (%s, %s, 2, %s, 'ACTIVE', now())",
+            "values (%s, %s, 3, %s, 'ACTIVE', now())",
             (second_generation, uuid.UUID(proposal_ticket_id), uuid.uuid4()),
         )
     scoped_headers = {
@@ -1025,8 +1202,8 @@ def main() -> None:
             json={
                 "compensationRequired": True,
                 "reasonCode": "LOGISTICS_DELAY",
-                "delayHours": 81,
-                "delaySeconds": 291600,
+                "delayHours": 80,
+                "delaySeconds": 288001,
                 "orderReference": proposal_order_reference,
                 "evidenceRefs": evidence_refs,
                 "suggestedMethod": "COUPON",
@@ -1055,7 +1232,7 @@ def main() -> None:
         ).fetchall()
         assert revisions == [
             (proposal_id, 1, 80, 288000, Decimal("26.80"), "SUPERSEDED"),
-            (proposal_id, 2, 81, 291600, Decimal("26.80"), "PENDING_APPROVAL"),
+            (proposal_id, 2, 80, 288001, Decimal("26.80"), "PENDING_APPROVAL"),
         ]
         assert (
             connection.execute(
@@ -1083,7 +1260,7 @@ def main() -> None:
         connection.execute(
             "insert into agent_processing_generation "
             "(id, ticket_id, generation_number, thread_id, status, created_at) "
-            "values (%s, %s, 3, %s, 'ACTIVE', now())",
+            "values (%s, %s, 4, %s, 'ACTIVE', now())",
             (third_generation, uuid.UUID(proposal_ticket_id), uuid.uuid4()),
         )
     with psycopg.connect(os.environ["SPRING_FIXTURE_DATABASE_URI"]) as connection:
@@ -1136,6 +1313,7 @@ def main() -> None:
         delay_seconds: int = 288000,
         compensation_method: str = "SIMULATED_PARTIAL_REFUND",
         amount: Decimal = Decimal("26.80"),
+        snapshot_delay_seconds: int | None = None,
     ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
         fixture_ticket_id = uuid.uuid4()
         fixture_generation_id = uuid.uuid4()
@@ -1191,9 +1369,51 @@ def main() -> None:
                 "paid, cancelled, fully_refunded, existing_compensation, "
                 "jsonb_build_array('order:' || order_reference, 'logistics:' || order_reference), "
                 "'2026-08-09T13:57:00Z' from synthetic_order where order_reference = %s",
-                (fixture_revision_id, delay_hours, delay_seconds, order_reference),
+                (
+                    fixture_revision_id,
+                    delay_hours,
+                    delay_seconds if snapshot_delay_seconds is None else snapshot_delay_seconds,
+                    order_reference,
+                ),
             )
         return fixture_ticket_id, fixture_generation_id, fixture_revision_id
+
+    try:
+        seed_pending_decision_fixture(
+            "ORDER-DELAY-E2E-NORMAL",
+            uuid.uuid4().hex * 2,
+            "inconsistent proposal delay proof",
+            delay_hours=81,
+            delay_seconds=288000,
+        )
+        raise AssertionError("proposal persisted inconsistent delay representations")
+    except psycopg.errors.CheckViolation as error:
+        assert error.diag.constraint_name == (
+            "compensation_proposal_delay_representations_consistent"
+        )
+
+    try:
+        seed_pending_decision_fixture(
+            "ORDER-DELAY-E2E-NORMAL",
+            uuid.uuid4().hex * 2,
+            "approval snapshot delay drift proof",
+            snapshot_delay_seconds=288001,
+        )
+        raise AssertionError("approval snapshot delay drifted from its proposal revision")
+    except psycopg.errors.ForeignKeyViolation as error:
+        assert error.diag.constraint_name == "approval_evidence_proposal_delay_fkey"
+
+    for guarded_amount in (Decimal("0.00"), Decimal("-0.01")):
+        try:
+            seed_pending_decision_fixture(
+                "ORDER-DELAY-E2E-NORMAL",
+                uuid.uuid4().hex * 2,
+                f"proposal amount guard {guarded_amount}",
+                amount=guarded_amount,
+            )
+            raise AssertionError(f"proposal amount {guarded_amount} unexpectedly persisted")
+        except psycopg.errors.CheckViolation as error:
+            assert error.diag.constraint_name == "compensation_proposal_revision_amount_check"
 
     def record_support_participation(
         ticket_id: uuid.UUID, revision_id: uuid.UUID, support_id: str, event_type: str

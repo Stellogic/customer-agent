@@ -168,6 +168,7 @@ class JdbcCompensationProposalStore {
             return StableParameterDigest.sha256(
                     ticketId.toString(),
                     orderReference,
+                    Integer.toString(delayHours),
                     Long.toString(delaySeconds),
                     method,
                     amount.toPlainString(),

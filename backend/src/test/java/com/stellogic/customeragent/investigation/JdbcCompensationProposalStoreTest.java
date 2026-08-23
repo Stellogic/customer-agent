@@ -17,6 +17,22 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 class JdbcCompensationProposalStoreTest {
     @Test
+    void immutableProposalDigestCoversBothDelayRepresentations() {
+        UUID ticketId = UUID.randomUUID();
+        UUID generationId = UUID.randomUUID();
+        var original = proposalContent(ticketId, generationId, 80, 288000);
+        var same = proposalContent(ticketId, UUID.randomUUID(), 80, 288000);
+        var hoursChanged = proposalContent(ticketId, UUID.randomUUID(), 81, 288000);
+        var secondsChanged = proposalContent(ticketId, UUID.randomUUID(), 80, 288001);
+
+        org.assertj.core.api.Assertions.assertThat(same.digest()).isEqualTo(original.digest());
+        org.assertj.core.api.Assertions.assertThat(hoursChanged.digest())
+                .isNotEqualTo(original.digest());
+        org.assertj.core.api.Assertions.assertThat(secondsChanged.digest())
+                .isNotEqualTo(original.digest());
+    }
+
+    @Test
     void reusesTheLockProtectedExpiryTimeForTheNewRevision() {
         JdbcTemplate jdbc = org.mockito.Mockito.mock(JdbcTemplate.class);
         CompensationProposalExpiry expiry =
@@ -82,5 +98,27 @@ class JdbcCompensationProposalStoreTest {
                 .contains(java.sql.Timestamp.from(lockProtectedNow));
         org.assertj.core.api.Assertions.assertThat(insertArguments)
                 .contains(java.sql.Timestamp.from(lockProtectedNow.plusSeconds(24 * 60 * 60)));
+    }
+
+    private static JdbcCompensationProposalStore.ProposalContent proposalContent(
+            UUID ticketId, UUID generationId, int delayHours, long delaySeconds) {
+        return new JdbcCompensationProposalStore.ProposalContent(
+                ticketId,
+                generationId,
+                "ORDER-DELAY-001",
+                delayHours,
+                delaySeconds,
+                "SIMULATED_PARTIAL_REFUND",
+                new BigDecimal("26.80"),
+                List.of("order:ORDER-DELAY-001", "logistics:ORDER-DELAY-001"),
+                "delay-policy-v1",
+                new BigDecimal("268.00"),
+                new BigDecimal("268.00"),
+                new BigDecimal("0.00"),
+                new BigDecimal("268.00"),
+                true,
+                false,
+                false,
+                false);
     }
 }
