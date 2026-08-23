@@ -108,6 +108,9 @@ describe("客服共享队列工作台", () => {
           businessTimeline: [],
         });
       }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
       throw new Error(`unexpected request: ${path}`);
     });
 
@@ -121,6 +124,99 @@ describe("客服共享队列工作台", () => {
       `/api/support/workbench/tickets/${HANDOFF_TICKET}`,
       expect.objectContaining({ credentials: "same-origin" }),
     );
+  });
+
+  it("assignment 失效后移除旧详情并重读权威详情", async () => {
+    let detailReads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/support/workbench/snapshot") {
+        return snapshotResponse("support-workbench-v1:1", [handoffItem()], []);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/claims`) {
+        return Response.json(
+          { ticketId: HANDOFF_TICKET, supportId: "support-demo", replayed: false },
+          { status: 201 },
+        );
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        detailReads += 1;
+        if (detailReads > 1) return Response.json({}, { status: 404 });
+        return Response.json({
+          ticketId: HANDOFF_TICKET,
+          customerId: "customer-demo",
+          orderReference: "ORDER-DELAY-001",
+          description: "物流延迟",
+          lifecycleState: "WAITING_FOR_CUSTOMER",
+          handlingMode: "HUMAN",
+          publicConversation: [],
+          investigationFacts: [],
+          businessTimeline: [],
+        });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return sseResponse("");
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+    fireEvent.click(await screen.findByRole("button", { name: `领取工单 ${HANDOFF_TICKET}` }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("分配已失效");
+    expect(screen.queryByRole("heading", { name: "当前工单详情" })).not.toBeInTheDocument();
+    expect(detailReads).toBe(2);
+  });
+
+  it("从旧详情切换领取失败时立即移除不再监控的旧详情", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/support/workbench/snapshot") {
+        return snapshotResponse("support-workbench-v1:1", [handoffItem(), breachedItem()], []);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/claims`) {
+        return Response.json(
+          { ticketId: HANDOFF_TICKET, supportId: "support-demo", replayed: false },
+          { status: 201 },
+        );
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json({
+          ticketId: HANDOFF_TICKET,
+          customerId: "customer-demo",
+          orderReference: "ORDER-DELAY-001",
+          description: "物流延迟",
+          lifecycleState: "WAITING_FOR_CUSTOMER",
+          handlingMode: "HUMAN",
+          publicConversation: [],
+          investigationFacts: [],
+          businessTimeline: [],
+        });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      if (path === `/api/support/workbench/tickets/${BREACHED_TICKET}/claims`) {
+        return Response.json({}, { status: 404 });
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+    fireEvent.click(await screen.findByRole("button", { name: `领取工单 ${HANDOFF_TICKET}` }));
+    expect(await screen.findByText("ORDER-DELAY-001")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: `领取工单 ${BREACHED_TICKET}` }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("领取未完成");
+    expect(screen.queryByText("ORDER-DELAY-001")).not.toBeInTheDocument();
   });
 
   it("序号缺口停止旧流并整体替换为新快照", async () => {

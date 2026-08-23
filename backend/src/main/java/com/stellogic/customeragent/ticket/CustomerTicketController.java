@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.ticket;
 
 import com.stellogic.customeragent.stream.AuthorizedSsePollingStream;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -55,6 +56,7 @@ public final class CustomerTicketController {
     @GetMapping(value = "/{ticketId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     SseEmitter events(
             Authentication authentication,
+            HttpServletRequest request,
             @RequestHeader(value = "Last-Event-ID", required = false) String cursor,
             @PathVariable UUID ticketId) {
         String owner = authentication.getName();
@@ -63,30 +65,33 @@ public final class CustomerTicketController {
                 250,
                 AuthorizedSsePollingStream.MAX_AUTHORIZATION_STALENESS_MILLIS,
                 cursor,
-                new AuthorizedSsePollingStream.Source<CustomerPublicEvent>() {
-                    @Override
-                    public List<CustomerPublicEvent> events(String afterCursor) {
-                        return service.events(owner, ticketId, afterCursor);
-                    }
+                AuthorizedSsePollingStream.requireCurrentHttpSession(
+                        request,
+                        owner,
+                        new AuthorizedSsePollingStream.Source<CustomerPublicEvent>() {
+                            @Override
+                            public List<CustomerPublicEvent> events(String afterCursor) {
+                                return service.events(owner, ticketId, afterCursor);
+                            }
 
-                    @Override
-                    public void authorize() {
-                        service.snapshot(owner, ticketId);
-                    }
+                            @Override
+                            public void authorize() {
+                                service.snapshot(owner, ticketId);
+                            }
 
-                    @Override
-                    public String cursor(CustomerPublicEvent event) {
-                        return event.cursor();
-                    }
+                            @Override
+                            public String cursor(CustomerPublicEvent event) {
+                                return event.cursor();
+                            }
 
-                    @Override
-                    public SseEmitter.SseEventBuilder render(CustomerPublicEvent event) {
-                        return SseEmitter.event()
-                                .id(event.cursor())
-                                .name(event.type())
-                                .data(event.publicData());
-                    }
-                });
+                            @Override
+                            public SseEmitter.SseEventBuilder render(CustomerPublicEvent event) {
+                                return SseEmitter.event()
+                                        .id(event.cursor())
+                                        .name(event.type())
+                                        .data(event.publicData());
+                            }
+                        }));
     }
 
     private static void requireText(String value, String message) {

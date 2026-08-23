@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.approval;
 
 import com.stellogic.customeragent.stream.AuthorizedSsePollingStream;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
@@ -65,6 +66,7 @@ public final class ApprovalController {
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     SseEmitter events(
             Authentication authentication,
+            HttpServletRequest request,
             @RequestHeader(value = "X-Approval-Lease-Token", required = false) UUID leaseToken,
             @RequestHeader(value = "X-Approval-Lease-Version", required = false) Long leaseVersion,
             @RequestHeader(value = "Last-Event-ID", required = false) String cursor,
@@ -76,31 +78,35 @@ public final class ApprovalController {
                 100,
                 AuthorizedSsePollingStream.MAX_AUTHORIZATION_STALENESS_MILLIS,
                 cursor,
-                new AuthorizedSsePollingStream.Source<ApprovalModels.ApprovalViewEvent>() {
-                    @Override
-                    public List<ApprovalModels.ApprovalViewEvent> events(String afterCursor) {
-                        return service.events(command, afterCursor);
-                    }
+                AuthorizedSsePollingStream.requireCurrentHttpSession(
+                        request,
+                        authentication.getName(),
+                        new AuthorizedSsePollingStream.Source<ApprovalModels.ApprovalViewEvent>() {
+                            @Override
+                            public List<ApprovalModels.ApprovalViewEvent> events(
+                                    String afterCursor) {
+                                return service.events(command, afterCursor);
+                            }
 
-                    @Override
-                    public void authorize() {
-                        service.requireCurrentView(command);
-                    }
+                            @Override
+                            public void authorize() {
+                                service.requireCurrentView(command);
+                            }
 
-                    @Override
-                    public String cursor(ApprovalModels.ApprovalViewEvent event) {
-                        return event.cursor();
-                    }
+                            @Override
+                            public String cursor(ApprovalModels.ApprovalViewEvent event) {
+                                return event.cursor();
+                            }
 
-                    @Override
-                    public SseEmitter.SseEventBuilder render(
-                            ApprovalModels.ApprovalViewEvent event) {
-                        return SseEmitter.event()
-                                .id(event.cursor())
-                                .name(event.eventType())
-                                .data(event.publicData());
-                    }
-                });
+                            @Override
+                            public SseEmitter.SseEventBuilder render(
+                                    ApprovalModels.ApprovalViewEvent event) {
+                                return SseEmitter.event()
+                                        .id(event.cursor())
+                                        .name(event.eventType())
+                                        .data(event.publicData());
+                            }
+                        }));
     }
 
     private static ApprovalModels.ViewCommand viewCommand(

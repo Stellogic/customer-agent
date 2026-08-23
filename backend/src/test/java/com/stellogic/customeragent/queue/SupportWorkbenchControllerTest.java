@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.queue;
 
+import static com.stellogic.customeragent.identity.HumanTestPrincipals.session;
 import static com.stellogic.customeragent.identity.HumanTestPrincipals.support;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -29,6 +30,7 @@ class SupportWorkbenchControllerTest {
     private final MockMvc mvc =
             MockMvcBuilders.standaloneSetup(new SupportWorkbenchController(service))
                     .setControllerAdvice(new SupportWorkbenchExceptionHandler())
+                    .defaultRequest(get("/").session(session("support-demo")))
                     .build();
 
     @Test
@@ -117,6 +119,7 @@ class SupportWorkbenchControllerTest {
         mvc.perform(
                         get("/api/support/workbench/events")
                                 .principal(support())
+                                .accept(MediaType.TEXT_EVENT_STREAM)
                                 .header("Last-Event-ID", "support-workbench-v0:9"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("SNAPSHOT_REQUIRED"));
@@ -133,6 +136,21 @@ class SupportWorkbenchControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.code").value("SUPPORT_TICKET_NOT_FOUND"));
+    }
+
+    @Test
+    void assignedTicketAuthorityStreamRevalidatesTheCurrentAssignment() throws Exception {
+        when(service.details("support-demo", HANDOFF_TICKET))
+                .thenReturn(org.mockito.Mockito.mock(SupportTicketDetails.class));
+
+        mvc.perform(
+                        get("/api/support/workbench/tickets/{ticketId}/events", HANDOFF_TICKET)
+                                .principal(support()))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(request().asyncStarted());
+
+        verify(service, timeout(2_000).atLeast(2)).details("support-demo", HANDOFF_TICKET);
     }
 
     @Test

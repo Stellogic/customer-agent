@@ -121,6 +121,7 @@ export function ApprovalWorkbench() {
       );
       if (!response.ok) {
         revokeLocalAuthority("审批责任已结束，证据和操作已移除。");
+        await loadQueue();
         return;
       }
       const value = (await response.json()) as unknown;

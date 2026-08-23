@@ -16,6 +16,7 @@ services:
       - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
       - ./agent/approval_queue_time_setup.sql:/smoke/approval_queue_time_setup.sql:ro
       - ./agent/approval_queue_time_cleanup.sql:/smoke/approval_queue_time_cleanup.sql:ro
+      - ./scripts/fixtures/issue80-browser.sql:/acceptance/issue80-browser.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 2s
@@ -101,6 +102,8 @@ services:
       AGENT_SERVER_URL: http://agent-server:2024
       AGENT_PROBE_CONNECT_TIMEOUT: ${AGENT_PROBE_CONNECT_TIMEOUT:-500ms}
       AGENT_PROBE_READ_TIMEOUT: ${AGENT_PROBE_READ_TIMEOUT:-1s}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      SERVER_SERVLET_SESSION_TIMEOUT: ${CUSTOMER_AGENT_SESSION_TIMEOUT:-30m}
       <<: *local-secrets
     depends_on:
       spring-migrate:
@@ -135,7 +138,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "127.0.0.1:4180:8080"
+      - "127.0.0.1:${CUSTOMER_AGENT_FRONTEND_PORT:-4180}:8080"
     healthcheck:
       test: ["CMD", "wget", "-Y", "off", "-qO-", "http://127.0.0.1:8080/api/system/status"]
       interval: 3s
@@ -190,8 +193,46 @@ services:
         condition: service_healthy
     networks: [edge]
 
+  browser-acceptance:
+    image: customer-agent/frontend-browser-test:${CUSTOMER_AGENT_IMAGE_TAG:-local}
+    profiles: [smoke]
+    build:
+      context: ./frontend
+      target: browser-test
+    init: true
+    ipc: host
+    environment:
+      PLAYWRIGHT_BASE_URL: https://browser-frontend:8443
+      ISSUE80_SESSION_PHASE: ${ISSUE80_SESSION_PHASE:-}
+      ISSUE80_DATABASE_HOST: postgres
+      ISSUE80_DATABASE_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-local-postgres-superuser}
+    volumes:
+      - browser-artifacts:/artifacts
+    depends_on:
+      browser-frontend:
+        condition: service_healthy
+    networks: [edge, data]
+
+  browser-frontend:
+    image: customer-agent/frontend-browser-server:${CUSTOMER_AGENT_IMAGE_TAG:-local}
+    profiles: [smoke]
+    build:
+      context: ./frontend
+      target: browser-server
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        ["CMD", "wget", "-Y", "off", "--no-check-certificate", "-qO-", "https://127.0.0.1:8443/api/system/status"]
+      interval: 3s
+      timeout: 4s
+      retries: 30
+    networks: [edge]
+
 volumes:
   postgres-data:
+  browser-artifacts:
 
 networks:
   edge:

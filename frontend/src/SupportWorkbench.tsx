@@ -71,12 +71,14 @@ export function SupportWorkbench() {
   const [actionError, setActionError] = useState("");
   const snapshotRef = useRef<WorkbenchSnapshot | null>(null);
   const streamController = useRef<AbortController | null>(null);
+  const detailStreamController = useRef<AbortController | null>(null);
   const reconnectTimer = useRef<number | null>(null);
 
   useEffect(() => {
     void loadSnapshot("loading");
     return () => {
       streamController.current?.abort();
+      detailStreamController.current?.abort();
       if (reconnectTimer.current !== null) globalThis.clearTimeout(reconnectTimer.current);
     };
   }, []);
@@ -210,6 +212,9 @@ export function SupportWorkbench() {
   }
 
   async function claimTicket(ticketId: string) {
+    detailStreamController.current?.abort();
+    detailStreamController.current = null;
+    setDetails(null);
     setClaimingTicketId(ticketId);
     setActionError("");
     try {
@@ -228,10 +233,46 @@ export function SupportWorkbench() {
       const value = (await detailResponse.json()) as unknown;
       if (!isTicketDetails(value)) throw new Error("incompatible detail");
       setDetails(value);
+      void monitorTicketAuthority(ticketId);
     } catch {
       setActionError("领取未完成或分配已失效；请重新同步队列后再试。");
     } finally {
       setClaimingTicketId(null);
+    }
+  }
+
+  async function monitorTicketAuthority(ticketId: string) {
+    const controller = new AbortController();
+    detailStreamController.current = controller;
+    try {
+      const response = await humanSessionFetch(
+        `/api/support/workbench/tickets/${ticketId}/events`,
+        {
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { Accept: "text/event-stream" },
+          signal: controller.signal,
+        },
+      );
+      if (!response.ok) throw new Error("assignment authority unavailable");
+      await consumeSseEvents(response.body, () => false);
+    } catch {
+      // Re-read the assigned detail below; the cached detail is never kept on an uncertain stream.
+    }
+    if (controller.signal.aborted || detailStreamController.current !== controller) return;
+    try {
+      const response = await humanSessionFetch(`/api/support/workbench/tickets/${ticketId}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("assignment no longer current");
+      const value = (await response.json()) as unknown;
+      if (!isTicketDetails(value)) throw new Error("incompatible detail");
+      setDetails(value);
+      void monitorTicketAuthority(ticketId);
+    } catch {
+      setDetails(null);
+      setActionError("客服分配已失效；旧工单详情已移除，请重新同步队列。");
     }
   }
 

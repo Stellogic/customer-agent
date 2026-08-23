@@ -55,7 +55,18 @@ describe("审批视图授权撤销", () => {
             { status: 200, headers: { "Content-Type": "text/event-stream" } },
           ),
       )
-      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            proposalRevisionId: REVISION_ID,
+            compensationMethod: "COUPON",
+            amount: 20,
+            submittedAt: "2026-08-11T03:00:00Z",
+            expiresAt: "2026-08-12T03:00:00Z",
+          },
+        ]),
+      );
 
     render(<ApprovalWorkbench />);
 
@@ -81,6 +92,13 @@ describe("审批视图授权撤销", () => {
     );
     expect(screen.queryByRole("button", { name: "批准补偿" })).not.toBeInTheDocument();
     expect(globalThis.location.search).toBe("");
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(globalThis.fetch)
+          .mock.calls.filter(([input]) => input === "/api/approver/compensation-proposals"),
+      ).toHaveLength(2),
+    );
   });
 
   it("瞬时断线使用同一租约和游标重新读取权威快照而不暴露额外能力", async () => {

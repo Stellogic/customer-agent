@@ -20,4 +20,5 @@ foreach ($current in $components) {
 
 if (-not $SkipAcceptance -and $Component -eq "all") {
     & "$PSScriptRoot/smoke.ps1" -Reset
+    & "$PSScriptRoot/issue80-acceptance.ps1"
 }
