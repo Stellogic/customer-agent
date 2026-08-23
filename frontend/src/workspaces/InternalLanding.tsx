@@ -8,15 +8,30 @@ export default function InternalLanding() {
   const session = CurrentSessionContext.use();
   return (
     <main className="workspace-choice">
-      <p className="eyebrow">INTERNAL WORKSPACE</p>
-      <h1>选择工作区</h1>
-      <p>这里只展示页面入口，不读取客服队列或审批业务数据。</p>
+      <header className="workspace-choice-header">
+        <p className="eyebrow">INTERNAL WORKSPACE</p>
+        <h1>选择工作区</h1>
+        <p>这里只展示当前身份获准进入的静态入口，不读取客服队列或审批业务数据。</p>
+        <span className="workspace-current-person">当前工作人员：{session.displayName}</span>
+      </header>
       <ProCard className="workspace-choice-grid" gutter={18} wrap>
         {INTERNAL_WORKSPACES.filter((workspace) =>
           hasCapability(session, workspace.capability),
         ).map((workspace) => (
-          <ProCard key={workspace.id} colSpan={{ xs: 24, md: 12 }}>
-            <Link to={workspace.path}>{workspace.cardLabel}</Link>
+          <ProCard
+            className={"workspace-choice-card workspace-choice-card-" + workspace.id}
+            key={workspace.id}
+            colSpan={{ xs: 24, md: 12 }}
+          >
+            <article>
+              <span aria-hidden="true" className="workspace-choice-icon">
+                {workspace.id === "support" ? "服" : "审"}
+              </span>
+              <p className="workspace-choice-eyebrow">{workspace.eyebrow}</p>
+              <h2>{workspace.cardLabel}</h2>
+              <p>{workspace.description}</p>
+              <Link to={workspace.path}>进入{workspace.menuLabel}</Link>
+            </article>
           </ProCard>
         ))}
       </ProCard>

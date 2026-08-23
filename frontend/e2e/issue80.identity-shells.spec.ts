@@ -72,6 +72,85 @@ test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
     await context.close();
   });
 
+  test("Issue #97 真实密码登录后呈现双界面壳、静态工作区选择并可安全退出", async ({
+    browser,
+  }, testInfo) => {
+    const customerContext = await newIssue80Context(browser, {
+      viewport: { width: 1440, height: 900 },
+    });
+    const customer = await freshPage(customerContext, "/help/login");
+    await login(customer, "customer", "customer-demo");
+    await expect(customer.getByRole("link", { name: "Stellogic 客户帮助中心" })).toBeVisible();
+    await expect(customer.getByText("当前客户：演示客户")).toBeVisible();
+    await expect(customer.getByRole("navigation", { name: "内部工作区" })).toHaveCount(0);
+    await customer.screenshot({ path: testInfo.outputPath("issue97-customer-shell.png") });
+    await customer.getByRole("button", { name: "退出登录" }).click();
+    await expect(customer).toHaveURL(/\/help\/login\?returnTo=%2Fhelp$/);
+    await expect(customer.getByRole("heading", { name: "客户登录" })).toBeVisible();
+    await customerContext.close();
+
+    const internalContext = await newIssue80Context(browser, {
+      viewport: { width: 1440, height: 900 },
+    });
+    const internal = await freshPage(internalContext, "/internal/login");
+    const businessReads: string[] = [];
+    internal.on("request", (request) => {
+      const pathname = new URL(request.url()).pathname;
+      if (pathname.startsWith("/api/support/") || pathname.startsWith("/api/approver/")) {
+        businessReads.push(pathname);
+      }
+    });
+    await login(internal, "internal", "internal-demo");
+    await expect(internal.getByRole("heading", { name: "选择工作区" })).toBeVisible();
+    await expect(
+      internal
+        .getByLabel("内部工作台", { exact: true })
+        .getByText("当前工作人员：演示双角色工作人员"),
+    ).toBeVisible();
+    await expect(internal.getByRole("link", { name: "进入客服工作区" })).toBeVisible();
+    await expect(internal.getByRole("link", { name: "进入审批工作区" })).toBeVisible();
+    expect(businessReads).toEqual([]);
+    await internal.screenshot({
+      path: testInfo.outputPath("issue97-internal-workspace-choice.png"),
+    });
+    await internal.getByRole("button", { name: "退出登录" }).click();
+    await expect(internal).toHaveURL(/\/internal\/login\?returnTo=%2Finternal$/);
+    await expect(internal.getByRole("heading", { name: "内部工作人员登录" })).toBeVisible();
+    await internalContext.close();
+  });
+
+  test("Issue #97 窄屏双界面壳保留身份、退出入口且不产生横向溢出", async ({ browser }) => {
+    const context = await newIssue80Context(browser, { viewport: { width: 390, height: 844 } });
+
+    const customer = await freshPage(context, "/help/login");
+    await login(customer, "customer", "customer-demo");
+    await expect(customer.getByText("当前客户：演示客户")).toBeVisible();
+    await expect(customer.getByRole("button", { name: "退出登录" })).toBeVisible();
+    expect(
+      await customer.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+    await customer.getByRole("button", { name: "退出登录" }).click();
+    await expect(customer).toHaveURL(/\/help\/login\?returnTo=%2Fhelp$/);
+    await expect(customer.getByRole("heading", { name: "客户登录" })).toBeVisible();
+
+    const internal = await freshPage(context, "/internal/login");
+    await login(internal, "internal", "internal-demo");
+    await expect(
+      internal
+        .getByLabel("内部工作台", { exact: true })
+        .getByText("当前工作人员：演示双角色工作人员"),
+    ).toBeVisible();
+    await expect(internal.getByRole("button", { name: "退出登录" })).toBeVisible();
+    expect(
+      await internal.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+    await context.close();
+  });
+
   const identities = [
     {
       username: "customer-demo",

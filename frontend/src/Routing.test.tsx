@@ -85,7 +85,29 @@ describe("Issue #73 静态路由与两个界面壳", () => {
     render(<RootApplication />);
 
     expect(await screen.findByRole("banner", { name: "客户帮助中心" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Stellogic 客户帮助中心" })).toHaveAttribute(
+      "href",
+      "/help",
+    );
+    expect(screen.getByText("当前客户：演示客户")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "客户导航" })).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "内部工作区" })).not.toBeInTheDocument();
+  });
+
+  it("内部 Shell 明确当前工作人员且不混入客户导航", async () => {
+    globalThis.history.replaceState(null, "", "/internal/support");
+    mockSession(support);
+
+    render(<RootApplication />);
+
+    expect(await screen.findByRole("banner", { name: "内部工作台" })).toHaveTextContent(
+      "当前工作人员：演示客服",
+    );
+    expect(screen.getByRole("link", { name: "Stellogic 内部工作台" })).toHaveAttribute(
+      "href",
+      "/internal",
+    );
+    expect(screen.queryByRole("navigation", { name: "客户导航" })).not.toBeInTheDocument();
   });
 
   it.each([
@@ -123,6 +145,13 @@ describe("Issue #73 静态路由与两个界面壳", () => {
       "href",
       "/internal/approvals",
     );
+    expect(within(choice!).getByText("当前工作人员：演示双角色工作人员")).toBeInTheDocument();
+    expect(
+      within(choice!).getByText("进入共享队列，查看当前职责允许的客服工作入口。"),
+    ).toBeInTheDocument();
+    expect(
+      within(choice!).getByText("进入待审批队列，查看当前职责允许的补偿审查入口。"),
+    ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith("/api/auth/session", {
       credentials: "same-origin",
