@@ -19,6 +19,7 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
   await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };
   await customer.getByRole("button", { name: "转人工处理" }).click();
+  await customer.getByRole("button", { name: "确认转人工" }).click();
   await expect(customer.getByText("人工客服处理中")).toBeVisible();
 
   const supportContext = await newAcceptanceContext(browser, {

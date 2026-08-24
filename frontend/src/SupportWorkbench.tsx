@@ -353,7 +353,7 @@ export function SupportWorkbench() {
       )}
 
       <footer className="workbench-footer">
-        <p>快照游标与客户、审批视图相互独立；刷新不会沿用旧本地队列。</p>
+        <p>队列会从权威状态重新同步；刷新不会沿用旧本地数据。</p>
         <button
           type="button"
           onClick={() => void loadSnapshot()}

@@ -36,6 +36,8 @@ test("Issue #98 客户真实创建、交互状态与断线权威恢复视觉", a
   const handoffButton = page.getByRole("button", { name: "转人工处理" });
   await expect(handoffButton).toBeVisible();
   await handoffButton.click();
+  await expect(page.getByRole("dialog", { name: "确认转人工处理" })).toBeVisible();
+  await page.getByRole("button", { name: "确认转人工" }).click();
   await expect(page.getByText("人工客服处理中")).toBeVisible();
   await expect(handoffButton).toHaveCount(0);
 
