@@ -113,10 +113,12 @@ class DeepSeekResponsesInvestigationModel:
         self,
         config: DeepSeekResponsesConfig,
         *,
+        endpoint: str = _RESPONSES_ENDPOINT,
         transport: httpx.AsyncBaseTransport | None = None,
         audit_sink: ModelCallAuditSink | None = None,
     ) -> None:
         self._config = config
+        self._endpoint = endpoint
         self._transport = transport
         self.audit_sink = audit_sink or InMemoryModelCallAuditSink()
 
@@ -144,7 +146,7 @@ class DeepSeekResponsesInvestigationModel:
                 attempt_started = time.monotonic()
                 try:
                     response = await asyncio.wait_for(
-                        client.post(_RESPONSES_ENDPOINT, json=request_body),
+                        client.post(self._endpoint, json=request_body),
                         timeout=remaining,
                     )
                 except TimeoutError:
