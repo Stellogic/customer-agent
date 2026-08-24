@@ -55,10 +55,12 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
 
         async def get(self, url: str, **_: object) -> Response:
             calls.append(("GET", url))
-            return Response(_unique_facts())
+            return Response(_capability_catalog())
 
         async def post(self, url: str, **_: object) -> Response:
             calls.append(("POST", url))
+            if "/capabilities/" in url:
+                return Response(_capability_result(url, _unique_facts()))
             return Response({"accepted": True})
 
     def forbidden_factory() -> ShadowCandidate:
@@ -79,7 +81,15 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
     )
 
     assert "shadow_comparison" not in result
-    assert [method for method, _ in calls] == ["GET", "POST"]
+    assert [method for method, _ in calls] == [
+        "GET",
+        "POST",
+        "POST",
+        "POST",
+        "POST",
+        "POST",
+        "POST",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -122,9 +132,11 @@ async def test_enabled_offline_shadow_only_adds_a_minimal_checkpoint_comparison(
             return None
 
         async def get(self, _url: str, **_: object) -> Response:
-            return Response(_unique_facts())
+            return Response(_capability_catalog())
 
         async def post(self, url: str, *, headers: dict[str, str], **_: object) -> Response:
+            if "/capabilities/" in url:
+                return Response(_capability_result(url, _unique_facts()))
             posts.append((url, headers["Idempotency-Key"]))
             return Response({"accepted": True})
 
@@ -203,6 +215,98 @@ def _unique_facts() -> dict:
     }
 
 
+def _capability_catalog() -> dict:
+    result_fields = {
+        "CONFIRM_ORDER": (
+            ("capability", "STRING"),
+            ("matchStatus", "STRING"),
+            ("orderReference", "STRING"),
+            ("evidenceRefs", "STRING_LIST"),
+        ),
+        "READ_LOGISTICS": (
+            ("capability", "STRING"),
+            ("delayHours", "INTEGER"),
+            ("delaySeconds", "INTEGER"),
+            ("evidenceRefs", "STRING_LIST"),
+        ),
+        "READ_PAYMENT_AND_REFUNDS": (
+            ("capability", "STRING"),
+            ("paid", "BOOLEAN"),
+            ("cancelled", "BOOLEAN"),
+            ("fullyRefunded", "BOOLEAN"),
+            ("evidenceRefs", "STRING_LIST"),
+        ),
+        "READ_COMPENSATION_AND_PENDING_ACTIONS": (
+            ("capability", "STRING"),
+            ("existingCompensation", "BOOLEAN"),
+            ("pendingActionCount", "INTEGER"),
+            ("evidenceRefs", "STRING_LIST"),
+        ),
+        "READ_APPLICABLE_POLICY": (
+            ("capability", "STRING"),
+            ("policyVersion", "STRING"),
+            ("evidenceRefs", "STRING_LIST"),
+        ),
+    }
+    definitions = []
+    for name, results in result_fields.items():
+        parameters = (
+            []
+            if name == "CONFIRM_ORDER"
+            else [{"name": "orderReference", "type": "STRING", "required": True}]
+        )
+        definitions.append(
+            {
+                "name": name,
+                "parameters": parameters,
+                "resultFields": [
+                    {"name": field, "type": field_type, "required": True}
+                    for field, field_type in results
+                ],
+            }
+        )
+    return {
+        "schemaVersion": "investigation-capability-catalog-v1",
+        "capabilities": definitions,
+    }
+
+
+def _capability_result(url: str, facts: dict) -> dict:
+    capability = url.rsplit("/", 1)[-1]
+    if capability == "CONFIRM_ORDER":
+        return {
+            "capability": capability,
+            "matchStatus": facts.get("matchStatus"),
+            "orderReference": facts.get("orderReference"),
+            "evidenceRefs": []
+            if facts.get("matchStatus") == "AMBIGUOUS"
+            else [f"order:{facts.get('orderReference')}"],
+        }
+    fields = {
+        "READ_LOGISTICS": ("delayHours", "delaySeconds"),
+        "READ_PAYMENT_AND_REFUNDS": ("paid", "cancelled", "fullyRefunded"),
+        "READ_COMPENSATION_AND_PENDING_ACTIONS": (
+            "existingCompensation",
+            "pendingActionCount",
+        ),
+        "READ_APPLICABLE_POLICY": ("policyVersion",),
+    }[capability]
+    evidence_refs = {
+        "READ_LOGISTICS": [f"logistics:{facts.get('orderReference')}"],
+        "READ_PAYMENT_AND_REFUNDS": [f"payment:{facts.get('orderReference')}"],
+        "READ_COMPENSATION_AND_PENDING_ACTIONS": [
+            f"compensation:{facts.get('orderReference')}",
+            f"order-actions:{facts.get('orderReference')}",
+        ],
+        "READ_APPLICABLE_POLICY": [f"policy:{facts.get('policyVersion')}"],
+    }[capability]
+    return {
+        "capability": capability,
+        **{field: facts.get(field) for field in fields},
+        "evidenceRefs": evidence_refs,
+    }
+
+
 @pytest.mark.parametrize(
     ("facts_payload", "expected_reason"),
     [
@@ -223,24 +327,7 @@ def _unique_facts() -> dict:
             "FACT_CONFLICT",
         ),
         ({"orderReference": ["raw", "payload"], "delayHours": "bad"}, "INVALID_TOOL_RESPONSE"),
-        (
-            {
-                "matchStatus": "AMBIGUOUS",
-                "orderReference": "ORDER-1",
-                "delayHours": None,
-                "delaySeconds": None,
-                "paid": None,
-                "cancelled": None,
-                "fullyRefunded": None,
-                "existingCompensation": None,
-                "pendingActionCount": None,
-                "policyVersion": None,
-                "evidenceRefs": [],
-                "rawPayload": "must-not-pass",
-            },
-            "INVALID_TOOL_RESPONSE",
-        ),
-        ({"orderReference": "ORDER-1", "delayHours": 2}, "REQUIRED_FACT_MISSING"),
+        ({"orderReference": "ORDER-1", "delayHours": 2}, "INVALID_TOOL_RESPONSE"),
         (
             {
                 "matchStatus": "UNIQUE",
@@ -286,9 +373,11 @@ async def test_unsafe_investigation_uses_controlled_handoff_without_leaking_raw_
             return None
 
         async def get(self, *_: object, **__: object) -> Response:
-            return Response(facts_payload)
+            return Response(_capability_catalog())
 
         async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
+            if "/capabilities/" in url:
+                return Response(_capability_result(url, facts_payload))
             posts.append((url, json, headers))
             return Response({"handlingMode": "HUMAN", "reasonCode": expected_reason})
 
@@ -409,10 +498,12 @@ async def test_conclusion_tool_retry_exhaustion_uses_the_same_stable_handoff_ide
             return None
 
         async def get(self, *_: object, **__: object) -> Response:
-            return Response(facts)
+            return Response(_capability_catalog())
 
         async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
             nonlocal conclusion_attempts
+            if "/capabilities/" in url:
+                return Response(_capability_result(url, facts))
             if url.endswith("/conclusions"):
                 conclusion_attempts += 1
                 raise httpx.ConnectError("temporary conclusion failure")
@@ -487,9 +578,11 @@ async def test_concurrent_unsafe_tool_results_share_one_handoff_identity(
 
         async def get(self, *_: object, **__: object) -> Response:
             await asyncio.sleep(0)
-            return Response(facts)
+            return Response(_capability_catalog())
 
-        async def post(self, _url: str, *, headers: dict[str, str], json: dict) -> Response:
+        async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
+            if "/capabilities/" in url:
+                return Response(_capability_result(url, facts))
             handoff_keys.append(headers["Idempotency-Key"])
             return Response({"handlingMode": "HUMAN", "reasonCode": json["reasonCode"]})
 
@@ -521,6 +614,18 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[tuple[str, str, dict | None]] = []
+    facts = {
+        "matchStatus": "UNIQUE",
+        "orderReference": "ORDER-DELAY-UNDER-24",
+        "delayHours": 23,
+        "delaySeconds": 23 * 60 * 60,
+        "paid": True,
+        "cancelled": False,
+        "fullyRefunded": False,
+        "existingCompensation": False,
+        "pendingActionCount": 0,
+        "policyVersion": "delay-policy-v1",
+    }
 
     class Response:
         def __init__(self, payload: dict) -> None:
@@ -541,28 +646,14 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
 
         async def get(self, url: str, *, headers: dict[str, str]) -> Response:
             calls.append(("GET", url, None))
-            assert headers["X-Agent-Operation"] == "READ_INVESTIGATION_FACTS"
-            return Response(
-                {
-                    "matchStatus": "UNIQUE",
-                    "orderReference": "ORDER-DELAY-UNDER-24",
-                    "delayHours": 23,
-                    "delaySeconds": 23 * 60 * 60,
-                    "paid": True,
-                    "cancelled": False,
-                    "fullyRefunded": False,
-                    "existingCompensation": False,
-                    "pendingActionCount": 0,
-                    "policyVersion": "delay-policy-v1",
-                    "evidenceRefs": [
-                        "order:ORDER-DELAY-UNDER-24",
-                        "logistics:ORDER-DELAY-UNDER-24",
-                    ],
-                }
-            )
+            assert headers["X-Agent-Operation"] == "USE_INVESTIGATION_CAPABILITY"
+            return Response(_capability_catalog())
 
         async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
             calls.append(("POST", url, json))
+            if "/capabilities/" in url:
+                assert headers["X-Agent-Operation"] == "USE_INVESTIGATION_CAPABILITY"
+                return Response(_capability_result(url, facts))
             assert headers["X-Agent-Operation"] == "SUBMIT_INVESTIGATION_CONCLUSION"
             assert headers["Idempotency-Key"] == "generation-14:submit-conclusion"
             return Response({"accepted": True, "lifecycleState": "RESOLVED"})
@@ -588,7 +679,7 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
         "evidenceRefs": ["order:ORDER-DELAY-UNDER-24", "logistics:ORDER-DELAY-UNDER-24"],
     }
     assert result["model_mode"] == "fixed-fake-model-v1"
-    assert [call[0] for call in calls] == ["GET", "POST"]
+    assert [call[0] for call in calls] == ["GET", "POST", "POST", "POST", "POST", "POST", "POST"]
 
 
 @pytest.mark.asyncio
@@ -663,4 +754,9 @@ def test_clarification_interrupt_contains_only_public_controlled_fields(
             "question": "请回复订单确认码（A 或 B），以便继续调查。",
         }
     ]
-    assert result == {"clarification_answer": {"answerDigest": "digest"}}
+    assert result == {
+        "clarification_answer": {
+            "answerDigest": "digest",
+            "clarificationRequestId": "clarification-16",
+        }
+    }

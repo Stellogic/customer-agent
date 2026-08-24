@@ -58,21 +58,100 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
 
     @Override
     @Transactional
-    public InvestigationFacts facts(UUID ticketId, UUID generationId) {
+    public InvestigationCapabilityCatalog capabilities(UUID ticketId, UUID generationId) {
         authorityLock.acquire(ticketId);
+        requireActiveGeneration(ticketId, generationId);
+        return new InvestigationCapabilityCatalog(
+                "investigation-capability-catalog-v1",
+                java.util.Arrays.stream(InvestigationCapability.values())
+                        .map(InvestigationCapability::definition)
+                        .toList());
+    }
+
+    @Override
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public InvestigationCapabilityResult invoke(
+            UUID ticketId,
+            UUID generationId,
+            String requestId,
+            InvestigationCapability capability,
+            InvestigationCapabilityParameters parameters) {
+        authorityLock.acquire(ticketId);
+        String scopedOrderReference = requireActiveGeneration(ticketId, generationId);
+        jdbc.query(
+                "select pg_advisory_xact_lock(hashtextextended(?, 0))",
+                rs -> null,
+                generationId + "\n" + requestId);
+        boolean duplicate =
+                !jdbc.query(
+                                "select 1 from agent_command_request where generation_id = ? and request_id = ?",
+                                (rs, row) -> rs.getInt(1),
+                                generationId,
+                                requestId)
+                        .isEmpty();
+        if (duplicate) {
+            auditRejectedInTransaction(ticketId, "DUPLICATE_CAPABILITY_REQUEST");
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "capability request identity was already used");
+        }
+        InvestigationCapabilityResult result;
+        if (capability == InvestigationCapability.CONFIRM_ORDER) {
+            result = confirmOrder(ticketId, generationId, scopedOrderReference);
+        } else {
+            ScopedOrder order = currentOrder(ticketId, scopedOrderReference);
+            if (parameters == null
+                    || parameters.orderReference() == null
+                    || !parameters.orderReference().equals(order.orderReference())) {
+                auditRejectedInTransaction(ticketId, "OUT_OF_SCOPE_CAPABILITY_PARAMETERS");
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN, "capability parameters are outside the ticket scope");
+            }
+            Instant now = clock.instant();
+            result =
+                    switch (capability) {
+                        case READ_LOGISTICS -> logistics(generationId, order, now);
+                        case READ_PAYMENT_AND_REFUNDS ->
+                                paymentAndRefunds(generationId, order, now);
+                        case READ_COMPENSATION_AND_PENDING_ACTIONS ->
+                                compensationAndActions(generationId, order, now);
+                        case READ_APPLICABLE_POLICY -> policy(generationId, order, now);
+                        case CONFIRM_ORDER -> throw new IllegalStateException("handled above");
+                    };
+            jdbc.update(
+                    "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, ?, 'agent-machine', ?)",
+                    ticketId,
+                    "AGENT_CAPABILITY_USED_" + capability.name(),
+                    Timestamp.from(now));
+        }
+        Instant completedAt = clock.instant();
+        String parameterDigest =
+                StableParameterDigest.sha256(
+                        capability.name(),
+                        parameters == null || parameters.orderReference() == null
+                                ? ""
+                                : parameters.orderReference());
+        jdbc.update(
+                "insert into agent_command_request (generation_id, request_id, operation, parameter_digest, response_payload, created_at) "
+                        + "values (?, ?, 'USE_INVESTIGATION_CAPABILITY', ?, jsonb_build_object('capability', ?), ?)",
+                generationId,
+                requestId,
+                parameterDigest,
+                capability.name(),
+                Timestamp.from(completedAt));
+        return result;
+    }
+
+    private InvestigationCapabilityResult confirmOrder(
+            UUID ticketId, UUID generationId, String scopedOrderReference) {
         List<String> ambiguous =
                 jdbc.query(
-                        "select t.order_reference from agent_processing_generation g "
-                                + "join support_ticket t on t.id = g.ticket_id "
-                                + "where g.id = ? and g.ticket_id = ? and g.status = 'ACTIVE' "
-                                + "and t.handling_mode = 'AGENT' and t.lifecycle_state = 'INVESTIGATING' "
-                                + "and not t.customer_human_preference "
-                                + "and (select count(*) from synthetic_order_alias a "
+                        "select t.order_reference from support_ticket t where t.id = ? "
+                                + "and t.order_reference = ? and (select count(*) from synthetic_order_alias a "
                                 + "where a.alias = t.order_reference and a.customer_id = t.customer_id) > 1 "
-                                + "for update of g, t",
+                                + "for update of t",
                         (rs, row) -> rs.getString(1),
-                        generationId,
-                        ticketId);
+                        ticketId,
+                        scopedOrderReference);
         if (!ambiguous.isEmpty()) {
             Instant now = clock.instant();
             jdbc.update(
@@ -80,20 +159,13 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                             + "values (?, 'AGENT_ORDER_AMBIGUITY_READ', 'agent-machine', ?)",
                     ticketId,
                     Timestamp.from(now));
-            return new InvestigationFacts(
+            return new OrderConfirmationResult(
+                    InvestigationCapability.CONFIRM_ORDER,
                     "AMBIGUOUS",
                     ambiguous.getFirst(),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
                     List.of());
         }
-        ScopedOrder order = currentOrder(ticketId, generationId);
+        ScopedOrder order = currentOrder(ticketId, scopedOrderReference);
         Instant now = clock.instant();
         recordFact(
                 generationId,
@@ -101,41 +173,86 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 order.orderReference(),
                 "order:" + order.orderReference(),
                 now);
+        jdbc.update(
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, 'AGENT_CAPABILITY_USED_CONFIRM_ORDER', 'agent-machine', ?)",
+                ticketId,
+                Timestamp.from(now));
+        return new OrderConfirmationResult(
+                InvestigationCapability.CONFIRM_ORDER,
+                "UNIQUE",
+                order.orderReference(),
+                List.of("order:" + order.orderReference()));
+    }
+
+    private LogisticsFactsResult logistics(UUID generationId, ScopedOrder order, Instant now) {
+        String evidence = "logistics:" + order.orderReference();
         recordFact(
                 generationId,
                 "LOGISTICS_DELAY_HOURS",
                 Integer.toString(order.delayHours()),
-                "logistics:" + order.orderReference(),
+                evidence,
                 now);
         recordFact(
                 generationId,
                 "LOGISTICS_DELAY_SECONDS",
                 Long.toString(order.delaySeconds()),
-                "logistics:" + order.orderReference(),
+                evidence,
                 now);
+        return new LogisticsFactsResult(
+                InvestigationCapability.READ_LOGISTICS,
+                order.delayHours(),
+                order.delaySeconds(),
+                List.of(evidence));
+    }
+
+    private PaymentRefundFactsResult paymentAndRefunds(
+            UUID generationId, ScopedOrder order, Instant now) {
+        String evidence = "payment:" + order.orderReference();
+        recordFact(generationId, "PAYMENT", order.paid() ? "PAID" : "UNPAID", evidence, now);
         recordFact(
                 generationId,
-                "PAYMENT",
-                order.paid() ? "PAID" : "UNPAID",
-                "payment:" + order.orderReference(),
+                "REFUND_STATUS",
+                order.fullyRefunded() ? "FULLY_REFUNDED" : "NOT_FULLY_REFUNDED",
+                evidence,
                 now);
+        return new PaymentRefundFactsResult(
+                InvestigationCapability.READ_PAYMENT_AND_REFUNDS,
+                order.paid(),
+                order.cancelled(),
+                order.fullyRefunded(),
+                List.of(evidence));
+    }
+
+    private CompensationActionsFactsResult compensationAndActions(
+            UUID generationId, ScopedOrder order, Instant now) {
+        String compensationEvidence = "compensation:" + order.orderReference();
+        String actionsEvidence = "order-actions:" + order.orderReference();
         recordFact(
                 generationId,
-                "POLICY",
-                order.policyVersion(),
-                "policy:" + order.policyVersion(),
+                "EXISTING_COMPENSATION",
+                Boolean.toString(order.existingCompensation()),
+                compensationEvidence,
                 now);
         recordFact(
                 generationId,
                 "PENDING_ACTION_COUNT",
                 Integer.toString(order.pendingActionCount()),
-                "order-actions:" + order.orderReference(),
+                actionsEvidence,
                 now);
-        jdbc.update(
-                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, 'AGENT_FACTS_READ', 'agent-machine', ?)",
-                ticketId,
-                Timestamp.from(now));
-        return order.asFacts();
+        return new CompensationActionsFactsResult(
+                InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
+                order.existingCompensation(),
+                order.pendingActionCount(),
+                List.of(compensationEvidence, actionsEvidence));
+    }
+
+    private ApplicablePolicyResult policy(UUID generationId, ScopedOrder order, Instant now) {
+        String evidence = "policy:" + order.policyVersion();
+        recordFact(generationId, "POLICY", order.policyVersion(), evidence, now);
+        return new ApplicablePolicyResult(
+                InvestigationCapability.READ_APPLICABLE_POLICY,
+                order.policyVersion(),
+                List.of(evidence));
     }
 
     @Override
@@ -391,36 +508,22 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     }
 
     private ScopedOrder currentOrder(UUID ticketId, UUID generationId) {
-        List<String> scope =
-                jdbc.query(
-                        "select o.order_reference from agent_processing_generation g "
-                                + "join support_ticket t on t.id = g.ticket_id "
-                                + "join synthetic_order o on o.order_reference = t.order_reference "
-                                + "and o.customer_id = t.customer_id "
-                                + "where g.id = ? and g.ticket_id = ? and g.status = 'ACTIVE' "
-                                + "and t.handling_mode = 'AGENT' and t.lifecycle_state = 'INVESTIGATING' "
-                                + "for update of g, t",
-                        (rs, row) -> rs.getString(1),
-                        generationId,
-                        ticketId);
-        if (scope.isEmpty()) {
-            accessAudit.rejected(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN, "generation is no longer current for this ticket");
-        }
+        return currentOrder(ticketId, requireActiveGeneration(ticketId, generationId));
+    }
+
+    private ScopedOrder currentOrder(UUID ticketId, String orderReference) {
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
-                scope.getFirst() + "\nCOMPENSATION_ALLOWANCE");
+                orderReference + "\nCOMPENSATION_ALLOWANCE");
         List<ScopedOrder> orders =
                 jdbc.query(
                         "select o.order_reference, o.delay_hours, o.delay_seconds, o.paid, o.cancelled, o.fully_refunded, "
                                 + "o.existing_compensation, o.policy_version, o.paid_amount, o.available_compensation_amount, "
                                 + "(select count(*) from synthetic_pending_action a where a.order_reference = o.order_reference), "
                                 + "coalesce((select sum(r.amount) from compensation_reservation r where r.order_reference = o.order_reference and r.status = 'ACTIVE'), 0) "
-                                + "from agent_processing_generation g join support_ticket t on t.id = g.ticket_id "
-                                + "join synthetic_order o on o.order_reference = t.order_reference and o.customer_id = t.customer_id "
-                                + "where g.id = ? and g.ticket_id = ?",
+                                + "from support_ticket t join synthetic_order o on o.order_reference = t.order_reference "
+                                + "and o.customer_id = t.customer_id where t.id = ? and o.order_reference = ?",
                         (rs, row) ->
                                 new ScopedOrder(
                                         rs.getString(1),
@@ -435,9 +538,33 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                                         rs.getBigDecimal(10),
                                         rs.getInt(11),
                                         rs.getBigDecimal(12)),
+                        ticketId,
+                        orderReference);
+        if (orders.isEmpty()) {
+            auditRejectedInTransaction(ticketId, "ORDER_OUTSIDE_TICKET_SCOPE");
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "ticket order is outside the current scope");
+        }
+        return orders.getFirst();
+    }
+
+    private String requireActiveGeneration(UUID ticketId, UUID generationId) {
+        List<String> authorized =
+                jdbc.query(
+                        "select t.order_reference from agent_processing_generation g "
+                                + "join support_ticket t on t.id = g.ticket_id "
+                                + "where g.id = ? and g.ticket_id = ? and g.status = 'ACTIVE' "
+                                + "and t.handling_mode = 'AGENT' and t.lifecycle_state = 'INVESTIGATING' "
+                                + "and not t.customer_human_preference for update of g, t",
+                        (rs, row) -> rs.getString(1),
                         generationId,
                         ticketId);
-        return orders.getFirst();
+        if (authorized.isEmpty()) {
+            accessAudit.rejected(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "generation is no longer current for this ticket");
+        }
+        return authorized.getFirst();
     }
 
     private void recordFact(
@@ -450,6 +577,15 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 value,
                 evidence,
                 Timestamp.from(now));
+    }
+
+    private void auditRejectedInTransaction(UUID ticketId, String reason) {
+        jdbc.update(
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                        + "values (?, ?, 'agent-machine', ?)",
+                ticketId,
+                "AGENT_COMMAND_REJECTED_" + reason,
+                Timestamp.from(clock.instant()));
     }
 
     private boolean mayReplayCompletedCommand(UUID ticketId, UUID generationId) {
@@ -493,21 +629,6 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             BigDecimal totalAvailableCompensationAmount,
             int pendingActionCount,
             BigDecimal activeReservationAmount) {
-        InvestigationFacts asFacts() {
-            return new InvestigationFacts(
-                    "UNIQUE",
-                    orderReference,
-                    delayHours,
-                    delaySeconds,
-                    paid,
-                    cancelled,
-                    fullyRefunded,
-                    existingCompensation,
-                    pendingActionCount,
-                    policyVersion,
-                    evidenceRefs());
-        }
-
         List<String> evidenceRefs() {
             return List.of("order:" + orderReference, "logistics:" + orderReference);
         }
