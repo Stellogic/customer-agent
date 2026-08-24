@@ -84,7 +84,9 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   const supportContext = await newIssue80Context(browser);
   const support = await supportContext.newPage();
   await login(support, "internal", "support-demo");
-  await expect(support.getByText(created.ticketId)).toBeVisible();
+  await expect(
+    support.getByText(`${created.ticketId.slice(0, 8)}…${created.ticketId.slice(-4)}`).first(),
+  ).toBeVisible();
 
   const minimumQueueItem = await support.evaluate(async (ticketId) => {
     const snapshot = (await (
@@ -122,9 +124,12 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   expect(hiddenResourceStatus).toBe(404);
 
   await support.getByRole("button", { name: `领取工单 ${created.ticketId}` }).click();
-  await expect(support.getByRole("heading", { name: "当前工单详情" })).toBeVisible();
+  await support.getByRole("button", { name: "确认领取" }).click();
+  await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
   await expect(support.getByText("ORDER-DELAY-UNDER-24")).toBeVisible();
-  await expect(support.getByText(description)).toBeVisible();
+  await expect(
+    support.getByRole("region", { name: "问题描述" }).getByText(description),
+  ).toBeVisible();
 
   await supportContext.close();
   await customerContext.close();

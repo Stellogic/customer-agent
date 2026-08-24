@@ -15,6 +15,11 @@ describe("客服共享队列工作台", () => {
 
   it("只在客服路由读取独立权威快照并呈现两种最小摘要", async () => {
     globalThis.history.replaceState(null, "", "/internal/support");
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(globalThis.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
         Response.json({
@@ -39,8 +44,17 @@ describe("客服共享队列工作台", () => {
     expect(await screen.findByRole("heading", { name: "客服共享队列" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "待接手工单" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "SLA 违约升级" })).toBeInTheDocument();
-    expect(await screen.findAllByText(HANDOFF_TICKET)).toHaveLength(1);
-    expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
+    expect(await screen.findAllByText("26000000…0001")).toHaveLength(1);
+    expect(await screen.findAllByText("26000000…0002")).toHaveLength(2);
+    expect(screen.queryByText(HANDOFF_TICKET)).not.toBeInTheDocument();
+    expect(screen.queryByText(BREACHED_TICKET)).not.toBeInTheDocument();
+    expect(screen.queryByText(/customer-demo|ORDER-DELAY|物流延迟/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: /搜索|筛选|回复|订单查询/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /转派|解决|导出/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `复制完整工单 UUID ${HANDOFF_TICKET}` }));
+    expect(writeText).toHaveBeenCalledWith(HANDOFF_TICKET);
     expect(screen.queryByRole("combobox", { name: /角色/ })).not.toBeInTheDocument();
     expect(
       screen.queryByText(/CUSTOMER_REQUESTED|AGENT_HUMAN_HANDOFF|调查摘要/),
@@ -78,7 +92,7 @@ describe("客服共享队列工作台", () => {
     );
   });
 
-  it("领取写操作携带当前 CSRF 且成功后只读取已分配工单详情", async () => {
+  it("确认领取后才写入分配并分区呈现真实授权详情", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const path = String(input);
       if (path === "/api/support/workbench/snapshot") {
@@ -105,9 +119,28 @@ describe("客服共享队列工作台", () => {
           description: "物流延迟",
           lifecycleState: "WAITING_FOR_CUSTOMER",
           handlingMode: "HUMAN",
-          publicConversation: [],
-          investigationFacts: [],
-          businessTimeline: [],
+          publicConversation: [
+            {
+              author: "CUSTOMER",
+              body: "物流一直没有更新",
+              sentAt: "2026-08-11T01:10:00Z",
+            },
+          ],
+          investigationFacts: [
+            {
+              factType: "DELIVERY_DELAY",
+              factValue: "26 hours",
+              evidenceReference: "shipment:ORDER-DELAY-001",
+              recordedAt: "2026-08-11T01:12:00Z",
+            },
+          ],
+          businessTimeline: [
+            {
+              eventType: "SUPPORT_ASSIGNMENT_CREATED",
+              actorId: "support-demo",
+              occurredAt: "2026-08-11T01:15:00Z",
+            },
+          ],
         });
       }
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
@@ -120,8 +153,22 @@ describe("客服共享队列工作台", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: `领取工单 ${HANDOFF_TICKET}` }));
 
-    expect(await screen.findByRole("heading", { name: "当前工单详情" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "确认领取工单" })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      `/api/support/workbench/tickets/${HANDOFF_TICKET}/claims`,
+      expect.anything(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "确认领取" }));
+
+    expect(await screen.findByRole("heading", { name: "授权工单详情" })).toBeInTheDocument();
+    expect(screen.getByText("customer-demo")).toBeInTheDocument();
     expect(screen.getByText("ORDER-DELAY-001")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "公开沟通" })).toBeInTheDocument();
+    expect(screen.getByText("物流一直没有更新")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "调查事实" })).toBeInTheDocument();
+    expect(screen.getByText("26 hours")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "业务时间线" })).toBeInTheDocument();
+    expect(screen.getByText("SUPPORT_ASSIGNMENT_CREATED")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/support/workbench/tickets/${HANDOFF_TICKET}`,
       expect.objectContaining({ credentials: "same-origin" }),
@@ -167,10 +214,10 @@ describe("客服共享队列工作台", () => {
     });
 
     render(<SupportWorkbench />);
-    fireEvent.click(await screen.findByRole("button", { name: `领取工单 ${HANDOFF_TICKET}` }));
+    await confirmClaim(HANDOFF_TICKET);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("分配已失效");
-    expect(screen.queryByRole("heading", { name: "当前工单详情" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "授权工单详情" })).not.toBeInTheDocument();
     expect(detailReads).toBe(2);
   });
 
@@ -213,10 +260,10 @@ describe("客服共享队列工作台", () => {
     });
 
     render(<SupportWorkbench />);
-    fireEvent.click(await screen.findByRole("button", { name: `领取工单 ${HANDOFF_TICKET}` }));
+    await confirmClaim(HANDOFF_TICKET);
     expect(await screen.findByText("ORDER-DELAY-001")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: `领取工单 ${BREACHED_TICKET}` }));
+    await confirmClaim(BREACHED_TICKET);
     expect(await screen.findByRole("alert")).toHaveTextContent("领取未完成");
     expect(screen.queryByText("ORDER-DELAY-001")).not.toBeInTheDocument();
   });
@@ -246,8 +293,8 @@ describe("客服共享队列工作台", () => {
     resolveRecovery?.(
       snapshotResponse("support-workbench-v1:8", [breachedItem()], [breachedItem()]),
     );
-    expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
-    expect(screen.queryByText(HANDOFF_TICKET)).not.toBeInTheDocument();
+    expect(await screen.findAllByText("26000000…0002")).toHaveLength(2);
+    expect(screen.queryByText("26000000…0001")).not.toBeInTheDocument();
     expect(
       vi
         .mocked(globalThis.fetch)
@@ -271,8 +318,8 @@ describe("客服共享队列工作台", () => {
           .mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"),
       ).toHaveLength(2),
     );
-    expect(await screen.findByText(BREACHED_TICKET)).toBeInTheDocument();
-    expect(screen.queryByText(HANDOFF_TICKET)).not.toBeInTheDocument();
+    expect(await screen.findByText("26000000…0002")).toBeInTheDocument();
+    expect(screen.queryByText("26000000…0001")).not.toBeInTheDocument();
   });
 
   it("非法 payload 与 reset_required 都不会继续应用旧状态", async () => {
@@ -301,7 +348,7 @@ describe("客服共享队列工作台", () => {
 
     render(<SupportWorkbench />);
 
-    expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
+    expect(await screen.findAllByText("26000000…0002")).toHaveLength(2);
     expect(screen.queryByText("不得进入浏览器事件")).not.toBeInTheDocument();
     expect(
       vi
@@ -321,8 +368,8 @@ describe("客服共享队列工作台", () => {
 
     render(<SupportWorkbench />);
 
-    expect(await screen.findAllByText(BREACHED_TICKET)).toHaveLength(2);
-    expect(screen.queryByText(HANDOFF_TICKET)).not.toBeInTheDocument();
+    expect(await screen.findAllByText("26000000…0002")).toHaveLength(2);
+    expect(screen.queryByText("26000000…0001")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "重新同步队列" })).not.toBeDisabled();
   });
 
@@ -335,7 +382,7 @@ describe("客服共享队列工作台", () => {
     render(<SupportWorkbench />);
 
     expect(await screen.findByRole("main", { name: "客服工作台" })).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "待接手工单" })).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "待接手工单" })).toBeInTheDocument();
     expect(screen.getByText("队列可发现不等于工单详情授权")).toBeInTheDocument();
   });
 });
@@ -347,6 +394,11 @@ function handoffItem() {
     handlingMode: "HUMAN",
     enteredAt: "2026-08-11T01:00:00Z",
   };
+}
+
+async function confirmClaim(ticketId: string) {
+  fireEvent.click(await screen.findByRole("button", { name: `领取工单 ${ticketId}` }));
+  fireEvent.click(await screen.findByRole("button", { name: "确认领取" }));
 }
 
 function breachedItem() {
