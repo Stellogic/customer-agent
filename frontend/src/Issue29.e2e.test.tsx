@@ -111,6 +111,7 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "领取审批" })[scenarioQueueIndex]);
     expect(await screen.findByRole("heading", { name: orderReference })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "批准补偿" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认批准" }));
     expect(
       await screen.findByText("审批责任已结束，已返回队列。", {}, { timeout: 10_000 }),
     ).toBeInTheDocument();

@@ -92,7 +92,7 @@ test("双角色不能审批本人参与的派生版本，独立审批人的旧�
     response.url().endsWith(`/${derivedRevisionId}/claims`),
   );
   await approver
-    .locator(".queue-list > li")
+    .locator(".approval-table-row:not(.approval-table-heading)")
     .nth(derivedQueueIndex)
     .getByRole("button", { name: "领取审批" })
     .click();
@@ -106,6 +106,7 @@ test("双角色不能审批本人参与的派生版本，独立审批人的旧�
   await expect(approver.getByRole("heading", { name: "ORDER-DELAY-001" })).toBeVisible();
   await expect(approver.getByText("order:ORDER-DELAY-001")).toBeVisible();
   await approver.getByRole("button", { name: "释放审批" }).click();
+  await approver.getByRole("button", { name: "确认释放审批责任" }).click();
   await expect(approver.getByText("审批责任已释放，已返回队列。")).toBeVisible();
 
   const oldLeaseStatus = await approver.evaluate(

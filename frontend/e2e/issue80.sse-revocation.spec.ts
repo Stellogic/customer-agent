@@ -21,7 +21,7 @@ async function claimApproval(page: Page) {
       response.url().endsWith(`/${revisionId}/approval-view/events`) && response.status() === 200,
   );
   await page
-    .locator(".queue-list > li")
+    .locator(".approval-table-row:not(.approval-table-heading)")
     .nth(index)
     .getByRole("button", { name: "领取审批" })
     .click();
