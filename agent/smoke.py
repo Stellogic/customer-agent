@@ -21,6 +21,90 @@ def expect_status(response: httpx.Response, expected: int) -> None:
         raise AssertionError(f"expected {expected}, got {response.status_code}: {response.text}")
 
 
+def collect_investigation_facts(
+    client: httpx.Client,
+    spring_url: str,
+    ticket_id: str | uuid.UUID,
+    generation_id: str | uuid.UUID,
+    scoped_headers: dict[str, str],
+    *,
+    verify_duplicate_rejected: bool = False,
+) -> dict:
+    base_url = f"{spring_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}"
+    headers = {
+        **scoped_headers,
+        "X-Agent-Operation": "USE_INVESTIGATION_CAPABILITY",
+    }
+    catalog = client.get(f"{base_url}/capabilities", headers=headers)
+    expect_status(catalog, 200)
+    assert catalog.json()["schemaVersion"] == "investigation-capability-catalog-v1"
+    assert [item["name"] for item in catalog.json()["capabilities"]] == [
+        "CONFIRM_ORDER",
+        "READ_LOGISTICS",
+        "READ_PAYMENT_AND_REFUNDS",
+        "READ_COMPENSATION_AND_PENDING_ACTIONS",
+        "READ_APPLICABLE_POLICY",
+    ]
+    confirmation = client.post(
+        f"{base_url}/capabilities/CONFIRM_ORDER",
+        headers={
+            **headers,
+            "Idempotency-Key": f"{generation_id}:capability:CONFIRM_ORDER",
+        },
+        json={},
+    )
+    expect_status(confirmation, 200)
+    confirmation_body = confirmation.json()
+    if confirmation_body["matchStatus"] == "AMBIGUOUS":
+        return {
+            "matchStatus": "AMBIGUOUS",
+            "orderReference": confirmation_body["orderReference"],
+            "evidenceRefs": [],
+        }
+    order_reference = confirmation_body["orderReference"]
+    parameters = {"orderReference": order_reference}
+
+    def invoke(name: str) -> dict:
+        response = client.post(
+            f"{base_url}/capabilities/{name}",
+            headers={
+                **headers,
+                "Idempotency-Key": f"{generation_id}:capability:{name}",
+            },
+            json=parameters,
+        )
+        expect_status(response, 200)
+        return response.json()
+
+    logistics = invoke("READ_LOGISTICS")
+    payment = invoke("READ_PAYMENT_AND_REFUNDS")
+    compensation = invoke("READ_COMPENSATION_AND_PENDING_ACTIONS")
+    policy = invoke("READ_APPLICABLE_POLICY")
+    if verify_duplicate_rejected:
+        duplicate_confirmation = client.post(
+            f"{base_url}/capabilities/CONFIRM_ORDER",
+            headers={
+                **headers,
+                "Idempotency-Key": f"{generation_id}:capability:CONFIRM_ORDER",
+            },
+            json={},
+        )
+        expect_status(duplicate_confirmation, 409)
+    return {
+        "matchStatus": "UNIQUE",
+        "orderReference": order_reference,
+        "delayHours": logistics["delayHours"],
+        "delaySeconds": logistics["delaySeconds"],
+        "paid": payment["paid"],
+        "cancelled": payment["cancelled"],
+        "fullyRefunded": payment["fullyRefunded"],
+        "existingCompensation": compensation["existingCompensation"],
+        "pendingActionCount": compensation["pendingActionCount"],
+        "policyVersion": policy["policyVersion"],
+        "evidenceRefs": [confirmation_body["evidenceRefs"][0], logistics["evidenceRefs"][0]],
+    }
+
+
 def start_authorized_sse(url: str, headers: dict[str, str], cursor: str):
     connected = threading.Event()
 
@@ -386,18 +470,26 @@ def main() -> None:
         assert generation is not None
         assert generation[2] == "COMPLETED"
         assert generation[4] == "COMPLETED"
-        assert (
-            connection.execute(
-                "select count(*) from investigation_fact where generation_id = %s", (generation[0],)
-            ).fetchone()[0]
-            == 6
-        )
+        assert connection.execute(
+            "select array_agg(fact_type order by fact_type) from investigation_fact "
+            "where generation_id = %s",
+            (generation[0],),
+        ).fetchone()[0] == [
+            "EXISTING_COMPENSATION",
+            "LOGISTICS_DELAY_HOURS",
+            "LOGISTICS_DELAY_SECONDS",
+            "ORDER",
+            "PAYMENT",
+            "PENDING_ACTION_COUNT",
+            "POLICY",
+            "REFUND_STATUS",
+        ]
         assert (
             connection.execute(
                 "select count(*) from agent_command_request where generation_id = %s",
                 (generation[0],),
             ).fetchone()[0]
-            == 1
+            == 6
         )
         assert (
             connection.execute(
@@ -443,10 +535,10 @@ def main() -> None:
         scoped_headers = {
             "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
             "X-Agent-Generation-Id": generation_id,
-            "X-Agent-Operation": "READ_INVESTIGATION_FACTS",
+            "X-Agent-Operation": "USE_INVESTIGATION_CAPABILITY",
         }
         stale = client.get(
-            f"{spring_url}/internal/agent/tickets/{resolved_ticket_id}/generations/{generation_id}/facts",
+            f"{spring_url}/internal/agent/tickets/{resolved_ticket_id}/generations/{generation_id}/capabilities",
             headers=scoped_headers,
         )
         expect_status(stale, 403)
@@ -526,15 +618,14 @@ def main() -> None:
             "X-Agent-Generation-Id": str(ineligible_generation_id),
         }
         with httpx.Client(timeout=20.0) as client:
-            facts = client.get(
-                f"{spring_url}/internal/agent/tickets/{ineligible_ticket_id}/generations/"
-                f"{ineligible_generation_id}/facts",
-                headers={
-                    **ineligible_headers,
-                    "X-Agent-Operation": "READ_INVESTIGATION_FACTS",
-                },
+            facts = collect_investigation_facts(
+                client,
+                spring_url,
+                ineligible_ticket_id,
+                ineligible_generation_id,
+                ineligible_headers,
+                verify_duplicate_rejected=order_reference == "ORDER-DELAY-ZERO-PAID",
             )
-            expect_status(facts, 200)
             conclusion = client.post(
                 f"{spring_url}/internal/agent/tickets/{ineligible_ticket_id}/generations/"
                 f"{ineligible_generation_id}/conclusions",
@@ -546,10 +637,10 @@ def main() -> None:
                 json={
                     "compensationRequired": True,
                     "reasonCode": "LOGISTICS_DELAY",
-                    "delayHours": facts.json()["delayHours"],
-                    "delaySeconds": facts.json()["delaySeconds"],
+                    "delayHours": facts["delayHours"],
+                    "delaySeconds": facts["delaySeconds"],
                     "orderReference": order_reference,
-                    "evidenceRefs": facts.json()["evidenceRefs"],
+                    "evidenceRefs": facts["evidenceRefs"],
                 },
             )
             expect_status(conclusion, 422)
@@ -645,12 +736,13 @@ def main() -> None:
         "X-Agent-Generation-Id": str(reused_generation),
     }
     with httpx.Client(timeout=20.0) as client:
-        reused_facts = client.get(
-            f"{spring_url}/internal/agent/tickets/{proposal_ticket_id}/generations/"
-            f"{reused_generation}/facts",
-            headers={**reused_headers, "X-Agent-Operation": "READ_INVESTIGATION_FACTS"},
+        reused_facts = collect_investigation_facts(
+            client,
+            spring_url,
+            proposal_ticket_id,
+            reused_generation,
+            reused_headers,
         )
-        expect_status(reused_facts, 200)
         reused = client.post(
             f"{spring_url}/internal/agent/tickets/{proposal_ticket_id}/generations/"
             f"{reused_generation}/conclusions",
@@ -665,7 +757,7 @@ def main() -> None:
                 "delayHours": 80,
                 "delaySeconds": 288000,
                 "orderReference": proposal_order_reference,
-                "evidenceRefs": reused_facts.json()["evidenceRefs"],
+                "evidenceRefs": reused_facts["evidenceRefs"],
             },
         )
         expect_status(reused, 200)
@@ -1200,12 +1292,14 @@ def main() -> None:
         "X-Agent-Generation-Id": str(second_generation),
     }
     with customer_browser_client(spring_url) as client:
-        facts = client.get(
-            f"{spring_url}/internal/agent/tickets/{proposal_ticket_id}/generations/{second_generation}/facts",
-            headers={**scoped_headers, "X-Agent-Operation": "READ_INVESTIGATION_FACTS"},
+        facts = collect_investigation_facts(
+            client,
+            spring_url,
+            proposal_ticket_id,
+            second_generation,
+            scoped_headers,
         )
-        expect_status(facts, 200)
-        evidence_refs = facts.json()["evidenceRefs"]
+        evidence_refs = facts["evidenceRefs"]
         replacement = client.post(
             f"{spring_url}/internal/agent/tickets/{proposal_ticket_id}/generations/{second_generation}/conclusions",
             headers={
@@ -1286,11 +1380,13 @@ def main() -> None:
         "X-Agent-Generation-Id": str(third_generation),
     }
     with customer_browser_client(spring_url) as client:
-        third_facts = client.get(
-            f"{spring_url}/internal/agent/tickets/{proposal_ticket_id}/generations/{third_generation}/facts",
-            headers={**third_headers, "X-Agent-Operation": "READ_INVESTIGATION_FACTS"},
+        third_facts = collect_investigation_facts(
+            client,
+            spring_url,
+            proposal_ticket_id,
+            third_generation,
+            third_headers,
         )
-        expect_status(third_facts, 200)
         approved_replacement = client.post(
             f"{spring_url}/internal/agent/tickets/{proposal_ticket_id}/generations/{third_generation}/conclusions",
             headers={
@@ -1304,7 +1400,7 @@ def main() -> None:
                 "delayHours": 82,
                 "delaySeconds": 295200,
                 "orderReference": proposal_order_reference,
-                "evidenceRefs": third_facts.json()["evidenceRefs"],
+                "evidenceRefs": third_facts["evidenceRefs"],
             },
         )
         expect_status(approved_replacement, 422)
@@ -3370,11 +3466,11 @@ def main() -> None:
         agent_capability_headers = {
             "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
             "X-Agent-Generation-Id": str(handoff_generation_id),
-            "X-Agent-Operation": "READ_INVESTIGATION_FACTS",
+            "X-Agent-Operation": "USE_INVESTIGATION_CAPABILITY",
         }
         late_facts = client.get(
             f"{spring_url}/internal/agent/tickets/{handoff_ticket_id}/generations/"
-            f"{handoff_generation_id}/facts",
+            f"{handoff_generation_id}/capabilities",
             headers=agent_capability_headers,
         )
         expect_status(late_facts, 403)

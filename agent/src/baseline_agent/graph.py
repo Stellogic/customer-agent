@@ -1,5 +1,7 @@
 import os
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import TypedDict
 
 import httpx
@@ -59,6 +61,80 @@ investigation_judgment_model: InvestigationJudgmentModel = FixedFakeInvestigatio
 shadow_candidate_factory: Callable[[], ShadowCandidate | None] = configured_shadow_candidate
 
 
+class InvestigationCapability(StrEnum):
+    CONFIRM_ORDER = "CONFIRM_ORDER"
+    READ_LOGISTICS = "READ_LOGISTICS"
+    READ_PAYMENT_AND_REFUNDS = "READ_PAYMENT_AND_REFUNDS"
+    READ_COMPENSATION_AND_PENDING_ACTIONS = "READ_COMPENSATION_AND_PENDING_ACTIONS"
+    READ_APPLICABLE_POLICY = "READ_APPLICABLE_POLICY"
+
+
+@dataclass(frozen=True)
+class CapabilityField:
+    name: str
+    type: str
+
+
+@dataclass(frozen=True)
+class CapabilityContract:
+    parameters: tuple[CapabilityField, ...]
+    result_fields: tuple[CapabilityField, ...]
+
+
+STRING = "STRING"
+INTEGER = "INTEGER"
+BOOLEAN = "BOOLEAN"
+STRING_LIST = "STRING_LIST"
+ORDER_REFERENCE = (CapabilityField("orderReference", STRING),)
+CAPABILITY_CONTRACTS = {
+    InvestigationCapability.CONFIRM_ORDER: CapabilityContract(
+        (),
+        (
+            CapabilityField("capability", STRING),
+            CapabilityField("matchStatus", STRING),
+            CapabilityField("orderReference", STRING),
+            CapabilityField("evidenceRefs", STRING_LIST),
+        ),
+    ),
+    InvestigationCapability.READ_LOGISTICS: CapabilityContract(
+        ORDER_REFERENCE,
+        (
+            CapabilityField("capability", STRING),
+            CapabilityField("delayHours", INTEGER),
+            CapabilityField("delaySeconds", INTEGER),
+            CapabilityField("evidenceRefs", STRING_LIST),
+        ),
+    ),
+    InvestigationCapability.READ_PAYMENT_AND_REFUNDS: CapabilityContract(
+        ORDER_REFERENCE,
+        (
+            CapabilityField("capability", STRING),
+            CapabilityField("paid", BOOLEAN),
+            CapabilityField("cancelled", BOOLEAN),
+            CapabilityField("fullyRefunded", BOOLEAN),
+            CapabilityField("evidenceRefs", STRING_LIST),
+        ),
+    ),
+    InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS: CapabilityContract(
+        ORDER_REFERENCE,
+        (
+            CapabilityField("capability", STRING),
+            CapabilityField("existingCompensation", BOOLEAN),
+            CapabilityField("pendingActionCount", INTEGER),
+            CapabilityField("evidenceRefs", STRING_LIST),
+        ),
+    ),
+    InvestigationCapability.READ_APPLICABLE_POLICY: CapabilityContract(
+        ORDER_REFERENCE,
+        (
+            CapabilityField("capability", STRING),
+            CapabilityField("policyVersion", STRING),
+            CapabilityField("evidenceRefs", STRING_LIST),
+        ),
+    ),
+}
+
+
 async def probe_spring(state: BaselineState) -> BaselineState:
     if state.get("requested_by") != "spring":
         raise ValueError("baseline graph accepts only Spring-owned probes")
@@ -83,14 +159,23 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
         "Authorization": authorization,
         "X-Agent-Generation-Id": generation_id,
     }
+    clarification_answer = state.get("clarification_answer", {})
+    capability_request_scope = clarification_answer.get("clarificationRequestId", "initial")
+    if not isinstance(capability_request_scope, str):
+        capability_request_scope = "invalid-resume"
     async with httpx.AsyncClient(timeout=5.0) as client:
-        facts_response = await _request_with_retries(
-            lambda: client.get(
-                f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/facts",
-                headers={**scope_headers, "X-Agent-Operation": "READ_INVESTIGATION_FACTS"},
+        try:
+            facts = await _collect_investigation_facts(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                capability_request_scope,
             )
-        )
-        if facts_response is None:
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code != 409:
+                raise
             return await _human_handoff(
                 client,
                 base_url,
@@ -100,10 +185,16 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "TOOL_RETRY_EXHAUSTED",
                 [],
             )
-        try:
-            facts: object = facts_response.json()
-        except ValueError:
-            facts = "INVALID_JSON_RESPONSE"
+        if facts is None:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "TOOL_RETRY_EXHAUSTED",
+                [],
+            )
         unsafe_reason = _unsafe_facts_reason(facts)
         if unsafe_reason is not None:
             return await _human_handoff(
@@ -161,6 +252,222 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 _controlled_summary_facts(facts),
             )
         return {"facts": facts, "conclusion": conclusion, "model_mode": "fixed-fake-model-v1"}
+
+
+async def _collect_investigation_facts(
+    client: httpx.AsyncClient,
+    base_url: str,
+    ticket_id: str,
+    generation_id: str,
+    scope_headers: dict[str, str],
+    request_scope: str,
+) -> object | None:
+    capability_headers = {
+        **scope_headers,
+        "X-Agent-Operation": "USE_INVESTIGATION_CAPABILITY",
+    }
+    catalog_response = await _request_with_retries(
+        lambda: client.get(
+            f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/capabilities",
+            headers=capability_headers,
+        )
+    )
+    if catalog_response is None:
+        return None
+    try:
+        catalog = catalog_response.json()
+    except ValueError:
+        return "INVALID_CAPABILITY_CATALOG"
+    if not _valid_capability_catalog(catalog):
+        return "INVALID_CAPABILITY_CATALOG"
+
+    confirmation = await _invoke_investigation_capability(
+        client,
+        base_url,
+        ticket_id,
+        generation_id,
+        capability_headers,
+        InvestigationCapability.CONFIRM_ORDER,
+        {},
+        request_scope,
+    )
+    if confirmation is None:
+        return None
+    if not _valid_capability_result(InvestigationCapability.CONFIRM_ORDER, confirmation):
+        return "INVALID_CAPABILITY_RESULT"
+    assert isinstance(confirmation, dict)
+    if confirmation.get("matchStatus") == "AMBIGUOUS":
+        if confirmation["evidenceRefs"] != []:
+            return "INVALID_CAPABILITY_RESULT"
+        return {
+            "matchStatus": "AMBIGUOUS",
+            "orderReference": confirmation.get("orderReference"),
+            "delayHours": None,
+            "delaySeconds": None,
+            "paid": None,
+            "cancelled": None,
+            "fullyRefunded": None,
+            "existingCompensation": None,
+            "pendingActionCount": None,
+            "policyVersion": None,
+            "evidenceRefs": [],
+        }
+    if confirmation["matchStatus"] != "UNIQUE":
+        return "INVALID_CAPABILITY_RESULT"
+    order_reference = confirmation["orderReference"]
+    if confirmation["evidenceRefs"] != [f"order:{order_reference}"]:
+        return "INVALID_CAPABILITY_RESULT"
+    results: dict[InvestigationCapability, dict] = {}
+    for capability in InvestigationCapability:
+        if capability is InvestigationCapability.CONFIRM_ORDER:
+            continue
+        result = await _invoke_investigation_capability(
+            client,
+            base_url,
+            ticket_id,
+            generation_id,
+            capability_headers,
+            capability,
+            {"orderReference": order_reference},
+            request_scope,
+        )
+        if result is None:
+            return None
+        if not _valid_capability_result(capability, result):
+            return "INVALID_CAPABILITY_RESULT"
+        assert isinstance(result, dict)
+        results[capability] = result
+    logistics = results[InvestigationCapability.READ_LOGISTICS]
+    payment = results[InvestigationCapability.READ_PAYMENT_AND_REFUNDS]
+    compensation = results[InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS]
+    policy = results[InvestigationCapability.READ_APPLICABLE_POLICY]
+    if logistics["evidenceRefs"] != [f"logistics:{order_reference}"]:
+        return "INVALID_CAPABILITY_RESULT"
+    if payment["evidenceRefs"] != [f"payment:{order_reference}"]:
+        return "INVALID_CAPABILITY_RESULT"
+    if compensation["evidenceRefs"] != [
+        f"compensation:{order_reference}",
+        f"order-actions:{order_reference}",
+    ]:
+        return "INVALID_CAPABILITY_RESULT"
+    if policy["evidenceRefs"] != [f"policy:{policy['policyVersion']}"]:
+        return "INVALID_CAPABILITY_RESULT"
+    return {
+        "matchStatus": confirmation["matchStatus"],
+        "orderReference": order_reference,
+        "delayHours": logistics["delayHours"],
+        "delaySeconds": logistics["delaySeconds"],
+        "paid": payment["paid"],
+        "cancelled": payment["cancelled"],
+        "fullyRefunded": payment["fullyRefunded"],
+        "existingCompensation": compensation["existingCompensation"],
+        "pendingActionCount": compensation["pendingActionCount"],
+        "policyVersion": policy["policyVersion"],
+        "evidenceRefs": [confirmation["evidenceRefs"][0], logistics["evidenceRefs"][0]],
+    }
+
+
+async def _invoke_investigation_capability(
+    client: httpx.AsyncClient,
+    base_url: str,
+    ticket_id: str,
+    generation_id: str,
+    headers: dict[str, str],
+    capability: InvestigationCapability,
+    parameters: dict[str, str],
+    request_scope: str,
+) -> object | None:
+    response = await _request_with_retries(
+        lambda: client.post(
+            f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/capabilities/{capability.value}",
+            headers={
+                **headers,
+                "Idempotency-Key": (
+                    f"{generation_id}:investigation:{request_scope}:capability:{capability.value}"
+                ),
+            },
+            json=parameters,
+        )
+    )
+    if response is None:
+        return None
+    try:
+        return response.json()
+    except ValueError:
+        return "INVALID_CAPABILITY_RESULT"
+
+
+def _valid_capability_catalog(catalog: object) -> bool:
+    if not isinstance(catalog, dict) or set(catalog) != {"schemaVersion", "capabilities"}:
+        return False
+    if catalog["schemaVersion"] != "investigation-capability-catalog-v1":
+        return False
+    definitions = catalog["capabilities"]
+    if not isinstance(definitions, list) or len(definitions) != len(CAPABILITY_CONTRACTS):
+        return False
+    declared: dict[str, CapabilityContract] = {}
+    for definition in definitions:
+        if not isinstance(definition, dict) or set(definition) != {
+            "name",
+            "parameters",
+            "resultFields",
+        }:
+            return False
+        name = definition.get("name")
+        parameters = definition.get("parameters")
+        result_fields = definition.get("resultFields")
+        if (
+            not isinstance(name, str)
+            or not isinstance(parameters, list)
+            or not isinstance(result_fields, list)
+        ):
+            return False
+        parsed_parameters = _parse_capability_fields(parameters)
+        parsed_results = _parse_capability_fields(result_fields)
+        if parsed_parameters is None or parsed_results is None or name in declared:
+            return False
+        declared[name] = CapabilityContract(parsed_parameters, parsed_results)
+    return declared == {
+        capability.value: contract for capability, contract in CAPABILITY_CONTRACTS.items()
+    }
+
+
+def _parse_capability_fields(fields: list) -> tuple[CapabilityField, ...] | None:
+    parsed: list[CapabilityField] = []
+    for field in fields:
+        if (
+            not isinstance(field, dict)
+            or set(field) != {"name", "type", "required"}
+            or not isinstance(field.get("name"), str)
+            or field.get("type") not in {STRING, INTEGER, BOOLEAN, STRING_LIST}
+            or field.get("required") is not True
+        ):
+            return None
+        parsed.append(CapabilityField(field["name"], field["type"]))
+    return tuple(parsed)
+
+
+def _valid_capability_result(capability: InvestigationCapability, result: object) -> bool:
+    if not isinstance(result, dict):
+        return False
+    contract = CAPABILITY_CONTRACTS[capability]
+    if set(result) != {field.name for field in contract.result_fields}:
+        return False
+    if result.get("capability") != capability.value:
+        return False
+    for field in contract.result_fields:
+        value = result[field.name]
+        if field.type == STRING and not isinstance(value, str):
+            return False
+        if field.type == INTEGER and (not isinstance(value, int) or isinstance(value, bool)):
+            return False
+        if field.type == BOOLEAN and not isinstance(value, bool):
+            return False
+        if field.type == STRING_LIST and (
+            not isinstance(value, list) or not all(isinstance(item, str) for item in value)
+        ):
+            return False
+    return True
 
 
 async def shadow_investigation(state: BaselineState) -> BaselineState:
@@ -382,7 +689,15 @@ def await_clarification(state: BaselineState) -> BaselineState:
         "promptCode": clarification["promptCode"],
         "question": clarification["question"],
     }
-    return {"clarification_answer": interrupt(public_interrupt)}
+    answer = interrupt(public_interrupt)
+    if not isinstance(answer, dict):
+        answer = {}
+    return {
+        "clarification_answer": {
+            **answer,
+            "clarificationRequestId": clarification["clarificationRequestId"],
+        }
+    }
 
 
 def _build_conclusion(facts: dict, judgment: InvestigationJudgment) -> dict:
