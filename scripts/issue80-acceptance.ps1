@@ -76,6 +76,7 @@ try {
         e2e/issue80.session-lifecycle.spec.ts `
         e2e/issue80.business-boundaries.spec.ts `
         e2e/issue80.approval-separation.spec.ts `
+        e2e/issue100.approval-workbench.spec.ts `
         e2e/issue80.sse-revocation.spec.ts
     if ($LASTEXITCODE -ne 0) {
         throw "Issue #80 真实浏览器验收失败，退出码: $LASTEXITCODE"
