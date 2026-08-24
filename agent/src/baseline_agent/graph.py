@@ -322,9 +322,6 @@ def fixed_fake_model(facts: dict) -> dict:
             "delaySeconds": facts["delaySeconds"],
             "orderReference": facts["orderReference"],
             "evidenceRefs": facts["evidenceRefs"],
-            # Intentionally wrong: Spring owns the authoritative method and amount.
-            "suggestedMethod": "COUPON",
-            "suggestedAmount": "999999.99",
         }
     return {
         "compensationRequired": False,

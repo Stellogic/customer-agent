@@ -22,9 +22,7 @@ record InvestigationConclusion(
         int delayHours,
         long delaySeconds,
         String orderReference,
-        List<String> evidenceRefs,
-        String suggestedMethod,
-        String suggestedAmount) {}
+        List<String> evidenceRefs) {}
 
 record ConclusionAcceptance(
         boolean accepted,

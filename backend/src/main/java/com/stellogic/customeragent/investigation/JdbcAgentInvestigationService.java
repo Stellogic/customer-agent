@@ -154,9 +154,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         Integer.toString(conclusion.delayHours()),
                         Long.toString(conclusion.delaySeconds()),
                         conclusion.orderReference(),
-                        String.join("\n", conclusion.evidenceRefs()),
-                        nullable(conclusion.suggestedMethod()),
-                        nullable(conclusion.suggestedAmount()));
+                        String.join("\n", conclusion.evidenceRefs()));
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
@@ -264,8 +262,6 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             InvestigationConclusion conclusion,
             ScopedOrder order) {
         if (conclusion.reasonCode() != DecisionReasonCode.LOGISTICS_DELAY
-                || conclusion.suggestedMethod() == null
-                || conclusion.suggestedAmount() == null
                 || !eligibleOrderState(order)
                 || order.existingCompensation()
                 || !DelayCompensationPolicy.VERSION.equals(order.policyVersion())) {
@@ -465,10 +461,6 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         generationId,
                         ticketId)
                 .isEmpty();
-    }
-
-    private static String nullable(String value) {
-        return value == null ? "" : value;
     }
 
     private record CommandRecord(
