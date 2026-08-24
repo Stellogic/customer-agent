@@ -57,6 +57,14 @@ export function App() {
   const [ticketReplyIssueKind, setTicketReplyIssueKind] = useState("LOGISTICS_DELAY");
   const [ticketReplyBody, setTicketReplyBody] = useState("");
   const [error, setError] = useState("");
+  const [copiedTicketId, setCopiedTicketId] = useState(false);
+  const [initialTicketId] = useState(readRequestedTicketId);
+  const [unknownHandoffRequestId, setUnknownHandoffRequestId] = useState<string | null>(() =>
+    initialTicketId
+      ? globalThis.sessionStorage.getItem(handoffRecoveryStorageKey(initialTicketId))
+      : null,
+  );
+  const [recoveringTicketId, setRecoveringTicketId] = useState<string | null>(initialTicketId);
   const requestId = useRef(globalThis.crypto.randomUUID());
   const replyMessageId = useRef(globalThis.crypto.randomUUID());
   const resumeRequestId = useRef(globalThis.crypto.randomUUID());
@@ -67,8 +75,12 @@ export function App() {
   const snapshotRef = useRef<Snapshot | null>(null);
 
   useEffect(() => {
-    const ticketId = new URLSearchParams(globalThis.location.search).get("ticket");
-    if (ticketId && /^[0-9a-f-]{36}$/i.test(ticketId)) void loadTicket(ticketId);
+    const ticketId = initialTicketId;
+    if (ticketId) {
+      void loadTicket(ticketId).catch(() => {
+        setError("暂时无法读取最新工单状态，我们会继续尝试从权威记录恢复。");
+      });
+    }
     return () => {
       streamController.current?.abort();
       if (reconnectTimer.current !== null) globalThis.clearTimeout(reconnectTimer.current);
@@ -110,6 +122,8 @@ export function App() {
     if (!isSnapshot(authoritative)) throw new Error("incompatible snapshot");
     snapshotRef.current = authoritative;
     setSnapshot(authoritative);
+    setRecoveringTicketId(null);
+    setCopiedTicketId(false);
     setError("");
     globalThis.history.replaceState(null, "", `?ticket=${ticketId}`);
     void consumeEvents(ticketId, authoritative.cursor);
@@ -224,22 +238,53 @@ export function App() {
       if (!response.ok) throw new Error("human handoff failed");
       await loadTicket(ticketId);
       handoffRequestId.current = globalThis.crypto.randomUUID();
+      forgetUnknownHandoff(ticketId);
     } catch {
-      const status = await humanSessionFetch(
-        `/api/customer/tickets/${ticketId}/human-handoff-requests/${requestId}`,
-        {
-          credentials: "same-origin",
-        },
-      ).catch(() => null);
-      if (status?.ok) {
-        await loadTicket(ticketId);
-        handoffRequestId.current = globalThis.crypto.randomUUID();
-      } else {
-        setError("转人工状态暂时未知；请保留本页重试，相同请求不会重复转人工。");
-      }
+      await reconcileHumanHandoff(ticketId, requestId);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function queryHumanHandoffResult() {
+    if (!snapshot || !unknownHandoffRequestId) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await reconcileHumanHandoff(snapshot.ticket.id, unknownHandoffRequestId);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function reconcileHumanHandoff(ticketId: string, stableRequestId: string) {
+    const status = await humanSessionFetch(
+      `/api/customer/tickets/${ticketId}/human-handoff-requests/${stableRequestId}`,
+      { credentials: "same-origin" },
+    ).catch(() => null);
+    if (!status?.ok) {
+      rememberUnknownHandoff(ticketId, stableRequestId);
+      setError("转人工结果仍在确认中。请只查询结果，不要重复提交转人工请求。");
+      return;
+    }
+    try {
+      await loadTicket(ticketId);
+      handoffRequestId.current = globalThis.crypto.randomUUID();
+      forgetUnknownHandoff(ticketId);
+    } catch {
+      rememberUnknownHandoff(ticketId, stableRequestId);
+      setError("已找到转人工结果，但最新工单状态刷新失败；请再次查询权威结果。");
+    }
+  }
+
+  function rememberUnknownHandoff(ticketId: string, stableRequestId: string) {
+    globalThis.sessionStorage.setItem(handoffRecoveryStorageKey(ticketId), stableRequestId);
+    setUnknownHandoffRequestId(stableRequestId);
+  }
+
+  function forgetUnknownHandoff(ticketId: string) {
+    globalThis.sessionStorage.removeItem(handoffRecoveryStorageKey(ticketId));
+    setUnknownHandoffRequestId(null);
   }
 
   async function submitTicketReply(event: FormEvent) {
@@ -286,7 +331,8 @@ export function App() {
       if (!controller.signal.aborted) {
         snapshotRef.current = null;
         setSnapshot(null);
-        setError("实时更新已断开；当前内容可能过期，刷新后将从权威快照恢复。");
+        setRecoveringTicketId(ticketId);
+        setError("实时更新已断开，已清除可能过期的内容并重新同步权威状态。");
       }
     };
     const scheduleRecovery = () => {
@@ -326,6 +372,31 @@ export function App() {
     markDisconnected();
     scheduleRecovery();
   }
+
+  async function copyTicketId() {
+    if (!snapshot) return;
+    try {
+      await globalThis.navigator.clipboard.writeText(snapshot.ticket.id);
+      setCopiedTicketId(true);
+    } catch {
+      setError("完整工单编号复制失败，请稍后再试。");
+    }
+  }
+
+  async function retryTicketRecovery() {
+    if (!recoveringTicketId) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await loadTicket(recoveringTicketId);
+    } catch {
+      setError("仍未读取到最新工单状态，请稍后再次查询。");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const currentLifecyclePresentation = lifecyclePresentation(snapshot?.ticket.lifecycleState);
 
   function applyPublicEvent(event: SseEvent) {
     const current = snapshotRef.current;
@@ -433,12 +504,43 @@ export function App() {
         </p>
       </header>
 
-      {!snapshot ? (
+      {!snapshot && recoveringTicketId ? (
+        <section className="ticket-recovery" aria-live="polite" aria-busy="true">
+          <span className="recovery-orbit" aria-hidden="true" />
+          <p className="eyebrow">安全恢复</p>
+          <h2>正在重新同步工单</h2>
+          <p>旧内容已清除。我们正在从服务端重新读取最新状态，无需重复创建或提交操作。</p>
+          <p className="ticket-reference">工单 {shortTicketId(recoveringTicketId)}</p>
+          <button
+            type="button"
+            className="recovery-action"
+            disabled={submitting}
+            onClick={retryTicketRecovery}
+          >
+            {submitting ? "正在同步…" : "立即重试同步"}
+          </button>
+          {error && (
+            <StatusNotice className="error" role="status" tone="warning">
+              {error}
+            </StatusNotice>
+          )}
+        </section>
+      ) : !snapshot ? (
         <form className="ticket-form" onSubmit={submit}>
+          <div className="form-intro">
+            <span className="form-step">01</span>
+            <div>
+              <p className="eyebrow">创建客服工单</p>
+              <h2>告诉我们发生了什么</h2>
+              <p>只需订单引用和问题描述。提交后，所有公开进展都会保留在同一张工单中。</p>
+            </div>
+          </div>
           <label>
-            订单编号
+            订单引用
             <input
               aria-label="订单编号"
+              autoComplete="off"
+              placeholder="例如 ORDER-DELAY-001"
               value={orderReference}
               onChange={(event) => setOrderReference(event.target.value)}
               required
@@ -448,13 +550,17 @@ export function App() {
             问题描述
             <textarea
               aria-label="问题描述"
+              placeholder="请说明你遇到的问题，以及希望我们核实的内容"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               required
               rows={5}
             />
           </label>
-          <button disabled={submitting}>{submitting ? "正在提交…" : "提交物流延迟问题"}</button>
+          <button className="primary-action" disabled={submitting}>
+            {submitting ? "正在安全提交…" : "提交物流延迟问题"}
+          </button>
+          <p className="form-assurance">提交使用稳定请求身份；响应不确定时，不会创建第二张工单。</p>
           {error && (
             <StatusNotice className="error" role="alert" tone="danger">
               {error}
@@ -464,21 +570,42 @@ export function App() {
       ) : (
         <section className="ticket-card" aria-live="polite">
           <div className="ticket-heading">
-            <div>
+            <div className="ticket-identity">
               <p className="eyebrow">客服工单</p>
-              <h2>{snapshot.ticket.id}</h2>
+              <div className="ticket-id-row">
+                <h2>{shortTicketId(snapshot.ticket.id)}</h2>
+                <button
+                  type="button"
+                  className="copy-ticket-id"
+                  aria-label="复制完整工单编号"
+                  onClick={copyTicketId}
+                >
+                  {copiedTicketId ? "已复制" : "复制编号"}
+                </button>
+              </div>
             </div>
-            <span className="status">
-              {snapshot.ticket.lifecycleState === "CLOSED"
-                ? "已关闭"
-                : snapshot.ticket.handlingMode === "HUMAN"
-                  ? "人工处理中"
-                  : snapshot.ticket.lifecycleState === "INVESTIGATING"
-                    ? "调查中"
-                    : snapshot.ticket.lifecycleState === "WAITING_FOR_CUSTOMER"
-                      ? "等待你的回复"
-                      : snapshot.ticket.lifecycleState}
-            </span>
+            <div className="ticket-state-summary">
+              <span className={`status ${currentLifecyclePresentation.className}`}>
+                {currentLifecyclePresentation.label}
+              </span>
+              <span className="handling-mode">
+                {handlingModeLabel(snapshot.ticket.handlingMode)}
+              </span>
+            </div>
+          </div>
+          <div className="state-guidance">
+            <span className="state-marker" aria-hidden="true" />
+            <div>
+              <strong>{currentLifecyclePresentation.title}</strong>
+              <p>{currentLifecyclePresentation.description}</p>
+            </div>
+          </div>
+          <div className="conversation-heading">
+            <div>
+              <p className="eyebrow">公开沟通</p>
+              <h3>这张工单中的消息</h3>
+            </div>
+            <span>{snapshot.messages.length} 条</span>
           </div>
           <ol className="conversation">
             {snapshot.messages.map((message, index) => (
@@ -493,6 +620,9 @@ export function App() {
                 <p>{message.body}</p>
               </li>
             ))}
+            {snapshot.messages.length === 0 && (
+              <li className="empty-conversation">新消息会在这里出现。</li>
+            )}
           </ol>
           {snapshot.clarification && snapshot.ticket.handlingMode === "AGENT" && (
             <form className="clarification-form" onSubmit={submitClarification}>
@@ -546,7 +676,22 @@ export function App() {
             </form>
           )}
           {snapshot.ticket.handlingMode === "AGENT" &&
-            snapshot.ticket.lifecycleState !== "CLOSED" && (
+            !["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState) &&
+            (unknownHandoffRequestId ? (
+              <div className="handoff-reconciliation">
+                <StatusNotice role="status" tone="warning">
+                  转人工请求已经发出，但结果尚未确认。后续操作只会查询原请求的权威结果。
+                </StatusNotice>
+                <button
+                  type="button"
+                  className="handoff-button"
+                  disabled={submitting}
+                  onClick={queryHumanHandoffResult}
+                >
+                  {submitting ? "正在查询…" : "查询转人工结果"}
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
                 className="handoff-button"
@@ -555,8 +700,8 @@ export function App() {
               >
                 {submitting ? "正在提交…" : "转人工处理"}
               </button>
-            )}
-          <p className="recovery-note">刷新页面时，公开沟通会从 Spring 权威快照恢复。</p>
+            ))}
+          <p className="recovery-note">刷新或重新连接后，本页只从权威快照恢复公开沟通。</p>
           {error && (
             <StatusNotice className="error" role="alert" tone="danger">
               {error}
@@ -655,4 +800,74 @@ function isLifecycleTransition(
         ? "INVESTIGATING"
         : "CLOSED";
   return value.lifecycleState === expected;
+}
+
+function readRequestedTicketId() {
+  const ticketId = new URLSearchParams(globalThis.location.search).get("ticket");
+  return ticketId && /^[0-9a-f-]{36}$/i.test(ticketId) ? ticketId : null;
+}
+
+function shortTicketId(ticketId: string) {
+  return ticketId.length === 36 ? `${ticketId.slice(0, 8)}…${ticketId.slice(-4)}` : ticketId;
+}
+
+function handlingModeLabel(handlingMode: string) {
+  return handlingMode === "HUMAN" ? "人工客服处理中" : "智能客服处理中";
+}
+
+const LIFECYCLE_PRESENTATIONS: Record<
+  string,
+  { label: string; title: string; description: string; className: string }
+> = {
+  NEW: {
+    label: "已受理",
+    title: "工单已经收到",
+    description: "我们正在准备调查，你无需重复提交。",
+    className: "status-new",
+  },
+  INVESTIGATING: {
+    label: "调查中",
+    title: "我们正在核实情况",
+    description: "调查会在后台继续，公开进展会更新到下方消息中。",
+    className: "status-investigating",
+  },
+  WAITING_FOR_CUSTOMER: {
+    label: "等待你的回复",
+    title: "需要你补充一项信息",
+    description: "请查看下方问题并回复；提交后我们会继续原调查。",
+    className: "status-waiting_for_customer",
+  },
+  WAITING_FOR_EXTERNAL: {
+    label: "等待外部信息",
+    title: "正在等待外部信息",
+    description: "当前无需操作，收到可公开的新信息后会继续更新。",
+    className: "status-waiting_for_external",
+  },
+  RESOLVED: {
+    label: "已解决",
+    title: "本次处理已有结果",
+    description: "请查看公开回复；如仍需说明，可使用下方现有回复入口。",
+    className: "status-resolved",
+  },
+  CLOSED: {
+    label: "已关闭",
+    title: "本次工单已经结束",
+    description: "历史公开回复仍可查看；如需继续反馈，可使用下方现有回复入口。",
+    className: "status-closed",
+  },
+};
+
+function lifecyclePresentation(lifecycleState?: string) {
+  return (
+    (lifecycleState ? LIFECYCLE_PRESENTATIONS[lifecycleState] : undefined) ?? {
+      label: "状态更新中",
+      title: "正在确认最新状态",
+      description: "请以本页下一次权威更新为准。",
+      className: "status-pending",
+    }
+  );
+}
+
+function handoffRecoveryStorageKey(ticketId: string) {
+  return `customer-handoff-recovery:${ticketId}`;
 }

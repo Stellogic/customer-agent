@@ -131,7 +131,7 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
         { timeout: asyncFlowTimeout },
       ),
     ).toBeInTheDocument();
-    expect(await screen.findByText("RESOLVED", {}, { timeout: 10_000 })).toBeInTheDocument();
+    expect(await screen.findByText("已解决", {}, { timeout: 10_000 })).toBeInTheDocument();
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     const browserRequests = vi
