@@ -373,8 +373,7 @@ describe("客服共享队列工作台", () => {
     expect(screen.getByRole("button", { name: "重新同步队列" })).not.toBeDisabled();
   });
 
-  it("窄屏仍保留地标、标题层级和可读的队列列表", async () => {
-    Object.defineProperty(globalThis, "innerWidth", { configurable: true, value: 360 });
+  it("保留地标、标题层级和语义化队列表格", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:1", [handoffItem()], []))
       .mockResolvedValueOnce(openStream());

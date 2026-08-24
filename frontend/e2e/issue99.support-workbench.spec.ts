@@ -46,6 +46,14 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
     fullPage: true,
   });
 
+  await support.setViewportSize({ width: 640, height: 960 });
+  const queueScroller = support.locator(".queue-table-wrap").first();
+  await expect(queueScroller).toBeVisible();
+  await expect
+    .poll(() => queueScroller.evaluate((element) => element.scrollWidth > element.clientWidth))
+    .toBe(true);
+  await expect(support.getByLabel("授权详情等待区")).toHaveCSS("position", "static");
+
   await support
     .getByRole("button", { name: `领取工单 ${created.ticketId}` })
     .first()
@@ -55,6 +63,7 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
   await support.getByRole("button", { name: "确认领取" }).click();
 
   await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
+  await support.setViewportSize({ width: 1440, height: 960 });
   const basicInformation = support.getByLabel("工单基本信息");
   await expect(basicInformation.getByText("customer-demo", { exact: true })).toBeVisible();
   await expect(basicInformation.getByText("ORDER-DELAY-UNDER-24", { exact: true })).toBeVisible();
