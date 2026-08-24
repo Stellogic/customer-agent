@@ -10,12 +10,22 @@ class InvestigationReasonCode(StrEnum):
 
 class InvestigationJudgmentFailureCode(StrEnum):
     INVALID_INPUT = "INVALID_INPUT"
+    CONFIGURATION_ERROR = "CONFIGURATION_ERROR"
+    MODEL_CALL_FAILED = "MODEL_CALL_FAILED"
 
 
 class InvestigationJudgmentFailure(Exception):
     def __init__(self, code: InvestigationJudgmentFailureCode) -> None:
         self.code = code
-        super().__init__("investigation judgment input is invalid")
+        message = {
+            InvestigationJudgmentFailureCode.INVALID_INPUT: (
+                "investigation judgment input is invalid"
+            ),
+            InvestigationJudgmentFailureCode.CONFIGURATION_ERROR: (
+                "investigation judgment model configuration is invalid"
+            ),
+        }.get(code, "investigation judgment model call failed")
+        super().__init__(message)
 
 
 @dataclass(frozen=True)
@@ -37,7 +47,7 @@ class InvestigationJudgmentModel(Protocol):
 
 class FixedFakeInvestigationModel:
     async def judge(self, model_input: InvestigationJudgmentInput) -> InvestigationJudgment:
-        _validate_input(model_input)
+        validate_investigation_judgment_input(model_input)
         if model_input.delay_seconds >= 24 * 60 * 60:
             return InvestigationJudgment(
                 compensation_review_required=True,
@@ -49,7 +59,7 @@ class FixedFakeInvestigationModel:
         )
 
 
-def _validate_input(model_input: InvestigationJudgmentInput) -> None:
+def validate_investigation_judgment_input(model_input: InvestigationJudgmentInput) -> None:
     expected_evidence = (
         f"order:{model_input.order_reference}",
         f"logistics:{model_input.order_reference}",
