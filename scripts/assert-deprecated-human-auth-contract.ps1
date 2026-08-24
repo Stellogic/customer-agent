@@ -1,5 +1,12 @@
 $ErrorActionPreference = "Stop"
 
+function Test-IsReadOnlyHistoricalMirror {
+    param([string]$Path)
+
+    return $Path.StartsWith('docs/specs/', [System.StringComparison]::Ordinal) -or
+        $Path.StartsWith('docs/tickets/', [System.StringComparison]::Ordinal)
+}
+
 $legacyHeaders = 'X-Synthetic-(Customer|Support|Approver)-Id'
 $headerMatches = @(& git grep -n -i -E $legacyHeaders -- .)
 if ($LASTEXITCODE -notin @(0, 1)) {
@@ -20,10 +27,10 @@ $negativeHeaderTestAllowlist = @(
 $unexpectedHeaderMatches = @($headerMatches | Where-Object {
     $normalized = ($_ -split ':', 2)[0].TrimStart('.', '/', '\').Replace('\', '/')
     $normalized -notin $negativeHeaderTestAllowlist -and
-        -not $normalized.StartsWith('docs/specs/', [System.StringComparison]::Ordinal)
+        -not (Test-IsReadOnlyHistoricalMirror -Path $normalized)
 })
 if ($unexpectedHeaderMatches.Count -gt 0) {
-    throw "旧人工身份头只允许存在于明确的伪造攻击、不发送断言或只读历史规格镜像中：`n$($unexpectedHeaderMatches -join "`n")"
+    throw "旧人工身份头只允许存在于明确的伪造攻击、不发送断言或只读历史镜像中：`n$($unexpectedHeaderMatches -join "`n")"
 }
 
 $legacyEntryMatches = @(& git grep -n -i -E '/api/demo|synthetic-demo-session' -- .)
@@ -37,10 +44,11 @@ $legacyEntryAllowlist = @(
 )
 $unexpectedLegacyEntries = @($legacyEntryMatches | Where-Object {
     $normalized = ($_ -split ':', 2)[0].TrimStart('.', '/', '\').Replace('\', '/')
-    $normalized -notin $legacyEntryAllowlist
+    $normalized -notin $legacyEntryAllowlist -and
+        -not (Test-IsReadOnlyHistoricalMirror -Path $normalized)
 })
 if ($unexpectedLegacyEntries.Count -gt 0) {
-    throw "旧身份入口只允许存在于明确废弃的历史说明和扫描器自身：`n$($unexpectedLegacyEntries -join "`n")"
+    throw "旧身份入口只允许存在于明确废弃的历史说明、只读历史镜像和扫描器自身：`n$($unexpectedLegacyEntries -join "`n")"
 }
 
 Write-Host "PASS: 产品运行路径、演示与入口文档不再接受旧合成人工身份契约"

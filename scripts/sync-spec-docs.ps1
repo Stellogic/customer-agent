@@ -65,6 +65,10 @@ $index = @"
 
 $($indexEntries -join "`n")
 
+## 关联实施票据
+
+明确归属于这些父规格的实施与验收票据见 [历史实施票据索引](../tickets/README.md)。
+
 ## 刷新方式
 
 在已通过 GitHub CLI 认证的仓库根目录执行：

@@ -1,30 +1,31 @@
-# Customer Support Agent Project
+# 客户支持 Agent 项目
 
-## User-confirmed project intent
+## 用户已确认的项目意图
 
-The following points are the current user-confirmed requirements:
+以下内容是用户当前已确认的要求：
 
-- Build a full-stack Agent project.
-- Use React for the presentation and interaction layer.
-- Use Spring Boot for the backend.
-- Use LangGraph for the Agent capability.
-- The selected product direction is a customer-ticket investigation and compensation-approval Agent.
-- Use `D:\java-agent-\research\agent-fullstack-project-topics.md` as prior discussion material.
-- Study relevant mature open-source projects and official documentation before making implementation decisions; do not invent designs without evidence.
-- Write project documentation and human-facing engineering artifacts in Chinese by default so they are easy for the user and agents to review together. Keep code identifiers and protocol fields in English where appropriate.
+- 构建一个全栈 Agent 项目。
+- 使用 React 作为展示与交互层。
+- 使用 Spring Boot 作为后端。
+- 使用 LangGraph 提供 Agent 能力。
+- 产品方向为客户工单调查与补偿审批 Agent。
+- 将 `D:\java-agent-\research\agent-fullstack-project-topics.md` 作为前期讨论材料。
+- 作出实现决策前，先研究相关成熟开源项目和官方文档；不得在缺少证据时凭空设计。
+- 项目文档和面向人的工程产物默认使用中文，便于用户与 Agent 共同审阅；代码标识符和协议字段可按需保留英文。
+- 凡有沉淀必要的产物文档，优先同步到代码库，不要只保存在 Issue 中。
 
-## Engineering decision principles
+## 工程决策原则
 
-- Before implementing common or non-differentiating capabilities, investigate whether a mature, actively maintained library or component already provides a natural fit.
-- Prefer reuse when the candidate has reliable documentation, an acceptable license, active maintenance, compatible technology, and reasonable security, bundle-size, operational, and lock-in costs.
-- Do not introduce a dependency merely to avoid a small amount of straightforward project-specific code.
-- Record consequential dependency choices, rejected alternatives, and supporting evidence in the relevant decision issue or ADR before implementation.
+- 实现通用或非差异化能力前，先调查是否已有成熟、活跃维护且自然适配的库或组件。
+- 候选方案具备可靠文档、可接受许可证、活跃维护、技术兼容性，以及合理的安全、包体积、运维和供应商锁定成本时，优先复用。
+- 不要仅为了省去少量直接、明确的项目专用代码而引入依赖。
+- 对重要的依赖选择、被否决的替代方案及其证据，应在相关决策 Issue 或 ADR 中记录。
 
-## Deliberately unresolved
+## 有意保持未决的事项
 
-Architecture and implementation details have not yet been designed or approved. In particular, do not treat any previously generated service boundaries, domain model, workflow, storage choice, API or event protocol, security model, MVP scope, or test matrix as a user requirement.
+架构与实现细节尚未完成设计或批准。尤其不得把任何此前生成的服务边界、领域模型、工作流、存储选择、API 或事件协议、安全模型、MVP 范围或测试矩阵视为用户要求。
 
-Resolve consequential decisions through the configured engineering workflow and record the evidence and trade-offs before implementation. Add detailed project rules to this file only after the user has confirmed them or they have been accepted through that workflow.
+应通过既定工程流程解决重要决策，并在实现前记录证据与权衡。只有用户确认或流程正式接受后，才把详细项目规则加入本文件。
 
 ## 规范化验证
 
@@ -33,16 +34,16 @@ Resolve consequential decisions through the configured engineering workflow and 
 - 规范化检查属于硬性要求：检查未通过时不得提交变更。
 - CI 会调用相同的组件检查，并单独运行全栈验收。
 
-## Agent skills
+## Agent 技能
 
-### Issue tracker
+### Issue 跟踪
 
-Issues and PRDs live in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
+Issue 和 PRD 在本仓库的 GitHub Issues 中跟踪。参见 `docs/agents/issue-tracker.md`。
 
-### Triage labels
+### 分流标签
 
-Default five-role triage vocabulary is used. See `docs/agents/triage-labels.md`.
+使用默认的五角色分流词汇。参见 `docs/agents/triage-labels.md`。
 
-### Domain docs
+### 领域文档
 
-This repository uses a single-context documentation layout. See `docs/agents/domain.md`.
+本仓库使用单限界上下文的文档布局。参见 `docs/agents/domain.md`。

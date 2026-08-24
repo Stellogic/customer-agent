@@ -54,5 +54,5 @@
 
 - 新的长期架构决定应新增或替代 ADR，并链接形成决定的规格、Issue 和证据。
 - ADR 被替代时保留原文件和历史状态，在新 ADR 中明确替代关系。
-- `scripts/sync-spec-docs.ps1` 只镜像标题以 `[规格]` 开头的 Issue 正文；不镜像评论、普通实施票据、Wayfinder 调研或原型。
-- 实施票据负责交付切片和验收，不作为长期架构事实源；其中产生的长期决定应回写 ADR 或父规格。
+- `scripts/sync-spec-docs.ps1` 只镜像标题以 `[规格]` 开头的 Issue 正文；`scripts/sync-ticket-docs.ps1` 只镜像明确归属于正式父规格的实施与验收票据。两者都不镜像评论、Wayfinder 调研或原型。
+- 实施票据镜像见 [`docs/tickets`](../tickets/)；它负责记录交付切片和验收历史，不作为长期架构事实源，其中产生的长期决定应回写 ADR 或父规格。
