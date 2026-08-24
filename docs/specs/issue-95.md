@@ -1,10 +1,10 @@
 # [规格] 依据高保真原型统一客户帮助中心与内部工作台视觉体验
 
 > 来源：[https://github.com/Stellogic/customer-agent/issues/95](https://github.com/Stellogic/customer-agent/issues/95)
-> Issue 状态：OPEN
+> Issue 状态：CLOSED
 > 创建时间：2026-08-23T12:47:34Z
-> 最后更新时间：2026-08-23T12:47:34Z
-> 同步日期：2026-08-23
+> 最后更新时间：2026-08-24T07:15:29Z
+> 同步日期：2026-08-24
 > 说明：本文件是 GitHub Issue 正文的只读镜像；项目仍以 GitHub Issue 为规格事实源。
 
 ## Problem Statement
