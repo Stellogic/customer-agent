@@ -58,7 +58,8 @@ test("客服 assignment 撤销后 60 秒内断流、移除旧详情并重读权�
     .getByRole("button", { name: `领取工单 ${assignmentTicketId}` })
     .first()
     .click();
-  await expect(page.getByRole("heading", { name: "当前工单详情" })).toBeVisible();
+  await page.getByRole("button", { name: "确认领取" }).click();
+  await expect(page.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
   await streamOpened;
 
   const revokedAt = Date.now();
@@ -70,7 +71,7 @@ test("客服 assignment 撤销后 60 秒内断流、移除旧详情并重读权�
 
   await expect(page.getByRole("alert")).toContainText("客服分配已失效", { timeout: 60_000 });
   expect(Date.now() - revokedAt).toBeLessThan(60_000);
-  await expect(page.getByRole("heading", { name: "当前工单详情" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "授权工单详情" })).toHaveCount(0);
   const authorityStatus = await page.evaluate(async (ticketId) => {
     return (
       await fetch(`/api/support/workbench/tickets/${ticketId}`, {

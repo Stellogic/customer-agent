@@ -520,6 +520,291 @@ h2 {
   font-size: 0.88rem;
   font-weight: 720;
 }
+.support-workspace-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(360px, 0.75fr);
+  align-items: start;
+  gap: 22px;
+}
+.support-queues {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+}
+.support-workbench .queue-panel {
+  border-radius: 4px 18px 18px;
+}
+.queue-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+.queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.queue-table th {
+  background: var(--forest-50);
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.queue-table td {
+  border-top: 1px solid var(--line);
+  padding: 12px 14px;
+  color: var(--ink-soft);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.queue-table tbody tr {
+  transition: background 0.16s ease;
+}
+.queue-table tbody tr:hover {
+  background: rgb(234 243 237 / 58%);
+}
+.support-ticket-identifier {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.support-ticket-identifier .ticket-number {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.support-ticket-identifier button {
+  min-height: 28px;
+  border: 1px solid var(--forest-200);
+  border-radius: 7px;
+  background: var(--forest-50);
+  padding: 4px 8px;
+  color: var(--forest-800);
+  font-size: 0.68rem;
+}
+.support-ticket-identifier.compact button {
+  width: 28px;
+  overflow: hidden;
+  padding-inline: 0;
+  color: transparent;
+}
+.support-ticket-identifier.compact button::before {
+  color: var(--forest-800);
+  content: "⎘";
+}
+.support-status.status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+.queue-claim-action {
+  min-height: 32px;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 0.72rem;
+}
+.detail-placeholder,
+.support-ticket-detail {
+  position: sticky;
+  top: 92px;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: rgb(255 255 252 / 92%);
+  box-shadow: var(--shadow-sm);
+}
+.detail-placeholder {
+  min-height: 390px;
+  padding: 48px 38px;
+}
+.detail-placeholder > span {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 26px;
+  place-items: center;
+  border: 1px solid var(--forest-200);
+  border-radius: 50%;
+  background: var(--forest-50);
+  color: var(--forest-700);
+  font-size: 1.4rem;
+}
+.detail-placeholder h2 {
+  margin: 8px 0 14px;
+  font-size: 1.85rem;
+}
+.detail-placeholder > p:last-child {
+  color: var(--muted);
+  line-height: 1.75;
+}
+.support-ticket-detail {
+  overflow: hidden;
+}
+.support-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--forest-900);
+  padding: 22px 24px;
+  color: white;
+}
+.support-detail-header .eyebrow {
+  color: var(--forest-200);
+}
+.support-detail-header h2 {
+  margin: 5px 0 0;
+  color: white;
+  font-size: 1.65rem;
+}
+.support-detail-header .ticket-number {
+  color: white;
+}
+.support-detail-header .support-ticket-identifier button {
+  border-color: rgb(255 255 255 / 20%);
+  background: rgb(255 255 255 / 8%);
+  color: white;
+}
+.support-detail-summary {
+  display: grid;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding: 22px 24px;
+}
+.support-detail-summary dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+  margin: 0;
+}
+.support-detail-summary dl > div {
+  min-width: 0;
+}
+.support-detail-summary dt {
+  color: var(--muted);
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.support-detail-summary dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+.support-detail-summary section {
+  border-left: 3px solid var(--forest-300);
+  background: var(--forest-50);
+  padding: 13px 15px;
+}
+.support-detail-summary h3,
+.support-detail-summary p {
+  margin: 0;
+}
+.support-detail-summary h3 {
+  font-family: var(--font-sans);
+  font-size: 0.73rem;
+}
+.support-detail-summary p {
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+.support-detail-sections {
+  display: grid;
+}
+.support-detail-section {
+  border-bottom: 1px solid var(--line);
+  padding: 20px 24px;
+}
+.support-detail-section:last-child {
+  border-bottom: 0;
+}
+.support-detail-section > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.support-detail-section h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+.support-detail-section ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.support-detail-section li {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  padding: 12px;
+}
+.support-detail-section li > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.support-detail-section li strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 0.76rem;
+}
+.support-detail-section li time,
+.support-detail-section li small {
+  color: var(--muted);
+  font-size: 0.67rem;
+}
+.support-detail-section li p {
+  margin: 7px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+.fact-entry {
+  border-left: 3px solid var(--orange) !important;
+}
+.timeline-entry {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  gap: 10px;
+}
+.timeline-marker {
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: var(--forest-500);
+  box-shadow: 0 0 0 2px var(--forest-200);
+}
+.detail-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+.claim-confirm-ticket {
+  display: inline-flex;
+  border-radius: 999px;
+  background: var(--forest-50);
+  padding: 6px 10px;
+  color: var(--forest-800);
+  font-weight: 800;
+}
 .queue-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
@@ -650,6 +935,19 @@ select:focus-visible {
     max-width: none;
   }
   .queue-grid {
+    grid-template-columns: 1fr;
+  }
+  .support-workspace-layout {
+    grid-template-columns: 1fr;
+  }
+  .detail-placeholder,
+  .support-ticket-detail {
+    position: static;
+  }
+  .support-detail-header {
+    flex-direction: column;
+  }
+  .support-detail-summary dl {
     grid-template-columns: 1fr;
   }
   .queue-list li,

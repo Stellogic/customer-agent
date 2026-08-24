@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Modal } from "antd";
 import {
   consumeSseEvents,
   hasOnlyKeys,
@@ -68,6 +69,7 @@ export function SupportWorkbench() {
     "loading" | "syncing" | "resetting" | "live" | "stale"
   >("loading");
   const [details, setDetails] = useState<TicketDetails | null>(null);
+  const [pendingClaimTicketId, setPendingClaimTicketId] = useState<string | null>(null);
   const [claimingTicketId, setClaimingTicketId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
   const snapshotRef = useRef<WorkbenchSnapshot | null>(null);
@@ -283,7 +285,7 @@ export function SupportWorkbench() {
         <div>
           <p className="eyebrow">SUPPORT WORKBENCH</p>
           <h1>客服共享队列</h1>
-          <p className="lede">发现需要人工关注的客服工单；领取与完整人工处理不在当前切片中。</p>
+          <p className="lede">比较真实队列摘要；确认领取后才会取得并展示受保护的工单详情。</p>
         </div>
         <StatusNotice
           className={`connection-state ${connection}`}
@@ -307,47 +309,47 @@ export function SupportWorkbench() {
       <p className="authorization-note">队列可发现不等于工单详情授权</p>
 
       <div
-        className="queue-grid"
+        className={`support-workspace-layout${details ? " has-detail" : ""}`}
         aria-busy={
           connection === "loading" || connection === "syncing" || connection === "resetting"
         }
       >
-        <QueueSection
-          title="待接手工单"
-          description="转人工与其他共享队列条目"
-          items={snapshot?.sharedQueue ?? []}
-          claimingTicketId={claimingTicketId}
-          onClaim={claimTicket}
-        />
-        <QueueSection
-          title="SLA 违约升级"
-          description="已发生 SLA 违约、需要提高关注的工单"
-          items={snapshot?.escalationQueue ?? []}
-          claimingTicketId={claimingTicketId}
-          onClaim={claimTicket}
-          accent
-        />
+        <div className="support-queues">
+          <QueueSection
+            title="待接手工单"
+            description="转人工与其他共享队列条目"
+            items={snapshot?.sharedQueue ?? []}
+            claimingTicketId={claimingTicketId}
+            onClaim={setPendingClaimTicketId}
+          />
+          <QueueSection
+            title="SLA 违约升级"
+            description="已发生 SLA 违约、需要提高关注的工单"
+            items={snapshot?.escalationQueue ?? []}
+            claimingTicketId={claimingTicketId}
+            onClaim={setPendingClaimTicketId}
+            accent
+          />
+        </div>
+
+        {details ? (
+          <TicketDetail details={details} onCopyError={setActionError} />
+        ) : (
+          <aside className="detail-placeholder" aria-label="授权详情等待区">
+            <span aria-hidden="true">↳</span>
+            <p className="eyebrow">AUTHORIZED DETAIL</p>
+            <h2>领取后查看授权详情</h2>
+            <p>
+              领取前仅提供队列最小摘要。确认领取并取得当前有效客服工单分配后，这里才会显示客户、订单与调查信息。
+            </p>
+          </aside>
+        )}
       </div>
 
       {actionError && (
         <p className="error" role="alert">
           {actionError}
         </p>
-      )}
-
-      {details && (
-        <section className="ticket-card" aria-labelledby="support-ticket-detail-title">
-          <h2 id="support-ticket-detail-title">当前工单详情</h2>
-          <p>{details.ticketId}</p>
-          <dl>
-            <dt>订单编号</dt>
-            <dd>{details.orderReference}</dd>
-            <dt>问题描述</dt>
-            <dd>{details.description}</dd>
-            <dt>当前状态</dt>
-            <dd>{stateLabel(details.lifecycleState)}</dd>
-          </dl>
-        </section>
       )}
 
       <footer className="workbench-footer">
@@ -362,6 +364,28 @@ export function SupportWorkbench() {
           重新同步队列
         </button>
       </footer>
+
+      <Modal
+        open={pendingClaimTicketId !== null}
+        title="确认领取工单"
+        okText="确认领取"
+        cancelText="取消"
+        confirmLoading={claimingTicketId !== null}
+        closable={claimingTicketId === null}
+        mask={{ closable: claimingTicketId === null }}
+        onCancel={() => setPendingClaimTicketId(null)}
+        onOk={() => {
+          if (!pendingClaimTicketId) return;
+          const ticketId = pendingClaimTicketId;
+          setPendingClaimTicketId(null);
+          void claimTicket(ticketId);
+        }}
+      >
+        <p>领取会建立你对该工单的当前客服分配责任，并在成功后请求受保护详情。</p>
+        {pendingClaimTicketId && (
+          <p className="claim-confirm-ticket">工单 {shortTicketId(pendingClaimTicketId)}</p>
+        )}
+      </Modal>
     </main>
   );
 }
@@ -378,7 +402,7 @@ function QueueSection({
   description: string;
   items: QueueItem[];
   claimingTicketId: string | null;
-  onClaim: (ticketId: string) => Promise<void>;
+  onClaim: (ticketId: string) => void;
   accent?: boolean;
 }) {
   return (
@@ -395,32 +419,202 @@ function QueueSection({
         <strong aria-label={`${title}数量`}>{items.length.toString().padStart(2, "0")}</strong>
       </header>
       {items.length ? (
-        <ul className="queue-list" aria-label={title}>
-          {items.map((item) => (
-            <li key={item.ticketId}>
-              <div>
-                <span className="ticket-number">{item.ticketId}</span>
-                <span>
-                  {stateLabel(item.lifecycleState)} ·{" "}
-                  {item.handlingMode === "HUMAN" ? "人工处理" : "Agent 处理"}
-                </span>
-              </div>
-              <time dateTime={item.enteredAt}>{formatTime(item.enteredAt)}</time>
-              <button
-                type="button"
-                aria-label={`领取工单 ${item.ticketId}`}
-                disabled={claimingTicketId !== null}
-                onClick={() => void onClaim(item.ticketId)}
-              >
-                {claimingTicketId === item.ticketId ? "正在领取…" : "领取"}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="queue-table-wrap">
+          <table className="queue-table" aria-label={title}>
+            <thead>
+              <tr>
+                <th scope="col">工单</th>
+                <th scope="col">生命周期</th>
+                <th scope="col">处理模式</th>
+                <th scope="col">进入时间</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.ticketId}>
+                  <td>
+                    <TicketIdentifier ticketId={item.ticketId} compact />
+                  </td>
+                  <td>
+                    <span
+                      className={`status support-status status-${item.lifecycleState.toLowerCase()}`}
+                    >
+                      {stateLabel(item.lifecycleState)}
+                    </span>
+                  </td>
+                  <td>{item.handlingMode === "HUMAN" ? "人工处理" : "Agent 处理"}</td>
+                  <td>
+                    <time dateTime={item.enteredAt}>{formatTime(item.enteredAt)}</time>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="queue-claim-action"
+                      aria-label={`领取工单 ${item.ticketId}`}
+                      disabled={claimingTicketId !== null}
+                      onClick={() => onClaim(item.ticketId)}
+                    >
+                      {claimingTicketId === item.ticketId ? "正在领取…" : "领取"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <p className="empty-queue">当前没有队列条目</p>
       )}
     </section>
+  );
+}
+
+function TicketDetail({
+  details,
+  onCopyError,
+}: {
+  details: TicketDetails;
+  onCopyError: (message: string) => void;
+}) {
+  return (
+    <article className="support-ticket-detail" aria-labelledby="support-ticket-detail-title">
+      <header className="support-detail-header">
+        <div>
+          <p className="eyebrow">CURRENT ASSIGNMENT</p>
+          <h2 id="support-ticket-detail-title">授权工单详情</h2>
+        </div>
+        <TicketIdentifier ticketId={details.ticketId} onCopyError={onCopyError} />
+      </header>
+
+      <div className="support-detail-summary">
+        <dl aria-label="工单基本信息">
+          <div>
+            <dt>客户标识</dt>
+            <dd>{details.customerId}</dd>
+          </div>
+          <div>
+            <dt>订单引用</dt>
+            <dd>{details.orderReference}</dd>
+          </div>
+          <div>
+            <dt>生命周期</dt>
+            <dd>{stateLabel(details.lifecycleState)}</dd>
+          </div>
+          <div>
+            <dt>处理模式</dt>
+            <dd>{details.handlingMode === "HUMAN" ? "人工处理" : "Agent 处理"}</dd>
+          </div>
+        </dl>
+        <section aria-labelledby="support-description-title">
+          <h3 id="support-description-title">问题描述</h3>
+          <p>{details.description}</p>
+        </section>
+      </div>
+
+      <div className="support-detail-sections">
+        <DetailSection
+          eyebrow="CUSTOMER VISIBLE"
+          title="公开沟通"
+          empty="暂无公开沟通"
+          items={details.publicConversation.map((message, index) => (
+            <li key={`${message.sentAt}-${index}`} className="conversation-entry">
+              <div>
+                <strong>{message.author}</strong>
+                <time dateTime={message.sentAt}>{formatTime(message.sentAt)}</time>
+              </div>
+              <p>{message.body}</p>
+            </li>
+          ))}
+        />
+        <DetailSection
+          eyebrow="INTERNAL FACTS"
+          title="调查事实"
+          empty="暂无调查事实"
+          items={details.investigationFacts.map((fact, index) => (
+            <li key={`${fact.recordedAt}-${fact.factType}-${index}`} className="fact-entry">
+              <div>
+                <strong>{fact.factType}</strong>
+                <time dateTime={fact.recordedAt}>{formatTime(fact.recordedAt)}</time>
+              </div>
+              <p>{fact.factValue}</p>
+              <small>证据引用：{fact.evidenceReference}</small>
+            </li>
+          ))}
+        />
+        <DetailSection
+          eyebrow="RESPONSIBILITY CHAIN"
+          title="业务时间线"
+          empty="暂无业务时间线"
+          items={details.businessTimeline.map((event, index) => (
+            <li key={`${event.occurredAt}-${event.eventType}-${index}`} className="timeline-entry">
+              <span className="timeline-marker" aria-hidden="true" />
+              <div>
+                <strong>{event.eventType}</strong>
+                <p>{event.actorId}</p>
+                <time dateTime={event.occurredAt}>{formatTime(event.occurredAt)}</time>
+              </div>
+            </li>
+          ))}
+        />
+      </div>
+    </article>
+  );
+}
+
+function DetailSection({
+  eyebrow,
+  title,
+  empty,
+  items,
+}: {
+  eyebrow: string;
+  title: string;
+  empty: string;
+  items: ReactNode[];
+}) {
+  const id = `support-${title}`;
+  return (
+    <section className="support-detail-section" aria-labelledby={id}>
+      <header>
+        <p className="eyebrow">{eyebrow}</p>
+        <h3 id={id}>{title}</h3>
+      </header>
+      {items.length ? <ol>{items}</ol> : <p className="detail-empty">{empty}</p>}
+    </section>
+  );
+}
+
+function TicketIdentifier({
+  ticketId,
+  compact = false,
+  onCopyError,
+}: {
+  ticketId: string;
+  compact?: boolean;
+  onCopyError?: (message: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await globalThis.navigator.clipboard.writeText(ticketId);
+      setCopied(true);
+    } catch {
+      onCopyError?.("完整工单 UUID 复制失败，请稍后再试。");
+    }
+  }
+
+  return (
+    <span className={`support-ticket-identifier${compact ? " compact" : ""}`}>
+      <span className="ticket-number">{shortTicketId(ticketId)}</span>
+      <button
+        type="button"
+        aria-label={`复制完整工单 UUID ${ticketId}`}
+        onClick={() => void copy()}
+      >
+        {copied ? "已复制" : "复制"}
+      </button>
+    </span>
   );
 }
 
@@ -471,8 +665,44 @@ function isTicketDetails(value: unknown): value is TicketDetails {
     isLifecycleState(value.lifecycleState) &&
     isHandlingMode(value.handlingMode) &&
     Array.isArray(value.publicConversation) &&
+    value.publicConversation.every(isConversationMessage) &&
     Array.isArray(value.investigationFacts) &&
-    Array.isArray(value.businessTimeline)
+    value.investigationFacts.every(isInvestigationFact) &&
+    Array.isArray(value.businessTimeline) &&
+    value.businessTimeline.every(isTimelineEvent)
+  );
+}
+
+function isConversationMessage(
+  value: unknown,
+): value is TicketDetails["publicConversation"][number] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["author", "body", "sentAt"]) &&
+    typeof value.author === "string" &&
+    typeof value.body === "string" &&
+    typeof value.sentAt === "string"
+  );
+}
+
+function isInvestigationFact(value: unknown): value is TicketDetails["investigationFacts"][number] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["factType", "factValue", "evidenceReference", "recordedAt"]) &&
+    typeof value.factType === "string" &&
+    typeof value.factValue === "string" &&
+    typeof value.evidenceReference === "string" &&
+    typeof value.recordedAt === "string"
+  );
+}
+
+function isTimelineEvent(value: unknown): value is TicketDetails["businessTimeline"][number] {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["eventType", "actorId", "occurredAt"]) &&
+    typeof value.eventType === "string" &&
+    typeof value.actorId === "string" &&
+    typeof value.occurredAt === "string"
   );
 }
 
@@ -543,4 +773,8 @@ function formatTime(value: string) {
         hour: "2-digit",
         minute: "2-digit",
       }).format(instant);
+}
+
+function shortTicketId(ticketId: string) {
+  return `${ticketId.slice(0, 8)}…${ticketId.slice(-4)}`;
 }
