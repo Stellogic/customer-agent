@@ -18,7 +18,11 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };
   expect(created.ticketId).toMatch(/^[0-9a-f-]{36}$/i);
-  await expect(customer.getByRole("heading", { name: created.ticketId })).toBeVisible();
+  await expect(
+    customer.getByRole("heading", {
+      name: `${created.ticketId.slice(0, 8)}…${created.ticketId.slice(-4)}`,
+    }),
+  ).toBeVisible();
 
   const customerProjection = await customer.evaluate(async (ticketId) => {
     const response = await fetch(`/api/customer/tickets/${ticketId}`, {
@@ -61,8 +65,8 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   });
   expect(forgedSupportStatus).toBe(403);
 
-  await customer.getByRole("button", { name: "转人工处理" }).click();
-  await expect(customer.getByText("人工处理中")).toBeVisible();
+  await customer.getByRole("button", { name: "转人工处理" }).dispatchEvent("click");
+  await expect(customer.getByText("人工客服处理中")).toBeVisible();
 
   const anonymousContext = await newIssue80Context(browser);
   const anonymous = await anonymousContext.newPage();

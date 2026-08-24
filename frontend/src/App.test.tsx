@@ -10,6 +10,7 @@ describe("客户帮助中心", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    globalThis.sessionStorage.clear();
     globalThis.history.replaceState(null, "", "/");
   });
 
@@ -543,7 +544,7 @@ describe("客户帮助中心", () => {
     fireEvent.click(screen.getByRole("button", { name: "转人工处理" }));
     fireEvent.click(screen.getByRole("button", { name: "正在提交…" }));
 
-    expect(await screen.findByText("人工处理中")).toBeInTheDocument();
+    expect(await screen.findByText("人工客服处理中")).toBeInTheDocument();
     expect(
       screen.getByText("已按您的要求转由客服继续处理。客服将在此工单中与您联系。"),
     ).toBeInTheDocument();
@@ -594,7 +595,7 @@ describe("客户帮助中心", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("人工处理中")).toBeInTheDocument();
+    expect(await screen.findByText("人工客服处理中")).toBeInTheDocument();
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
     expect(screen.queryByText("不应展示的旧代次结论")).not.toBeInTheDocument();
   });
@@ -749,6 +750,7 @@ describe("客户帮助中心", () => {
 
     render(<App />);
     expect(await screen.findByRole("button", { name: "发送回复" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "转人工处理" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("回复订单编号"), {
       target: { value: "ORDER-INTAKE-ONLY" },
     });
@@ -758,7 +760,7 @@ describe("客户帮助中心", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "发送回复" }));
 
-    expect(await screen.findByText(linkedId)).toBeInTheDocument();
+    expect(await screen.findByText("28000000…0004")).toBeInTheDocument();
     expect(JSON.parse(submittedBody)).toEqual({
       orderReference: "ORDER-INTAKE-ONLY",
       issueKind: "OTHER",
@@ -891,6 +893,108 @@ describe("客户帮助中心", () => {
     expect(screen.getByText("调查中")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "转人工处理" })).toBeInTheDocument();
   });
+
+  it.each([
+    ["NEW", "AGENT", "已受理", "智能客服处理中"],
+    ["INVESTIGATING", "AGENT", "调查中", "智能客服处理中"],
+    ["WAITING_FOR_CUSTOMER", "AGENT", "等待你的回复", "智能客服处理中"],
+    ["WAITING_FOR_EXTERNAL", "AGENT", "等待外部信息", "智能客服处理中"],
+    ["RESOLVED", "HUMAN", "已解决", "人工客服处理中"],
+    ["CLOSED", "HUMAN", "已关闭", "人工客服处理中"],
+  ])("用客户可理解的文案同时呈现 %s 与 %s", async (lifecycle, mode, stateLabel, modeLabel) => {
+    const ticketId = "98000000-0000-0000-0000-000000000001";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(ticketStateResponse(ticketId, lifecycle, mode))
+      .mockResolvedValueOnce(openEventResponse());
+
+    render(<App />);
+
+    expect(await screen.findByText(stateLabel)).toBeInTheDocument();
+    expect(screen.getByText(modeLabel)).toBeInTheDocument();
+    expect(screen.queryByText(lifecycle)).not.toBeInTheDocument();
+    expect(screen.queryByText(mode)).not.toBeInTheDocument();
+  });
+
+  it("稳定缩略展示工单 UUID，并通过明确操作复制完整值", async () => {
+    const ticketId = "98000000-0000-0000-0000-000000000002";
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(globalThis.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(ticketStateResponse(ticketId, "INVESTIGATING", "AGENT"))
+      .mockResolvedValueOnce(openEventResponse());
+
+    render(<App />);
+
+    expect(await screen.findByText("98000000…0002")).toBeInTheDocument();
+    expect(screen.queryByText(ticketId)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "复制完整工单编号" }));
+    expect(writeText).toHaveBeenCalledWith(ticketId);
+  });
+
+  it("SSE 恢复失败时清除旧投影并保留权威重同步入口，不退回创建表单", async () => {
+    const ticketId = "98000000-0000-0000-0000-000000000003";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        ticketStateResponse(ticketId, "INVESTIGATING", "AGENT", [message("即将过期的公开投影")]),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(
+        ticketStateResponse(ticketId, "INVESTIGATING", "AGENT", [message("恢复后的权威公开投影")]),
+      )
+      .mockResolvedValueOnce(openEventResponse());
+
+    render(<App />);
+
+    expect(await screen.findByText("正在重新同步工单")).toBeInTheDocument();
+    expect(screen.queryByText("即将过期的公开投影")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "提交物流延迟问题" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "立即重试同步" }));
+    expect(await screen.findByText("恢复后的权威公开投影")).toBeInTheDocument();
+  });
+
+  it("转人工结果未知时只提供权威结果查询，不提供普通重复提交路径", async () => {
+    const ticketId = "98000000-0000-0000-0000-000000000004";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    let handoffPosts = 0;
+    let resultQueries = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === `/api/customer/tickets/${ticketId}`) {
+        return ticketStateResponse(ticketId, "INVESTIGATING", "AGENT");
+      }
+      if (path.endsWith("/events")) return openEventResponse();
+      if (path.endsWith("/human-handoff") && init?.method === "POST") {
+        handoffPosts += 1;
+        throw new TypeError("response lost after commit");
+      }
+      if (path.includes("/human-handoff-requests/")) {
+        resultQueries += 1;
+        return new Response(null, { status: 404 });
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const firstRender = render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "转人工处理" }));
+
+    const queryButton = await screen.findByRole("button", { name: "查询转人工结果" });
+    expect(screen.queryByRole("button", { name: "转人工处理" })).not.toBeInTheDocument();
+    fireEvent.click(queryButton);
+    await waitFor(() => expect(resultQueries).toBe(2));
+    expect(handoffPosts).toBe(1);
+
+    firstRender.unmount();
+    render(<App />);
+    expect(await screen.findByRole("button", { name: "查询转人工结果" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "转人工处理" })).not.toBeInTheDocument();
+    expect(handoffPosts).toBe(1);
+  });
 });
 
 function message(body: string) {
@@ -913,6 +1017,31 @@ function snapshotResponse(
         handlingMode: "AGENT",
         agentGeneration: 1,
         firstRespondedAt: "2026-08-09T00:00:00Z",
+      },
+      messages,
+      clarification: null,
+    }),
+    { status: 200 },
+  );
+}
+
+function ticketStateResponse(
+  ticketId: string,
+  lifecycleState: string,
+  handlingMode: string,
+  messages: ReturnType<typeof message>[] = [],
+) {
+  return new Response(
+    JSON.stringify({
+      view: "CUSTOMER_PUBLIC",
+      schema: "customer-public-v1",
+      cursor: "customer-public-v1:2",
+      ticket: {
+        id: ticketId,
+        lifecycleState,
+        handlingMode,
+        agentGeneration: 1,
+        firstRespondedAt: "2026-08-24T00:00:00Z",
       },
       messages,
       clarification: null,

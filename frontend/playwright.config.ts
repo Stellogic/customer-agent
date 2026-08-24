@@ -1,5 +1,5 @@
 import { defineConfig } from "@playwright/test";
-import { issue80ContextOptions } from "./e2e/support/browser-context";
+import { acceptanceContextOptions } from "./e2e/support/browser-context";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -8,7 +8,7 @@ export default defineConfig({
   retries: 0,
   reporter: "line",
   use: {
-    ...issue80ContextOptions,
+    ...acceptanceContextOptions,
     trace: "retain-on-failure",
   },
 });
