@@ -559,15 +559,56 @@ function Confirmation({
   cancel: () => void;
   confirm: () => void;
 }) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
   const title =
     action === "approve"
       ? "确认批准补偿"
       : action === "reject"
         ? "确认驳回并转人工"
         : "确认释放审批责任";
+
+  useEffect(() => {
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    (action === "reject" ? reasonRef.current : cancelRef.current)?.focus();
+    return () => trigger?.focus();
+  }, [action]);
+
+  function handleDialogKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancel();
+      return;
+    }
+    if (event.key !== "Tab" || !dialogRef.current) return;
+    const focusable = Array.from(
+      dialogRef.current.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), textarea:not([disabled])",
+      ),
+    );
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   return (
     <div className="approval-dialog-backdrop">
-      <section className="approval-dialog" role="dialog" aria-modal="true" aria-label={title}>
+      <section
+        ref={dialogRef}
+        className="approval-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onKeyDown={handleDialogKeyDown}
+      >
         <p className="queue-kicker">风险确认</p>
         <h2>{title}</h2>
         <p>
@@ -577,6 +618,7 @@ function Confirmation({
           <label>
             内部驳回理由
             <textarea
+              ref={reasonRef}
               aria-label="内部驳回理由"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -594,7 +636,7 @@ function Confirmation({
           </label>
         ) : null}
         <div className="approval-dialog-actions">
-          <button type="button" className="approval-secondary" onClick={cancel}>
+          <button ref={cancelRef} type="button" className="approval-secondary" onClick={cancel}>
             取消
           </button>
           <button

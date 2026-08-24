@@ -335,6 +335,30 @@ describe("审批视图授权撤销", () => {
     });
   });
 
+  it("确认对话框接管焦点、约束键盘遍历并在取消后恢复触发点", async () => {
+    mockClaimFlow(async () => undefined);
+
+    render(<ApprovalWorkbench />);
+    fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
+    const trigger = await screen.findByRole("button", { name: "批准补偿" });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = screen.getByRole("dialog", { name: "确认批准补偿" });
+    const cancel = screen.getByRole("button", { name: "取消" });
+    const confirm = screen.getByRole("button", { name: "确认批准" });
+    const note = screen.getByLabelText("审批备注（可选）");
+    await waitFor(() => expect(cancel).toHaveFocus());
+
+    confirm.focus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(note).toHaveFocus();
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "确认批准补偿" })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
   it("驳回确认要求真实内部理由", async () => {
     mockClaimFlow(async (path) => {
       if (path.endsWith("/reject")) {

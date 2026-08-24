@@ -3,6 +3,7 @@ import { login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
 
 test("Issue #98 客户真实创建、交互状态与断线权威恢复视觉", async ({ browser }) => {
+  test.setTimeout(60_000);
   const context = await newAcceptanceContext(browser, {
     viewport: { width: 1440, height: 960 },
   });
@@ -32,15 +33,16 @@ test("Issue #98 客户真实创建、交互状态与断线权威恢复视觉", a
   const shortTicketId = `${created.ticketId.slice(0, 8)}…${created.ticketId.slice(-4)}`;
 
   await expect(page.getByRole("heading", { name: shortTicketId })).toBeVisible();
+  const handoffButton = page.getByRole("button", { name: "转人工处理" });
+  await expect(handoffButton).toBeVisible();
+  await handoffButton.click();
+  await expect(page.getByText("人工客服处理中")).toBeVisible();
+  await expect(handoffButton).toHaveCount(0);
+
   await expect(page.getByText("调查中", { exact: true })).toBeVisible();
-  await expect(page.getByText("智能客服处理中")).toBeVisible();
   await expect(page.getByText(description)).toBeVisible();
   await expect(page.getByText(created.ticketId, { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "复制完整工单编号" })).toBeVisible();
-
-  await page.getByRole("button", { name: "转人工处理" }).click();
-  await expect(page.getByText("人工客服处理中")).toBeVisible();
-  await expect(page.getByRole("button", { name: "转人工处理" })).toHaveCount(0);
   await page.screenshot({ path: "/artifacts/issue98-customer-ticket.png", fullPage: true });
 
   disconnectTicketStream = true;

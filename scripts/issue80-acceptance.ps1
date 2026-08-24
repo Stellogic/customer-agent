@@ -34,6 +34,40 @@ function Get-ProjectVolumes {
     @(docker volume ls --quiet --filter "label=com.docker.compose.project=$projectName")
 }
 
+function Get-ProjectNetworks {
+    @(docker network ls --quiet --filter "label=com.docker.compose.project=$projectName")
+}
+
+function Get-OwnedImages {
+    $existingImages = @(docker image ls --format '{{.Repository}}:{{.Tag}}')
+    @($ownedImages | Where-Object { $existingImages -contains $_ })
+}
+
+function Get-IsolatedResourceSnapshot {
+    [pscustomobject]@{
+        Containers = @(Get-ProjectContainers)
+        Volumes    = @(Get-ProjectVolumes)
+        Networks   = @(Get-ProjectNetworks)
+        Images     = @(Get-OwnedImages)
+    }
+}
+
+function Assert-IsolatedResourcesEmpty {
+    param(
+        [Parameter(Mandatory)]$Snapshot,
+        [Parameter(Mandatory)][string]$Phase
+    )
+
+    if (
+        $Snapshot.Containers.Count -ne 0 -or
+        $Snapshot.Volumes.Count -ne 0 -or
+        $Snapshot.Networks.Count -ne 0 -or
+        $Snapshot.Images.Count -ne 0
+    ) {
+        throw "Issue #80 隔离资源${Phase}非空: project=$projectName containers=$($Snapshot.Containers -join ',') volumes=$($Snapshot.Volumes -join ',') networks=$($Snapshot.Networks -join ',') images=$($Snapshot.Images -join ',')"
+    }
+}
+
 function Invoke-BoundedBuild {
     for ($attempt = 1; $attempt -le 5; $attempt++) {
         try {
@@ -58,11 +92,23 @@ function Invoke-BoundedBuild {
     }
 }
 
-if ((Get-ProjectContainers).Count -ne 0 -or (Get-ProjectVolumes).Count -ne 0) {
-    throw "Issue #80 隔离 project 在启动前已有资源: $projectName"
+$effectiveConfigJson = docker compose --project-name $projectName --profile smoke config --format json
+if ($LASTEXITCODE -ne 0) {
+    throw "Issue #80 effective config 读取失败: $projectName"
+}
+$effectiveConfig = $effectiveConfigJson | ConvertFrom-Json
+$configuredPort = [string]$effectiveConfig.services.frontend.ports[0].published
+$configuredImages = @($effectiveConfig.services.PSObject.Properties.Value.image)
+if ($effectiveConfig.name -ne $projectName -or $configuredPort -ne [string]$frontendPort) {
+    throw "Issue #80 effective config 未应用唯一 project/端口: project=$($effectiveConfig.name) port=$configuredPort"
+}
+if ($ownedImages | Where-Object { $configuredImages -notcontains $_ }) {
+    throw "Issue #80 effective config 未应用唯一镜像标签: $imageTag"
 }
 
-Write-Host "Issue #80 isolated project: $projectName"
+Assert-IsolatedResourcesEmpty -Snapshot (Get-IsolatedResourceSnapshot) -Phase '在启动前'
+
+Write-Host "Issue #80 effective config: project=$projectName port=$frontendPort tag=$imageTag volumes=$projectName`_postgres-data,$projectName`_browser-artifacts; preflight containers=0 volumes=0 networks=0 images=0"
 try {
     if (-not $SkipBuild) {
         Invoke-BoundedBuild
@@ -76,7 +122,10 @@ try {
         e2e/issue80.session-lifecycle.spec.ts `
         e2e/issue80.business-boundaries.spec.ts `
         e2e/issue80.approval-separation.spec.ts `
+        e2e/issue98.customer-help-center.spec.ts `
+        e2e/issue99.support-workbench.spec.ts `
         e2e/issue100.approval-workbench.spec.ts `
+        e2e/issue101.cross-role-acceptance.spec.ts `
         e2e/issue80.sse-revocation.spec.ts
     if ($LASTEXITCODE -ne 0) {
         throw "Issue #80 真实浏览器验收失败，退出码: $LASTEXITCODE"
@@ -101,20 +150,10 @@ try {
     }
 } finally {
     docker compose --project-name $projectName --profile smoke down --volumes --remove-orphans
-    $remainingContainers = Get-ProjectContainers
-    $remainingVolumes = Get-ProjectVolumes
-    if ($remainingContainers.Count -ne 0 -or $remainingVolumes.Count -ne 0) {
-        throw "Issue #80 隔离资源清理后仍有残留: containers=$($remainingContainers -join ',') volumes=$($remainingVolumes -join ',')"
-    }
-    $existingImages = @(docker image ls --format '{{.Repository}}:{{.Tag}}')
-    $ownedImages | Where-Object { $existingImages -contains $_ } | ForEach-Object {
+    Get-OwnedImages | ForEach-Object {
         docker image rm $_ | Out-Null
     }
-    $remainingImages = @(docker image ls --format '{{.Repository}}:{{.Tag}}') |
-        Where-Object { $ownedImages -contains $_ }
-    if ($remainingImages.Count -ne 0) {
-        throw "Issue #80 隔离镜像清理后仍有残留: $($remainingImages -join ',')"
-    }
+    Assert-IsolatedResourcesEmpty -Snapshot (Get-IsolatedResourceSnapshot) -Phase '清理后'
     Remove-Item Env:CUSTOMER_AGENT_IMAGE_TAG -ErrorAction SilentlyContinue
     Remove-Item Env:CUSTOMER_AGENT_FRONTEND_PORT -ErrorAction SilentlyContinue
     Remove-Item Env:SESSION_COOKIE_SECURE -ErrorAction SilentlyContinue
