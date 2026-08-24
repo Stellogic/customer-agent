@@ -422,6 +422,24 @@ def main() -> None:
         ]
         assert len(matching_runs) == 1, matching_runs
 
+        thread_state = client.get(
+            f"{agent_url}/threads/{generation_thread_id}/state",
+            headers=spring_headers,
+        )
+        expect_status(thread_state, 200)
+        shadow_comparison = thread_state.json()["values"]["shadow_comparison"]
+        assert shadow_comparison == {
+            "comparison_id": shadow_comparison["comparison_id"],
+            "ticket_id": resolved_ticket_id,
+            "generation_id": generation_id,
+            "model": "deepseek-v4-flash",
+            "prompt_version": "investigation-judgment-v1",
+            "schema_version": "investigation-judgment-v1",
+            "outcome": "MATCH",
+        }
+        assert len(shadow_comparison["comparison_id"]) == 64
+        assert "ORDER-DELAY-UNDER-24" not in json.dumps(shadow_comparison)
+
         scoped_headers = {
             "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
             "X-Agent-Generation-Id": generation_id,

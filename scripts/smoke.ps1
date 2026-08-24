@@ -9,6 +9,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 $imageTag = if ($env:CUSTOMER_AGENT_IMAGE_TAG) { $env:CUSTOMER_AGENT_IMAGE_TAG } else { 'local' }
 $env:CUSTOMER_AGENT_IMAGE_TAG = $imageTag
+$env:AGENT_INVESTIGATION_SHADOW_MODE = 'offline'
 $frontendPort = if ($env:CUSTOMER_AGENT_FRONTEND_PORT) { $env:CUSTOMER_AGENT_FRONTEND_PORT } else { '4180' }
 $suiteName = if ($Reset) { 'FULL_RESET_GATE' } else { 'PERSISTENT_RERUN_SUITE' }
 Write-Host "smoke suite: $suiteName"
