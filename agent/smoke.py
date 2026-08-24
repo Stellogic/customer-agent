@@ -532,8 +532,6 @@ def main() -> None:
                     "delaySeconds": facts.json()["delaySeconds"],
                     "orderReference": order_reference,
                     "evidenceRefs": facts.json()["evidenceRefs"],
-                    "suggestedMethod": "SIMULATED_PARTIAL_REFUND",
-                    "suggestedAmount": "999999.99",
                 },
             )
             expect_status(conclusion, 422)
@@ -650,8 +648,6 @@ def main() -> None:
                 "delaySeconds": 288000,
                 "orderReference": proposal_order_reference,
                 "evidenceRefs": reused_facts.json()["evidenceRefs"],
-                "suggestedMethod": "COUPON",
-                "suggestedAmount": "999999.99",
             },
         )
         expect_status(reused, 200)
@@ -1206,8 +1202,6 @@ def main() -> None:
                 "delaySeconds": 288001,
                 "orderReference": proposal_order_reference,
                 "evidenceRefs": evidence_refs,
-                "suggestedMethod": "COUPON",
-                "suggestedAmount": "999999.99",
             },
         )
         expect_status(replacement, 200)
@@ -1293,8 +1287,6 @@ def main() -> None:
                 "delaySeconds": 295200,
                 "orderReference": proposal_order_reference,
                 "evidenceRefs": third_facts.json()["evidenceRefs"],
-                "suggestedMethod": "COUPON",
-                "suggestedAmount": "999999.99",
             },
         )
         expect_status(approved_replacement, 422)

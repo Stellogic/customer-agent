@@ -400,8 +400,8 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
     assert [call[0] for call in calls] == ["GET", "POST"]
 
 
-def test_agent_submits_a_structured_but_non_authoritative_compensation_suggestion() -> None:
-    suggestion = fixed_fake_model(
+def test_agent_submits_compensation_conclusion_without_method_or_amount() -> None:
+    conclusion = fixed_fake_model(
         {
             "orderReference": "ORDER-DELAY-001",
             "delayHours": 80,
@@ -416,15 +416,13 @@ def test_agent_submits_a_structured_but_non_authoritative_compensation_suggestio
         }
     )
 
-    assert suggestion == {
+    assert conclusion == {
         "compensationRequired": True,
         "reasonCode": "LOGISTICS_DELAY",
         "delayHours": 80,
         "delaySeconds": 80 * 60 * 60,
         "orderReference": "ORDER-DELAY-001",
         "evidenceRefs": ["order:ORDER-DELAY-001", "logistics:ORDER-DELAY-001"],
-        "suggestedMethod": "COUPON",
-        "suggestedAmount": "999999.99",
     }
 
 
