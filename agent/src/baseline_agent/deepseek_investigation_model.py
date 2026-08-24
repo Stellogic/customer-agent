@@ -21,9 +21,9 @@ from baseline_agent.investigation_model import (
 )
 
 _RESPONSES_ENDPOINT = "https://api.deepseek.com/responses"
-_SUPPORTED_MODEL = "deepseek-v4-flash"
-_PROMPT_VERSION = "investigation-judgment-v1"
-_SCHEMA_VERSION = "investigation-judgment-v1"
+DEEPSEEK_FLASH_MODEL = "deepseek-v4-flash"
+INVESTIGATION_JUDGMENT_PROMPT_VERSION = "investigation-judgment-v1"
+INVESTIGATION_JUDGMENT_SCHEMA_VERSION = "investigation-judgment-v1"
 _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 503})
 
 
@@ -45,7 +45,7 @@ class DeepSeekFailureClassification(StrEnum):
 @dataclass(frozen=True)
 class DeepSeekResponsesConfig:
     api_key: str = field(repr=False)
-    model: str = _SUPPORTED_MODEL
+    model: str = DEEPSEEK_FLASH_MODEL
     connect_timeout_seconds: float = 3
     read_timeout_seconds: float = 15
     deadline_seconds: float = 20
@@ -56,7 +56,7 @@ class DeepSeekResponsesConfig:
     def __post_init__(self) -> None:
         if (
             not self.api_key.strip()
-            or self.model != _SUPPORTED_MODEL
+            or self.model != DEEPSEEK_FLASH_MODEL
             or self.connect_timeout_seconds <= 0
             or self.read_timeout_seconds <= 0
             or self.deadline_seconds <= 0
@@ -70,7 +70,7 @@ class DeepSeekResponsesConfig:
     def from_environment(cls, environment: Mapping[str, str]) -> DeepSeekResponsesConfig:
         return cls(
             api_key=environment.get("DEEPSEEK_API_KEY", ""),
-            model=environment.get("DEEPSEEK_MODEL", _SUPPORTED_MODEL),
+            model=environment.get("DEEPSEEK_MODEL", DEEPSEEK_FLASH_MODEL),
         )
 
 
@@ -282,8 +282,8 @@ class DeepSeekResponsesInvestigationModel:
                 backend_fingerprint=(
                     _optional_string(payload.get("system_fingerprint")) if payload else None
                 ),
-                prompt_version=_PROMPT_VERSION,
-                schema_version=_SCHEMA_VERSION,
+                prompt_version=INVESTIGATION_JUDGMENT_PROMPT_VERSION,
+                schema_version=INVESTIGATION_JUDGMENT_SCHEMA_VERSION,
                 duration_ms=max(0, round((time.monotonic() - attempt_started) * 1000)),
                 input_tokens=_optional_int(usage.get("input_tokens")),
                 output_tokens=_optional_int(usage.get("output_tokens")),

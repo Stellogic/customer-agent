@@ -6,11 +6,24 @@ import httpx
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from baseline_agent.deepseek_investigation_model import (
+    DEEPSEEK_FLASH_MODEL,
+    INVESTIGATION_JUDGMENT_PROMPT_VERSION,
+    INVESTIGATION_JUDGMENT_SCHEMA_VERSION,
+)
 from baseline_agent.investigation_model import (
     FixedFakeInvestigationModel,
     InvestigationJudgment,
     InvestigationJudgmentInput,
     InvestigationJudgmentModel,
+    InvestigationReasonCode,
+)
+from baseline_agent.shadow_investigation import (
+    ShadowCandidate,
+    compare_shadow_judgment,
+    configured_shadow_candidate,
+    failed_shadow_comparison,
+    shadow_mode_enabled,
 )
 
 
@@ -24,6 +37,7 @@ class BaselineState(TypedDict, total=False):
     clarification: dict
     clarification_answer: dict
     model_mode: str
+    shadow_comparison: dict[str, str]
     handoff: dict
 
 
@@ -42,6 +56,7 @@ REQUIRED_FACT_FIELDS = {
 }
 
 investigation_judgment_model: InvestigationJudgmentModel = FixedFakeInvestigationModel()
+shadow_candidate_factory: Callable[[], ShadowCandidate | None] = configured_shadow_candidate
 
 
 async def probe_spring(state: BaselineState) -> BaselineState:
@@ -146,6 +161,47 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 _controlled_summary_facts(facts),
             )
         return {"facts": facts, "conclusion": conclusion, "model_mode": "fixed-fake-model-v1"}
+
+
+async def shadow_investigation(state: BaselineState) -> BaselineState:
+    ticket_id = state["ticket_id"]
+    generation_id = state["generation_id"]
+    try:
+        candidate = shadow_candidate_factory()
+    except Exception:
+        candidate = ShadowCandidate(
+            model=FixedFakeInvestigationModel(),
+            model_name=DEEPSEEK_FLASH_MODEL,
+            prompt_version=INVESTIGATION_JUDGMENT_PROMPT_VERSION,
+            schema_version=INVESTIGATION_JUDGMENT_SCHEMA_VERSION,
+        )
+        record = failed_shadow_comparison(
+            ticket_id=ticket_id,
+            generation_id=generation_id,
+            candidate=candidate,
+        )
+        return {"shadow_comparison": record.as_checkpoint_value()}
+    if candidate is None:
+        return {}
+    facts = state["facts"]
+    conclusion = state["conclusion"]
+    model_input = InvestigationJudgmentInput(
+        order_reference=facts["orderReference"],
+        delay_seconds=facts["delaySeconds"],
+        evidence_refs=tuple(facts["evidenceRefs"]),
+    )
+    baseline = InvestigationJudgment(
+        compensation_review_required=conclusion["compensationRequired"],
+        reason_code=InvestigationReasonCode(conclusion["reasonCode"]),
+    )
+    record = await compare_shadow_judgment(
+        ticket_id=ticket_id,
+        generation_id=generation_id,
+        model_input=model_input,
+        baseline=baseline,
+        candidate=candidate,
+    )
+    return {"shadow_comparison": record.as_checkpoint_value()}
 
 
 def _tool_attempt_budget() -> int:
@@ -345,19 +401,23 @@ def select_work(state: BaselineState) -> str:
 
 
 def after_investigation(state: BaselineState) -> str:
-    return (
-        "request_clarification" if state.get("facts", {}).get("matchStatus") == "AMBIGUOUS" else END
-    )
+    if state.get("facts", {}).get("matchStatus") == "AMBIGUOUS":
+        return "request_clarification"
+    if state.get("conclusion") and shadow_mode_enabled():
+        return "shadow_investigation"
+    return END
 
 
 builder = StateGraph(BaselineState)
 builder.add_node("probe_spring", probe_spring)
 builder.add_node("investigate_ticket", investigate_ticket)
+builder.add_node("shadow_investigation", shadow_investigation)
 builder.add_node("request_clarification", request_clarification)
 builder.add_node("await_clarification", await_clarification)
 builder.add_conditional_edges(START, select_work)
 builder.add_edge("probe_spring", END)
 builder.add_conditional_edges("investigate_ticket", after_investigation)
+builder.add_edge("shadow_investigation", END)
 builder.add_edge("request_clarification", "await_clarification")
 builder.add_edge("await_clarification", "investigate_ticket")
 graph = builder.compile()

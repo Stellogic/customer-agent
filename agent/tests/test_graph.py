@@ -5,10 +5,202 @@ import pytest
 
 from baseline_agent.graph import (
     await_clarification,
+    graph,
     investigate_ticket,
     probe_spring,
     request_clarification,
 )
+from baseline_agent.investigation_model import (
+    InvestigationJudgment,
+    InvestigationJudgmentInput,
+    InvestigationReasonCode,
+)
+from baseline_agent.shadow_investigation import ShadowCandidate
+
+
+class _OfflineShadowModel:
+    def __init__(self, result: InvestigationJudgment | Exception) -> None:
+        self.result = result
+        self.inputs: list[InvestigationJudgmentInput] = []
+
+    async def judge(self, model_input: InvestigationJudgmentInput) -> InvestigationJudgment:
+        self.inputs.append(model_input)
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+@pytest.mark.asyncio
+async def test_default_business_graph_never_constructs_or_calls_a_shadow_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    class Response:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, url: str, **_: object) -> Response:
+            calls.append(("GET", url))
+            return Response(_unique_facts())
+
+        async def post(self, url: str, **_: object) -> Response:
+            calls.append(("POST", url))
+            return Response({"accepted": True})
+
+    def forbidden_factory() -> ShadowCandidate:
+        raise AssertionError("disabled shadow must not construct a provider")
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setattr("baseline_agent.graph.shadow_candidate_factory", forbidden_factory)
+    monkeypatch.delenv("AGENT_INVESTIGATION_SHADOW_MODE", raising=False)
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+
+    result = await graph.ainvoke(
+        {
+            "requested_by": "spring",
+            "ticket_id": "ticket-116",
+            "generation_id": "generation-116",
+        }
+    )
+
+    assert "shadow_comparison" not in result
+    assert [method for method, _ in calls] == ["GET", "POST"]
+
+
+@pytest.mark.parametrize(
+    ("candidate_result", "expected_outcome"),
+    [
+        (
+            InvestigationJudgment(
+                compensation_review_required=True,
+                reason_code=InvestigationReasonCode.LOGISTICS_DELAY,
+            ),
+            "MATCH",
+        ),
+        (RuntimeError("raw offline supplier failure"), "FAILED"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_enabled_offline_shadow_only_adds_a_minimal_checkpoint_comparison(
+    monkeypatch: pytest.MonkeyPatch,
+    candidate_result: InvestigationJudgment | Exception,
+    expected_outcome: str,
+) -> None:
+    posts: list[tuple[str, str]] = []
+    shadow_model = _OfflineShadowModel(candidate_result)
+
+    class Response:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, _url: str, **_: object) -> Response:
+            return Response(_unique_facts())
+
+        async def post(self, url: str, *, headers: dict[str, str], **_: object) -> Response:
+            posts.append((url, headers["Idempotency-Key"]))
+            return Response({"accepted": True})
+
+    candidate = ShadowCandidate(
+        model=shadow_model,
+        model_name="offline-deepseek-v4-flash",
+        prompt_version="investigation-judgment-v1",
+        schema_version="investigation-judgment-v1",
+    )
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setattr("baseline_agent.graph.shadow_candidate_factory", lambda: candidate)
+    monkeypatch.setenv("AGENT_INVESTIGATION_SHADOW_MODE", "deepseek")
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    graph_input = {
+        "requested_by": "spring",
+        "ticket_id": "ticket-116",
+        "generation_id": "generation-116",
+    }
+
+    first = await graph.ainvoke(graph_input)
+    duplicate = await graph.ainvoke(graph_input)
+
+    comparison = first["shadow_comparison"]
+    assert comparison["outcome"] == expected_outcome
+    assert duplicate["shadow_comparison"]["comparison_id"] == comparison["comparison_id"]
+    assert set(comparison) == {
+        "comparison_id",
+        "ticket_id",
+        "generation_id",
+        "model",
+        "prompt_version",
+        "schema_version",
+        "outcome",
+    }
+    assert shadow_model.inputs == [
+        InvestigationJudgmentInput(
+            order_reference="ORDER-116",
+            delay_seconds=80 * 60 * 60,
+            evidence_refs=("order:ORDER-116", "logistics:ORDER-116"),
+        ),
+        InvestigationJudgmentInput(
+            order_reference="ORDER-116",
+            delay_seconds=80 * 60 * 60,
+            evidence_refs=("order:ORDER-116", "logistics:ORDER-116"),
+        ),
+    ]
+    assert posts == [
+        (
+            "http://spring/internal/agent/tickets/ticket-116/generations/generation-116/conclusions",
+            "generation-116:submit-conclusion",
+        ),
+        (
+            "http://spring/internal/agent/tickets/ticket-116/generations/generation-116/conclusions",
+            "generation-116:submit-conclusion",
+        ),
+    ]
+    serialized = repr(comparison)
+    assert "ORDER-116" not in serialized
+    assert "raw offline supplier failure" not in serialized
+
+
+def _unique_facts() -> dict:
+    return {
+        "matchStatus": "UNIQUE",
+        "orderReference": "ORDER-116",
+        "delayHours": 80,
+        "delaySeconds": 80 * 60 * 60,
+        "paid": True,
+        "cancelled": False,
+        "fullyRefunded": False,
+        "existingCompensation": False,
+        "pendingActionCount": 0,
+        "policyVersion": "delay-policy-v1",
+        "evidenceRefs": ["order:ORDER-116", "logistics:ORDER-116"],
+    }
 
 
 @pytest.mark.parametrize(
