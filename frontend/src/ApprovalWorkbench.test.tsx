@@ -227,6 +227,7 @@ describe("审批视图授权撤销", () => {
     expect(screen.getByText("责任链")).toBeInTheDocument();
     expect(screen.getByText("order:ORDER-DELAY-001")).toBeInTheDocument();
     expect(screen.queryByText(/AI 建议批准|风险评级|PRP-/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/内容摘要|审批租约|租约 v/)).not.toBeInTheDocument();
   });
 
   it("队列直接复制完整 UUID 并提供完整表格语义", async () => {

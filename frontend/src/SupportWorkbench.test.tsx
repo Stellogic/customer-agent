@@ -59,6 +59,7 @@ describe("客服共享队列工作台", () => {
     expect(
       screen.queryByText(/CUSTOMER_REQUESTED|AGENT_HUMAN_HANDOFF|调查摘要/),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText(/快照游标/)).not.toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe("/api/auth/session");
     expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe("/api/support/workbench/snapshot");
     expect(

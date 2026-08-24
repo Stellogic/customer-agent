@@ -432,7 +432,7 @@ function Detail({
             <p className="queue-kicker">提案摘要</p>
             <h2>{snapshot.orderReference}</h2>
           </div>
-          <span className="approval-lease-badge">租约 v{snapshot.leaseVersion}</span>
+          <span className="approval-lease-badge">当前审批责任</span>
         </header>
         <dl className="approval-facts">
           <Fact name="提案 UUID">
@@ -514,7 +514,7 @@ function Detail({
       <section className="approval-card approval-decisions">
         <p className="queue-kicker">不可逆决定</p>
         <h2>决定操作</h2>
-        <p>操作将绑定当前提案版本、内容摘要与审批租约。结果不确定时将恢复 Spring 权威状态。</p>
+        <p>操作只针对当前提案和有效审批责任。结果不确定时将恢复权威状态。</p>
         <div>
           <button type="button" className="approval-secondary" onClick={() => onAction("release")}>
             释放审批

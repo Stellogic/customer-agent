@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { Modal } from "antd";
 import {
   consumeSseEvents,
   hasOnlyKeys,
@@ -58,6 +59,7 @@ export function App() {
   const [ticketReplyBody, setTicketReplyBody] = useState("");
   const [error, setError] = useState("");
   const [copiedTicketId, setCopiedTicketId] = useState(false);
+  const [confirmingHumanHandoff, setConfirmingHumanHandoff] = useState(false);
   const [initialTicketId] = useState(readRequestedTicketId);
   const [unknownHandoffRequestId, setUnknownHandoffRequestId] = useState<string | null>(() =>
     initialTicketId
@@ -696,11 +698,24 @@ export function App() {
                 type="button"
                 className="handoff-button"
                 disabled={submitting}
-                onClick={requestHumanHandoff}
+                onClick={() => setConfirmingHumanHandoff(true)}
               >
                 {submitting ? "正在提交…" : "转人工处理"}
               </button>
             ))}
+          <Modal
+            open={confirmingHumanHandoff}
+            title="确认转人工处理"
+            okText="确认转人工"
+            cancelText="暂不转人工"
+            onCancel={() => setConfirmingHumanHandoff(false)}
+            onOk={() => {
+              setConfirmingHumanHandoff(false);
+              void requestHumanHandoff();
+            }}
+          >
+            <p>确认后，当前工单将转由人工客服继续处理；系统不会承诺具体响应时间。</p>
+          </Modal>
           <p className="recovery-note">刷新或重新连接后，本页只从权威快照恢复公开沟通。</p>
           {error && (
             <StatusNotice className="error" role="alert" tone="danger">

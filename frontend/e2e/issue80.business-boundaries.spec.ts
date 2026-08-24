@@ -66,6 +66,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   expect(forgedSupportStatus).toBe(403);
 
   await customer.getByRole("button", { name: "转人工处理" }).dispatchEvent("click");
+  await customer.getByRole("button", { name: "确认转人工" }).click();
   await expect(customer.getByText("人工客服处理中")).toBeVisible();
 
   const anonymousContext = await newIssue80Context(browser);

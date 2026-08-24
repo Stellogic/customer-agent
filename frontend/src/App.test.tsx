@@ -542,6 +542,7 @@ describe("客户帮助中心", () => {
     render(<App />);
     expect(await screen.findByRole("button", { name: "转人工处理" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "转人工处理" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认转人工" }));
     fireEvent.click(screen.getByRole("button", { name: "正在提交…" }));
 
     expect(await screen.findByText("人工客服处理中")).toBeInTheDocument();
@@ -982,6 +983,9 @@ describe("客户帮助中心", () => {
 
     const firstRender = render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "转人工处理" }));
+    expect(screen.getByRole("dialog", { name: "确认转人工处理" })).toBeInTheDocument();
+    expect(handoffPosts).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: "确认转人工" }));
 
     const queryButton = await screen.findByRole("button", { name: "查询转人工结果" });
     expect(screen.queryByRole("button", { name: "转人工处理" })).not.toBeInTheDocument();
