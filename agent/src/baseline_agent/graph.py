@@ -6,6 +6,13 @@ import httpx
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from baseline_agent.investigation_model import (
+    FixedFakeInvestigationModel,
+    InvestigationJudgment,
+    InvestigationJudgmentInput,
+    InvestigationJudgmentModel,
+)
+
 
 class BaselineState(TypedDict, total=False):
     requested_by: str
@@ -33,6 +40,8 @@ REQUIRED_FACT_FIELDS = {
     "policyVersion",
     "evidenceRefs",
 }
+
+investigation_judgment_model: InvestigationJudgmentModel = FixedFakeInvestigationModel()
 
 
 async def probe_spring(state: BaselineState) -> BaselineState:
@@ -94,7 +103,14 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
         assert isinstance(facts, dict)
         if facts.get("matchStatus") == "AMBIGUOUS":
             return {"facts": facts, "model_mode": "fixed-fake-model-v1"}
-        conclusion = fixed_fake_model(facts)
+        judgment = await investigation_judgment_model.judge(
+            InvestigationJudgmentInput(
+                order_reference=facts["orderReference"],
+                delay_seconds=facts["delaySeconds"],
+                evidence_refs=tuple(facts["evidenceRefs"]),
+            )
+        )
+        conclusion = _build_conclusion(facts, judgment)
         try:
             conclusion_response = await _request_with_retries(
                 lambda: client.post(
@@ -313,19 +329,10 @@ def await_clarification(state: BaselineState) -> BaselineState:
     return {"clarification_answer": interrupt(public_interrupt)}
 
 
-def fixed_fake_model(facts: dict) -> dict:
-    if facts["delaySeconds"] >= 24 * 60 * 60:
-        return {
-            "compensationRequired": True,
-            "reasonCode": "LOGISTICS_DELAY",
-            "delayHours": facts["delayHours"],
-            "delaySeconds": facts["delaySeconds"],
-            "orderReference": facts["orderReference"],
-            "evidenceRefs": facts["evidenceRefs"],
-        }
+def _build_conclusion(facts: dict, judgment: InvestigationJudgment) -> dict:
     return {
-        "compensationRequired": False,
-        "reasonCode": "DELAY_UNDER_24_HOURS",
+        "compensationRequired": judgment.compensation_review_required,
+        "reasonCode": judgment.reason_code.value,
         "delayHours": facts["delayHours"],
         "delaySeconds": facts["delaySeconds"],
         "orderReference": facts["orderReference"],

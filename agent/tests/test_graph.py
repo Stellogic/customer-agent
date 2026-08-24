@@ -5,7 +5,6 @@ import pytest
 
 from baseline_agent.graph import (
     await_clarification,
-    fixed_fake_model,
     investigate_ticket,
     probe_spring,
     request_clarification,
@@ -398,32 +397,6 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
     }
     assert result["model_mode"] == "fixed-fake-model-v1"
     assert [call[0] for call in calls] == ["GET", "POST"]
-
-
-def test_agent_submits_compensation_conclusion_without_method_or_amount() -> None:
-    conclusion = fixed_fake_model(
-        {
-            "orderReference": "ORDER-DELAY-001",
-            "delayHours": 80,
-            "delaySeconds": 80 * 60 * 60,
-            "paid": True,
-            "cancelled": False,
-            "fullyRefunded": False,
-            "existingCompensation": False,
-            "pendingActionCount": 0,
-            "policyVersion": "delay-policy-v1",
-            "evidenceRefs": ["order:ORDER-DELAY-001", "logistics:ORDER-DELAY-001"],
-        }
-    )
-
-    assert conclusion == {
-        "compensationRequired": True,
-        "reasonCode": "LOGISTICS_DELAY",
-        "delayHours": 80,
-        "delaySeconds": 80 * 60 * 60,
-        "orderReference": "ORDER-DELAY-001",
-        "evidenceRefs": ["order:ORDER-DELAY-001", "logistics:ORDER-DELAY-001"],
-    }
 
 
 @pytest.mark.asyncio
