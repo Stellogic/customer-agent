@@ -74,12 +74,15 @@ function assertNoBrowserLeakage(evidence: BrowserEvidence) {
     ...evidence.requestBodies,
     ...evidence.ssePayloads,
   ].join("\n");
-  for (const forbidden of forbiddenBrowserEvidence) expect(serialized).not.toContain(forbidden);
+  const normalized = serialized.toLowerCase();
+  for (const forbidden of forbiddenBrowserEvidence) {
+    expect(normalized).not.toContain(forbidden.toLowerCase());
+  }
   for (const pattern of [
     ...sensitivePatterns.contentPatterns,
     ...sensitivePatterns.internalAddressPatterns,
   ]) {
-    expect(serialized).not.toMatch(new RegExp(pattern));
+    expect(serialized).not.toMatch(new RegExp(pattern, "i"));
   }
 }
 

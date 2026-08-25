@@ -19,7 +19,7 @@ const forbiddenProductionContent = sensitivePatterns.modelBoundaryLiterals;
 const forbiddenProductionPatterns = [
   ...sensitivePatterns.contentPatterns,
   ...sensitivePatterns.internalAddressPatterns,
-].map((pattern) => new RegExp(pattern));
+].map((pattern) => new RegExp(pattern, "i"));
 
 function requireChunk(key) {
   const chunk = manifest[key];
@@ -88,8 +88,9 @@ for (const chunk of Object.values(manifest)) {
 }
 for (const file of productionFiles) {
   const content = readFileSync(new URL(file, distUrl), "utf8");
+  const normalized = content.toLowerCase();
   for (const forbidden of forbiddenProductionContent) {
-    if (content.includes(forbidden)) {
+    if (normalized.includes(forbidden.toLowerCase())) {
       throw new Error(`production bundle ${file} contains forbidden model-boundary content`);
     }
   }
