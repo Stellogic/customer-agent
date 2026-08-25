@@ -66,6 +66,31 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     }
 
     @Override
+    @Transactional
+    public CustomerCommunicationContext customerCommunicationContext(
+            UUID ticketId, UUID generationId) {
+        requireActiveGeneration(ticketId, generationId);
+        List<String> descriptions =
+                jdbc.query(
+                        "select description from support_ticket where id = ?",
+                        (rs, row) -> rs.getString(1),
+                        ticketId);
+        if (descriptions.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "ticket not found");
+        }
+        List<CustomerCommunicationMessage> conversation =
+                jdbc.query(
+                        "select author, body from (select author, body, message_sequence "
+                                + "from public_message where ticket_id = ? order by message_sequence desc limit 20) recent "
+                                + "order by message_sequence",
+                        (rs, row) ->
+                                new CustomerCommunicationMessage(rs.getString(1), rs.getString(2)),
+                        ticketId);
+        return new CustomerCommunicationContext(
+                "customer-communication-input-v1", descriptions.getFirst(), conversation);
+    }
+
+    @Override
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public InvestigationCapabilityResult invoke(
             UUID ticketId,
