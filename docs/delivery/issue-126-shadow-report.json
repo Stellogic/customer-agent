@@ -1,0 +1,68 @@
+{
+  "admittedForFormalMode": true,
+  "attempts": {
+    "actualReal": 3,
+    "maximumReal": 6,
+    "retries": 0
+  },
+  "auditEvidence": {
+    "contractValidAttempts": 3,
+    "failureClassifications": {
+      "NONE": 3
+    },
+    "httpStatusCounts": {
+      "200": 3
+    },
+    "realProviderAttempts": 3,
+    "retries": 0
+  },
+  "blockedReason": null,
+  "candidateModel": "deepseek-v4-flash",
+  "comparisonEvidence": {
+    "failed": 0,
+    "matches": 3,
+    "mismatches": 0
+  },
+  "endedAtUtc": "2026-08-25T10:33:27.958262Z",
+  "failureSimulations": {
+    "INVALID_JSON": 1,
+    "MODEL_REFUSAL": 1,
+    "READ_TIMEOUT": 1
+  },
+  "limits": {
+    "callDeadlineSeconds": 20,
+    "connectTimeoutSeconds": 3,
+    "maximumAttemptsPerScenario": 1,
+    "maximumRealProviderAttempts": 6,
+    "readTimeoutSeconds": 12
+  },
+  "metrics": {
+    "averageCostUsd": 2.5756e-05,
+    "costMeasurementRate": 1.0,
+    "failureRate": 0.0,
+    "matchRate": 1.0,
+    "mismatchCount": 0,
+    "p50LatencyMs": 931,
+    "p95LatencyMs": 934,
+    "sideEffectInvariantRate": 1.0
+  },
+  "pricingTier": "off-peak",
+  "pricingVersion": "deepseek-time-of-use-2026-08-25",
+  "priorContractAdmitted": true,
+  "scenarioIds": [
+    "normal",
+    "boundary-24h",
+    "ineligible-under-24h",
+    "refusal",
+    "timeout",
+    "invalid-output"
+  ],
+  "schemaVersion": "issue-126-real-business-shadow-v1",
+  "startedAtUtc": "2026-08-25T10:33:20.889146Z",
+  "usage": {
+    "cachedInputTokens": 384,
+    "inputTokens": 549,
+    "outputTokens": 58,
+    "totalTokens": 607
+  }
+}

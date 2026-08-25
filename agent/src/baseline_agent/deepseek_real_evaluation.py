@@ -29,7 +29,7 @@ from baseline_agent.synthetic_evaluation import (
 
 ISSUE_125_OPT_IN = "issue-125-authorized-real-deepseek-evaluation"
 _REPORT_SCHEMA_VERSION = "issue-125-deepseek-real-contract-v1"
-_PRICING_VERSION = "deepseek-time-of-use-2026-08-25"
+DEEPSEEK_PRICING_VERSION = "deepseek-time-of-use-2026-08-25"
 _DATASET_REPETITIONS = 5
 _MAX_PROVIDER_ATTEMPTS = 55
 _WHOLE_EVALUATION_DEADLINE_SECONDS = 600
@@ -117,7 +117,7 @@ def _validate_environment(environment: Mapping[str, str]) -> None:
         raise RealEvaluationBlocked("UNSUPPORTED_MODEL")
 
 
-def _pricing_at(observed_at: datetime) -> tuple[str, TokenPricing]:
+def deepseek_flash_pricing_at(observed_at: datetime) -> tuple[str, TokenPricing]:
     if observed_at.tzinfo is None:
         raise ValueError("pricing observation must be timezone-aware")
     observed_utc = observed_at.astimezone(UTC)
@@ -136,7 +136,7 @@ async def run_real_evaluation(
 ) -> dict[str, object]:
     _validate_environment(environment)
     observed_at = pricing_observed_at or datetime.now(UTC)
-    pricing_tier, pricing = _pricing_at(observed_at)
+    pricing_tier, pricing = deepseek_flash_pricing_at(observed_at)
     audit = InMemoryModelCallAuditSink()
     config = DeepSeekResponsesConfig(
         api_key=environment["DEEPSEEK_API_KEY"],
@@ -175,7 +175,7 @@ async def run_real_evaluation(
         blocked_reason = error.reason
     if (
         pricing_observed_at is None
-        and _pricing_at(datetime.now(UTC))[0] != pricing_tier
+        and deepseek_flash_pricing_at(datetime.now(UTC))[0] != pricing_tier
         and blocked_reason is None
     ):
         blocked_reason = "PRICING_WINDOW_CHANGED"
@@ -237,7 +237,7 @@ def _aggregate_report(
     return {
         "schemaVersion": _REPORT_SCHEMA_VERSION,
         "candidateModel": DEEPSEEK_FLASH_MODEL,
-        "pricingVersion": _PRICING_VERSION,
+        "pricingVersion": DEEPSEEK_PRICING_VERSION,
         "pricingTier": pricing_tier,
         "pricingObservedAtUtc": pricing_observed_at.astimezone(UTC)
         .isoformat()
