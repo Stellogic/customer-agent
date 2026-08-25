@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import httpx
 import pytest
@@ -12,6 +13,7 @@ from baseline_agent.graph import (
     await_clarification,
     graph,
     investigate_ticket,
+    investigate_ticket_step,
     probe_spring,
     request_clarification,
 )
@@ -29,6 +31,71 @@ from baseline_agent.investigation_model import (
     InvestigationReasonCode,
 )
 from baseline_agent.shadow_investigation import ShadowCandidate
+
+
+@pytest.mark.asyncio
+async def test_langgraph_checkpoint_resume_keeps_decremented_budget_until_handoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    capability_calls: list[str] = []
+
+    class Response:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, url: str, **_: object) -> Response:
+            return Response(_catalog_or_customer_context(url))
+
+        async def post(self, url: str, **_: object) -> Response:
+            if "/capabilities/" in url:
+                capability_calls.append(url)
+                return Response(_capability_result(url, _unique_facts()))
+            return Response({"handlingMode": "HUMAN", "reasonCode": "TOOL_RETRY_EXHAUSTED"})
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    monkeypatch.setenv("AGENT_INVESTIGATION_MAX_ACTIONS", "2")
+    monkeypatch.setenv("AGENT_INVESTIGATION_MAX_PROVIDER_ATTEMPTS", "2")
+    initial = {
+        "requested_by": "spring",
+        "ticket_id": "ticket-checkpoint",
+        "generation_id": "generation-checkpoint",
+    }
+
+    first = await investigate_ticket_step(initial)
+    first_checkpoint = json.loads(json.dumps(first["investigation_progress"]))
+    assert first_checkpoint["remainingActions"] == 1
+    assert first_checkpoint["remainingProviderAttempts"] == 1
+
+    second = await investigate_ticket_step({**initial, "investigation_progress": first_checkpoint})
+    second_checkpoint = json.loads(json.dumps(second["investigation_progress"]))
+    assert second_checkpoint["remainingActions"] == 0
+    assert second_checkpoint["remainingProviderAttempts"] == 0
+    assert second_checkpoint["providerAttempts"] == 2
+
+    exhausted = await investigate_ticket_step(
+        {**initial, "investigation_progress": second_checkpoint}
+    )
+
+    assert exhausted["handoff"]["reasonCode"] == "TOOL_RETRY_EXHAUSTED"
+    assert exhausted["investigation_progress"] is None
+    assert exhausted["investigation_run_evidence"]["failureClassification"] == "BUDGET_EXHAUSTED"
+    assert exhausted["investigation_run_evidence"]["providerAttempts"] == 2
+    assert len(capability_calls) == 2
 
 
 class _OfflineShadowModel:
@@ -148,7 +215,7 @@ async def test_terminal_handoff_and_budget_failure_preserve_controlled_action_re
         assert result["investigation_run_evidence"] == {
             "outcome": "SAFE_HANDOFF",
             "failureClassification": "BUDGET_EXHAUSTED",
-            "providerAttempts": 3,
+            "providerAttempts": 2,
             "toolRounds": 2,
             "modelCalls": [
                 {
@@ -161,13 +228,6 @@ async def test_terminal_handoff_and_budget_failure_preserve_controlled_action_re
                 {
                     "callNumber": 2,
                     "selectedAction": "READ_LOGISTICS",
-                    "providerAttempts": 1,
-                    "tokens": 0,
-                    "costMicros": 0,
-                },
-                {
-                    "callNumber": 3,
-                    "selectedAction": "READ_PAYMENT_AND_REFUNDS",
                     "providerAttempts": 1,
                     "tokens": 0,
                     "costMicros": 0,

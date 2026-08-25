@@ -105,9 +105,13 @@ async def test_flash_allows_terminal_action_without_order_parameter() -> None:
         {
             "matchStatus": "UNIQUE",
             "orderReference": "ORDER-128",
+            "delayHours": 25,
             "delaySeconds": 90_000,
             "paid": True,
+            "cancelled": False,
+            "fullyRefunded": False,
             "existingCompensation": False,
+            "pendingActionCount": 0,
             "policyVersion": "delay-policy-v1",
         }
     )
@@ -135,6 +139,40 @@ async def test_flash_allows_only_clarification_for_an_ambiguous_match() -> None:
     body = json.loads(captured[0].content)
     allowed = body["text"]["format"]["schema"]["properties"]["action"]["enum"]
     assert allowed == ["REQUEST_CLARIFICATION"]
+
+
+@pytest.mark.asyncio
+async def test_flash_schema_requires_handoff_for_known_fact_conflict() -> None:
+    captured: list[httpx.Request] = []
+
+    def supplier(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(200, json=_completed_action("HANDOFF", None))
+
+    model = DeepSeekResponsesInvestigationActionModel(
+        DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
+        transport=httpx.MockTransport(supplier),
+    )
+
+    decision = await model.choose(
+        {
+            "matchStatus": "UNIQUE",
+            "orderReference": "ORDER-128",
+            "delayHours": 25,
+            "delaySeconds": 90_001,
+            "paid": True,
+            "cancelled": False,
+            "fullyRefunded": False,
+            "existingCompensation": False,
+            "pendingActionCount": 0,
+            "policyVersion": "delay-policy-v1",
+        }
+    )
+
+    assert decision.action.kind is TerminalAction.HANDOFF
+    body = json.loads(captured[0].content)
+    allowed = body["text"]["format"]["schema"]["properties"]["action"]["enum"]
+    assert allowed == ["HANDOFF"]
 
 
 @pytest.mark.asyncio

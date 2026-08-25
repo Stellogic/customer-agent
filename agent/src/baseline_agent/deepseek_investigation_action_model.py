@@ -288,7 +288,52 @@ def _allowed_actions(facts: dict[str, object]) -> tuple[str, ...]:
         for capability in completion_markers
         if completion_markers[capability] not in facts
     )
-    return missing_capabilities or (TerminalAction.SUBMIT_CONCLUSION.value,)
+    if missing_capabilities:
+        return missing_capabilities
+    if _known_facts_require_handoff(facts):
+        return (TerminalAction.HANDOFF.value,)
+    return (TerminalAction.SUBMIT_CONCLUSION.value,)
+
+
+def _known_facts_require_handoff(facts: dict[str, object]) -> bool:
+    required = {
+        "delayHours",
+        "delaySeconds",
+        "paid",
+        "cancelled",
+        "fullyRefunded",
+        "existingCompensation",
+        "pendingActionCount",
+        "policyVersion",
+    }
+    if not required.issubset(facts):
+        return True
+    delay_hours = facts["delayHours"]
+    delay_seconds = facts["delaySeconds"]
+    pending_actions = facts["pendingActionCount"]
+    if (
+        not isinstance(delay_hours, int)
+        or isinstance(delay_hours, bool)
+        or not isinstance(delay_seconds, int)
+        or isinstance(delay_seconds, bool)
+        or not isinstance(pending_actions, int)
+        or isinstance(pending_actions, bool)
+        or not all(
+            isinstance(facts[name], bool)
+            for name in ("paid", "cancelled", "fullyRefunded", "existingCompensation")
+        )
+        or not isinstance(facts["policyVersion"], str)
+    ):
+        return True
+    return (
+        delay_seconds != delay_hours * 60 * 60
+        or not facts["paid"]
+        or bool(facts["cancelled"])
+        or bool(facts["fullyRefunded"])
+        or bool(facts["existingCompensation"])
+        or pending_actions != 0
+        or facts["policyVersion"] != "delay-policy-v1"
+    )
 
 
 def _build_request(
