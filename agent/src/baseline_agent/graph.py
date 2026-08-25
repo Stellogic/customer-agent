@@ -13,6 +13,15 @@ from baseline_agent.deepseek_investigation_model import (
     INVESTIGATION_JUDGMENT_PROMPT_VERSION,
     INVESTIGATION_JUDGMENT_SCHEMA_VERSION,
 )
+from baseline_agent.investigation_action_loop import (
+    ActionBudget,
+    ActionDecision,
+    ActionLoop,
+    ActionLoopFailure,
+    ActionLoopFailureCode,
+    DeterministicActionModel,
+    InvestigationAction,
+)
 from baseline_agent.investigation_model import (
     FixedFakeInvestigationModel,
     InvestigationJudgment,
@@ -41,6 +50,7 @@ class BaselineState(TypedDict, total=False):
     model_mode: str
     shadow_comparison: dict[str, str]
     handoff: dict
+    investigation_actions: list[dict[str, object]]
 
 
 REQUIRED_FACT_FIELDS = {
@@ -58,6 +68,7 @@ REQUIRED_FACT_FIELDS = {
 }
 
 investigation_judgment_model: InvestigationJudgmentModel = FixedFakeInvestigationModel()
+investigation_action_model = DeterministicActionModel()
 shadow_candidate_factory: Callable[[], ShadowCandidate | None] = configured_shadow_candidate
 
 
@@ -165,13 +176,27 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
         capability_request_scope = "invalid-resume"
     async with httpx.AsyncClient(timeout=5.0) as client:
         try:
-            facts = await _collect_investigation_facts(
+            loop_result = await _run_investigation_action_loop(
                 client,
                 base_url,
                 ticket_id,
                 generation_id,
                 scope_headers,
                 capability_request_scope,
+            )
+        except ActionLoopFailure as error:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                (
+                    "INVALID_TOOL_RESPONSE"
+                    if error.code is ActionLoopFailureCode.INVALID_TOOL_RESPONSE
+                    else "TOOL_RETRY_EXHAUSTED"
+                ),
+                [],
             )
         except httpx.HTTPStatusError as error:
             if error.response.status_code != 409:
@@ -185,16 +210,15 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "TOOL_RETRY_EXHAUSTED",
                 [],
             )
-        if facts is None:
-            return await _human_handoff(
-                client,
-                base_url,
-                ticket_id,
-                generation_id,
-                scope_headers,
-                "TOOL_RETRY_EXHAUSTED",
-                [],
-            )
+        facts = _normalize_loop_facts(loop_result.facts)
+        action_records = [
+            {
+                "actionType": record.action_type,
+                "evidenceReferences": list(record.evidence_references),
+                "resultCode": record.result_code,
+            }
+            for record in loop_result.records
+        ]
         unsafe_reason = _unsafe_facts_reason(facts)
         if unsafe_reason is not None:
             return await _human_handoff(
@@ -208,7 +232,11 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
             )
         assert isinstance(facts, dict)
         if facts.get("matchStatus") == "AMBIGUOUS":
-            return {"facts": facts, "model_mode": "fixed-fake-model-v1"}
+            return {
+                "facts": facts,
+                "model_mode": "fixed-fake-model-v1",
+                "investigation_actions": action_records,
+            }
         judgment = await investigation_judgment_model.judge(
             InvestigationJudgmentInput(
                 order_reference=facts["orderReference"],
@@ -251,17 +279,22 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "TOOL_RETRY_EXHAUSTED",
                 _controlled_summary_facts(facts),
             )
-        return {"facts": facts, "conclusion": conclusion, "model_mode": "fixed-fake-model-v1"}
+        return {
+            "facts": facts,
+            "conclusion": conclusion,
+            "model_mode": "fixed-fake-model-v1",
+            "investigation_actions": action_records,
+        }
 
 
-async def _collect_investigation_facts(
+async def _run_investigation_action_loop(
     client: httpx.AsyncClient,
     base_url: str,
     ticket_id: str,
     generation_id: str,
     scope_headers: dict[str, str],
     request_scope: str,
-) -> object | None:
+):
     capability_headers = {
         **scope_headers,
         "X-Agent-Operation": "USE_INVESTIGATION_CAPABILITY",
@@ -273,54 +306,16 @@ async def _collect_investigation_facts(
         )
     )
     if catalog_response is None:
-        return None
+        raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
     try:
         catalog = catalog_response.json()
-    except ValueError:
-        return "INVALID_CAPABILITY_CATALOG"
+    except ValueError as error:
+        raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE) from error
     if not _valid_capability_catalog(catalog):
-        return "INVALID_CAPABILITY_CATALOG"
+        raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
 
-    confirmation = await _invoke_investigation_capability(
-        client,
-        base_url,
-        ticket_id,
-        generation_id,
-        capability_headers,
-        InvestigationCapability.CONFIRM_ORDER,
-        {},
-        request_scope,
-    )
-    if confirmation is None:
-        return None
-    if not _valid_capability_result(InvestigationCapability.CONFIRM_ORDER, confirmation):
-        return "INVALID_CAPABILITY_RESULT"
-    assert isinstance(confirmation, dict)
-    if confirmation.get("matchStatus") == "AMBIGUOUS":
-        if confirmation["evidenceRefs"] != []:
-            return "INVALID_CAPABILITY_RESULT"
-        return {
-            "matchStatus": "AMBIGUOUS",
-            "orderReference": confirmation.get("orderReference"),
-            "delayHours": None,
-            "delaySeconds": None,
-            "paid": None,
-            "cancelled": None,
-            "fullyRefunded": None,
-            "existingCompensation": None,
-            "pendingActionCount": None,
-            "policyVersion": None,
-            "evidenceRefs": [],
-        }
-    if confirmation["matchStatus"] != "UNIQUE":
-        return "INVALID_CAPABILITY_RESULT"
-    order_reference = confirmation["orderReference"]
-    if confirmation["evidenceRefs"] != [f"order:{order_reference}"]:
-        return "INVALID_CAPABILITY_RESULT"
-    results: dict[InvestigationCapability, dict] = {}
-    for capability in InvestigationCapability:
-        if capability is InvestigationCapability.CONFIRM_ORDER:
-            continue
+    async def execute(action: InvestigationAction) -> dict:
+        capability = InvestigationCapability(action.kind.value)
         result = await _invoke_investigation_capability(
             client,
             base_url,
@@ -328,43 +323,60 @@ async def _collect_investigation_facts(
             generation_id,
             capability_headers,
             capability,
-            {"orderReference": order_reference},
+            action.parameter_map,
             request_scope,
         )
         if result is None:
-            return None
+            raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
         if not _valid_capability_result(capability, result):
-            return "INVALID_CAPABILITY_RESULT"
+            raise ActionLoopFailure(ActionLoopFailureCode.INVALID_TOOL_RESPONSE)
         assert isinstance(result, dict)
-        results[capability] = result
-    logistics = results[InvestigationCapability.READ_LOGISTICS]
-    payment = results[InvestigationCapability.READ_PAYMENT_AND_REFUNDS]
-    compensation = results[InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS]
-    policy = results[InvestigationCapability.READ_APPLICABLE_POLICY]
-    if logistics["evidenceRefs"] != [f"logistics:{order_reference}"]:
-        return "INVALID_CAPABILITY_RESULT"
-    if payment["evidenceRefs"] != [f"payment:{order_reference}"]:
-        return "INVALID_CAPABILITY_RESULT"
-    if compensation["evidenceRefs"] != [
-        f"compensation:{order_reference}",
-        f"order-actions:{order_reference}",
-    ]:
-        return "INVALID_CAPABILITY_RESULT"
-    if policy["evidenceRefs"] != [f"policy:{policy['policyVersion']}"]:
-        return "INVALID_CAPABILITY_RESULT"
-    return {
-        "matchStatus": confirmation["matchStatus"],
-        "orderReference": order_reference,
-        "delayHours": logistics["delayHours"],
-        "delaySeconds": logistics["delaySeconds"],
-        "paid": payment["paid"],
-        "cancelled": payment["cancelled"],
-        "fullyRefunded": payment["fullyRefunded"],
-        "existingCompensation": compensation["existingCompensation"],
-        "pendingActionCount": compensation["pendingActionCount"],
-        "policyVersion": policy["policyVersion"],
-        "evidenceRefs": [confirmation["evidenceRefs"][0], logistics["evidenceRefs"][0]],
-    }
+        if not _valid_capability_evidence(capability, result, action.parameter_map):
+            raise ActionLoopFailure(ActionLoopFailureCode.INVALID_TOOL_RESPONSE)
+        return result
+
+    async def choose(facts: dict) -> ActionDecision:
+        return await investigation_action_model.choose(facts)
+
+    return await ActionLoop(choose, ActionBudget.configured()).run(execute)
+
+
+def _normalize_loop_facts(collected: dict) -> dict:
+    facts = {name: collected.get(name) for name in REQUIRED_FACT_FIELDS}
+    if facts.get("matchStatus") == "AMBIGUOUS":
+        facts["evidenceRefs"] = []
+        return facts
+    order_reference = facts.get("orderReference")
+    facts["evidenceRefs"] = [
+        f"order:{order_reference}",
+        f"logistics:{order_reference}",
+    ]
+    return facts
+
+
+def _valid_capability_evidence(
+    capability: InvestigationCapability, result: dict, parameters: dict[str, str]
+) -> bool:
+    if capability is InvestigationCapability.CONFIRM_ORDER:
+        if result["matchStatus"] == "AMBIGUOUS":
+            return result["evidenceRefs"] == [] and isinstance(result["orderReference"], str)
+        reference = result["orderReference"]
+        return result["matchStatus"] == "UNIQUE" and result["evidenceRefs"] == [
+            f"order:{reference}"
+        ]
+    reference = parameters["orderReference"]
+    if capability is InvestigationCapability.READ_LOGISTICS:
+        expected = [f"logistics:{reference}"]
+    elif capability is InvestigationCapability.READ_PAYMENT_AND_REFUNDS:
+        expected = [f"payment:{reference}"]
+    elif capability is InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS:
+        expected = [
+            f"compensation:{reference}",
+            f"order-actions:{reference}",
+        ]
+    else:
+        expected = [f"policy:{result['policyVersion']}"]
+    return result["evidenceRefs"] == expected
 
 
 async def _invoke_investigation_capability(
