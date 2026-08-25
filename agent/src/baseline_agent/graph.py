@@ -40,6 +40,7 @@ from baseline_agent.investigation_model import (
     InvestigationJudgmentModel,
     InvestigationReasonCode,
 )
+from baseline_agent.investigation_model_runtime import configured_investigation_model
 from baseline_agent.shadow_investigation import (
     ShadowCandidate,
     compare_shadow_judgment,
@@ -90,7 +91,9 @@ REQUIRED_FACT_FIELDS = {
     "evidenceRefs",
 }
 
-investigation_judgment_model: InvestigationJudgmentModel = FixedFakeInvestigationModel()
+_configured_investigation_model = configured_investigation_model(os.environ)
+investigation_judgment_model: InvestigationJudgmentModel = _configured_investigation_model.model
+investigation_model_mode = _configured_investigation_model.mode
 investigation_action_model = DeterministicActionModel()
 customer_communication_model: CustomerCommunicationModel = FixedFakeCustomerCommunicationModel()
 shadow_candidate_factory: Callable[[], ShadowCandidate | None] = configured_shadow_candidate
@@ -262,7 +265,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 )
             return {
                 "facts": facts,
-                "model_mode": "fixed-fake-model-v1",
+                "model_mode": investigation_model_mode,
                 "investigation_actions": action_records,
             }
         unsafe_reason = _unsafe_facts_reason(facts)
@@ -289,13 +292,25 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 _controlled_summary_facts(facts),
                 action_records,
             )
-        judgment = await investigation_judgment_model.judge(
-            InvestigationJudgmentInput(
-                order_reference=facts["orderReference"],
-                delay_seconds=facts["delaySeconds"],
-                evidence_refs=tuple(facts["evidenceRefs"]),
+        try:
+            judgment = await investigation_judgment_model.judge(
+                InvestigationJudgmentInput(
+                    order_reference=facts["orderReference"],
+                    delay_seconds=facts["delaySeconds"],
+                    evidence_refs=tuple(facts["evidenceRefs"]),
+                )
             )
-        )
+        except Exception:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_MODEL_OUTPUT",
+                _controlled_summary_facts(facts),
+                action_records,
+            )
         communication_context = await _read_customer_communication_context(
             client, base_url, ticket_id, generation_id, scope_headers
         )
@@ -388,7 +403,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
             "facts": facts,
             "conclusion": conclusion,
             "customer_reply": customer_reply.as_request_value(),
-            "model_mode": "fixed-fake-model-v1",
+            "model_mode": investigation_model_mode,
             "investigation_actions": action_records,
         }
 
@@ -852,7 +867,7 @@ async def _human_handoff(
     response.raise_for_status()
     return {
         "handoff": response.json(),
-        "model_mode": "fixed-fake-model-v1",
+        "model_mode": investigation_model_mode,
         "investigation_actions": action_records or [],
     }
 

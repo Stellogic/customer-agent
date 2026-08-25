@@ -72,10 +72,11 @@ services:
       SPRING_INTERNAL_URL: http://backend:8080
       SPRING_TO_AGENT_TOKEN: ${SPRING_TO_AGENT_TOKEN:-local-spring-to-agent}
       AGENT_MACHINE_TOKEN: ${AGENT_MACHINE_TOKEN:-local-agent-machine}
+      AGENT_INVESTIGATION_MODEL_MODE: ${AGENT_INVESTIGATION_MODEL_MODE:-fixed-fake}
       AGENT_INVESTIGATION_SHADOW_MODE: ${AGENT_INVESTIGATION_SHADOW_MODE:-disabled}
       AGENT_INVESTIGATION_SHADOW_FAULT: ${AGENT_INVESTIGATION_SHADOW_FAULT:-}
       DEEPSEEK_API_KEY:
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-}
       LOG_LEVEL: ERROR
     command: ["--server-log-level", "ERROR"]
     # 私有编排运行时的第三方错误日志会携带 thread/run/checkpoint 标识；产品日志面不采集该流。
@@ -180,6 +181,18 @@ services:
       SPRING_SHADOW_DATABASE_URI: postgresql://postgres:${POSTGRES_SUPERUSER_PASSWORD:-local-postgres-superuser}@postgres:5432/customer_agent
       SPRING_TO_AGENT_TOKEN: ${SPRING_TO_AGENT_TOKEN:-local-spring-to-agent}
       DEEPSEEK_PRIOR_CONTRACT_ADMITTED: ${DEEPSEEK_PRIOR_CONTRACT_ADMITTED:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [data, services]
+
+  formal-mode-smoke:
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-local}
+    profiles: [formal]
+    entrypoint: ["python", "-m", "baseline_agent.formal_mode_business_smoke"]
+    environment:
+      SPRING_INTERNAL_URL: http://backend:8080
+      SPRING_FORMAL_DATABASE_URI: postgresql://postgres:${POSTGRES_SUPERUSER_PASSWORD:-local-postgres-superuser}@postgres:5432/customer_agent
     depends_on:
       backend:
         condition: service_healthy
