@@ -23,9 +23,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 class JdbcAgentInvestigationService implements AgentInvestigationService {
-    private static final String PUBLIC_NO_COMPENSATION_CONCLUSION =
-            "经核验，本次物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。";
-    private static final String PUBLIC_WAITING_APPROVAL = "调查已完成，补偿建议正在等待人工审批；审批完成前不会执行补偿。";
     private final JdbcTemplate jdbc;
     private final AgentAccessAudit accessAudit;
     private final Clock clock;
@@ -271,7 +268,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         Integer.toString(conclusion.delayHours()),
                         Long.toString(conclusion.delaySeconds()),
                         conclusion.orderReference(),
-                        String.join("\n", conclusion.evidenceRefs()));
+                        String.join("\n", conclusion.evidenceRefs()),
+                        replyDigest(conclusion.customerReply()));
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
@@ -322,6 +320,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         && conclusion.orderReference().equals(order.orderReference())
                         && conclusion.evidenceRefs().equals(expectedEvidence);
         if (!factsMatch) reject(ticketId, "DETERMINISTIC_REVIEW_FAILED");
+        validateCustomerReply(ticketId, conclusion, order);
 
         if (!conclusion.compensationRequired()) {
             return acceptNoCompensation(
@@ -352,7 +351,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         if (ticketUpdated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
         completeGeneration(generationId, databaseTime);
         publicProjection.appendAgentMessage(
-                ticketId, generationId, PUBLIC_NO_COMPENSATION_CONCLUSION, now, true);
+                ticketId, generationId, conclusion.customerReply().body(), now, true);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values "
                         + "(?, 'AGENT_CONCLUSION_ACCEPTED', 'agent-machine', ?), (?, 'TICKET_RESOLVED', 'spring-system', ?)",
@@ -424,7 +423,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
         publicProjection.appendAgentMessage(
-                ticketId, generationId, PUBLIC_WAITING_APPROVAL, now, false);
+                ticketId, generationId, conclusion.customerReply().body(), now, false);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, subject_type, subject_id) values "
                         + "(?, ?, 'spring-system', ?, 'COMPENSATION_PROPOSAL_REVISION', ?), "
@@ -462,11 +461,38 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 || conclusion.orderReference() == null
                 || conclusion.evidenceRefs() == null
                 || conclusion.evidenceRefs().size() != 2
-                || conclusion.evidenceRefs().stream().anyMatch(Objects::isNull)) {
+                || conclusion.evidenceRefs().stream().anyMatch(Objects::isNull)
+                || conclusion.customerReply() == null
+                || conclusion.customerReply().schemaVersion() == null
+                || conclusion.customerReply().body() == null
+                || conclusion.customerReply().intent() == null
+                || conclusion.customerReply().evidenceRefs() == null
+                || conclusion.customerReply().evidenceRefs().size() != 2
+                || conclusion.customerReply().evidenceRefs().stream().anyMatch(Objects::isNull)
+                || conclusion.customerReply().referencedOrder() == null) {
             accessAudit.rejected(ticketId, "MALFORMED_CONCLUSION");
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "malformed investigation conclusion");
         }
+    }
+
+    private void validateCustomerReply(
+            UUID ticketId, InvestigationConclusion conclusion, ScopedOrder order) {
+        String rejection =
+                CustomerReplySafetyPolicy.rejectionReason(
+                        conclusion, order.orderReference(), order.evidenceRefs());
+        if (rejection != null) reject(ticketId, rejection);
+    }
+
+    private static String replyDigest(CustomerReplyEnvelope reply) {
+        if (reply == null) return "missing-customer-reply";
+        return StableParameterDigest.sha256(
+                reply.schemaVersion(),
+                reply.body(),
+                reply.intent() == null ? "null" : reply.intent().name(),
+                reply.evidenceRefs() == null ? "null" : String.join("\n", reply.evidenceRefs()),
+                Boolean.toString(reply.escalationRequired()),
+                reply.referencedOrder());
     }
 
     private static boolean eligibleOrderState(ScopedOrder order) {
@@ -555,7 +581,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                                 + "join support_ticket t on t.id = g.ticket_id "
                                 + "where g.id = ? and g.ticket_id = ? and g.status = 'ACTIVE' "
                                 + "and t.handling_mode = 'AGENT' and t.lifecycle_state = 'INVESTIGATING' "
-                                + "and not t.customer_human_preference for update of g, t",
+                                + "and not t.customer_human_preference "
+                                + "and g.generation_number = (select max(current_generation.generation_number) "
+                                + "from agent_processing_generation current_generation where current_generation.ticket_id = t.id) "
+                                + "for update of g, t",
                         (rs, row) -> rs.getString(1),
                         generationId,
                         ticketId);
