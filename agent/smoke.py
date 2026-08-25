@@ -555,6 +555,15 @@ def main() -> None:
             "prompt_version": "investigation-judgment-v1",
             "schema_version": "investigation-judgment-v1",
             "outcome": "MATCH",
+            "failure_classification": "",
+            "latency_ms": shadow_comparison["latency_ms"],
+            "provider_attempts": "1",
+            "input_tokens": "1",
+            "output_tokens": "1",
+            "total_tokens": "2",
+            "cached_input_tokens": "0",
+            "contract_valid": "true",
+            "provider_http_status": "200",
         }
         assert len(shadow_comparison["comparison_id"]) == 64
         assert "ORDER-DELAY-UNDER-24" not in json.dumps(shadow_comparison)

@@ -126,7 +126,9 @@ async def test_real_entrypoint_reuses_frozen_dataset_and_emits_only_aggregate_co
 
 
 def test_time_of_use_pricing_uses_off_peak_rates_outside_weekday_windows() -> None:
-    tier, pricing = real_evaluation._pricing_at(datetime(2026, 8, 25, 4, 0, tzinfo=UTC))
+    tier, pricing = real_evaluation.deepseek_flash_pricing_at(
+        datetime(2026, 8, 25, 4, 0, tzinfo=UTC)
+    )
 
     assert tier == "off-peak"
     assert pricing.input_usd_per_million_tokens == 0.22
@@ -136,7 +138,7 @@ def test_time_of_use_pricing_uses_off_peak_rates_outside_weekday_windows() -> No
 
 def test_time_of_use_pricing_rejects_naive_timestamp() -> None:
     with pytest.raises(ValueError, match="timezone-aware"):
-        real_evaluation._pricing_at(datetime(2026, 8, 25, 8, 0))
+        real_evaluation.deepseek_flash_pricing_at(datetime(2026, 8, 25, 8, 0))
 
 
 @pytest.mark.asyncio

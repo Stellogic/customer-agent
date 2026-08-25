@@ -73,6 +73,9 @@ services:
       SPRING_TO_AGENT_TOKEN: ${SPRING_TO_AGENT_TOKEN:-local-spring-to-agent}
       AGENT_MACHINE_TOKEN: ${AGENT_MACHINE_TOKEN:-local-agent-machine}
       AGENT_INVESTIGATION_SHADOW_MODE: ${AGENT_INVESTIGATION_SHADOW_MODE:-disabled}
+      AGENT_INVESTIGATION_SHADOW_FAULT: ${AGENT_INVESTIGATION_SHADOW_FAULT:-}
+      DEEPSEEK_API_KEY:
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
       LOG_LEVEL: ERROR
     command: ["--server-log-level", "ERROR"]
     # 私有编排运行时的第三方错误日志会携带 thread/run/checkpoint 标识；产品日志面不采集该流。
@@ -86,7 +89,7 @@ services:
       interval: 3s
       timeout: 4s
       retries: 30
-    networks: [data, services]
+    networks: [data, services, provider-egress]
 
   backend:
     image: customer-agent/backend:${CUSTOMER_AGENT_IMAGE_TAG:-local}
@@ -167,6 +170,21 @@ services:
         condition: service_healthy
     networks: [data, services]
 
+  real-shadow-smoke:
+    image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-local}
+    profiles: [shadow]
+    entrypoint: ["python", "-m", "baseline_agent.real_shadow_business_smoke"]
+    environment:
+      AGENT_SERVER_URL: http://agent-server:2024
+      SPRING_INTERNAL_URL: http://backend:8080
+      SPRING_SHADOW_DATABASE_URI: postgresql://postgres:${POSTGRES_SUPERUSER_PASSWORD:-local-postgres-superuser}@postgres:5432/customer_agent
+      SPRING_TO_AGENT_TOKEN: ${SPRING_TO_AGENT_TOKEN:-local-spring-to-agent}
+      DEEPSEEK_PRIOR_CONTRACT_ADMITTED: ${DEEPSEEK_PRIOR_CONTRACT_ADMITTED:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [data, services]
+
   approval-queue-time-smoke:
     image: customer-agent/agent:${CUSTOMER_AGENT_IMAGE_TAG:-local}
     profiles: [smoke]
@@ -241,3 +259,6 @@ networks:
     internal: true
   data:
     internal: true
+  # 仅 Agent Server 可通过该专用网络访问已准入的模型供应商；
+  # Spring 与数据层仍只连接内部网络，供应商调用不扩大业务权威边界。
+  provider-egress:

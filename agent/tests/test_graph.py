@@ -269,6 +269,15 @@ async def test_enabled_offline_shadow_only_adds_a_minimal_checkpoint_comparison(
         "prompt_version",
         "schema_version",
         "outcome",
+        "failure_classification",
+        "latency_ms",
+        "provider_attempts",
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "cached_input_tokens",
+        "contract_valid",
+        "provider_http_status",
     }
     assert shadow_model.inputs == [
         InvestigationJudgmentInput(
