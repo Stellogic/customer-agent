@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 from collections.abc import Awaitable, Callable
@@ -5,15 +6,21 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 
-class ActionKind(StrEnum):
+class InvestigationCapability(StrEnum):
     CONFIRM_ORDER = "CONFIRM_ORDER"
     READ_LOGISTICS = "READ_LOGISTICS"
     READ_PAYMENT_AND_REFUNDS = "READ_PAYMENT_AND_REFUNDS"
     READ_COMPENSATION_AND_PENDING_ACTIONS = "READ_COMPENSATION_AND_PENDING_ACTIONS"
     READ_APPLICABLE_POLICY = "READ_APPLICABLE_POLICY"
+
+
+class TerminalAction(StrEnum):
     REQUEST_CLARIFICATION = "REQUEST_CLARIFICATION"
     SUBMIT_CONCLUSION = "SUBMIT_CONCLUSION"
     HANDOFF = "HANDOFF"
+
+
+ActionKind = InvestigationCapability | TerminalAction
 
 
 class ActionLoopFailureCode(StrEnum):
@@ -22,12 +29,6 @@ class ActionLoopFailureCode(StrEnum):
     BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
     TOOL_FAILURE = "TOOL_FAILURE"
     INVALID_TOOL_RESPONSE = "INVALID_TOOL_RESPONSE"
-
-
-class ActionLoopFailure(Exception):
-    def __init__(self, code: ActionLoopFailureCode) -> None:
-        self.code = code
-        super().__init__(code.value)
 
 
 @dataclass(frozen=True)
@@ -57,17 +58,20 @@ class ActionDecision:
         cls, kind: ActionKind | str, parameters: dict[str, str], usage: ActionUsage
     ) -> "ActionDecision":
         try:
-            controlled_kind = ActionKind(kind)
-        except ValueError as error:
-            raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION) from error
+            controlled_kind: ActionKind = InvestigationCapability(kind)
+        except ValueError:
+            try:
+                controlled_kind = TerminalAction(kind)
+            except ValueError as error:
+                raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION) from error
         expected = (
             set()
             if controlled_kind
             in {
-                ActionKind.CONFIRM_ORDER,
-                ActionKind.REQUEST_CLARIFICATION,
-                ActionKind.SUBMIT_CONCLUSION,
-                ActionKind.HANDOFF,
+                InvestigationCapability.CONFIRM_ORDER,
+                TerminalAction.REQUEST_CLARIFICATION,
+                TerminalAction.SUBMIT_CONCLUSION,
+                TerminalAction.HANDOFF,
             }
             else {"orderReference"}
         )
@@ -108,9 +112,22 @@ class ActionRecord:
     result_code: str
 
 
+class ActionLoopFailure(Exception):
+    def __init__(
+        self,
+        code: ActionLoopFailureCode,
+        facts: dict | None = None,
+        records: tuple[ActionRecord, ...] = (),
+    ) -> None:
+        self.code = code
+        self.facts = dict(facts or {})
+        self.records = records
+        super().__init__(code.value)
+
+
 @dataclass(frozen=True)
 class ActionLoopResult:
-    terminal_action: ActionKind
+    terminal_action: TerminalAction
     facts: dict
     records: tuple[ActionRecord, ...]
 
@@ -118,21 +135,24 @@ class ActionLoopResult:
 class DeterministicActionModel:
     async def choose(self, facts: dict) -> ActionDecision:
         if "matchStatus" not in facts:
-            return _decision(ActionKind.CONFIRM_ORDER)
+            return _decision(InvestigationCapability.CONFIRM_ORDER)
         if facts["matchStatus"] == "AMBIGUOUS":
-            return _decision(ActionKind.REQUEST_CLARIFICATION)
+            return _decision(TerminalAction.REQUEST_CLARIFICATION)
         reference = facts.get("orderReference")
         if not isinstance(reference, str) or not reference:
-            return _decision(ActionKind.HANDOFF)
+            return _decision(TerminalAction.HANDOFF)
         for field, kind in (
-            ("delaySeconds", ActionKind.READ_LOGISTICS),
-            ("paid", ActionKind.READ_PAYMENT_AND_REFUNDS),
-            ("existingCompensation", ActionKind.READ_COMPENSATION_AND_PENDING_ACTIONS),
-            ("policyVersion", ActionKind.READ_APPLICABLE_POLICY),
+            ("delaySeconds", InvestigationCapability.READ_LOGISTICS),
+            ("paid", InvestigationCapability.READ_PAYMENT_AND_REFUNDS),
+            (
+                "existingCompensation",
+                InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
+            ),
+            ("policyVersion", InvestigationCapability.READ_APPLICABLE_POLICY),
         ):
             if field not in facts:
                 return _decision(kind, {"orderReference": reference})
-        return _decision(ActionKind.SUBMIT_CONCLUSION)
+        return _decision(TerminalAction.SUBMIT_CONCLUSION)
 
 
 class ActionLoop:
@@ -155,16 +175,22 @@ class ActionLoop:
         seen: dict[InvestigationAction, int] = {}
         tokens = cost_micros = provider_attempts = 0
         while True:
-            if (self._clock() - started) * 1000 > self._budget.max_wall_clock_ms:
-                raise ActionLoopFailure(ActionLoopFailureCode.BUDGET_EXHAUSTED)
+            remaining_seconds = self._remaining_seconds(started)
+            if remaining_seconds <= 0:
+                raise self._failure(ActionLoopFailureCode.BUDGET_EXHAUSTED, facts, records)
             try:
-                decision = await self._choose(dict(facts))
-            except ActionLoopFailure:
-                raise
+                async with asyncio.timeout(remaining_seconds):
+                    decision = await self._choose(dict(facts))
+            except TimeoutError as error:
+                raise self._failure(
+                    ActionLoopFailureCode.BUDGET_EXHAUSTED, facts, records
+                ) from error
+            except ActionLoopFailure as error:
+                raise self._failure(error.code, facts, records) from error
             except Exception as error:
-                raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION) from error
+                raise self._failure(ActionLoopFailureCode.UNKNOWN_ACTION, facts, records) from error
             if not isinstance(decision, ActionDecision):
-                raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION)
+                raise self._failure(ActionLoopFailureCode.UNKNOWN_ACTION, facts, records)
             tokens += decision.usage.tokens
             cost_micros += decision.usage.cost_micros
             provider_attempts += decision.usage.provider_attempts
@@ -174,26 +200,30 @@ class ActionLoop:
                 or cost_micros > self._budget.max_cost_micros
                 or provider_attempts > self._budget.max_provider_attempts
             ):
-                raise ActionLoopFailure(ActionLoopFailureCode.BUDGET_EXHAUSTED)
+                raise self._failure(ActionLoopFailureCode.BUDGET_EXHAUSTED, facts, records)
             repeats = seen.get(decision.action, 0)
             if repeats > self._budget.max_repeated_actions:
-                raise ActionLoopFailure(ActionLoopFailureCode.REPEATED_NO_PROGRESS)
+                raise self._failure(ActionLoopFailureCode.REPEATED_NO_PROGRESS, facts, records)
             seen[decision.action] = repeats + 1
-            if decision.action.kind in {
-                ActionKind.REQUEST_CLARIFICATION,
-                ActionKind.SUBMIT_CONCLUSION,
-                ActionKind.HANDOFF,
-            }:
+            if isinstance(decision.action.kind, TerminalAction):
                 records.append(ActionRecord(decision.action.kind.value, (), "SELECTED"))
                 return ActionLoopResult(decision.action.kind, facts, tuple(records))
             try:
-                result = await execute(decision.action)
-            except ActionLoopFailure:
-                raise
+                remaining_seconds = self._remaining_seconds(started)
+                if remaining_seconds <= 0:
+                    raise self._failure(ActionLoopFailureCode.BUDGET_EXHAUSTED, facts, records)
+                async with asyncio.timeout(remaining_seconds):
+                    result = await execute(decision.action)
+            except TimeoutError as error:
+                raise self._failure(
+                    ActionLoopFailureCode.BUDGET_EXHAUSTED, facts, records
+                ) from error
+            except ActionLoopFailure as error:
+                raise self._failure(error.code, facts, records) from error
             except Exception as error:
-                raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE) from error
+                raise self._failure(ActionLoopFailureCode.TOOL_FAILURE, facts, records) from error
             if not isinstance(result, dict):
-                raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
+                raise self._failure(ActionLoopFailureCode.TOOL_FAILURE, facts, records)
             before = dict(facts)
             facts.update(
                 {
@@ -215,6 +245,15 @@ class ActionLoop:
                     "PROGRESSED" if facts != before else "NO_PROGRESS",
                 )
             )
+
+    def _remaining_seconds(self, started: float) -> float:
+        return self._budget.max_wall_clock_ms / 1000 - (self._clock() - started)
+
+    @staticmethod
+    def _failure(
+        code: ActionLoopFailureCode, facts: dict, records: list[ActionRecord]
+    ) -> ActionLoopFailure:
+        return ActionLoopFailure(code, facts, tuple(records))
 
 
 def _decision(kind: ActionKind, parameters: dict[str, str] | None = None) -> ActionDecision:

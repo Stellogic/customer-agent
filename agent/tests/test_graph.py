@@ -10,6 +10,12 @@ from baseline_agent.graph import (
     probe_spring,
     request_clarification,
 )
+from baseline_agent.investigation_action_loop import (
+    ActionDecision,
+    ActionUsage,
+    DeterministicActionModel,
+    TerminalAction,
+)
 from baseline_agent.investigation_model import (
     InvestigationJudgment,
     InvestigationJudgmentInput,
@@ -28,6 +34,75 @@ class _OfflineShadowModel:
         if isinstance(self.result, Exception):
             raise self.result
         return self.result
+
+
+class _HandoffAfterFactsModel(DeterministicActionModel):
+    async def choose(self, facts: dict) -> ActionDecision:
+        if "policyVersion" in facts:
+            return ActionDecision.from_values(TerminalAction.HANDOFF, {}, ActionUsage())
+        return await super().choose(facts)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("force_handoff", [False, True])
+async def test_terminal_handoff_and_budget_failure_preserve_controlled_action_records(
+    monkeypatch: pytest.MonkeyPatch, force_handoff: bool
+) -> None:
+    posts: list[str] = []
+
+    class Response:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, *_: object, **__: object) -> Response:
+            return Response(_capability_catalog())
+
+        async def post(self, url: str, **_: object) -> Response:
+            posts.append(url)
+            if "/capabilities/" in url:
+                return Response(_capability_result(url, _unique_facts()))
+            if url.endswith("/conclusions"):
+                raise AssertionError("handoff path must not submit a conclusion")
+            return Response({"handlingMode": "HUMAN", "reasonCode": "UNSUPPORTED_SCENARIO"})
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    if force_handoff:
+        monkeypatch.setattr(
+            "baseline_agent.graph.investigation_action_model", _HandoffAfterFactsModel()
+        )
+    else:
+        monkeypatch.setenv("AGENT_INVESTIGATION_MAX_ACTIONS", "2")
+
+    result = await investigate_ticket(
+        {
+            "requested_by": "spring",
+            "ticket_id": "ticket-120",
+            "generation_id": "generation-120",
+        }
+    )
+
+    assert result["handoff"]["handlingMode"] == "HUMAN"
+    assert not any(url.endswith("/conclusions") for url in posts)
+    action_types = [record["actionType"] for record in result["investigation_actions"]]
+    if force_handoff:
+        assert action_types[-1] == "HANDOFF"
+    else:
+        assert action_types == ["CONFIRM_ORDER", "READ_LOGISTICS"]
 
 
 @pytest.mark.asyncio

@@ -1,19 +1,22 @@
+import asyncio
+
 import pytest
 
 from baseline_agent.investigation_action_loop import (
     ActionBudget,
     ActionDecision,
-    ActionKind,
     ActionLoop,
     ActionLoopFailure,
     ActionLoopFailureCode,
     ActionUsage,
     DeterministicActionModel,
+    InvestigationCapability,
+    TerminalAction,
 )
 
 
 def _decision(
-    kind: ActionKind | str,
+    kind: InvestigationCapability | TerminalAction | str,
     order_reference: str | None = None,
     *,
     tokens: int = 1,
@@ -33,12 +36,12 @@ async def test_deterministic_model_selects_one_allowed_action_until_submission()
     model = DeterministicActionModel()
     facts: dict = {}
     expected = [
-        ActionKind.CONFIRM_ORDER,
-        ActionKind.READ_LOGISTICS,
-        ActionKind.READ_PAYMENT_AND_REFUNDS,
-        ActionKind.READ_COMPENSATION_AND_PENDING_ACTIONS,
-        ActionKind.READ_APPLICABLE_POLICY,
-        ActionKind.SUBMIT_CONCLUSION,
+        InvestigationCapability.CONFIRM_ORDER,
+        InvestigationCapability.READ_LOGISTICS,
+        InvestigationCapability.READ_PAYMENT_AND_REFUNDS,
+        InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
+        InvestigationCapability.READ_APPLICABLE_POLICY,
+        TerminalAction.SUBMIT_CONCLUSION,
     ]
 
     selected = []
@@ -48,19 +51,18 @@ async def test_deterministic_model_selects_one_allowed_action_until_submission()
         facts.update(_progress_for(kind))
 
     assert selected == expected
-    assert all(kind in ActionKind for kind in selected)
 
 
 @pytest.mark.asyncio
 async def test_loop_allows_different_legal_tool_order_and_records_only_controlled_results() -> None:
     decisions = iter(
         [
-            _decision(ActionKind.CONFIRM_ORDER),
-            _decision(ActionKind.READ_APPLICABLE_POLICY, "ORDER-120"),
-            _decision(ActionKind.READ_LOGISTICS, "ORDER-120"),
-            _decision(ActionKind.READ_PAYMENT_AND_REFUNDS, "ORDER-120"),
-            _decision(ActionKind.READ_COMPENSATION_AND_PENDING_ACTIONS, "ORDER-120"),
-            _decision(ActionKind.SUBMIT_CONCLUSION),
+            _decision(InvestigationCapability.CONFIRM_ORDER),
+            _decision(InvestigationCapability.READ_APPLICABLE_POLICY, "ORDER-120"),
+            _decision(InvestigationCapability.READ_LOGISTICS, "ORDER-120"),
+            _decision(InvestigationCapability.READ_PAYMENT_AND_REFUNDS, "ORDER-120"),
+            _decision(InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS, "ORDER-120"),
+            _decision(TerminalAction.SUBMIT_CONCLUSION),
         ]
     )
 
@@ -72,7 +74,7 @@ async def test_loop_allows_different_legal_tool_order_and_records_only_controlle
 
     result = await ActionLoop(choose, ActionBudget()).run(execute)
 
-    assert result.terminal_action is ActionKind.SUBMIT_CONCLUSION
+    assert result.terminal_action is TerminalAction.SUBMIT_CONCLUSION
     assert result.facts["policyVersion"] == "delay-policy-v1"
     assert [record.action_type for record in result.records] == [
         "CONFIRM_ORDER",
@@ -93,22 +95,25 @@ async def test_loop_allows_different_legal_tool_order_and_records_only_controlle
     [
         ([{"action": "UNKNOWN"}], ActionBudget(), ActionLoopFailureCode.UNKNOWN_ACTION),
         (
-            [_decision(ActionKind.CONFIRM_ORDER), _decision(ActionKind.CONFIRM_ORDER)],
+            [
+                _decision(InvestigationCapability.CONFIRM_ORDER),
+                _decision(InvestigationCapability.CONFIRM_ORDER),
+            ],
             ActionBudget(max_repeated_actions=0),
             ActionLoopFailureCode.REPEATED_NO_PROGRESS,
         ),
         (
-            [_decision(ActionKind.CONFIRM_ORDER, tokens=101)],
+            [_decision(InvestigationCapability.CONFIRM_ORDER, tokens=101)],
             ActionBudget(max_tokens=100),
             ActionLoopFailureCode.BUDGET_EXHAUSTED,
         ),
         (
-            [_decision(ActionKind.CONFIRM_ORDER, cost_micros=11)],
+            [_decision(InvestigationCapability.CONFIRM_ORDER, cost_micros=11)],
             ActionBudget(max_cost_micros=10),
             ActionLoopFailureCode.BUDGET_EXHAUSTED,
         ),
         (
-            [_decision(ActionKind.CONFIRM_ORDER, provider_attempts=3)],
+            [_decision(InvestigationCapability.CONFIRM_ORDER, provider_attempts=3)],
             ActionBudget(max_provider_attempts=2),
             ActionLoopFailureCode.BUDGET_EXHAUSTED,
         ),
@@ -120,46 +125,72 @@ async def test_loop_fails_closed_for_unknown_repeated_or_exhausted_actions(
     iterator = iter(decisions)
 
     async def execute(action) -> dict:
-        return {} if action.kind is ActionKind.CONFIRM_ORDER else _progress_for(action.kind)
+        return (
+            {}
+            if action.kind is InvestigationCapability.CONFIRM_ORDER
+            else _progress_for(action.kind)
+        )
 
     with pytest.raises(ActionLoopFailure) as captured:
         await ActionLoop(lambda _: _async_next(iterator), budget).run(execute)
 
     assert captured.value.code is expected
+    if expected is ActionLoopFailureCode.REPEATED_NO_PROGRESS:
+        assert captured.value.facts == {}
+        assert [record.action_type for record in captured.value.records] == ["CONFIRM_ORDER"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("slow_boundary", ["model", "tool"])
+async def test_wall_clock_budget_cancels_slow_model_and_tool_calls(slow_boundary: str) -> None:
+    async def choose(_: dict) -> ActionDecision:
+        if slow_boundary == "model":
+            await asyncio.sleep(0.05)
+        return _decision(InvestigationCapability.CONFIRM_ORDER)
+
+    async def execute(_) -> dict:
+        if slow_boundary == "tool":
+            await asyncio.sleep(0.05)
+        return _progress_for(InvestigationCapability.CONFIRM_ORDER)
+
+    with pytest.raises(ActionLoopFailure) as captured:
+        await ActionLoop(choose, ActionBudget(max_wall_clock_ms=5)).run(execute)
+
+    assert captured.value.code is ActionLoopFailureCode.BUDGET_EXHAUSTED
 
 
 async def _async_next(iterator) -> ActionDecision:
     return next(iterator)
 
 
-def _progress_for(kind: ActionKind) -> dict:
+def _progress_for(kind: InvestigationCapability | TerminalAction) -> dict:
     return {
-        ActionKind.CONFIRM_ORDER: {
+        InvestigationCapability.CONFIRM_ORDER: {
             "matchStatus": "UNIQUE",
             "orderReference": "ORDER-120",
             "evidenceRefs": ["order:ORDER-120"],
         },
-        ActionKind.READ_LOGISTICS: {
+        InvestigationCapability.READ_LOGISTICS: {
             "delayHours": 80,
             "delaySeconds": 288000,
             "evidenceRefs": ["logistics:ORDER-120"],
         },
-        ActionKind.READ_PAYMENT_AND_REFUNDS: {
+        InvestigationCapability.READ_PAYMENT_AND_REFUNDS: {
             "paid": True,
             "cancelled": False,
             "fullyRefunded": False,
             "evidenceRefs": ["payment:ORDER-120"],
         },
-        ActionKind.READ_COMPENSATION_AND_PENDING_ACTIONS: {
+        InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS: {
             "existingCompensation": False,
             "pendingActionCount": 0,
             "evidenceRefs": ["compensation:ORDER-120", "order-actions:ORDER-120"],
         },
-        ActionKind.READ_APPLICABLE_POLICY: {
+        InvestigationCapability.READ_APPLICABLE_POLICY: {
             "policyVersion": "delay-policy-v1",
             "evidenceRefs": ["policy:delay-policy-v1"],
         },
-        ActionKind.SUBMIT_CONCLUSION: {},
-        ActionKind.REQUEST_CLARIFICATION: {},
-        ActionKind.HANDOFF: {},
+        TerminalAction.SUBMIT_CONCLUSION: {},
+        TerminalAction.REQUEST_CLARIFICATION: {},
+        TerminalAction.HANDOFF: {},
     }[kind]

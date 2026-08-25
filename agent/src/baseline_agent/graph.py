@@ -1,7 +1,6 @@
 import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import TypedDict
 
 import httpx
@@ -19,8 +18,11 @@ from baseline_agent.investigation_action_loop import (
     ActionLoop,
     ActionLoopFailure,
     ActionLoopFailureCode,
+    ActionRecord,
     DeterministicActionModel,
     InvestigationAction,
+    InvestigationCapability,
+    TerminalAction,
 )
 from baseline_agent.investigation_model import (
     FixedFakeInvestigationModel,
@@ -70,14 +72,6 @@ REQUIRED_FACT_FIELDS = {
 investigation_judgment_model: InvestigationJudgmentModel = FixedFakeInvestigationModel()
 investigation_action_model = DeterministicActionModel()
 shadow_candidate_factory: Callable[[], ShadowCandidate | None] = configured_shadow_candidate
-
-
-class InvestigationCapability(StrEnum):
-    CONFIRM_ORDER = "CONFIRM_ORDER"
-    READ_LOGISTICS = "READ_LOGISTICS"
-    READ_PAYMENT_AND_REFUNDS = "READ_PAYMENT_AND_REFUNDS"
-    READ_COMPENSATION_AND_PENDING_ACTIONS = "READ_COMPENSATION_AND_PENDING_ACTIONS"
-    READ_APPLICABLE_POLICY = "READ_APPLICABLE_POLICY"
 
 
 @dataclass(frozen=True)
@@ -185,6 +179,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 capability_request_scope,
             )
         except ActionLoopFailure as error:
+            failed_action_records = _checkpoint_action_records(error.records)
             return await _human_handoff(
                 client,
                 base_url,
@@ -197,6 +192,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                     else "TOOL_RETRY_EXHAUSTED"
                 ),
                 [],
+                failed_action_records,
             )
         except httpx.HTTPStatusError as error:
             if error.response.status_code != 409:
@@ -211,14 +207,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 [],
             )
         facts = _normalize_loop_facts(loop_result.facts)
-        action_records = [
-            {
-                "actionType": record.action_type,
-                "evidenceReferences": list(record.evidence_references),
-                "resultCode": record.result_code,
-            }
-            for record in loop_result.records
-        ]
+        action_records = _checkpoint_action_records(loop_result.records)
         unsafe_reason = _unsafe_facts_reason(facts)
         if unsafe_reason is not None:
             return await _human_handoff(
@@ -229,14 +218,48 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 scope_headers,
                 unsafe_reason,
                 _controlled_summary_facts(facts),
+                action_records,
             )
         assert isinstance(facts, dict)
-        if facts.get("matchStatus") == "AMBIGUOUS":
+        if loop_result.terminal_action is TerminalAction.HANDOFF:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "UNSUPPORTED_SCENARIO",
+                _controlled_summary_facts(facts),
+                action_records,
+            )
+        if loop_result.terminal_action is TerminalAction.REQUEST_CLARIFICATION:
+            if facts.get("matchStatus") != "AMBIGUOUS":
+                return await _human_handoff(
+                    client,
+                    base_url,
+                    ticket_id,
+                    generation_id,
+                    scope_headers,
+                    "INVALID_TOOL_RESPONSE",
+                    _controlled_summary_facts(facts),
+                    action_records,
+                )
             return {
                 "facts": facts,
                 "model_mode": "fixed-fake-model-v1",
                 "investigation_actions": action_records,
             }
+        if loop_result.terminal_action is not TerminalAction.SUBMIT_CONCLUSION:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_TOOL_RESPONSE",
+                _controlled_summary_facts(facts),
+                action_records,
+            )
         judgment = await investigation_judgment_model.judge(
             InvestigationJudgmentInput(
                 order_reference=facts["orderReference"],
@@ -352,6 +375,17 @@ def _normalize_loop_facts(collected: dict) -> dict:
         f"logistics:{order_reference}",
     ]
     return facts
+
+
+def _checkpoint_action_records(records: tuple[ActionRecord, ...]) -> list[dict[str, object]]:
+    return [
+        {
+            "actionType": record.action_type,
+            "evidenceReferences": list(record.evidence_references),
+            "resultCode": record.result_code,
+        }
+        for record in records
+    ]
 
 
 def _valid_capability_evidence(
@@ -653,6 +687,7 @@ async def _human_handoff(
     scope_headers: dict[str, str],
     reason_code: str,
     facts: list[dict[str, str]],
+    action_records: list[dict[str, object]] | None = None,
 ) -> BaselineState:
     response = await client.post(
         f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/human-handoff",
@@ -667,7 +702,11 @@ async def _human_handoff(
         },
     )
     response.raise_for_status()
-    return {"handoff": response.json(), "model_mode": "fixed-fake-model-v1"}
+    return {
+        "handoff": response.json(),
+        "model_mode": "fixed-fake-model-v1",
+        "investigation_actions": action_records or [],
+    }
 
 
 async def request_clarification(state: BaselineState) -> BaselineState:
