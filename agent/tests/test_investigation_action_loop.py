@@ -174,6 +174,36 @@ async def test_wall_clock_budget_cancels_slow_model_and_tool_calls(slow_boundary
     assert captured.value.code is ActionLoopFailureCode.BUDGET_EXHAUSTED
 
 
+@pytest.mark.asyncio
+async def test_loop_preserves_sanitized_model_failure_attempts_after_completed_tools() -> None:
+    decisions = iter([_decision(InvestigationCapability.CONFIRM_ORDER)])
+
+    async def choose(_: dict) -> ActionDecision:
+        try:
+            return next(decisions)
+        except StopIteration:
+            raise ActionLoopFailure(
+                ActionLoopFailureCode.MODEL_CALL_FAILED,
+                provider_attempts=2,
+            ) from None
+
+    with pytest.raises(ActionLoopFailure) as captured:
+        await ActionLoop(choose, ActionBudget()).run(
+            lambda action: _async_result(_progress_for(action.kind))
+        )
+
+    assert captured.value.code is ActionLoopFailureCode.MODEL_CALL_FAILED
+    assert captured.value.provider_attempts == 3
+    assert [record.action_type for record in captured.value.records] == ["CONFIRM_ORDER"]
+    assert [call.call_number for call in captured.value.model_calls] == [1, 2]
+    assert captured.value.model_calls[-1].selected_action == ""
+    assert captured.value.model_calls[-1].provider_attempts == 2
+
+
+async def _async_result(value: dict) -> dict:
+    return value
+
+
 async def _async_next(iterator) -> ActionDecision:
     return next(iterator)
 

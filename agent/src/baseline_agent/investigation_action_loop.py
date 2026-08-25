@@ -4,6 +4,7 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Protocol
 
 
 class InvestigationCapability(StrEnum):
@@ -34,6 +35,7 @@ ActionKind = InvestigationCapability | TerminalAction
 
 class ActionLoopFailureCode(StrEnum):
     UNKNOWN_ACTION = "UNKNOWN_ACTION"
+    MODEL_CALL_FAILED = "MODEL_CALL_FAILED"
     REPEATED_NO_PROGRESS = "REPEATED_NO_PROGRESS"
     BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
     TOOL_FAILURE = "TOOL_FAILURE"
@@ -126,16 +128,29 @@ class ActionRecord:
     result_code: str
 
 
+@dataclass(frozen=True)
+class ActionModelCallRecord:
+    call_number: int
+    selected_action: str
+    provider_attempts: int
+    tokens: int
+    cost_micros: int
+
+
 class ActionLoopFailure(Exception):
     def __init__(
         self,
         code: ActionLoopFailureCode,
         facts: dict | None = None,
         records: tuple[ActionRecord, ...] = (),
+        provider_attempts: int = 0,
+        model_calls: tuple[ActionModelCallRecord, ...] = (),
     ) -> None:
         self.code = code
         self.facts = dict(facts or {})
         self.records = records
+        self.provider_attempts = provider_attempts
+        self.model_calls = model_calls
         super().__init__(code.value)
 
 
@@ -144,6 +159,10 @@ class ActionLoopResult:
     terminal_action: TerminalAction
     facts: dict
     records: tuple[ActionRecord, ...]
+    tokens: int
+    cost_micros: int
+    provider_attempts: int
+    model_calls: tuple[ActionModelCallRecord, ...]
 
 
 class DeterministicActionModel:
@@ -169,6 +188,10 @@ class DeterministicActionModel:
         return _decision(TerminalAction.SUBMIT_CONCLUSION)
 
 
+class InvestigationActionModel(Protocol):
+    async def choose(self, facts: dict) -> ActionDecision: ...
+
+
 class ActionLoop:
     def __init__(
         self,
@@ -186,58 +209,155 @@ class ActionLoop:
         started = self._clock()
         facts: dict = {}
         records: list[ActionRecord] = []
+        model_calls: list[ActionModelCallRecord] = []
         seen: dict[InvestigationAction, int] = {}
         tokens = cost_micros = provider_attempts = 0
         while True:
             remaining_seconds = self._remaining_seconds(started)
             if remaining_seconds <= 0:
-                raise self._failure(ActionLoopFailureCode.BUDGET_EXHAUSTED, facts, records)
+                raise self._failure(
+                    ActionLoopFailureCode.BUDGET_EXHAUSTED,
+                    facts,
+                    records,
+                    provider_attempts,
+                    model_calls,
+                )
             try:
                 async with asyncio.timeout(remaining_seconds):
                     decision = await self._choose(dict(facts))
             except TimeoutError as error:
                 raise self._failure(
-                    ActionLoopFailureCode.BUDGET_EXHAUSTED, facts, records
+                    ActionLoopFailureCode.BUDGET_EXHAUSTED,
+                    facts,
+                    records,
+                    provider_attempts,
+                    model_calls,
                 ) from error
             except ActionLoopFailure as error:
-                raise self._failure(error.code, facts, records) from error
+                failed_calls = list(model_calls)
+                if error.provider_attempts > 0:
+                    failed_calls.append(
+                        ActionModelCallRecord(
+                            call_number=len(failed_calls) + 1,
+                            selected_action="",
+                            provider_attempts=error.provider_attempts,
+                            tokens=0,
+                            cost_micros=0,
+                        )
+                    )
+                raise self._failure(
+                    error.code,
+                    facts,
+                    records,
+                    provider_attempts + error.provider_attempts,
+                    failed_calls,
+                ) from error
             except Exception as error:
-                raise self._failure(ActionLoopFailureCode.UNKNOWN_ACTION, facts, records) from error
+                raise self._failure(
+                    ActionLoopFailureCode.UNKNOWN_ACTION,
+                    facts,
+                    records,
+                    provider_attempts,
+                    model_calls,
+                ) from error
             if not isinstance(decision, ActionDecision):
-                raise self._failure(ActionLoopFailureCode.UNKNOWN_ACTION, facts, records)
+                raise self._failure(
+                    ActionLoopFailureCode.UNKNOWN_ACTION,
+                    facts,
+                    records,
+                    provider_attempts,
+                    model_calls,
+                )
             tokens += decision.usage.tokens
             cost_micros += decision.usage.cost_micros
             provider_attempts += decision.usage.provider_attempts
+            model_calls.append(
+                ActionModelCallRecord(
+                    call_number=len(model_calls) + 1,
+                    selected_action=decision.action.kind.value,
+                    provider_attempts=decision.usage.provider_attempts,
+                    tokens=decision.usage.tokens,
+                    cost_micros=decision.usage.cost_micros,
+                )
+            )
             if (
                 len(records) >= self._budget.max_actions
                 or tokens > self._budget.max_tokens
                 or cost_micros > self._budget.max_cost_micros
                 or provider_attempts > self._budget.max_provider_attempts
             ):
-                raise self._failure(ActionLoopFailureCode.BUDGET_EXHAUSTED, facts, records)
+                raise self._failure(
+                    ActionLoopFailureCode.BUDGET_EXHAUSTED,
+                    facts,
+                    records,
+                    provider_attempts,
+                    model_calls,
+                )
             repeats = seen.get(decision.action, 0)
             if repeats > self._budget.max_repeated_actions:
-                raise self._failure(ActionLoopFailureCode.REPEATED_NO_PROGRESS, facts, records)
+                raise self._failure(
+                    ActionLoopFailureCode.REPEATED_NO_PROGRESS,
+                    facts,
+                    records,
+                    provider_attempts,
+                    model_calls,
+                )
             seen[decision.action] = repeats + 1
             if isinstance(decision.action.kind, TerminalAction):
                 records.append(ActionRecord(decision.action.kind.value, (), "SELECTED"))
-                return ActionLoopResult(decision.action.kind, facts, tuple(records))
+                return ActionLoopResult(
+                    decision.action.kind,
+                    facts,
+                    tuple(records),
+                    tokens,
+                    cost_micros,
+                    provider_attempts,
+                    tuple(model_calls),
+                )
             try:
                 remaining_seconds = self._remaining_seconds(started)
                 if remaining_seconds <= 0:
-                    raise self._failure(ActionLoopFailureCode.BUDGET_EXHAUSTED, facts, records)
+                    raise self._failure(
+                        ActionLoopFailureCode.BUDGET_EXHAUSTED,
+                        facts,
+                        records,
+                        provider_attempts,
+                        model_calls,
+                    )
                 async with asyncio.timeout(remaining_seconds):
                     result = await execute(decision.action)
             except TimeoutError as error:
                 raise self._failure(
-                    ActionLoopFailureCode.BUDGET_EXHAUSTED, facts, records
+                    ActionLoopFailureCode.BUDGET_EXHAUSTED,
+                    facts,
+                    records,
+                    provider_attempts,
+                    model_calls,
                 ) from error
             except ActionLoopFailure as error:
-                raise self._failure(error.code, facts, records) from error
+                raise self._failure(
+                    error.code,
+                    facts,
+                    records,
+                    provider_attempts,
+                    model_calls,
+                ) from error
             except Exception as error:
-                raise self._failure(ActionLoopFailureCode.TOOL_FAILURE, facts, records) from error
+                raise self._failure(
+                    ActionLoopFailureCode.TOOL_FAILURE,
+                    facts,
+                    records,
+                    provider_attempts,
+                    model_calls,
+                ) from error
             if not isinstance(result, dict):
-                raise self._failure(ActionLoopFailureCode.TOOL_FAILURE, facts, records)
+                raise self._failure(
+                    ActionLoopFailureCode.TOOL_FAILURE,
+                    facts,
+                    records,
+                    provider_attempts,
+                    model_calls,
+                )
             before = dict(facts)
             facts.update(
                 {
@@ -265,9 +385,19 @@ class ActionLoop:
 
     @staticmethod
     def _failure(
-        code: ActionLoopFailureCode, facts: dict, records: list[ActionRecord]
+        code: ActionLoopFailureCode,
+        facts: dict,
+        records: list[ActionRecord],
+        provider_attempts: int = 0,
+        model_calls: list[ActionModelCallRecord] | None = None,
     ) -> ActionLoopFailure:
-        return ActionLoopFailure(code, facts, tuple(records))
+        return ActionLoopFailure(
+            code,
+            facts,
+            tuple(records),
+            provider_attempts=provider_attempts,
+            model_calls=tuple(model_calls or ()),
+        )
 
 
 def _decision(kind: ActionKind, parameters: dict[str, str] | None = None) -> ActionDecision:

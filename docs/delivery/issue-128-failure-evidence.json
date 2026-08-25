@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "issue-128-sanitized-failure-evidence-v1",
+  "providerInvokedDuringExport": false,
+  "actions": [
+    {
+      "callNumber": 1,
+      "actionType": "CONFIRM_ORDER",
+      "parameterSummary": "no parameters",
+      "providerAttempts": 1,
+      "tokens": 316,
+      "estimatedCostMicros": 152,
+      "authorizedToolResult": "PROGRESSED",
+      "factChangeSummary": "added the unique-match fact and a verified order reference"
+    },
+    {
+      "callNumber": 2,
+      "actionType": "READ_LOGISTICS",
+      "parameterSummary": "one previously verified order-reference parameter; value omitted",
+      "providerAttempts": 1,
+      "tokens": 345,
+      "estimatedCostMicros": 173,
+      "authorizedToolResult": "PROGRESSED",
+      "factChangeSummary": "added the two controlled logistics-delay facts"
+    },
+    {
+      "callNumber": 3,
+      "actionType": "READ_LOGISTICS",
+      "parameterSummary": "the same previously verified order-reference parameter; value omitted",
+      "providerAttempts": 1,
+      "tokens": 363,
+      "estimatedCostMicros": 187,
+      "authorizedToolResult": "NOT_INVOKED",
+      "factChangeSummary": "none; repeated-action protection stopped before tool execution"
+    }
+  ],
+  "progressFingerprint": {
+    "implementationKey": "action type plus exact controlled parameters",
+    "firstFingerprint": "CONFIRM_ORDER with no parameters",
+    "secondFingerprint": "READ_LOGISTICS with one verified order-reference parameter",
+    "thirdFingerprint": "identical to the second fingerprint",
+    "factProgressIncludedInFingerprint": false,
+    "decisionPoint": "the third model result, before a third authorized tool invocation",
+    "classification": "REPEATED_NO_PROGRESS",
+    "repeatBudget": 0
+  },
+  "checkpoint": {
+    "outcome": "SAFE_HANDOFF",
+    "failureClassification": "REPEATED_NO_PROGRESS",
+    "providerAttempts": 3,
+    "logicalCalls": 3,
+    "toolRounds": 2,
+    "estimatedCostMicros": 512,
+    "persistedActionRecordCount": 2
+  },
+  "springAuthority": {
+    "generationStatus": "HANDED_OFF",
+    "submissionStatus": "COMPLETED",
+    "lifecycleState": "INVESTIGATING",
+    "handlingMode": "HUMAN",
+    "handoffReasonCode": "TOOL_RETRY_EXHAUSTED",
+    "handoffRequestCount": 1,
+    "authoritativeFactCount": 3,
+    "agentCommandCount": 2
+  },
+  "consistency": {
+    "sameRetainedRunVerified": true,
+    "checkpointAndSpringAgreeOnHandoff": true,
+    "twoCompletedToolsMatchTwoSpringCommands": true,
+    "springFactTypes": [
+      "ORDER",
+      "LOGISTICS_DELAY_HOURS",
+      "LOGISTICS_DELAY_SECONDS"
+    ]
+  },
+  "excludedData": [
+    "credentials",
+    "prompts",
+    "provider response content",
+    "raw tool payloads",
+    "business identifiers"
+  ]
+}

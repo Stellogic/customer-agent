@@ -70,12 +70,12 @@ def test_formal_flash_freezes_bounded_provider_attempts_and_deadline() -> None:
 
     assert runtime.mode == "deepseek-v4-flash-formal-v1"
     assert isinstance(runtime.model, DeepSeekResponsesInvestigationModel)
-    assert runtime.maximum_provider_attempts == 2
+    assert runtime.maximum_provider_attempts == 1
     assert runtime.call_deadline_seconds == 20
 
 
 @pytest.mark.asyncio
-async def test_formal_flash_exhausts_two_retryable_attempts_without_fake_fallback() -> None:
+async def test_formal_flash_stops_after_one_retryable_attempt_without_fake_fallback() -> None:
     requests = 0
 
     def supplier(_: httpx.Request) -> httpx.Response:
@@ -106,4 +106,4 @@ async def test_formal_flash_exhausts_two_retryable_attempts_without_fake_fallbac
         )
 
     assert captured.value.code is InvestigationJudgmentFailureCode.MODEL_CALL_FAILED
-    assert requests == runtime.maximum_provider_attempts == 2
+    assert requests == runtime.maximum_provider_attempts == 1

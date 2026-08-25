@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import re
 import time
 import uuid
@@ -26,6 +27,8 @@ DEEPSEEK_FLASH_MODEL = "deepseek-v4-flash"
 INVESTIGATION_JUDGMENT_PROMPT_VERSION = "investigation-judgment-v1"
 INVESTIGATION_JUDGMENT_SCHEMA_VERSION = "investigation-judgment-v1"
 _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 503})
+_FLASH_INPUT_USD_PER_MILLION_TOKENS = 0.44
+_FLASH_OUTPUT_USD_PER_MILLION_TOKENS = 1.32
 
 
 class DeepSeekFailureClassification(StrEnum):
@@ -115,6 +118,13 @@ class InMemoryModelCallAuditSink:
 
     async def record(self, record: ModelCallAttemptRecord) -> None:
         self.records.append(record)
+
+
+def estimate_flash_cost_micros(input_tokens: int, output_tokens: int) -> int:
+    return math.ceil(
+        input_tokens * _FLASH_INPUT_USD_PER_MILLION_TOKENS
+        + output_tokens * _FLASH_OUTPUT_USD_PER_MILLION_TOKENS
+    )
 
 
 class DeepSeekResponsesInvestigationModel:

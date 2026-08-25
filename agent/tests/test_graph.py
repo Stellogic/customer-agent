@@ -125,8 +125,55 @@ async def test_terminal_handoff_and_budget_failure_preserve_controlled_action_re
     action_types = [record["actionType"] for record in result["investigation_actions"]]
     if force_handoff:
         assert action_types[-1] == "HANDOFF"
+        assert result["investigation_run_evidence"] == {
+            "outcome": "HANDOFF_SELECTED",
+            "failureClassification": "",
+            "providerAttempts": 6,
+            "toolRounds": 5,
+            "tokens": 0,
+            "costMicros": 0,
+            "modelCalls": [
+                {
+                    "callNumber": index + 1,
+                    "selectedAction": action,
+                    "providerAttempts": 1,
+                    "tokens": 0,
+                    "costMicros": 0,
+                }
+                for index, action in enumerate(action_types)
+            ],
+        }
     else:
         assert action_types == ["CONFIRM_ORDER", "READ_LOGISTICS"]
+        assert result["investigation_run_evidence"] == {
+            "outcome": "SAFE_HANDOFF",
+            "failureClassification": "BUDGET_EXHAUSTED",
+            "providerAttempts": 3,
+            "toolRounds": 2,
+            "modelCalls": [
+                {
+                    "callNumber": 1,
+                    "selectedAction": "CONFIRM_ORDER",
+                    "providerAttempts": 1,
+                    "tokens": 0,
+                    "costMicros": 0,
+                },
+                {
+                    "callNumber": 2,
+                    "selectedAction": "READ_LOGISTICS",
+                    "providerAttempts": 1,
+                    "tokens": 0,
+                    "costMicros": 0,
+                },
+                {
+                    "callNumber": 3,
+                    "selectedAction": "READ_PAYMENT_AND_REFUNDS",
+                    "providerAttempts": 1,
+                    "tokens": 0,
+                    "costMicros": 0,
+                },
+            ],
+        }
 
 
 @pytest.mark.asyncio
