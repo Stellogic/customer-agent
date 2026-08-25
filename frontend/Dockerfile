@@ -34,6 +34,7 @@ RUN for attempt in 1 2 3; do \
     exit 1
 COPY playwright.config.ts ./
 COPY e2e ./e2e
+COPY src/sensitive-content-patterns.json ./src/sensitive-content-patterns.json
 ENTRYPOINT ["npm", "run", "test:browser", "--"]
 
 FROM nginx:1.29.4-alpine AS browser-server

@@ -4,6 +4,9 @@ import { gzipSync } from "node:zlib";
 const manifestPath = new URL("../dist/.vite/manifest.json", import.meta.url);
 const distUrl = new URL("../dist/", import.meta.url);
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const sensitivePatterns = JSON.parse(
+  readFileSync(new URL("../src/sensitive-content-patterns.json", import.meta.url), "utf8"),
+);
 
 const internalEntries = [
   "src/shells/InternalShell.tsx",
@@ -12,6 +15,11 @@ const internalEntries = [
   "src/workspaces/ApprovalWorkspace.tsx",
 ];
 const customerEntries = ["src/shells/CustomerShell.tsx", "src/workspaces/CustomerWorkspace.tsx"];
+const forbiddenProductionContent = sensitivePatterns.modelBoundaryLiterals;
+const forbiddenProductionPatterns = [
+  ...sensitivePatterns.contentPatterns,
+  ...sensitivePatterns.internalAddressPatterns,
+].map((pattern) => new RegExp(pattern, "i"));
 
 function requireChunk(key) {
   const chunk = manifest[key];
@@ -71,6 +79,31 @@ const evidence = {
   lazyInternalRoutes: Object.fromEntries(
     internalEntries.map((key) => [key, metrics(staticClosure([key]))]),
   ),
+};
+
+const productionFiles = new Set();
+for (const chunk of Object.values(manifest)) {
+  productionFiles.add(chunk.file);
+  for (const css of chunk.css ?? []) productionFiles.add(css);
+}
+for (const file of productionFiles) {
+  const content = readFileSync(new URL(file, distUrl), "utf8");
+  const normalized = content.toLowerCase();
+  for (const forbidden of forbiddenProductionContent) {
+    if (normalized.includes(forbidden.toLowerCase())) {
+      throw new Error(`production bundle ${file} contains forbidden model-boundary content`);
+    }
+  }
+  for (const forbidden of forbiddenProductionPatterns) {
+    if (forbidden.test(content)) {
+      throw new Error(`production bundle ${file} contains forbidden sensitive-content pattern`);
+    }
+  }
+}
+
+evidence.modelBoundaryLeakage = {
+  scannedFiles: productionFiles.size,
+  forbiddenMatches: 0,
 };
 
 console.log(JSON.stringify(evidence, null, 2));
