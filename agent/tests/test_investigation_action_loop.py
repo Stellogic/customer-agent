@@ -6,6 +6,7 @@ from baseline_agent.investigation_action_loop import (
     ActionBudget,
     ActionDecision,
     ActionLoop,
+    ActionLoopContinuation,
     ActionLoopFailure,
     ActionLoopFailureCode,
     ActionUsage,
@@ -172,6 +173,107 @@ async def test_wall_clock_budget_cancels_slow_model_and_tool_calls(slow_boundary
         await ActionLoop(choose, ActionBudget(max_wall_clock_ms=5)).run(execute)
 
     assert captured.value.code is ActionLoopFailureCode.BUDGET_EXHAUSTED
+
+
+@pytest.mark.asyncio
+async def test_loop_preserves_sanitized_model_failure_attempts_after_completed_tools() -> None:
+    decisions = iter([_decision(InvestigationCapability.CONFIRM_ORDER)])
+
+    async def choose(_: dict) -> ActionDecision:
+        try:
+            return next(decisions)
+        except StopIteration:
+            raise ActionLoopFailure(
+                ActionLoopFailureCode.MODEL_CALL_FAILED,
+                provider_attempts=2,
+            ) from None
+
+    with pytest.raises(ActionLoopFailure) as captured:
+        await ActionLoop(choose, ActionBudget()).run(
+            lambda action: _async_result(_progress_for(action.kind))
+        )
+
+    assert captured.value.code is ActionLoopFailureCode.MODEL_CALL_FAILED
+    assert captured.value.provider_attempts == 3
+    assert [record.action_type for record in captured.value.records] == ["CONFIRM_ORDER"]
+    assert [call.call_number for call in captured.value.model_calls] == [1, 2]
+    assert captured.value.model_calls[-1].selected_action == ""
+    assert captured.value.model_calls[-1].provider_attempts == 2
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_resume_continues_with_decremented_action_and_provider_budgets() -> None:
+    first_model_calls = 0
+
+    async def choose_first(_: dict) -> ActionDecision:
+        nonlocal first_model_calls
+        first_model_calls += 1
+        return _decision(InvestigationCapability.CONFIRM_ORDER)
+
+    budget = ActionBudget(max_actions=3, max_provider_attempts=3)
+    first = await ActionLoop(choose_first, budget).advance(
+        None,
+        lambda action: _async_result(_progress_for(action.kind)),
+    )
+
+    assert isinstance(first, ActionLoopContinuation)
+    assert first.checkpoint["remainingActions"] == 2
+    assert first.checkpoint["remainingProviderAttempts"] == 2
+    assert first_model_calls == 1
+
+    resumed_model_calls = 0
+
+    async def choose_resumed(facts: dict) -> ActionDecision:
+        nonlocal resumed_model_calls
+        resumed_model_calls += 1
+        assert facts["matchStatus"] == "UNIQUE"
+        return _decision(InvestigationCapability.READ_LOGISTICS, "ORDER-120")
+
+    resumed = await ActionLoop(choose_resumed, budget).advance(
+        first.checkpoint,
+        lambda action: _async_result(_progress_for(action.kind)),
+    )
+
+    assert isinstance(resumed, ActionLoopContinuation)
+    assert resumed.checkpoint["remainingActions"] == 1
+    assert resumed.checkpoint["remainingProviderAttempts"] == 1
+    assert resumed.checkpoint["providerAttempts"] == 2
+    assert [record["actionType"] for record in resumed.checkpoint["records"]] == [
+        "CONFIRM_ORDER",
+        "READ_LOGISTICS",
+    ]
+    assert resumed_model_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_resume_exhausts_budget_before_another_model_call() -> None:
+    budget = ActionBudget(max_actions=1, max_provider_attempts=1)
+    first = await ActionLoop(
+        lambda _: _async_result(_decision(InvestigationCapability.CONFIRM_ORDER)),
+        budget,
+    ).advance(None, lambda action: _async_result(_progress_for(action.kind)))
+    assert isinstance(first, ActionLoopContinuation)
+
+    resumed_model_calls = 0
+
+    async def choose_resumed(_: dict) -> ActionDecision:
+        nonlocal resumed_model_calls
+        resumed_model_calls += 1
+        return _decision(TerminalAction.SUBMIT_CONCLUSION)
+
+    with pytest.raises(ActionLoopFailure) as captured:
+        await ActionLoop(choose_resumed, budget).advance(
+            first.checkpoint,
+            lambda action: _async_result(_progress_for(action.kind)),
+        )
+
+    assert captured.value.code is ActionLoopFailureCode.BUDGET_EXHAUSTED
+    assert captured.value.provider_attempts == 1
+    assert resumed_model_calls == 0
+
+
+async def _async_result(value: dict) -> dict:
+    return value
 
 
 async def _async_next(iterator) -> ActionDecision:

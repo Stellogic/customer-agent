@@ -52,7 +52,7 @@ def configured_investigation_model(
         connect_timeout_seconds=3,
         read_timeout_seconds=12,
         deadline_seconds=20,
-        max_attempts=2,
+        max_attempts=1,
         retry_base_delay_seconds=0.2,
         max_output_tokens=128,
     )

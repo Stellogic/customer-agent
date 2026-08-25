@@ -1,0 +1,95 @@
+{
+  "actionModelMode": "deepseek-v4-flash-action-formal-v1+deepseek-v4-flash-formal-v1",
+  "boundedProviderAttempts": 2,
+  "checkpointEvidence": {
+    "actionOrder": [
+      "CONFIRM_ORDER",
+      "READ_LOGISTICS",
+      "READ_PAYMENT_AND_REFUNDS",
+      "READ_COMPENSATION_AND_PENDING_ACTIONS",
+      "READ_APPLICABLE_POLICY",
+      "SUBMIT_CONCLUSION"
+    ],
+    "actionRun": {
+      "costMicros": 951,
+      "failureClassification": "",
+      "modelCalls": [
+        {
+          "callNumber": 1,
+          "costMicros": 125,
+          "providerAttempts": 1,
+          "selectedAction": "CONFIRM_ORDER",
+          "tokens": 256
+        },
+        {
+          "callNumber": 2,
+          "costMicros": 159,
+          "providerAttempts": 1,
+          "selectedAction": "READ_LOGISTICS",
+          "tokens": 317
+        },
+        {
+          "callNumber": 3,
+          "costMicros": 169,
+          "providerAttempts": 1,
+          "selectedAction": "READ_PAYMENT_AND_REFUNDS",
+          "tokens": 328
+        },
+        {
+          "callNumber": 4,
+          "costMicros": 173,
+          "providerAttempts": 1,
+          "selectedAction": "READ_COMPENSATION_AND_PENDING_ACTIONS",
+          "tokens": 333
+        },
+        {
+          "callNumber": 5,
+          "costMicros": 168,
+          "providerAttempts": 1,
+          "selectedAction": "READ_APPLICABLE_POLICY",
+          "tokens": 329
+        },
+        {
+          "callNumber": 6,
+          "costMicros": 157,
+          "providerAttempts": 1,
+          "selectedAction": "SUBMIT_CONCLUSION",
+          "tokens": 326
+        }
+      ],
+      "outcome": "CONCLUSION_SUBMITTED",
+      "providerAttempts": 6,
+      "tokens": 1889,
+      "toolRounds": 5
+    },
+    "estimatedCostMicros": 1056,
+    "judgmentRun": {
+      "costMicros": 105,
+      "failureClassification": "",
+      "logicalCalls": 1,
+      "providerAttempts": 1,
+      "tokens": 201
+    },
+    "modelMode": "deepseek-v4-flash-action-formal-v1+deepseek-v4-flash-formal-v1",
+    "totalLogicalCalls": 7,
+    "totalProviderAttempts": 7
+  },
+  "expectation": "success",
+  "model": "deepseek-v4-flash",
+  "modelMode": "deepseek-formal",
+  "publicFailureClassification": "",
+  "publicHandoffReason": "",
+  "result": "PASSED",
+  "schemaVersion": "issue-128-formal-autonomous-acceptance-v1",
+  "springState": {
+    "agentCommandCount": 6,
+    "authoritativeFactCount": 8,
+    "generationStatus": "COMPLETED",
+    "handlingMode": "AGENT",
+    "handoffReasonCode": null,
+    "handoffRequestCount": 0,
+    "lifecycleState": "INVESTIGATING",
+    "proposalCount": 1,
+    "submissionStatus": "COMPLETED"
+  }
+}

@@ -1,7 +1,7 @@
 import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import TypedDict, cast
 
 import httpx
 from langgraph.graph import END, START, StateGraph
@@ -19,19 +19,27 @@ from baseline_agent.deepseek_investigation_model import (
     DEEPSEEK_FLASH_MODEL,
     INVESTIGATION_JUDGMENT_PROMPT_VERSION,
     INVESTIGATION_JUDGMENT_SCHEMA_VERSION,
+    DeepSeekResponsesInvestigationModel,
+    InMemoryModelCallAuditSink,
+    estimate_flash_cost_micros,
 )
 from baseline_agent.investigation_action_loop import (
     CAPABILITY_PARAMETER_NAMES,
     ActionBudget,
     ActionDecision,
     ActionLoop,
+    ActionLoopContinuation,
     ActionLoopFailure,
     ActionLoopFailureCode,
+    ActionLoopResult,
+    ActionModelCallRecord,
     ActionRecord,
-    DeterministicActionModel,
     InvestigationAction,
     InvestigationCapability,
     TerminalAction,
+)
+from baseline_agent.investigation_action_model_runtime import (
+    configured_investigation_action_model,
 )
 from baseline_agent.investigation_model import (
     FixedFakeInvestigationModel,
@@ -64,6 +72,9 @@ class BaselineState(TypedDict, total=False):
     shadow_comparison: dict[str, str]
     handoff: dict
     investigation_actions: list[dict[str, object]]
+    investigation_run_evidence: dict[str, object]
+    investigation_judgment_evidence: dict[str, object]
+    investigation_progress: dict[str, object] | None
 
 
 class CustomerCommunicationContextMessage(TypedDict):
@@ -94,7 +105,9 @@ REQUIRED_FACT_FIELDS = {
 _configured_investigation_model = configured_investigation_model(os.environ)
 investigation_judgment_model: InvestigationJudgmentModel = _configured_investigation_model.model
 investigation_model_mode = _configured_investigation_model.mode
-investigation_action_model = DeterministicActionModel()
+_configured_action_model = configured_investigation_action_model(os.environ)
+investigation_action_model = _configured_action_model.model
+investigation_action_model_mode = _configured_action_model.mode
 customer_communication_model: CustomerCommunicationModel = FixedFakeCustomerCommunicationModel()
 shadow_candidate_factory: Callable[[], ShadowCandidate | None] = configured_shadow_candidate
 
@@ -185,7 +198,7 @@ async def probe_spring(state: BaselineState) -> BaselineState:
         return {"spring_probe": response.json()}
 
 
-async def investigate_ticket(state: BaselineState) -> BaselineState:
+async def investigate_ticket_step(state: BaselineState) -> BaselineState:
     if state.get("requested_by") != "spring":
         raise ValueError("ticket investigation accepts only Spring-owned runs")
     ticket_id = state["ticket_id"]
@@ -202,13 +215,14 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
         capability_request_scope = "invalid-resume"
     async with httpx.AsyncClient(timeout=5.0) as client:
         try:
-            loop_result = await _run_investigation_action_loop(
+            loop_result = await _advance_investigation_action_loop(
                 client,
                 base_url,
                 ticket_id,
                 generation_id,
                 scope_headers,
                 capability_request_scope,
+                state.get("investigation_progress"),
             )
         except ActionLoopFailure as error:
             failed_action_records = _checkpoint_action_records(error.records)
@@ -218,13 +232,10 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 ticket_id,
                 generation_id,
                 scope_headers,
-                (
-                    "INVALID_TOOL_RESPONSE"
-                    if error.code is ActionLoopFailureCode.INVALID_TOOL_RESPONSE
-                    else "TOOL_RETRY_EXHAUSTED"
-                ),
+                _action_loop_handoff_reason(error.code),
                 [],
                 failed_action_records,
+                _failed_run_evidence(error),
             )
         except httpx.HTTPStatusError as error:
             if error.response.status_code != 409:
@@ -238,6 +249,11 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "TOOL_RETRY_EXHAUSTED",
                 [],
             )
+        if isinstance(loop_result, ActionLoopContinuation):
+            return {
+                "model_mode": _combined_model_mode(),
+                "investigation_progress": loop_result.checkpoint,
+            }
         facts = _normalize_loop_facts(loop_result.facts)
         action_records = _checkpoint_action_records(loop_result.records)
         if loop_result.terminal_action is TerminalAction.HANDOFF:
@@ -250,6 +266,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "UNSUPPORTED_SCENARIO",
                 _controlled_summary_facts(facts),
                 action_records,
+                _completed_run_evidence(loop_result, "HANDOFF_SELECTED"),
             )
         if loop_result.terminal_action is TerminalAction.REQUEST_CLARIFICATION:
             if _clarification_facts_reason(facts) is not None:
@@ -265,8 +282,12 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 )
             return {
                 "facts": facts,
-                "model_mode": investigation_model_mode,
+                "model_mode": _combined_model_mode(),
+                "investigation_progress": None,
                 "investigation_actions": action_records,
+                "investigation_run_evidence": _completed_run_evidence(
+                    loop_result, "CLARIFICATION_SELECTED"
+                ),
             }
         unsafe_reason = _unsafe_facts_reason(facts)
         if unsafe_reason is not None:
@@ -279,6 +300,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 unsafe_reason,
                 _controlled_summary_facts(facts),
                 action_records,
+                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
             )
         assert isinstance(facts, dict)
         if loop_result.terminal_action is not TerminalAction.SUBMIT_CONCLUSION:
@@ -291,7 +313,9 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "INVALID_TOOL_RESPONSE",
                 _controlled_summary_facts(facts),
                 action_records,
+                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
             )
+        judgment_audit_offset = _judgment_audit_offset()
         try:
             judgment = await investigation_judgment_model.judge(
                 InvestigationJudgmentInput(
@@ -310,7 +334,10 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "INVALID_MODEL_OUTPUT",
                 _controlled_summary_facts(facts),
                 action_records,
+                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                _judgment_call_evidence(judgment_audit_offset, "MODEL_CALL_FAILED"),
             )
+        judgment_evidence = _judgment_call_evidence(judgment_audit_offset, "")
         communication_context = await _read_customer_communication_context(
             client, base_url, ticket_id, generation_id, scope_headers
         )
@@ -324,6 +351,8 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "INVALID_TOOL_RESPONSE",
                 _controlled_summary_facts(facts),
                 action_records,
+                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                judgment_evidence,
             )
         conclusion = _build_conclusion(facts, judgment)
         communication_input = CustomerCommunicationInput(
@@ -350,6 +379,8 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "INVALID_MODEL_OUTPUT",
                 _controlled_summary_facts(facts),
                 action_records,
+                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                judgment_evidence,
             )
         if customer_reply.intent is CustomerReplyIntent.HUMAN_HANDOFF:
             return await _human_handoff(
@@ -361,6 +392,8 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "CUSTOMER_REQUESTED_HUMAN",
                 _controlled_summary_facts(facts),
                 action_records,
+                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                judgment_evidence,
             )
         completion = {**conclusion, "customerReply": customer_reply.as_request_value()}
         try:
@@ -386,6 +419,8 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                     "FACT_CONFLICT",
                     _controlled_summary_facts(facts),
                     action_records,
+                    _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                    judgment_evidence,
                 )
             raise
         if conclusion_response is None:
@@ -398,14 +433,30 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "TOOL_RETRY_EXHAUSTED",
                 _controlled_summary_facts(facts),
                 action_records,
+                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                judgment_evidence,
             )
         return {
             "facts": facts,
             "conclusion": conclusion,
             "customer_reply": customer_reply.as_request_value(),
-            "model_mode": investigation_model_mode,
+            "model_mode": _combined_model_mode(),
+            "investigation_progress": None,
             "investigation_actions": action_records,
+            "investigation_run_evidence": _completed_run_evidence(
+                loop_result, "CONCLUSION_SUBMITTED"
+            ),
+            "investigation_judgment_evidence": judgment_evidence,
         }
+
+
+async def investigate_ticket(state: BaselineState) -> BaselineState:
+    current = state
+    while True:
+        result = await investigate_ticket_step(current)
+        if result.get("investigation_progress") is None:
+            return result
+        current = cast(BaselineState, {**current, **result})
 
 
 async def _read_customer_communication_context(
@@ -464,32 +515,34 @@ async def _read_customer_communication_context(
     )
 
 
-async def _run_investigation_action_loop(
+async def _advance_investigation_action_loop(
     client: httpx.AsyncClient,
     base_url: str,
     ticket_id: str,
     generation_id: str,
     scope_headers: dict[str, str],
     request_scope: str,
+    checkpoint: dict[str, object] | None,
 ):
     capability_headers = {
         **scope_headers,
         "X-Agent-Operation": "USE_INVESTIGATION_CAPABILITY",
     }
-    catalog_response = await _request_with_retries(
-        lambda: client.get(
-            f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/capabilities",
-            headers=capability_headers,
+    if checkpoint is None:
+        catalog_response = await _request_with_retries(
+            lambda: client.get(
+                f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/capabilities",
+                headers=capability_headers,
+            )
         )
-    )
-    if catalog_response is None:
-        raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
-    try:
-        catalog = catalog_response.json()
-    except ValueError as error:
-        raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE) from error
-    if not _valid_capability_catalog(catalog):
-        raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
+        if catalog_response is None:
+            raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
+        try:
+            catalog = catalog_response.json()
+        except ValueError as error:
+            raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE) from error
+        if not _valid_capability_catalog(catalog):
+            raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
 
     async def execute(action: InvestigationAction) -> dict:
         capability = InvestigationCapability(action.kind.value)
@@ -515,7 +568,24 @@ async def _run_investigation_action_loop(
     async def choose(facts: dict) -> ActionDecision:
         return await investigation_action_model.choose(facts)
 
-    return await ActionLoop(choose, ActionBudget.configured()).run(execute)
+    return await ActionLoop(choose, ActionBudget.configured()).advance(checkpoint, execute)
+
+
+def _combined_model_mode() -> str:
+    if investigation_action_model_mode == "deterministic-action-model-v1":
+        return investigation_model_mode
+    return f"{investigation_action_model_mode}+{investigation_model_mode}"
+
+
+def _action_loop_handoff_reason(code: ActionLoopFailureCode) -> str:
+    if code is ActionLoopFailureCode.INVALID_TOOL_RESPONSE:
+        return "INVALID_TOOL_RESPONSE"
+    if code in {
+        ActionLoopFailureCode.MODEL_CALL_FAILED,
+        ActionLoopFailureCode.UNKNOWN_ACTION,
+    }:
+        return "INVALID_MODEL_OUTPUT"
+    return "TOOL_RETRY_EXHAUSTED"
 
 
 def _normalize_loop_facts(collected: dict) -> dict:
@@ -540,6 +610,85 @@ def _checkpoint_action_records(records: tuple[ActionRecord, ...]) -> list[dict[s
         }
         for record in records
     ]
+
+
+def _failed_run_evidence(error: ActionLoopFailure) -> dict[str, object]:
+    return {
+        "outcome": "SAFE_HANDOFF",
+        "failureClassification": error.code.value,
+        "providerAttempts": error.provider_attempts,
+        "toolRounds": len(error.records),
+        "modelCalls": _model_call_evidence(error.model_calls),
+    }
+
+
+def _completed_run_evidence(result: ActionLoopResult, outcome: str) -> dict[str, object]:
+    tool_rounds = sum(
+        record.action_type in {capability.value for capability in InvestigationCapability}
+        for record in result.records
+    )
+    return {
+        "outcome": outcome,
+        "failureClassification": "",
+        "providerAttempts": result.provider_attempts,
+        "toolRounds": tool_rounds,
+        "tokens": result.tokens,
+        "costMicros": result.cost_micros,
+        "modelCalls": _model_call_evidence(result.model_calls),
+    }
+
+
+def _model_call_evidence(
+    calls: tuple[ActionModelCallRecord, ...],
+) -> list[dict[str, object]]:
+    return [
+        {
+            "callNumber": call.call_number,
+            "selectedAction": call.selected_action,
+            "providerAttempts": call.provider_attempts,
+            "tokens": call.tokens,
+            "costMicros": call.cost_micros,
+        }
+        for call in calls
+    ]
+
+
+def _judgment_audit_offset() -> int | None:
+    if not isinstance(investigation_judgment_model, DeepSeekResponsesInvestigationModel):
+        return None
+    sink = investigation_judgment_model.audit_sink
+    return len(sink.records) if isinstance(sink, InMemoryModelCallAuditSink) else None
+
+
+def _judgment_call_evidence(offset: int | None, failure: str) -> dict[str, object]:
+    if offset is None or not isinstance(
+        investigation_judgment_model, DeepSeekResponsesInvestigationModel
+    ):
+        return {
+            "logicalCalls": 0,
+            "providerAttempts": 0,
+            "tokens": 0,
+            "costMicros": 0,
+            "failureClassification": failure,
+        }
+    sink = investigation_judgment_model.audit_sink
+    if not isinstance(sink, InMemoryModelCallAuditSink):
+        raise RuntimeError("formal judgment audit sink is not readable")
+    records = sink.records[offset:]
+    input_tokens = sum(record.input_tokens or 0 for record in records)
+    output_tokens = sum(record.output_tokens or 0 for record in records)
+    classifications = {
+        record.failure_classification.value
+        for record in records
+        if record.failure_classification is not None
+    }
+    return {
+        "logicalCalls": 1 if records else 0,
+        "providerAttempts": len(records),
+        "tokens": sum(record.total_tokens or 0 for record in records),
+        "costMicros": estimate_flash_cost_micros(input_tokens, output_tokens),
+        "failureClassification": failure or (sorted(classifications)[0] if classifications else ""),
+    }
 
 
 def _valid_capability_evidence(
@@ -851,6 +1000,8 @@ async def _human_handoff(
     reason_code: str,
     facts: list[dict[str, str]],
     action_records: list[dict[str, object]] | None = None,
+    run_evidence: dict[str, object] | None = None,
+    judgment_evidence: dict[str, object] | None = None,
 ) -> BaselineState:
     response = await client.post(
         f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/human-handoff",
@@ -865,11 +1016,17 @@ async def _human_handoff(
         },
     )
     response.raise_for_status()
-    return {
+    result: BaselineState = {
         "handoff": response.json(),
-        "model_mode": investigation_model_mode,
+        "model_mode": _combined_model_mode(),
+        "investigation_progress": None,
         "investigation_actions": action_records or [],
     }
+    if run_evidence is not None:
+        result["investigation_run_evidence"] = run_evidence
+    if judgment_evidence is not None:
+        result["investigation_judgment_evidence"] = judgment_evidence
+    return result
 
 
 async def request_clarification(state: BaselineState) -> BaselineState:
@@ -1010,6 +1167,8 @@ def select_work(state: BaselineState) -> str:
 
 
 def after_investigation(state: BaselineState) -> str:
+    if state.get("investigation_progress") is not None:
+        return "investigate_ticket"
     if state.get("facts", {}).get("matchStatus") == "AMBIGUOUS":
         return "request_clarification"
     if state.get("conclusion") and shadow_mode_enabled():
@@ -1019,7 +1178,7 @@ def after_investigation(state: BaselineState) -> str:
 
 builder = StateGraph(BaselineState)
 builder.add_node("probe_spring", probe_spring)
-builder.add_node("investigate_ticket", investigate_ticket)
+builder.add_node("investigate_ticket", investigate_ticket_step)
 builder.add_node("shadow_investigation", shadow_investigation)
 builder.add_node("request_clarification", request_clarification)
 builder.add_node("await_clarification", await_clarification)
