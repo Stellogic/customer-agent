@@ -73,11 +73,8 @@ class AgentResumeDispatcher {
                                                     "resume",
                                                     Map.of(
                                                             "clarificationRequestId",
-                                                                    resume.clarificationRequestId()
-                                                                            .toString(),
-                                                            "answerDigest", resume.answerDigest(),
-                                                            "answerSummary",
-                                                                    resume.answerSummary()))))
+                                                            resume.clarificationRequestId()
+                                                                    .toString()))))
                             .retrieve()
                             .body(String.class);
             JsonNode response = json.readTree(body == null ? "{}" : body);
