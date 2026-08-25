@@ -33,7 +33,7 @@ docker compose exec -T agent-server sh -c 'test -z "${EXECUTOR_MACHINE_TOKEN+x}"
 docker compose exec -T compensation-executor sh -c 'test -z "${AGENT_MACHINE_TOKEN+x}"'
 
 $migrationHistory = docker compose exec -T postgres psql -U postgres -d customer_agent -Atc "select version || ':' || success from flyway_schema_history order by installed_rank"
-if (($migrationHistory -join ',') -ne '1:true,2:true,3:true,4:true,5:true,6:true,7:true,8:true,9:true,10:true,11:true,12:true,13:true,14:true,15:true,16:true,17:true,18:true,19:true,20:true,21:true') {
+if (($migrationHistory -join ',') -ne '1:true,2:true,3:true,4:true,5:true,6:true,7:true,8:true,9:true,10:true,11:true,12:true,13:true,14:true,15:true,16:true,17:true,18:true,19:true,20:true,21:true,22:true') {
     throw "Spring Flyway 迁移历史不完整: $($migrationHistory -join ',')"
 }
 

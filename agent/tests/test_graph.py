@@ -23,6 +23,8 @@ from baseline_agent.investigation_action_loop import (
 )
 from baseline_agent.investigation_model import (
     InvestigationJudgment,
+    InvestigationJudgmentFailure,
+    InvestigationJudgmentFailureCode,
     InvestigationJudgmentInput,
     InvestigationReasonCode,
 )
@@ -909,6 +911,70 @@ async def test_customer_communication_failure_hands_off_without_submitting_or_se
     )
 
     assert result["handoff"]["reasonCode"] == "INVALID_MODEL_OUTPUT"
+    assert not any(url.endswith("/conclusions") for url in posts)
+
+
+@pytest.mark.asyncio
+async def test_formal_investigation_model_failure_hands_off_without_fake_or_conclusion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    posts: list[str] = []
+    model_calls = 0
+
+    class FailedFormalModel:
+        async def judge(self, _model_input):
+            nonlocal model_calls
+            model_calls += 1
+            raise InvestigationJudgmentFailure(InvestigationJudgmentFailureCode.MODEL_CALL_FAILED)
+
+    class Response:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, url: str, **__: object) -> Response:
+            return Response(_catalog_or_customer_context(url))
+
+        async def post(self, url: str, *, json: dict, **_: object) -> Response:
+            posts.append(url)
+            if "/capabilities/" in url:
+                return Response(_capability_result(url, _unique_facts()))
+            if url.endswith("/conclusions"):
+                raise AssertionError("failed formal model must not submit a conclusion")
+            return Response({"handlingMode": "HUMAN", "reasonCode": json["reasonCode"]})
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setattr("baseline_agent.graph.investigation_judgment_model", FailedFormalModel())
+    monkeypatch.setattr(
+        "baseline_agent.graph.investigation_model_mode",
+        "deepseek-v4-flash-formal-v1",
+    )
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+
+    result = await investigate_ticket(
+        {
+            "requested_by": "spring",
+            "ticket_id": "ticket-127",
+            "generation_id": "generation-127",
+        }
+    )
+
+    assert model_calls == 1
+    assert result["handoff"]["reasonCode"] == "INVALID_MODEL_OUTPUT"
+    assert result["model_mode"] == "deepseek-v4-flash-formal-v1"
     assert not any(url.endswith("/conclusions") for url in posts)
 
 
