@@ -21,10 +21,29 @@ async function observeBrowserEvidence(page: Page): Promise<BrowserEvidence> {
     requestPaths: [],
     ssePayloads: [],
   };
-  const devtools = await page.context().newCDPSession(page);
-  await devtools.send("Network.enable");
-  devtools.on("Network.eventSourceMessageReceived", (event) => {
-    evidence.ssePayloads.push(event.data);
+  await page.exposeFunction("__captureIssue124Sse", (chunk: string) => {
+    evidence.ssePayloads.push(chunk);
+  });
+  await page.addInitScript(() => {
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    globalThis.fetch = async (...args: Parameters<typeof fetch>) => {
+      const response = await originalFetch(...args);
+      if (response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
+        const reader = response.clone().body!.getReader();
+        const decoder = new TextDecoder();
+        const capture = Reflect.get(globalThis, "__captureIssue124Sse") as (chunk: string) => void;
+        void (async () => {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            capture(decoder.decode(value, { stream: true }));
+          }
+          const tail = decoder.decode();
+          if (tail) capture(tail);
+        })();
+      }
+      return response;
+    };
   });
   page.on("request", (request) => {
     const url = new URL(request.url());
@@ -56,6 +75,12 @@ function assertNoBrowserLeakage(evidence: BrowserEvidence) {
     ...evidence.ssePayloads,
   ].join("\n");
   for (const forbidden of forbiddenBrowserEvidence) expect(serialized).not.toContain(forbidden);
+  for (const pattern of [
+    ...sensitivePatterns.contentPatterns,
+    ...sensitivePatterns.internalAddressPatterns,
+  ]) {
+    expect(serialized).not.toMatch(new RegExp(pattern));
+  }
 }
 
 async function openCustomer(browser: Browser) {
@@ -78,6 +103,7 @@ async function createTicket(page: Page, orderReference: string, description: str
 
 async function closeContext(context: BrowserContext, evidence: BrowserEvidence) {
   await expect.poll(() => evidence.bundleBodies.length).toBeGreaterThan(0);
+  await expect.poll(() => evidence.ssePayloads.length).toBeGreaterThan(0);
   assertNoBrowserLeakage(evidence);
   await context.close();
 }

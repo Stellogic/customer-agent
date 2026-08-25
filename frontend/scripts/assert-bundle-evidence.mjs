@@ -16,6 +16,10 @@ const internalEntries = [
 ];
 const customerEntries = ["src/shells/CustomerShell.tsx", "src/workspaces/CustomerWorkspace.tsx"];
 const forbiddenProductionContent = sensitivePatterns.modelBoundaryLiterals;
+const forbiddenProductionPatterns = [
+  ...sensitivePatterns.contentPatterns,
+  ...sensitivePatterns.internalAddressPatterns,
+].map((pattern) => new RegExp(pattern));
 
 function requireChunk(key) {
   const chunk = manifest[key];
@@ -87,6 +91,11 @@ for (const file of productionFiles) {
   for (const forbidden of forbiddenProductionContent) {
     if (content.includes(forbidden)) {
       throw new Error(`production bundle ${file} contains forbidden model-boundary content`);
+    }
+  }
+  for (const forbidden of forbiddenProductionPatterns) {
+    if (forbidden.test(content)) {
+      throw new Error(`production bundle ${file} contains forbidden sensitive-content pattern`);
     }
   }
 }
