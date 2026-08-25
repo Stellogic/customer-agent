@@ -12,6 +12,18 @@ const internalEntries = [
   "src/workspaces/ApprovalWorkspace.tsx",
 ];
 const customerEntries = ["src/shells/CustomerShell.tsx", "src/workspaces/CustomerWorkspace.tsx"];
+const forbiddenProductionContent = [
+  "DEEPSEEK_API_KEY",
+  "deepseek.com",
+  "agent-server:2024",
+  "local-agent-machine",
+  "local-spring-to-agent",
+  "untrustedCustomerData",
+  "authorizedInvestigation",
+  '"rawResponse"',
+  '"toolPayload"',
+  '"checkpoint"',
+];
 
 function requireChunk(key) {
   const chunk = manifest[key];
@@ -71,6 +83,25 @@ const evidence = {
   lazyInternalRoutes: Object.fromEntries(
     internalEntries.map((key) => [key, metrics(staticClosure([key]))]),
   ),
+};
+
+const productionFiles = new Set();
+for (const chunk of Object.values(manifest)) {
+  productionFiles.add(chunk.file);
+  for (const css of chunk.css ?? []) productionFiles.add(css);
+}
+for (const file of productionFiles) {
+  const content = readFileSync(new URL(file, distUrl), "utf8");
+  for (const forbidden of forbiddenProductionContent) {
+    if (content.includes(forbidden)) {
+      throw new Error(`production bundle ${file} contains forbidden model-boundary content`);
+    }
+  }
+}
+
+evidence.modelBoundaryLeakage = {
+  scannedFiles: productionFiles.size,
+  forbiddenMatches: 0,
 };
 
 console.log(JSON.stringify(evidence, null, 2));
