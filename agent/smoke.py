@@ -3268,6 +3268,20 @@ def main() -> None:
                 time.sleep(0.25)
         raise AssertionError("clarification request was not published")
 
+    def claim_support_handoff_details(client: httpx.Client, ticket_id: str) -> dict:
+        unassigned = client.get(f"{spring_url}/api/support/workbench/tickets/{ticket_id}")
+        expect_status(unassigned, 404)
+        claim = client.post(f"{spring_url}/api/support/workbench/tickets/{ticket_id}/claims")
+        expect_status(claim, 201)
+        assigned = client.get(f"{spring_url}/api/support/workbench/tickets/{ticket_id}")
+        expect_status(assigned, 200)
+        projection = assigned.json()
+        serialized = json.dumps(projection)
+        assert "checkpoint" not in serialized
+        assert "answerDigest" not in serialized
+        assert "answerSummary" not in serialized
+        return projection
+
     clarification_ticket_id, clarification_projection = create_ambiguous_ticket("primary")
     clarification_request_id = clarification_projection["clarification"]["id"]
     assert clarification_projection["clarification"]["promptCode"] == "ORDER_CONFIRMATION_CODE"
@@ -3587,19 +3601,9 @@ def main() -> None:
             },
         )
         expect_status(late_conclusion, 403)
-        unassigned_customer_handoff_details = client.get(
-            f"{spring_url}/api/support/workbench/tickets/{handoff_ticket_id}"
+        customer_handoff_support_projection = claim_support_handoff_details(
+            client, handoff_ticket_id
         )
-        expect_status(unassigned_customer_handoff_details, 404)
-        customer_handoff_claim = client.post(
-            f"{spring_url}/api/support/workbench/tickets/{handoff_ticket_id}/claims"
-        )
-        expect_status(customer_handoff_claim, 201)
-        assigned_customer_handoff_details = client.get(
-            f"{spring_url}/api/support/workbench/tickets/{handoff_ticket_id}"
-        )
-        expect_status(assigned_customer_handoff_details, 200)
-        customer_handoff_support_projection = assigned_customer_handoff_details.json()
         assert {
             (fact["factType"], fact["factValue"], fact["evidenceReference"])
             for fact in customer_handoff_support_projection["investigationFacts"]
@@ -3609,10 +3613,6 @@ def main() -> None:
         }
         assert "AGENT_ORDER_AMBIGUITY_READ" in customer_handoff_actions
         assert "CUSTOMER_HUMAN_HANDOFF_REQUEST_RECORDED" in customer_handoff_actions
-        customer_handoff_support_json = json.dumps(customer_handoff_support_projection)
-        assert "checkpoint" not in customer_handoff_support_json
-        assert "answerDigest" not in customer_handoff_support_json
-        assert "answerSummary" not in customer_handoff_support_json
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         handoff_state = connection.execute(
@@ -3791,19 +3791,7 @@ def main() -> None:
         )
         assert agent_handoff_queue_item["reasonCodes"] == ["AGENT_HUMAN_HANDOFF"]
         assert "summary" not in agent_handoff_queue_item
-        unassigned_agent_handoff_details = client.get(
-            f"{spring_url}/api/support/workbench/tickets/{agent_handoff_ticket_id}"
-        )
-        expect_status(unassigned_agent_handoff_details, 404)
-        assigned_agent_handoff = client.post(
-            f"{spring_url}/api/support/workbench/tickets/{agent_handoff_ticket_id}/claims"
-        )
-        expect_status(assigned_agent_handoff, 201)
-        assigned_agent_handoff_details = client.get(
-            f"{spring_url}/api/support/workbench/tickets/{agent_handoff_ticket_id}"
-        )
-        expect_status(assigned_agent_handoff_details, 200)
-        support_handoff_projection = assigned_agent_handoff_details.json()
+        support_handoff_projection = claim_support_handoff_details(client, agent_handoff_ticket_id)
         assert {
             (fact["factType"], fact["factValue"], fact["evidenceReference"])
             for fact in support_handoff_projection["investigationFacts"]
@@ -3818,10 +3806,6 @@ def main() -> None:
         assert "AGENT_HUMAN_HANDOFF_REQUEST_RECORDED" in {
             event["eventType"] for event in support_handoff_projection["businessTimeline"]
         }
-        support_handoff_json = json.dumps(support_handoff_projection)
-        assert "checkpoint" not in support_handoff_json
-        assert "answerDigest" not in support_handoff_json
-        assert "answerSummary" not in support_handoff_json
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert connection.execute(
