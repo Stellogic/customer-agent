@@ -146,6 +146,88 @@ class AgentInvestigationCapabilityControllerTest {
         verify(service).auditRejected(TICKET_ID, "MISSING_IDEMPOTENCY_IDENTITY");
     }
 
+    @Test
+    void acceptsOnlyTheExactVersionedCustomerReplyEnvelope() throws Exception {
+        when(service.submit(eq(TICKET_ID), eq(GENERATION_ID), eq("reply-request"), any()))
+                .thenReturn(
+                        new ConclusionAcceptance(
+                                true, TicketLifecycleState.INVESTIGATING, null, null, null));
+
+        mvc.perform(
+                        post(
+                                        "/internal/agent/tickets/{ticketId}/generations/{generationId}/conclusions",
+                                        TICKET_ID,
+                                        GENERATION_ID)
+                                .headers(conclusionHeaders())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(validConclusion("")))
+                .andExpect(status().isOk());
+
+        verify(service)
+                .submit(
+                        eq(TICKET_ID),
+                        eq(GENERATION_ID),
+                        eq("reply-request"),
+                        org.mockito.ArgumentMatchers.argThat(
+                                conclusion ->
+                                        conclusion
+                                                        .customerReply()
+                                                        .schemaVersion()
+                                                        .equals("customer-reply-v1")
+                                                && conclusion
+                                                        .customerReply()
+                                                        .evidenceRefs()
+                                                        .equals(
+                                                                List.of(
+                                                                        "order:ORDER-122",
+                                                                        "logistics:ORDER-122"))));
+    }
+
+    @Test
+    void rejectsAdditionalPublicFieldsBeforeTheyReachTheService() throws Exception {
+        mvc.perform(
+                        post(
+                                        "/internal/agent/tickets/{ticketId}/generations/{generationId}/conclusions",
+                                        TICKET_ID,
+                                        GENERATION_ID)
+                                .headers(conclusionHeaders())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(validConclusion(",\"rawModel\":\"forbidden\"")))
+                .andExpect(status().isUnprocessableEntity());
+
+        verify(service).auditRejected(TICKET_ID, "MALFORMED_CONCLUSION");
+        org.mockito.Mockito.verifyNoMoreInteractions(service);
+    }
+
+    private static String validConclusion(String additionalReplyField) {
+        return """
+                {
+                  "compensationRequired": true,
+                  "reasonCode": "LOGISTICS_DELAY",
+                  "delayHours": 80,
+                  "delaySeconds": 288000,
+                  "orderReference": "ORDER-122",
+                  "evidenceRefs": ["order:ORDER-122", "logistics:ORDER-122"],
+                  "customerReply": {
+                    "schemaVersion": "customer-reply-v1",
+                    "body": "订单 ORDER-122 的调查已完成，正在等待人工审批。",
+                    "intent": "COMPENSATION_REVIEW_PENDING",
+                    "evidenceRefs": ["order:ORDER-122", "logistics:ORDER-122"],
+                    "escalationRequired": false,
+                    "referencedOrder": "ORDER-122"%s
+                  }
+                }
+                """
+                .formatted(additionalReplyField);
+    }
+
+    private static org.springframework.http.HttpHeaders conclusionHeaders() {
+        org.springframework.http.HttpHeaders headers = scopedHeaders();
+        headers.set("X-Agent-Operation", "SUBMIT_INVESTIGATION_CONCLUSION");
+        headers.set("Idempotency-Key", "reply-request");
+        return headers;
+    }
+
     private static org.springframework.http.HttpHeaders scopedHeaders() {
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
         headers.setBearerAuth("agent-token");

@@ -3,6 +3,10 @@ import asyncio
 import httpx
 import pytest
 
+from baseline_agent.customer_communication_model import (
+    CustomerCommunicationFailure,
+    CustomerCommunicationFailureCode,
+)
 from baseline_agent.graph import (
     await_clarification,
     graph,
@@ -762,7 +766,80 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
         "evidenceRefs": ["order:ORDER-DELAY-UNDER-24", "logistics:ORDER-DELAY-UNDER-24"],
     }
     assert result["model_mode"] == "fixed-fake-model-v1"
+    assert result["customer_reply"] == {
+        "schemaVersion": "customer-reply-v1",
+        "body": (
+            "经核验，订单 ORDER-DELAY-UNDER-24 的本次物流延迟不足 24 小时，"
+            "当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。"
+        ),
+        "intent": "NO_COMPENSATION_RESOLUTION",
+        "evidenceRefs": [
+            "order:ORDER-DELAY-UNDER-24",
+            "logistics:ORDER-DELAY-UNDER-24",
+        ],
+        "escalationRequired": False,
+        "referencedOrder": "ORDER-DELAY-UNDER-24",
+    }
+    submitted = next(call[2] for call in calls if call[1].endswith("/conclusions"))
+    assert submitted == {**result["conclusion"], "customerReply": result["customer_reply"]}
     assert [call[0] for call in calls] == ["GET", "POST", "POST", "POST", "POST", "POST", "POST"]
+
+
+@pytest.mark.asyncio
+async def test_customer_communication_failure_hands_off_without_submitting_or_sending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    posts: list[str] = []
+
+    class FailedCommunicationModel:
+        async def compose(self, _model_input):
+            raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.MODEL_CALL_FAILED)
+
+    class Response:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, *_: object, **__: object) -> Response:
+            return Response(_capability_catalog())
+
+        async def post(self, url: str, *, json: dict, **_: object) -> Response:
+            posts.append(url)
+            if "/capabilities/" in url:
+                return Response(_capability_result(url, _unique_facts()))
+            if url.endswith("/conclusions"):
+                raise AssertionError("unsafe communication must not submit a conclusion")
+            return Response({"handlingMode": "HUMAN", "reasonCode": json["reasonCode"]})
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setattr(
+        "baseline_agent.graph.customer_communication_model", FailedCommunicationModel()
+    )
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+
+    result = await investigate_ticket(
+        {
+            "requested_by": "spring",
+            "ticket_id": "ticket-122",
+            "generation_id": "generation-122",
+        }
+    )
+
+    assert result["handoff"]["reasonCode"] == "INVALID_MODEL_OUTPUT"
+    assert not any(url.endswith("/conclusions") for url in posts)
 
 
 @pytest.mark.asyncio

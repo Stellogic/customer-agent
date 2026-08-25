@@ -139,7 +139,21 @@ record InvestigationConclusion(
         int delayHours,
         long delaySeconds,
         String orderReference,
-        List<String> evidenceRefs) {}
+        List<String> evidenceRefs,
+        CustomerReplyEnvelope customerReply) {}
+
+record CustomerReplyEnvelope(
+        String schemaVersion,
+        String body,
+        CustomerReplyIntent intent,
+        List<String> evidenceRefs,
+        boolean escalationRequired,
+        String referencedOrder) {}
+
+enum CustomerReplyIntent {
+    NO_COMPENSATION_RESOLUTION,
+    COMPENSATION_REVIEW_PENDING
+}
 
 record ConclusionAcceptance(
         boolean accepted,

@@ -21,6 +21,33 @@ def expect_status(response: httpx.Response, expected: int) -> None:
         raise AssertionError(f"expected {expected}, got {response.status_code}: {response.text}")
 
 
+def customer_reply(
+    order_reference: str, evidence_refs: list[str], compensation_required: bool
+) -> dict[str, object]:
+    if compensation_required:
+        body = (
+            f"订单 {order_reference} 的调查已完成，补偿建议正在等待人工审批；"
+            "审批完成前不会执行补偿或退款。"
+        )
+        intent = "COMPENSATION_REVIEW_PENDING"
+    else:
+        body = (
+            f"经核验，订单 {order_reference} 的本次物流延迟不足 24 小时，"
+            "当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。"
+        )
+        intent = "NO_COMPENSATION_RESOLUTION"
+    return {
+        "customerReply": {
+            "schemaVersion": "customer-reply-v1",
+            "body": body,
+            "intent": intent,
+            "evidenceRefs": evidence_refs,
+            "escalationRequired": False,
+            "referencedOrder": order_reference,
+        }
+    }
+
+
 def collect_investigation_facts(
     client: httpx.Client,
     spring_url: str,
@@ -560,6 +587,14 @@ def main() -> None:
                     "order:ORDER-DELAY-UNDER-24",
                     "logistics:ORDER-DELAY-UNDER-24",
                 ],
+                **customer_reply(
+                    "ORDER-DELAY-UNDER-24",
+                    [
+                        "order:ORDER-DELAY-UNDER-24",
+                        "logistics:ORDER-DELAY-UNDER-24",
+                    ],
+                    False,
+                ),
             },
         )
         expect_status(conflict, 409)
@@ -581,6 +616,14 @@ def main() -> None:
                     "order:ORDER-DELAY-UNDER-24",
                     "logistics:ORDER-DELAY-UNDER-24",
                 ],
+                **customer_reply(
+                    "ORDER-DELAY-UNDER-24",
+                    [
+                        "order:ORDER-DELAY-UNDER-24",
+                        "logistics:ORDER-DELAY-UNDER-24",
+                    ],
+                    False,
+                ),
             },
         )
         expect_status(wrong_ticket_replay, 403)
@@ -641,6 +684,7 @@ def main() -> None:
                     "delaySeconds": facts["delaySeconds"],
                     "orderReference": order_reference,
                     "evidenceRefs": facts["evidenceRefs"],
+                    **customer_reply(order_reference, facts["evidenceRefs"], True),
                 },
             )
             expect_status(conclusion, 422)
@@ -758,6 +802,7 @@ def main() -> None:
                 "delaySeconds": 288000,
                 "orderReference": proposal_order_reference,
                 "evidenceRefs": reused_facts["evidenceRefs"],
+                **customer_reply(proposal_order_reference, reused_facts["evidenceRefs"], True),
             },
         )
         expect_status(reused, 200)
@@ -1314,6 +1359,7 @@ def main() -> None:
                 "delaySeconds": 288001,
                 "orderReference": proposal_order_reference,
                 "evidenceRefs": evidence_refs,
+                **customer_reply(proposal_order_reference, evidence_refs, True),
             },
         )
         expect_status(replacement, 200)
@@ -1401,6 +1447,7 @@ def main() -> None:
                 "delaySeconds": 295200,
                 "orderReference": proposal_order_reference,
                 "evidenceRefs": third_facts["evidenceRefs"],
+                **customer_reply(proposal_order_reference, third_facts["evidenceRefs"], True),
             },
         )
         expect_status(approved_replacement, 422)
@@ -3598,6 +3645,14 @@ def main() -> None:
                     "order:ORDER-DELAY-AMBIGUOUS-A",
                     "logistics:ORDER-DELAY-AMBIGUOUS-A",
                 ],
+                **customer_reply(
+                    "ORDER-DELAY-AMBIGUOUS-A",
+                    [
+                        "order:ORDER-DELAY-AMBIGUOUS-A",
+                        "logistics:ORDER-DELAY-AMBIGUOUS-A",
+                    ],
+                    False,
+                ),
             },
         )
         expect_status(late_conclusion, 403)
@@ -3915,6 +3970,14 @@ def main() -> None:
                     "order:ORDER-DELAY-UNDER-24",
                     "logistics:ORDER-DELAY-UNDER-24",
                 ],
+                **customer_reply(
+                    "ORDER-DELAY-UNDER-24",
+                    [
+                        "order:ORDER-DELAY-UNDER-24",
+                        "logistics:ORDER-DELAY-UNDER-24",
+                    ],
+                    False,
+                ),
             },
         )
         expect_status(replayed_conclusion_after_handoff, 403)

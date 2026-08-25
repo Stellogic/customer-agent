@@ -7,6 +7,12 @@ import httpx
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from baseline_agent.customer_communication_model import (
+    CustomerCommunicationInput,
+    CustomerCommunicationModel,
+    FixedFakeCustomerCommunicationModel,
+    validate_customer_reply_envelope,
+)
 from baseline_agent.deepseek_investigation_model import (
     DEEPSEEK_FLASH_MODEL,
     INVESTIGATION_JUDGMENT_PROMPT_VERSION,
@@ -48,6 +54,7 @@ class BaselineState(TypedDict, total=False):
     generation_id: str
     facts: dict
     conclusion: dict
+    customer_reply: dict[str, object]
     clarification: dict
     clarification_answer: dict
     model_mode: str
@@ -72,6 +79,7 @@ REQUIRED_FACT_FIELDS = {
 
 investigation_judgment_model: InvestigationJudgmentModel = FixedFakeInvestigationModel()
 investigation_action_model = DeterministicActionModel()
+customer_communication_model: CustomerCommunicationModel = FixedFakeCustomerCommunicationModel()
 shadow_candidate_factory: Callable[[], ShadowCandidate | None] = configured_shadow_candidate
 
 
@@ -276,6 +284,27 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
             )
         )
         conclusion = _build_conclusion(facts, judgment)
+        communication_input = CustomerCommunicationInput(
+            order_reference=facts["orderReference"],
+            delay_seconds=facts["delaySeconds"],
+            compensation_review_required=judgment.compensation_review_required,
+            evidence_refs=tuple(facts["evidenceRefs"]),
+        )
+        try:
+            customer_reply = await customer_communication_model.compose(communication_input)
+            validate_customer_reply_envelope(communication_input, customer_reply)
+        except Exception:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_MODEL_OUTPUT",
+                _controlled_summary_facts(facts),
+                action_records,
+            )
+        completion = {**conclusion, "customerReply": customer_reply.as_request_value()}
         try:
             conclusion_response = await _request_with_retries(
                 lambda: client.post(
@@ -285,7 +314,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                         "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
                         "Idempotency-Key": f"{generation_id}:submit-conclusion",
                     },
-                    json=conclusion,
+                    json=completion,
                 )
             )
         except httpx.HTTPStatusError as error:
@@ -315,6 +344,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
         return {
             "facts": facts,
             "conclusion": conclusion,
+            "customer_reply": customer_reply.as_request_value(),
             "model_mode": "fixed-fake-model-v1",
             "investigation_actions": action_records,
         }

@@ -120,7 +120,7 @@ public final class AgentInvestigationController {
                     UUID scopedGenerationId,
             @RequestHeader(value = "X-Agent-Operation", required = false) String operation,
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
-            @RequestBody InvestigationConclusion conclusion) {
+            @RequestBody JsonNode payload) {
         requireScope(
                 ticketId,
                 generationId,
@@ -133,7 +133,106 @@ public final class AgentInvestigationController {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "missing stable command identity");
         }
+        InvestigationConclusion conclusion = parseConclusion(ticketId, payload);
         return service.submit(ticketId, generationId, requestId, conclusion);
+    }
+
+    private InvestigationConclusion parseConclusion(UUID ticketId, JsonNode payload) {
+        Set<String> expected =
+                Set.of(
+                        "compensationRequired",
+                        "reasonCode",
+                        "delayHours",
+                        "delaySeconds",
+                        "orderReference",
+                        "evidenceRefs",
+                        "customerReply");
+        if (payload == null || !payload.isObject() || !expected.equals(properties(payload))) {
+            return malformedConclusion(ticketId);
+        }
+        JsonNode reply = payload.get("customerReply");
+        Set<String> expectedReply =
+                Set.of(
+                        "schemaVersion",
+                        "body",
+                        "intent",
+                        "evidenceRefs",
+                        "escalationRequired",
+                        "referencedOrder");
+        if (reply == null || !reply.isObject() || !expectedReply.equals(properties(reply))) {
+            return malformedConclusion(ticketId);
+        }
+        try {
+            return new InvestigationConclusion(
+                    requiredBoolean(payload, "compensationRequired"),
+                    DecisionReasonCode.valueOf(requiredText(payload, "reasonCode")),
+                    requiredInt(payload, "delayHours"),
+                    requiredLong(payload, "delaySeconds"),
+                    requiredText(payload, "orderReference"),
+                    requiredTextList(payload, "evidenceRefs"),
+                    new CustomerReplyEnvelope(
+                            requiredText(reply, "schemaVersion"),
+                            requiredText(reply, "body"),
+                            CustomerReplyIntent.valueOf(requiredText(reply, "intent")),
+                            requiredTextList(reply, "evidenceRefs"),
+                            requiredBoolean(reply, "escalationRequired"),
+                            requiredText(reply, "referencedOrder")));
+        } catch (IllegalArgumentException exception) {
+            return malformedConclusion(ticketId);
+        }
+    }
+
+    private InvestigationConclusion malformedConclusion(UUID ticketId) {
+        service.auditRejected(ticketId, "MALFORMED_CONCLUSION");
+        throw new ResponseStatusException(
+                HttpStatus.UNPROCESSABLE_ENTITY, "malformed investigation conclusion");
+    }
+
+    private static String requiredText(JsonNode object, String name) {
+        JsonNode value = object.get(name);
+        if (value == null || !value.isString() || value.asText().isBlank()) {
+            throw new IllegalArgumentException("invalid string");
+        }
+        return value.asText();
+    }
+
+    private static boolean requiredBoolean(JsonNode object, String name) {
+        JsonNode value = object.get(name);
+        if (value == null || !value.isBoolean()) {
+            throw new IllegalArgumentException("invalid boolean");
+        }
+        return value.asBoolean();
+    }
+
+    private static int requiredInt(JsonNode object, String name) {
+        JsonNode value = object.get(name);
+        if (value == null || !value.isInt()) {
+            throw new IllegalArgumentException("invalid integer");
+        }
+        return value.asInt();
+    }
+
+    private static long requiredLong(JsonNode object, String name) {
+        JsonNode value = object.get(name);
+        if (value == null || !value.isIntegralNumber()) {
+            throw new IllegalArgumentException("invalid long");
+        }
+        return value.asLong();
+    }
+
+    private static java.util.List<String> requiredTextList(JsonNode object, String name) {
+        JsonNode value = object.get(name);
+        if (value == null || !value.isArray()) {
+            throw new IllegalArgumentException("invalid string list");
+        }
+        java.util.ArrayList<String> result = new java.util.ArrayList<>();
+        for (JsonNode item : value) {
+            if (!item.isString() || item.asText().isBlank()) {
+                throw new IllegalArgumentException("invalid string list item");
+            }
+            result.add(item.asText());
+        }
+        return java.util.List.copyOf(result);
     }
 
     private void requireScope(
