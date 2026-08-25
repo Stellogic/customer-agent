@@ -13,5 +13,17 @@
   ],
   "internalAddressPatterns": [
     "agent-server|agent:2024|local-(spring|agent|executor|postgres)|postgresql://"
+  ],
+  "modelBoundaryLiterals": [
+    "DEEPSEEK_API_KEY",
+    "deepseek.com",
+    "agent-server:2024",
+    "local-agent-machine",
+    "local-spring-to-agent",
+    "untrustedCustomerData",
+    "authorizedInvestigation",
+    "\"rawResponse\"",
+    "\"toolPayload\"",
+    "\"checkpoint\""
   ]
 }

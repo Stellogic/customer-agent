@@ -1,34 +1,31 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import sensitivePatterns from "../src/sensitive-content-patterns.json" with { type: "json" };
 import { login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
 
-const forbiddenBrowserEvidence = [
-  "DEEPSEEK_API_KEY",
-  "deepseek.com",
-  "agent-server:2024",
-  "local-agent-machine",
-  "local-spring-to-agent",
-  "untrustedCustomerData",
-  "authorizedInvestigation",
-  '"rawResponse"',
-  '"toolPayload"',
-  '"checkpoint"',
-];
+const forbiddenBrowserEvidence = sensitivePatterns.modelBoundaryLiterals;
 
 type BrowserEvidence = {
   apiBodies: string[];
   bundleBodies: string[];
   requestBodies: string[];
   requestPaths: string[];
+  ssePayloads: string[];
 };
 
-function observeBrowserEvidence(page: Page): BrowserEvidence {
+async function observeBrowserEvidence(page: Page): Promise<BrowserEvidence> {
   const evidence: BrowserEvidence = {
     apiBodies: [],
     bundleBodies: [],
     requestBodies: [],
     requestPaths: [],
+    ssePayloads: [],
   };
+  const devtools = await page.context().newCDPSession(page);
+  await devtools.send("Network.enable");
+  devtools.on("Network.eventSourceMessageReceived", (event) => {
+    evidence.ssePayloads.push(event.data);
+  });
   page.on("request", (request) => {
     const url = new URL(request.url());
     evidence.requestPaths.push(url.pathname);
@@ -56,6 +53,7 @@ function assertNoBrowserLeakage(evidence: BrowserEvidence) {
     ...evidence.apiBodies,
     ...evidence.bundleBodies,
     ...evidence.requestBodies,
+    ...evidence.ssePayloads,
   ].join("\n");
   for (const forbidden of forbiddenBrowserEvidence) expect(serialized).not.toContain(forbidden);
 }
@@ -63,7 +61,7 @@ function assertNoBrowserLeakage(evidence: BrowserEvidence) {
 async function openCustomer(browser: Browser) {
   const context = await newAcceptanceContext(browser, { viewport: { width: 1440, height: 960 } });
   const page = await context.newPage();
-  const evidence = observeBrowserEvidence(page);
+  const evidence = await observeBrowserEvidence(page);
   await login(page, "customer", "customer-demo");
   return { context, page, evidence };
 }
@@ -108,6 +106,11 @@ test("Issue #124 客户通过真实全栈完成安全自动回复并从 SSE 断�
   await expect(page.getByRole("heading", { name: "正在重新同步工单" })).toBeVisible();
   await expect(page.getByText(created.ticketId, { exact: true })).toHaveCount(0);
   await expect(page.getByText(description, { exact: true })).toHaveCount(0);
+
+  disconnectEvents = false;
+  await page.getByRole("button", { name: "立即重试同步" }).click();
+  await expect(page.getByText(expectedReply, { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("已解决", { exact: true })).toBeVisible();
 
   await closeContext(context, evidence);
 });
@@ -159,6 +162,7 @@ test("Issue #124 客户人工意图停止自动处理且客服只在领取后看
     viewport: { width: 1440, height: 960 },
   });
   const support = await supportContext.newPage();
+  const supportEvidence = await observeBrowserEvidence(support);
   await login(support, "internal", "support-demo");
   const shortTicketId = `${created.ticketId.slice(0, 8)}…${created.ticketId.slice(-4)}`;
   await expect(support.getByText(shortTicketId).first()).toBeVisible({ timeout: 60_000 });
@@ -172,5 +176,5 @@ test("Issue #124 客户人工意图停止自动处理且客服只在领取后看
   expect(detail).not.toMatch(/checkpoint|rawResponse|toolPayload|思维链|完整提示/i);
 
   await closeContext(customerContext, evidence);
-  await supportContext.close();
+  await closeContext(supportContext, supportEvidence);
 });

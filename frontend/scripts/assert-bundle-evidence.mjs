@@ -4,6 +4,9 @@ import { gzipSync } from "node:zlib";
 const manifestPath = new URL("../dist/.vite/manifest.json", import.meta.url);
 const distUrl = new URL("../dist/", import.meta.url);
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const sensitivePatterns = JSON.parse(
+  readFileSync(new URL("../src/sensitive-content-patterns.json", import.meta.url), "utf8"),
+);
 
 const internalEntries = [
   "src/shells/InternalShell.tsx",
@@ -12,18 +15,7 @@ const internalEntries = [
   "src/workspaces/ApprovalWorkspace.tsx",
 ];
 const customerEntries = ["src/shells/CustomerShell.tsx", "src/workspaces/CustomerWorkspace.tsx"];
-const forbiddenProductionContent = [
-  "DEEPSEEK_API_KEY",
-  "deepseek.com",
-  "agent-server:2024",
-  "local-agent-machine",
-  "local-spring-to-agent",
-  "untrustedCustomerData",
-  "authorizedInvestigation",
-  '"rawResponse"',
-  '"toolPayload"',
-  '"checkpoint"',
-];
+const forbiddenProductionContent = sensitivePatterns.modelBoundaryLiterals;
 
 function requireChunk(key) {
   const chunk = manifest[key];
