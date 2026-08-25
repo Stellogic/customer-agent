@@ -6,6 +6,7 @@ import pytest
 from baseline_agent.customer_communication_model import (
     CustomerCommunicationFailure,
     CustomerCommunicationFailureCode,
+    StructuredCustomerCommunicationModel,
 )
 from baseline_agent.graph import (
     await_clarification,
@@ -47,6 +48,23 @@ class _HandoffAfterFactsModel(DeterministicActionModel):
         return await super().choose(facts)
 
 
+def _customer_communication_context() -> dict[str, object]:
+    return {
+        "schemaVersion": "customer-communication-input-v1",
+        "syntheticCustomerText": "包裹还没到，请帮我调查",
+        "publicConversation": [
+            {"author": "CUSTOMER", "body": "包裹还没到，请帮我调查"},
+            {"author": "SUPPORT", "body": "我们正在调查"},
+        ],
+    }
+
+
+def _catalog_or_customer_context(url: str) -> dict[str, object]:
+    if url.endswith("/customer-communication-context"):
+        return _customer_communication_context()
+    return _capability_catalog()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("force_handoff", [False, True])
 async def test_terminal_handoff_and_budget_failure_preserve_controlled_action_records(
@@ -71,8 +89,8 @@ async def test_terminal_handoff_and_budget_failure_preserve_controlled_action_re
         async def __aexit__(self, *_: object) -> None:
             return None
 
-        async def get(self, *_: object, **__: object) -> Response:
-            return Response(_capability_catalog())
+        async def get(self, url: str, **__: object) -> Response:
+            return Response(_catalog_or_customer_context(url))
 
         async def post(self, url: str, **_: object) -> Response:
             posts.append(url)
@@ -134,7 +152,7 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
 
         async def get(self, url: str, **_: object) -> Response:
             calls.append(("GET", url))
-            return Response(_capability_catalog())
+            return Response(_catalog_or_customer_context(url))
 
         async def post(self, url: str, **_: object) -> Response:
             calls.append(("POST", url))
@@ -167,6 +185,7 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
         "POST",
         "POST",
         "POST",
+        "GET",
         "POST",
     ]
 
@@ -210,8 +229,8 @@ async def test_enabled_offline_shadow_only_adds_a_minimal_checkpoint_comparison(
         async def __aexit__(self, *_: object) -> None:
             return None
 
-        async def get(self, _url: str, **_: object) -> Response:
-            return Response(_capability_catalog())
+        async def get(self, url: str, **_: object) -> Response:
+            return Response(_catalog_or_customer_context(url))
 
         async def post(self, url: str, *, headers: dict[str, str], **_: object) -> Response:
             if "/capabilities/" in url:
@@ -451,8 +470,8 @@ async def test_unsafe_investigation_uses_controlled_handoff_without_leaking_raw_
         async def __aexit__(self, *_: object) -> None:
             return None
 
-        async def get(self, *_: object, **__: object) -> Response:
-            return Response(_capability_catalog())
+        async def get(self, url: str, **__: object) -> Response:
+            return Response(_catalog_or_customer_context(url))
 
         async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
             if "/capabilities/" in url:
@@ -577,8 +596,8 @@ async def test_conclusion_tool_retry_exhaustion_uses_the_same_stable_handoff_ide
         async def __aexit__(self, *_: object) -> None:
             return None
 
-        async def get(self, *_: object, **__: object) -> Response:
-            return Response(_capability_catalog())
+        async def get(self, url: str, **__: object) -> Response:
+            return Response(_catalog_or_customer_context(url))
 
         async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
             nonlocal conclusion_attempts
@@ -663,9 +682,9 @@ async def test_concurrent_unsafe_tool_results_share_one_handoff_identity(
         async def __aexit__(self, *_: object) -> None:
             return None
 
-        async def get(self, *_: object, **__: object) -> Response:
+        async def get(self, url: str, **__: object) -> Response:
             await asyncio.sleep(0)
-            return Response(_capability_catalog())
+            return Response(_catalog_or_customer_context(url))
 
         async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
             if "/capabilities/" in url:
@@ -701,6 +720,7 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[tuple[str, str, dict | None]] = []
+    provider_requests: list[dict[str, object]] = []
     facts = {
         "matchStatus": "UNIQUE",
         "orderReference": "ORDER-DELAY-UNDER-24",
@@ -733,8 +753,11 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
 
         async def get(self, url: str, *, headers: dict[str, str]) -> Response:
             calls.append(("GET", url, None))
-            assert headers["X-Agent-Operation"] == "USE_INVESTIGATION_CAPABILITY"
-            return Response(_capability_catalog())
+            if url.endswith("/customer-communication-context"):
+                assert headers["X-Agent-Operation"] == "READ_CUSTOMER_COMMUNICATION_CONTEXT"
+            else:
+                assert headers["X-Agent-Operation"] == "USE_INVESTIGATION_CAPABILITY"
+            return Response(_catalog_or_customer_context(url))
 
         async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
             calls.append(("POST", url, json))
@@ -745,7 +768,29 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
             assert headers["Idempotency-Key"] == "generation-14:submit-conclusion"
             return Response({"accepted": True, "lifecycleState": "RESOLVED"})
 
+    class ProviderStub:
+        async def generate(self, request: dict[str, object]) -> dict[str, object]:
+            provider_requests.append(request)
+            return {
+                "schemaVersion": "customer-reply-v1",
+                "body": (
+                    "经核验，订单 ORDER-DELAY-UNDER-24 的本次物流延迟不足 24 小时，"
+                    "当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。"
+                ),
+                "intent": "NO_COMPENSATION_RESOLUTION",
+                "evidenceRefs": [
+                    "order:ORDER-DELAY-UNDER-24",
+                    "logistics:ORDER-DELAY-UNDER-24",
+                ],
+                "escalationRequired": False,
+                "referencedOrder": "ORDER-DELAY-UNDER-24",
+            }
+
     monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setattr(
+        "baseline_agent.graph.customer_communication_model",
+        StructuredCustomerCommunicationModel(ProviderStub()),
+    )
     monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
     monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
 
@@ -782,7 +827,23 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
     }
     submitted = next(call[2] for call in calls if call[1].endswith("/conclusions"))
     assert submitted == {**result["conclusion"], "customerReply": result["customer_reply"]}
-    assert [call[0] for call in calls] == ["GET", "POST", "POST", "POST", "POST", "POST", "POST"]
+    assert provider_requests[0]["untrustedCustomerData"] == {
+        "syntheticCustomerText": "包裹还没到，请帮我调查",
+        "publicConversation": [
+            {"author": "CUSTOMER", "body": "包裹还没到，请帮我调查"},
+            {"author": "SUPPORT", "body": "我们正在调查"},
+        ],
+    }
+    assert [call[0] for call in calls] == [
+        "GET",
+        "POST",
+        "POST",
+        "POST",
+        "POST",
+        "POST",
+        "GET",
+        "POST",
+    ]
 
 
 @pytest.mark.asyncio
@@ -812,8 +873,8 @@ async def test_customer_communication_failure_hands_off_without_submitting_or_se
         async def __aexit__(self, *_: object) -> None:
             return None
 
-        async def get(self, *_: object, **__: object) -> Response:
-            return Response(_capability_catalog())
+        async def get(self, url: str, **__: object) -> Response:
+            return Response(_catalog_or_customer_context(url))
 
         async def post(self, url: str, *, json: dict, **_: object) -> Response:
             posts.append(url)
@@ -871,6 +932,17 @@ async def test_ambiguous_order_creates_a_controlled_request_before_interrupt(
             assert headers["X-Agent-Operation"] == "CREATE_CUSTOMER_CLARIFICATION"
             return Response()
 
+        async def get(self, url: str, *, headers: dict[str, str]) -> Response:
+            assert url.endswith("/customer-communication-context")
+            assert headers["X-Agent-Operation"] == "READ_CUSTOMER_COMMUNICATION_CONTEXT"
+            response = Response()
+            response.json = lambda: {
+                "schemaVersion": "customer-communication-input-v1",
+                "syntheticCustomerText": "两个订单都可能，请问需要哪个？",
+                "publicConversation": [],
+            }
+            return response
+
     monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
     monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
     monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
@@ -880,12 +952,69 @@ async def test_ambiguous_order_creates_a_controlled_request_before_interrupt(
             "requested_by": "spring",
             "ticket_id": "ticket-16",
             "generation_id": "generation-16",
-            "facts": {"matchStatus": "AMBIGUOUS"},
+            "facts": {"matchStatus": "AMBIGUOUS", "orderReference": "ORDER-PENDING"},
         }
     )
 
     assert result["clarification"]["clarificationRequestId"] == "clarification-16"
-    assert calls[0][1] == {"reasonCode": "ORDER_AMBIGUOUS"}
+    assert calls[0][1]["reasonCode"] == "ORDER_AMBIGUOUS"
+    assert calls[0][1]["customerReply"]["intent"] == "CLARIFICATION_REQUIRED"
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_order_customer_human_request_uses_handoff_instead_of_clarification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    posts: list[tuple[str, dict]] = []
+
+    class Response:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, _url: str, *, headers: dict[str, str]) -> Response:
+            assert headers["X-Agent-Operation"] == "READ_CUSTOMER_COMMUNICATION_CONTEXT"
+            return Response(
+                {
+                    "schemaVersion": "customer-communication-input-v1",
+                    "syntheticCustomerText": "请直接转人工客服",
+                    "publicConversation": [],
+                }
+            )
+
+        async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
+            posts.append((url, json))
+            assert headers["X-Agent-Operation"] == "REQUEST_HUMAN_HANDOFF"
+            return Response({"reasonCode": "CUSTOMER_REQUESTED_HUMAN"})
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+
+    result = await request_clarification(
+        {
+            "requested_by": "spring",
+            "ticket_id": "ticket-16",
+            "generation_id": "generation-16",
+            "facts": {"matchStatus": "AMBIGUOUS", "orderReference": "ORDER-PENDING"},
+        }
+    )
+
+    assert result["handoff"]["reasonCode"] == "CUSTOMER_REQUESTED_HUMAN"
+    assert posts[0][0].endswith("/human-handoff")
+    assert posts[0][1]["reasonCode"] == "CUSTOMER_REQUESTED_HUMAN"
 
 
 def test_clarification_interrupt_and_checkpoint_contain_only_recovery_fields(

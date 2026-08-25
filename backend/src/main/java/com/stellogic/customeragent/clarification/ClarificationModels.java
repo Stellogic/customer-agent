@@ -1,8 +1,22 @@
 package com.stellogic.customeragent.clarification;
 
+import java.util.List;
 import java.util.UUID;
 
-record CreateClarification(UUID ticketId, UUID generationId, String requestId, String reasonCode) {}
+record CreateClarification(
+        UUID ticketId,
+        UUID generationId,
+        String requestId,
+        String reasonCode,
+        CustomerClarificationReply customerReply) {}
+
+record CustomerClarificationReply(
+        String schemaVersion,
+        String body,
+        String intent,
+        List<String> evidenceRefs,
+        boolean escalationRequired,
+        String referencedOrder) {}
 
 record ClarificationRequestResult(
         UUID clarificationRequestId, String promptCode, String question) {}

@@ -58,6 +58,35 @@ class AgentInvestigationCapabilityControllerTest {
     }
 
     @Test
+    void exposesOnlyCurrentSyntheticPublicCommunicationContext() throws Exception {
+        when(service.customerCommunicationContext(TICKET_ID, GENERATION_ID))
+                .thenReturn(
+                        new CustomerCommunicationContext(
+                                "customer-communication-input-v1",
+                                "包裹还没到，请尽快帮我看看",
+                                List.of(
+                                        new CustomerCommunicationMessage(
+                                                "CUSTOMER", "包裹还没到，请尽快帮我看看"),
+                                        new CustomerCommunicationMessage("SUPPORT", "我们正在调查"))));
+
+        org.springframework.http.HttpHeaders headers = scopedHeaders();
+        headers.set("X-Agent-Operation", "READ_CUSTOMER_COMMUNICATION_CONTEXT");
+        mvc.perform(
+                        get(
+                                        "/internal/agent/tickets/{ticketId}/generations/{generationId}/customer-communication-context",
+                                        TICKET_ID,
+                                        GENERATION_ID)
+                                .headers(headers))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.schemaVersion").value("customer-communication-input-v1"))
+                .andExpect(jsonPath("$.syntheticCustomerText").value("包裹还没到，请尽快帮我看看"))
+                .andExpect(jsonPath("$.publicConversation[0].author").value("CUSTOMER"))
+                .andExpect(jsonPath("$.publicConversation[0].body").value("包裹还没到，请尽快帮我看看"))
+                .andExpect(jsonPath("$.orderReference").doesNotExist())
+                .andExpect(jsonPath("$.internalNotes").doesNotExist());
+    }
+
+    @Test
     void invokesOnlyADeclaredCapabilityWithItsExactParameters() throws Exception {
         when(service.invoke(
                         eq(TICKET_ID),

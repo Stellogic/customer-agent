@@ -3611,7 +3611,17 @@ def main() -> None:
                 "X-Agent-Operation": "CREATE_CUSTOMER_CLARIFICATION",
                 "Idempotency-Key": f"late-clarification-{uuid.uuid4()}",
             },
-            json={"reasonCode": "ORDER_AMBIGUOUS"},
+            json={
+                "reasonCode": "ORDER_AMBIGUOUS",
+                "customerReply": {
+                    "schemaVersion": "customer-reply-v1",
+                    "body": "为确认需要调查的订单，请回复订单确认码（A 或 B）。",
+                    "intent": "CLARIFICATION_REQUIRED",
+                    "evidenceRefs": [],
+                    "escalationRequired": False,
+                    "referencedOrder": "ORDER-PENDING",
+                },
+            },
         )
         expect_status(late_clarification, 403)
         replayed_clarification_after_handoff = client.post(
@@ -4086,7 +4096,17 @@ def main() -> None:
                 "X-Agent-Operation": "CREATE_CUSTOMER_CLARIFICATION",
                 "Idempotency-Key": f"{replacement_generation_id}:order-disambiguation",
             },
-            json={"reasonCode": "ORDER_AMBIGUOUS"},
+            json={
+                "reasonCode": "ORDER_AMBIGUOUS",
+                "customerReply": {
+                    "schemaVersion": "customer-reply-v1",
+                    "body": "为确认需要调查的订单，请回复订单确认码（A 或 B）。",
+                    "intent": "CLARIFICATION_REQUIRED",
+                    "evidenceRefs": [],
+                    "escalationRequired": False,
+                    "referencedOrder": "ORDER-PENDING",
+                },
+            },
         )
         expect_status(replacement_request, 200)
         assert (

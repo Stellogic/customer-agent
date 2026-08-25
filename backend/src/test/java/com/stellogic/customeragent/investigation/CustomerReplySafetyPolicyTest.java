@@ -12,6 +12,13 @@ class CustomerReplySafetyPolicyTest {
     @Test
     void acceptsOnlyTheSafeDeterministicReplyEnvelope() {
         assertThat(rejection(safeReply())).isNull();
+        assertThat(
+                        rejection(
+                                reply(
+                                        "我们已核对订单 ORDER-122 的物流记录。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+                                        EVIDENCE,
+                                        ORDER)))
+                .isNull();
     }
 
     @Test
@@ -31,13 +38,22 @@ class CustomerReplySafetyPolicyTest {
         assertThat(rejection(reply("订单 ORDER-122：退款处理完成，补偿金额为二十元。", EVIDENCE, ORDER)))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_AMOUNT");
         assertThat(rejection(reply(safeReply().body() + "相关价值为二十块钱。", EVIDENCE, ORDER)))
-                .isEqualTo("UNSAFE_CUSTOMER_REPLY");
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_AMOUNT");
         assertThat(rejection(reply(safeReply().body() + "相关价值为壹佰元。", EVIDENCE, ORDER)))
-                .isEqualTo("UNSAFE_CUSTOMER_REPLY");
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_AMOUNT");
+        assertThat(rejection(reply(safeReply().body() + "我们会在 2 小时内回复。", EVIDENCE, ORDER)))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
     }
 
     @Test
     void rejectsFabricatedEvidenceAndOrdersOutsideTheTicketScope() {
+        assertThat(
+                        rejection(
+                                reply(
+                                        "订单 ORDER-122 的调查已完成，包裹已由张三签收。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+                                        EVIDENCE,
+                                        ORDER)))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT");
         assertThat(
                         rejection(
                                 reply(

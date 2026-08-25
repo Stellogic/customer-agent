@@ -83,6 +83,22 @@ class JdbcClarificationService implements ClarificationService {
                         command.ticketId());
         if (scopes.isEmpty())
             reject(command.ticketId(), HttpStatus.FORBIDDEN, "STALE_CLARIFICATION_GENERATION");
+        CustomerClarificationReply reply = command.customerReply();
+        if (reply == null
+                || !"customer-reply-v1".equals(reply.schemaVersion())
+                || !PUBLIC_QUESTION.equals(reply.body())
+                || !"CLARIFICATION_REQUIRED".equals(reply.intent())
+                || reply.evidenceRefs() == null
+                || !reply.evidenceRefs().isEmpty()
+                || reply.escalationRequired()
+                || reply.referencedOrder() == null
+                || reply.referencedOrder().isBlank()
+                || reply.referencedOrder().length() > 200) {
+            reject(
+                    command.ticketId(),
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "UNSAFE_CLARIFICATION_REPLY");
+        }
         Integer candidates =
                 jdbc.queryForObject(
                         "select count(*) from synthetic_order_alias a join support_ticket t "
@@ -105,7 +121,7 @@ class JdbcClarificationService implements ClarificationService {
                 command.generationId(),
                 command.requestId(),
                 PROMPT_CODE,
-                PUBLIC_QUESTION,
+                reply.body(),
                 at);
         jdbc.update(
                 "update support_ticket set lifecycle_state = 'WAITING_FOR_CUSTOMER', "
@@ -119,12 +135,12 @@ class JdbcClarificationService implements ClarificationService {
                 command.ticketId(),
                 command.generationId(),
                 "AGENT",
-                PUBLIC_QUESTION,
+                reply.body(),
                 now,
                 "CUSTOMER_CLARIFICATION_REQUESTED",
                 requestId);
         audit(command.ticketId(), "CUSTOMER_CLARIFICATION_REQUESTED", "agent-machine", at);
-        return new ClarificationRequestResult(requestId, PROMPT_CODE, PUBLIC_QUESTION);
+        return new ClarificationRequestResult(requestId, PROMPT_CODE, reply.body());
     }
 
     @Override

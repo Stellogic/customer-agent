@@ -10,6 +10,8 @@ from langgraph.types import interrupt
 from baseline_agent.customer_communication_model import (
     CustomerCommunicationInput,
     CustomerCommunicationModel,
+    CustomerConversationMessage,
+    CustomerReplyIntent,
     FixedFakeCustomerCommunicationModel,
     validate_customer_reply_envelope,
 )
@@ -61,6 +63,17 @@ class BaselineState(TypedDict, total=False):
     shadow_comparison: dict[str, str]
     handoff: dict
     investigation_actions: list[dict[str, object]]
+
+
+class CustomerCommunicationContextMessage(TypedDict):
+    author: str
+    body: str
+
+
+class CustomerCommunicationContextValue(TypedDict):
+    schemaVersion: str
+    syntheticCustomerText: str
+    publicConversation: list[CustomerCommunicationContextMessage]
 
 
 REQUIRED_FACT_FIELDS = {
@@ -283,12 +296,31 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 evidence_refs=tuple(facts["evidenceRefs"]),
             )
         )
+        communication_context = await _read_customer_communication_context(
+            client, base_url, ticket_id, generation_id, scope_headers
+        )
+        if communication_context is None:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_TOOL_RESPONSE",
+                _controlled_summary_facts(facts),
+                action_records,
+            )
         conclusion = _build_conclusion(facts, judgment)
         communication_input = CustomerCommunicationInput(
             order_reference=facts["orderReference"],
             delay_seconds=facts["delaySeconds"],
             compensation_review_required=judgment.compensation_review_required,
             evidence_refs=tuple(facts["evidenceRefs"]),
+            synthetic_customer_text=communication_context["syntheticCustomerText"],
+            public_conversation=tuple(
+                CustomerConversationMessage(message["author"], message["body"])
+                for message in communication_context["publicConversation"]
+            ),
         )
         try:
             customer_reply = await customer_communication_model.compose(communication_input)
@@ -301,6 +333,17 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 generation_id,
                 scope_headers,
                 "INVALID_MODEL_OUTPUT",
+                _controlled_summary_facts(facts),
+                action_records,
+            )
+        if customer_reply.intent is CustomerReplyIntent.HUMAN_HANDOFF:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "CUSTOMER_REQUESTED_HUMAN",
                 _controlled_summary_facts(facts),
                 action_records,
             )
@@ -348,6 +391,62 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
             "model_mode": "fixed-fake-model-v1",
             "investigation_actions": action_records,
         }
+
+
+async def _read_customer_communication_context(
+    client: httpx.AsyncClient,
+    base_url: str,
+    ticket_id: str,
+    generation_id: str,
+    scope_headers: dict[str, str],
+) -> CustomerCommunicationContextValue | None:
+    response = await _request_with_retries(
+        lambda: client.get(
+            f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/customer-communication-context",
+            headers={
+                **scope_headers,
+                "X-Agent-Operation": "READ_CUSTOMER_COMMUNICATION_CONTEXT",
+            },
+        )
+    )
+    if response is None:
+        return None
+    try:
+        context = response.json()
+    except ValueError:
+        return None
+    if not isinstance(context, dict) or set(context) != {
+        "schemaVersion",
+        "syntheticCustomerText",
+        "publicConversation",
+    }:
+        return None
+    conversation = context["publicConversation"]
+    if (
+        context["schemaVersion"] != "customer-communication-input-v1"
+        or not isinstance(context["syntheticCustomerText"], str)
+        or len(context["syntheticCustomerText"]) > 4_000
+        or not isinstance(conversation, list)
+        or len(conversation) > 20
+        or not all(
+            isinstance(message, dict)
+            and set(message) == {"author", "body"}
+            and message["author"] in {"CUSTOMER", "SUPPORT", "AGENT"}
+            and isinstance(message["body"], str)
+            and bool(message["body"].strip())
+            and len(message["body"]) <= 2_000
+            for message in conversation
+        )
+    ):
+        return None
+    return CustomerCommunicationContextValue(
+        schemaVersion=context["schemaVersion"],
+        syntheticCustomerText=context["syntheticCustomerText"],
+        publicConversation=[
+            CustomerCommunicationContextMessage(author=message["author"], body=message["body"])
+            for message in conversation
+        ],
+    )
 
 
 async def _run_investigation_action_loop(
@@ -773,13 +872,96 @@ async def request_clarification(state: BaselineState) -> BaselineState:
         "Idempotency-Key": f"{generation_id}:order-disambiguation",
     }
     async with httpx.AsyncClient(timeout=5.0) as client:
-        response = await client.post(
-            f"{os.environ['SPRING_INTERNAL_URL']}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/clarifications",
-            headers=headers,
-            json={"reasonCode": "ORDER_AMBIGUOUS"},
+        base_url = os.environ["SPRING_INTERNAL_URL"]
+        scope_headers = {
+            "Authorization": headers["Authorization"],
+            "X-Agent-Generation-Id": generation_id,
+        }
+        context = await _read_customer_communication_context(
+            client,
+            base_url,
+            ticket_id,
+            generation_id,
+            scope_headers,
         )
-        response.raise_for_status()
-        return {"clarification": response.json()}
+        if context is None:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_TOOL_RESPONSE",
+                [],
+            )
+        model_input = CustomerCommunicationInput(
+            order_reference=state["facts"]["orderReference"],
+            delay_seconds=None,
+            compensation_review_required=None,
+            evidence_refs=(),
+            synthetic_customer_text=context["syntheticCustomerText"],
+            public_conversation=tuple(
+                CustomerConversationMessage(message["author"], message["body"])
+                for message in context["publicConversation"]
+            ),
+        )
+        try:
+            customer_reply = await customer_communication_model.compose(model_input)
+            validate_customer_reply_envelope(model_input, customer_reply)
+        except Exception:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_MODEL_OUTPUT",
+                [],
+            )
+        if customer_reply.intent is CustomerReplyIntent.HUMAN_HANDOFF:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "CUSTOMER_REQUESTED_HUMAN",
+                [],
+            )
+        if customer_reply.intent is not CustomerReplyIntent.CLARIFICATION_REQUIRED:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_MODEL_OUTPUT",
+                [],
+            )
+        try:
+            response = await client.post(
+                f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/clarifications",
+                headers=headers,
+                json={
+                    "reasonCode": "ORDER_AMBIGUOUS",
+                    "customerReply": customer_reply.as_request_value(),
+                },
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_MODEL_OUTPUT",
+                [],
+            )
+        return {
+            "clarification": response.json(),
+            "customer_reply": customer_reply.as_request_value(),
+        }
 
 
 def await_clarification(state: BaselineState) -> BaselineState:

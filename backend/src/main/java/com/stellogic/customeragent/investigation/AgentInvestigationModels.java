@@ -6,6 +6,13 @@ import java.util.UUID;
 record InvestigationCapabilityCatalog(
         String schemaVersion, List<InvestigationCapabilityDefinition> capabilities) {}
 
+record CustomerCommunicationContext(
+        String schemaVersion,
+        String syntheticCustomerText,
+        List<CustomerCommunicationMessage> publicConversation) {}
+
+record CustomerCommunicationMessage(String author, String body) {}
+
 record InvestigationCapabilityDefinition(
         InvestigationCapability name,
         List<InvestigationCapabilityField> parameters,

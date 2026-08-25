@@ -49,6 +49,25 @@ public final class AgentInvestigationController {
         return service.capabilities(ticketId, generationId);
     }
 
+    @GetMapping("/customer-communication-context")
+    CustomerCommunicationContext customerCommunicationContext(
+            @PathVariable UUID ticketId,
+            @PathVariable UUID generationId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
+                    String authorization,
+            @RequestHeader(value = "X-Agent-Generation-Id", required = false)
+                    UUID scopedGenerationId,
+            @RequestHeader(value = "X-Agent-Operation", required = false) String operation) {
+        requireScope(
+                ticketId,
+                generationId,
+                scopedGenerationId,
+                operation,
+                "READ_CUSTOMER_COMMUNICATION_CONTEXT",
+                authorization);
+        return service.customerCommunicationContext(ticketId, generationId);
+    }
+
     @PostMapping("/capabilities/{capabilityName}")
     InvestigationCapabilityResult invoke(
             @PathVariable UUID ticketId,
