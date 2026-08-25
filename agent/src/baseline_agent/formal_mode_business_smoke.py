@@ -101,7 +101,9 @@ def _read_autonomous_checkpoint(thread_id: str) -> dict[str, object]:
     return values
 
 
-def _verify_autonomous_actions(state: dict[str, object], expected_mode: str) -> dict[str, object]:
+def _verify_autonomous_actions(
+    state: dict[str, object], expected_mode: str, expect_customer_communication: bool
+) -> dict[str, object]:
     values = _read_autonomous_checkpoint(str(state["threadId"]))
     if values.get("model_mode") != expected_mode:
         raise RuntimeError("formal autonomous action mode was not used")
@@ -176,12 +178,54 @@ def _verify_autonomous_actions(state: dict[str, object], expected_mode: str) -> 
         or judgment_evidence["failureClassification"] != ""
     ):
         raise RuntimeError("formal judgment call evidence is incomplete")
-    total_logical_calls = len(model_calls) + judgment_evidence["logicalCalls"]
-    total_provider_attempts = (
-        run_evidence["providerAttempts"] + judgment_evidence["providerAttempts"]
+    communication_evidence = values.get("customer_communication_evidence")
+    if expect_customer_communication:
+        if (
+            not isinstance(communication_evidence, dict)
+            or set(communication_evidence)
+            != {
+                "logicalCalls",
+                "providerAttempts",
+                "tokens",
+                "costMicros",
+                "durationMs",
+                "failureClassification",
+            }
+            or communication_evidence["logicalCalls"] != 1
+            or not isinstance(communication_evidence["providerAttempts"], int)
+            or not 1 <= communication_evidence["providerAttempts"] <= 2
+            or not isinstance(communication_evidence["durationMs"], int)
+            or communication_evidence["durationMs"] < 0
+            or communication_evidence["failureClassification"] != ""
+        ):
+            raise RuntimeError("formal customer communication evidence is incomplete")
+    else:
+        communication_evidence = {
+            "logicalCalls": 0,
+            "providerAttempts": 0,
+            "tokens": 0,
+            "costMicros": 0,
+            "durationMs": 0,
+            "failureClassification": "",
+        }
+    total_logical_calls = (
+        len(model_calls)
+        + judgment_evidence["logicalCalls"]
+        + communication_evidence["logicalCalls"]
     )
-    estimated_cost_micros = run_evidence["costMicros"] + judgment_evidence["costMicros"]
-    if total_logical_calls > 7 or total_provider_attempts > 7:
+    total_provider_attempts = (
+        run_evidence["providerAttempts"]
+        + judgment_evidence["providerAttempts"]
+        + communication_evidence["providerAttempts"]
+    )
+    estimated_cost_micros = (
+        run_evidence["costMicros"]
+        + judgment_evidence["costMicros"]
+        + communication_evidence["costMicros"]
+    )
+    logical_limit = 8 if expect_customer_communication else 7
+    attempt_limit = 9 if expect_customer_communication else 7
+    if total_logical_calls > logical_limit or total_provider_attempts > attempt_limit:
         raise RuntimeError("formal provider call hard limit was exceeded")
     serialized = json.dumps(values, ensure_ascii=False)
     for forbidden in ("reasoning", "rawModel", "rawTool", "providerPayload", "api_key"):
@@ -192,6 +236,7 @@ def _verify_autonomous_actions(state: dict[str, object], expected_mode: str) -> 
         "actionOrder": action_types,
         "actionRun": run_evidence,
         "judgmentRun": judgment_evidence,
+        "customerCommunicationRun": communication_evidence,
         "totalLogicalCalls": total_logical_calls,
         "totalProviderAttempts": total_provider_attempts,
         "estimatedCostMicros": estimated_cost_micros,
@@ -220,6 +265,7 @@ def _run(
     expectation: str,
     run_id: str,
     expected_action_model_mode: str | None,
+    expected_customer_communication_mode: str | None,
 ) -> dict[str, object]:
     spring_url = os.environ["SPRING_INTERNAL_URL"]
     connection_uri = os.environ["SPRING_FORMAL_DATABASE_URI"]
@@ -249,7 +295,11 @@ def _run(
         if projection["messages"][-1]["author"] != "AGENT":
             raise RuntimeError("formal Flash success did not publish the controlled Agent result")
         if expected_action_model_mode is not None:
-            checkpoint_evidence = _verify_autonomous_actions(state, expected_action_model_mode)
+            checkpoint_evidence = _verify_autonomous_actions(
+                state,
+                expected_action_model_mode,
+                expected_customer_communication_mode is not None,
+            )
     elif expectation == "handoff":
         if (
             state["generationStatus"] != "HANDED_OFF"
@@ -278,12 +328,19 @@ def _run(
         ):
             public_failure = action_run["failureClassification"]
     return {
-        "schemaVersion": "issue-128-formal-autonomous-acceptance-v1",
+        "schemaVersion": (
+            "issue-129-formal-customer-communication-acceptance-v1"
+            if expected_customer_communication_mode is not None
+            else "issue-128-formal-autonomous-acceptance-v1"
+        ),
         "expectation": expectation,
         "model": "deepseek-v4-flash",
         "modelMode": "deepseek-formal",
         "boundedProviderAttempts": 2,
         "actionModelMode": expected_action_model_mode or "deterministic-action-model-v1",
+        "customerCommunicationModelMode": (
+            expected_customer_communication_mode or "fixed-fake-customer-communication-v1"
+        ),
         "springState": sanitized_spring_state,
         "checkpointEvidence": checkpoint_evidence,
         "publicFailureClassification": public_failure,
@@ -297,6 +354,7 @@ def _main() -> None:
     parser.add_argument("--expect", choices=["success", "handoff"], required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--expected-action-model-mode")
+    parser.add_argument("--expected-customer-communication-mode")
     parser.add_argument("--report-path")
     arguments = parser.parse_args()
     if not arguments.run_id.isalnum():
@@ -305,6 +363,7 @@ def _main() -> None:
         arguments.expect,
         arguments.run_id,
         arguments.expected_action_model_mode,
+        arguments.expected_customer_communication_mode,
     )
     if arguments.report_path:
         Path(arguments.report_path).write_text(

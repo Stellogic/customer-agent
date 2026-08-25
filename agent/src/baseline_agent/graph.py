@@ -12,8 +12,13 @@ from baseline_agent.customer_communication_model import (
     CustomerCommunicationModel,
     CustomerConversationMessage,
     CustomerReplyIntent,
-    FixedFakeCustomerCommunicationModel,
     validate_customer_reply_envelope,
+)
+from baseline_agent.customer_communication_model_runtime import (
+    configured_customer_communication_model,
+)
+from baseline_agent.deepseek_customer_communication_model import (
+    DeepSeekResponsesCustomerCommunicationModel,
 )
 from baseline_agent.deepseek_investigation_model import (
     DEEPSEEK_FLASH_MODEL,
@@ -74,6 +79,7 @@ class BaselineState(TypedDict, total=False):
     investigation_actions: list[dict[str, object]]
     investigation_run_evidence: dict[str, object]
     investigation_judgment_evidence: dict[str, object]
+    customer_communication_evidence: dict[str, object]
     investigation_progress: dict[str, object] | None
 
 
@@ -108,7 +114,11 @@ investigation_model_mode = _configured_investigation_model.mode
 _configured_action_model = configured_investigation_action_model(os.environ)
 investigation_action_model = _configured_action_model.model
 investigation_action_model_mode = _configured_action_model.mode
-customer_communication_model: CustomerCommunicationModel = FixedFakeCustomerCommunicationModel()
+_configured_customer_communication_model = configured_customer_communication_model(os.environ)
+customer_communication_model: CustomerCommunicationModel = (
+    _configured_customer_communication_model.model
+)
+customer_communication_model_mode = _configured_customer_communication_model.mode
 shadow_candidate_factory: Callable[[], ShadowCandidate | None] = configured_shadow_candidate
 
 
@@ -366,6 +376,7 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 for message in communication_context["publicConversation"]
             ),
         )
+        communication_audit_offset = _communication_audit_offset()
         try:
             customer_reply = await customer_communication_model.compose(communication_input)
             validate_customer_reply_envelope(communication_input, customer_reply)
@@ -447,6 +458,9 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 loop_result, "CONCLUSION_SUBMITTED"
             ),
             "investigation_judgment_evidence": judgment_evidence,
+            "customer_communication_evidence": _communication_call_evidence(
+                communication_audit_offset, ""
+            ),
         }
 
 
@@ -572,9 +586,13 @@ async def _advance_investigation_action_loop(
 
 
 def _combined_model_mode() -> str:
-    if investigation_action_model_mode == "deterministic-action-model-v1":
-        return investigation_model_mode
-    return f"{investigation_action_model_mode}+{investigation_model_mode}"
+    modes = []
+    if investigation_action_model_mode != "deterministic-action-model-v1":
+        modes.append(investigation_action_model_mode)
+    modes.append(investigation_model_mode)
+    if customer_communication_model_mode != "fixed-fake-customer-communication-v1":
+        modes.append(customer_communication_model_mode)
+    return "+".join(modes)
 
 
 def _action_loop_handoff_reason(code: ActionLoopFailureCode) -> str:
@@ -687,6 +705,46 @@ def _judgment_call_evidence(offset: int | None, failure: str) -> dict[str, objec
         "providerAttempts": len(records),
         "tokens": sum(record.total_tokens or 0 for record in records),
         "costMicros": estimate_flash_cost_micros(input_tokens, output_tokens),
+        "failureClassification": failure or (sorted(classifications)[0] if classifications else ""),
+    }
+
+
+def _communication_audit_offset() -> int | None:
+    if not isinstance(customer_communication_model, DeepSeekResponsesCustomerCommunicationModel):
+        return None
+    sink = customer_communication_model.audit_sink
+    return len(sink.records) if isinstance(sink, InMemoryModelCallAuditSink) else None
+
+
+def _communication_call_evidence(offset: int | None, failure: str) -> dict[str, object]:
+    if offset is None or not isinstance(
+        customer_communication_model, DeepSeekResponsesCustomerCommunicationModel
+    ):
+        return {
+            "logicalCalls": 0,
+            "providerAttempts": 0,
+            "tokens": 0,
+            "costMicros": 0,
+            "durationMs": 0,
+            "failureClassification": failure,
+        }
+    sink = customer_communication_model.audit_sink
+    if not isinstance(sink, InMemoryModelCallAuditSink):
+        raise RuntimeError("formal communication audit sink is not readable")
+    records = sink.records[offset:]
+    input_tokens = sum(record.input_tokens or 0 for record in records)
+    output_tokens = sum(record.output_tokens or 0 for record in records)
+    classifications = {
+        record.failure_classification.value
+        for record in records
+        if record.failure_classification is not None
+    }
+    return {
+        "logicalCalls": 1 if records else 0,
+        "providerAttempts": len(records),
+        "tokens": sum(record.total_tokens or 0 for record in records),
+        "costMicros": estimate_flash_cost_micros(input_tokens, output_tokens),
+        "durationMs": sum(record.duration_ms for record in records),
         "failureClassification": failure or (sorted(classifications)[0] if classifications else ""),
     }
 
@@ -1077,6 +1135,7 @@ async def request_clarification(state: BaselineState) -> BaselineState:
                 for message in context["publicConversation"]
             ),
         )
+        communication_audit_offset = _communication_audit_offset()
         try:
             customer_reply = await customer_communication_model.compose(model_input)
             validate_customer_reply_envelope(model_input, customer_reply)
@@ -1133,6 +1192,9 @@ async def request_clarification(state: BaselineState) -> BaselineState:
         return {
             "clarification": response.json(),
             "customer_reply": customer_reply.as_request_value(),
+            "customer_communication_evidence": _communication_call_evidence(
+                communication_audit_offset, ""
+            ),
         }
 
 
