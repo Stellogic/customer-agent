@@ -34,4 +34,4 @@ pwsh ./scripts/check.ps1
 - `FULL_RESET_GATE` 的 Spring、PostgreSQL 与 Agent 状态均为 `UP`，完整离线 integration smoke 通过。
 - 真实 Chromium 主矩阵为 `24 passed`；后端重启和加速 Session 到期矩阵分别通过。
 - 生产 bundle 扫描覆盖 24 个 JavaScript/CSS 文件，模型边界禁用内容匹配为 0。
-- 完整门禁使用隔离 project `customer-agent-issue124-7c91d6`、端口 `53771` 与镜像 tag `issue124-7c91d6`；浏览器子门禁另用唯一 project。两组自有容器、卷、网络与镜像清理后均回读为空，既有 `customer-agent-baseline` 未被停止或清理。
+- 最终完整门禁使用隔离 project `customer-agent-issue124-final-3c4b9f`、端口 `54367` 与镜像 tag `issue124-final-3c4b9f`；浏览器子门禁另用唯一 project `customer-agent-issue80-769a65f605af`。两组自有容器、卷、网络与镜像清理后均回读为空，既有 `customer-agent-baseline` 未被停止或清理。
