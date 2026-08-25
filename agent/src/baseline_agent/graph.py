@@ -13,6 +13,7 @@ from baseline_agent.deepseek_investigation_model import (
     INVESTIGATION_JUDGMENT_SCHEMA_VERSION,
 )
 from baseline_agent.investigation_action_loop import (
+    CAPABILITY_PARAMETER_NAMES,
     ActionBudget,
     ActionDecision,
     ActionLoop,
@@ -90,10 +91,17 @@ STRING = "STRING"
 INTEGER = "INTEGER"
 BOOLEAN = "BOOLEAN"
 STRING_LIST = "STRING_LIST"
-ORDER_REFERENCE = (CapabilityField("orderReference", STRING),)
+
+
+def _capability_parameters(
+    capability: InvestigationCapability,
+) -> tuple[CapabilityField, ...]:
+    return tuple(CapabilityField(name, STRING) for name in CAPABILITY_PARAMETER_NAMES[capability])
+
+
 CAPABILITY_CONTRACTS = {
     InvestigationCapability.CONFIRM_ORDER: CapabilityContract(
-        (),
+        _capability_parameters(InvestigationCapability.CONFIRM_ORDER),
         (
             CapabilityField("capability", STRING),
             CapabilityField("matchStatus", STRING),
@@ -102,7 +110,7 @@ CAPABILITY_CONTRACTS = {
         ),
     ),
     InvestigationCapability.READ_LOGISTICS: CapabilityContract(
-        ORDER_REFERENCE,
+        _capability_parameters(InvestigationCapability.READ_LOGISTICS),
         (
             CapabilityField("capability", STRING),
             CapabilityField("delayHours", INTEGER),
@@ -111,7 +119,7 @@ CAPABILITY_CONTRACTS = {
         ),
     ),
     InvestigationCapability.READ_PAYMENT_AND_REFUNDS: CapabilityContract(
-        ORDER_REFERENCE,
+        _capability_parameters(InvestigationCapability.READ_PAYMENT_AND_REFUNDS),
         (
             CapabilityField("capability", STRING),
             CapabilityField("paid", BOOLEAN),
@@ -121,7 +129,7 @@ CAPABILITY_CONTRACTS = {
         ),
     ),
     InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS: CapabilityContract(
-        ORDER_REFERENCE,
+        _capability_parameters(InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS),
         (
             CapabilityField("capability", STRING),
             CapabilityField("existingCompensation", BOOLEAN),
@@ -130,7 +138,7 @@ CAPABILITY_CONTRACTS = {
         ),
     ),
     InvestigationCapability.READ_APPLICABLE_POLICY: CapabilityContract(
-        ORDER_REFERENCE,
+        _capability_parameters(InvestigationCapability.READ_APPLICABLE_POLICY),
         (
             CapabilityField("capability", STRING),
             CapabilityField("policyVersion", STRING),
@@ -208,19 +216,6 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
             )
         facts = _normalize_loop_facts(loop_result.facts)
         action_records = _checkpoint_action_records(loop_result.records)
-        unsafe_reason = _unsafe_facts_reason(facts)
-        if unsafe_reason is not None:
-            return await _human_handoff(
-                client,
-                base_url,
-                ticket_id,
-                generation_id,
-                scope_headers,
-                unsafe_reason,
-                _controlled_summary_facts(facts),
-                action_records,
-            )
-        assert isinstance(facts, dict)
         if loop_result.terminal_action is TerminalAction.HANDOFF:
             return await _human_handoff(
                 client,
@@ -233,7 +228,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 action_records,
             )
         if loop_result.terminal_action is TerminalAction.REQUEST_CLARIFICATION:
-            if facts.get("matchStatus") != "AMBIGUOUS":
+            if _clarification_facts_reason(facts) is not None:
                 return await _human_handoff(
                     client,
                     base_url,
@@ -249,6 +244,19 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 "model_mode": "fixed-fake-model-v1",
                 "investigation_actions": action_records,
             }
+        unsafe_reason = _unsafe_facts_reason(facts)
+        if unsafe_reason is not None:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                unsafe_reason,
+                _controlled_summary_facts(facts),
+                action_records,
+            )
+        assert isinstance(facts, dict)
         if loop_result.terminal_action is not TerminalAction.SUBMIT_CONCLUSION:
             return await _human_handoff(
                 client,
@@ -290,6 +298,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                     scope_headers,
                     "FACT_CONFLICT",
                     _controlled_summary_facts(facts),
+                    action_records,
                 )
             raise
         if conclusion_response is None:
@@ -301,6 +310,7 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 scope_headers,
                 "TOOL_RETRY_EXHAUSTED",
                 _controlled_summary_facts(facts),
+                action_records,
             )
         return {
             "facts": facts,
@@ -587,26 +597,7 @@ def _unsafe_facts_reason(facts: object) -> str | None:
         return "INVALID_TOOL_RESPONSE"
     present = set(facts)
     if facts.get("matchStatus") == "AMBIGUOUS":
-        if not REQUIRED_FACT_FIELDS.issubset(present):
-            return "REQUIRED_FACT_MISSING"
-        if present != REQUIRED_FACT_FIELDS:
-            return "INVALID_TOOL_RESPONSE"
-        nullable_fields = (
-            "delayHours",
-            "delaySeconds",
-            "paid",
-            "cancelled",
-            "fullyRefunded",
-            "existingCompensation",
-            "pendingActionCount",
-            "policyVersion",
-        )
-        valid_ambiguity = (
-            isinstance(facts["orderReference"], str)
-            and all(facts[name] is None for name in nullable_fields)
-            and facts["evidenceRefs"] == []
-        )
-        return None if valid_ambiguity else "INVALID_TOOL_RESPONSE"
+        return _clarification_facts_reason(facts)
     typed_values = {
         "orderReference": str,
         "delayHours": int,
@@ -652,6 +643,34 @@ def _unsafe_facts_reason(facts: object) -> str | None:
     ):
         return "UNSUPPORTED_SCENARIO"
     return None
+
+
+def _clarification_facts_reason(facts: object) -> str | None:
+    if not isinstance(facts, dict):
+        return "INVALID_TOOL_RESPONSE"
+    present = set(facts)
+    if not REQUIRED_FACT_FIELDS.issubset(present):
+        return "REQUIRED_FACT_MISSING"
+    if present != REQUIRED_FACT_FIELDS:
+        return "INVALID_TOOL_RESPONSE"
+    nullable_fields = (
+        "delayHours",
+        "delaySeconds",
+        "paid",
+        "cancelled",
+        "fullyRefunded",
+        "existingCompensation",
+        "pendingActionCount",
+        "policyVersion",
+    )
+    valid_ambiguity = (
+        facts.get("matchStatus") == "AMBIGUOUS"
+        and isinstance(facts.get("orderReference"), str)
+        and bool(facts["orderReference"])
+        and all(facts[name] is None for name in nullable_fields)
+        and facts["evidenceRefs"] == []
+    )
+    return None if valid_ambiguity else "INVALID_TOOL_RESPONSE"
 
 
 def _controlled_summary_facts(facts: object) -> list[dict[str, str]]:

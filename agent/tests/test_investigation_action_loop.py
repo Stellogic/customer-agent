@@ -31,6 +31,21 @@ def _decision(
     )
 
 
+@pytest.mark.parametrize(
+    ("tokens", "cost_micros", "provider_attempts"),
+    [(-1, 0, 1), (0, -1, 1), (0, 0, 0), (True, 0, 1)],
+)
+def test_action_usage_rejects_values_that_could_bypass_budgets(
+    tokens: int, cost_micros: int, provider_attempts: int
+) -> None:
+    with pytest.raises(ValueError):
+        ActionUsage(
+            tokens=tokens,
+            cost_micros=cost_micros,
+            provider_attempts=provider_attempts,
+        )
+
+
 @pytest.mark.asyncio
 async def test_deterministic_model_selects_one_allowed_action_until_submission() -> None:
     model = DeterministicActionModel()

@@ -535,9 +535,10 @@ async def test_transient_fact_tool_errors_retry_to_budget_then_handoff_without_w
     ]
 
 
+@pytest.mark.parametrize("failure_mode", ["retry_exhausted", "fact_conflict"])
 @pytest.mark.asyncio
 async def test_conclusion_tool_retry_exhaustion_uses_the_same_stable_handoff_identity(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, failure_mode: str
 ) -> None:
     conclusion_attempts = 0
     handoff_keys: list[str] = []
@@ -581,9 +582,14 @@ async def test_conclusion_tool_retry_exhaustion_uses_the_same_stable_handoff_ide
                 return Response(_capability_result(url, facts))
             if url.endswith("/conclusions"):
                 conclusion_attempts += 1
+                if failure_mode == "fact_conflict":
+                    request = httpx.Request("POST", url)
+                    response = httpx.Response(422, request=request)
+                    raise httpx.HTTPStatusError("fact conflict", request=request, response=response)
                 raise httpx.ConnectError("temporary conclusion failure")
             handoff_keys.append(headers["Idempotency-Key"])
-            return Response({"handlingMode": "HUMAN", "reasonCode": "TOOL_RETRY_EXHAUSTED"})
+            reason = "FACT_CONFLICT" if failure_mode == "fact_conflict" else "TOOL_RETRY_EXHAUSTED"
+            return Response({"handlingMode": "HUMAN", "reasonCode": reason})
 
     monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
     monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
@@ -605,13 +611,15 @@ async def test_conclusion_tool_retry_exhaustion_uses_the_same_stable_handoff_ide
         }
     )
 
-    assert conclusion_attempts == 6
-    assert (
-        first["handoff"]["reasonCode"] == replay["handoff"]["reasonCode"] == "TOOL_RETRY_EXHAUSTED"
-    )
+    expected_attempts = 2 if failure_mode == "fact_conflict" else 6
+    expected_reason = "FACT_CONFLICT" if failure_mode == "fact_conflict" else "TOOL_RETRY_EXHAUSTED"
+    assert conclusion_attempts == expected_attempts
+    assert first["handoff"]["reasonCode"] == replay["handoff"]["reasonCode"] == expected_reason
+    assert first["investigation_actions"][-1]["actionType"] == "SUBMIT_CONCLUSION"
+    assert replay["investigation_actions"] == first["investigation_actions"]
     assert handoff_keys == [
-        "generation-19:human-handoff:TOOL_RETRY_EXHAUSTED",
-        "generation-19:human-handoff:TOOL_RETRY_EXHAUSTED",
+        f"generation-19:human-handoff:{expected_reason}",
+        f"generation-19:human-handoff:{expected_reason}",
     ]
 
 

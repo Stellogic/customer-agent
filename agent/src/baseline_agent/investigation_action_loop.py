@@ -14,6 +14,15 @@ class InvestigationCapability(StrEnum):
     READ_APPLICABLE_POLICY = "READ_APPLICABLE_POLICY"
 
 
+CAPABILITY_PARAMETER_NAMES: dict[InvestigationCapability, tuple[str, ...]] = {
+    InvestigationCapability.CONFIRM_ORDER: (),
+    InvestigationCapability.READ_LOGISTICS: ("orderReference",),
+    InvestigationCapability.READ_PAYMENT_AND_REFUNDS: ("orderReference",),
+    InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS: ("orderReference",),
+    InvestigationCapability.READ_APPLICABLE_POLICY: ("orderReference",),
+}
+
+
 class TerminalAction(StrEnum):
     REQUEST_CLARIFICATION = "REQUEST_CLARIFICATION"
     SUBMIT_CONCLUSION = "SUBMIT_CONCLUSION"
@@ -36,6 +45,17 @@ class ActionUsage:
     tokens: int = 0
     cost_micros: int = 0
     provider_attempts: int = 1
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.tokens) is not int
+            or self.tokens < 0
+            or type(self.cost_micros) is not int
+            or self.cost_micros < 0
+            or type(self.provider_attempts) is not int
+            or self.provider_attempts < 1
+        ):
+            raise ValueError("action usage must contain non-negative integer consumption")
 
 
 @dataclass(frozen=True)
@@ -65,15 +85,9 @@ class ActionDecision:
             except ValueError as error:
                 raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION) from error
         expected = (
-            set()
-            if controlled_kind
-            in {
-                InvestigationCapability.CONFIRM_ORDER,
-                TerminalAction.REQUEST_CLARIFICATION,
-                TerminalAction.SUBMIT_CONCLUSION,
-                TerminalAction.HANDOFF,
-            }
-            else {"orderReference"}
+            set(CAPABILITY_PARAMETER_NAMES[controlled_kind])
+            if isinstance(controlled_kind, InvestigationCapability)
+            else set()
         )
         if set(parameters) != expected or not all(
             isinstance(value, str) and value for value in parameters.values()
