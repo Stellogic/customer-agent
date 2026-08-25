@@ -45,7 +45,12 @@ final class AgentClarificationController {
                     HttpStatus.BAD_REQUEST, "missing stable clarification identity");
         }
         return service.create(
-                new CreateClarification(ticketId, generationId, requestId, body.reasonCode()));
+                new CreateClarification(
+                        ticketId,
+                        generationId,
+                        requestId,
+                        body.reasonCode(),
+                        body.customerReply()));
     }
 
     private void requireScope(
@@ -67,5 +72,5 @@ final class AgentClarificationController {
         }
     }
 
-    record CreateBody(String reasonCode) {}
+    record CreateBody(String reasonCode, CustomerClarificationReply customerReply) {}
 }

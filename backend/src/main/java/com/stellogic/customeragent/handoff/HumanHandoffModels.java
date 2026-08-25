@@ -12,8 +12,10 @@ record AgentHumanHandoffFact(String type, String value, String evidenceReference
 record AgentHumanHandoffSummary(String conclusionCode, List<AgentHumanHandoffFact> facts) {}
 
 enum AgentHumanHandoffReason {
+    CUSTOMER_REQUESTED_HUMAN,
     TOOL_RETRY_EXHAUSTED,
     FACT_CONFLICT,
+    INVALID_MODEL_OUTPUT,
     INVALID_TOOL_RESPONSE,
     REQUIRED_FACT_MISSING,
     UNSUPPORTED_SCENARIO

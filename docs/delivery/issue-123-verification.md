@@ -11,7 +11,8 @@
 ## 安全失败边界
 
 - 供应商拒绝、异常、未知意图、额外字段、错误类型、错误证据或错误 escalation 组合统一形成受控客户沟通失败。
-- LangGraph 在沟通上下文缺失或越界时转人工；模型失败或安全校验失败时不提交调查结论，因此不会向现有 `public_message` 与 `customer_public_event` 写入猜测性回复。
+- LangGraph 在沟通上下文缺失或越界时转人工；模型失败、安全校验失败或客户明确要求人工时，不提交调查结论或猜测性回复，而是进入现有人工接管路径。
+- 歧义订单的模型澄清 envelope 由 Spring 复核后，其正文通过既有 clarification/public projection 写入；最终调查回复只允许引用当前订单与物流证据可证明的受控自然语言叙述。
 - 成功输出仍随调查结论进入 Spring 的同一权威事务；Spring 继续复核当前 generation、`AGENT` 处理模式、生命周期、客户人工偏好、订单、证据、金额和禁止承诺，只有通过后才写入现有公开消息系统。
 
 ## 离线评测与规范化门禁
@@ -21,7 +22,7 @@
 - `pwsh ./scripts/check.ps1 -Component agent -SkipAcceptance`
   - Ruff format/check 通过；
   - Pyright：`0 errors, 0 warnings, 0 informations`；
-  - Pytest：`114 passed`；
+  - Pytest：`116 passed`；
   - 客户沟通离线评测包含澄清、转人工、不足 24 小时、等待审批、长延迟和提示注入 6 个场景。
 - `pwsh ./scripts/check.ps1 -Component backend -SkipAcceptance`
   - Java 编译、Spotless、Checkstyle 与 Gradle `check` 通过。
@@ -31,4 +32,3 @@
   - 真实 Chromium 跨角色验收 `21 passed`，会话重启/到期门禁通过。
 
 完整 Compose 门禁使用项目 `customer-agent-issue123-44e9`、卷 `customer-agent-issue123-44e9_postgres-data`、网络 `customer-agent-issue123-44e9_{data,services,edge}`、前端端口 `4623` 与镜像 tag `issue123-44e9`。执行前已通过 `docker compose config --format json` 读回；执行后容器、卷和网络均为空。宿主既有 `customer-agent-baseline` 项目及其 `4180` 端口在门禁后仍保持运行。
-

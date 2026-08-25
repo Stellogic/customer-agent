@@ -93,15 +93,22 @@ class StructuredCustomerCommunicationModel:
 class FixedFakeCustomerCommunicationModel:
     async def compose(self, model_input: CustomerCommunicationInput) -> CustomerReplyEnvelope:
         validate_customer_communication_input(model_input)
-        if model_input.compensation_review_required is None:
-            if "人工" in model_input.synthetic_customer_text:
-                body = "为确保处理安全，此工单已转由客服继续调查。客服将在此工单中与您联系。"
-                intent = CustomerReplyIntent.HUMAN_HANDOFF
-                escalation_required = True
-            else:
-                body = "为继续调查，请提供当前工单所需的订单确认信息。"
-                intent = CustomerReplyIntent.CLARIFICATION_REQUIRED
-                escalation_required = False
+        customer_text = "\n".join(
+            [model_input.synthetic_customer_text]
+            + [
+                message.body
+                for message in model_input.public_conversation
+                if message.author == "CUSTOMER"
+            ]
+        )
+        if "人工" in customer_text:
+            body = "已按您的要求转由人工客服继续处理。"
+            intent = CustomerReplyIntent.HUMAN_HANDOFF
+            escalation_required = True
+        elif model_input.compensation_review_required is None:
+            body = "为确认需要调查的订单，请回复订单确认码（A 或 B）。"
+            intent = CustomerReplyIntent.CLARIFICATION_REQUIRED
+            escalation_required = False
         elif model_input.compensation_review_required:
             body = (
                 f"订单 {model_input.order_reference} 的调查已完成，补偿建议正在等待人工审批；"
@@ -121,7 +128,9 @@ class FixedFakeCustomerCommunicationModel:
             body=body,
             intent=intent,
             evidence_refs=(
-                ()
+                model_input.evidence_refs
+                if intent is CustomerReplyIntent.HUMAN_HANDOFF
+                else ()
                 if model_input.compensation_review_required is None
                 else model_input.evidence_refs
             ),
@@ -169,13 +178,16 @@ def validate_customer_communication_input(model_input: CustomerCommunicationInpu
 def validate_customer_reply_envelope(
     model_input: CustomerCommunicationInput, envelope: CustomerReplyEnvelope
 ) -> None:
-    if model_input.compensation_review_required is None:
+    if envelope.intent is CustomerReplyIntent.HUMAN_HANDOFF:
+        valid_intent = True
+        expected_evidence = model_input.evidence_refs
+        expected_escalation = True
+    elif model_input.compensation_review_required is None:
         valid_intent = envelope.intent in {
             CustomerReplyIntent.CLARIFICATION_REQUIRED,
-            CustomerReplyIntent.HUMAN_HANDOFF,
         }
         expected_evidence: tuple[str, ...] = ()
-        expected_escalation = envelope.intent is CustomerReplyIntent.HUMAN_HANDOFF
+        expected_escalation = False
     else:
         expected_intent = (
             CustomerReplyIntent.COMPENSATION_REVIEW_PENDING

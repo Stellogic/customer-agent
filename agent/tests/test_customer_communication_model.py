@@ -178,3 +178,20 @@ async def test_programmable_provider_refusal_or_invalid_output_is_a_controlled_f
         )
 
     assert failure.value.code is CustomerCommunicationFailureCode.MODEL_CALL_FAILED
+
+
+@pytest.mark.asyncio
+async def test_completed_investigation_still_honors_customer_human_handoff_intent() -> None:
+    result = await FixedFakeCustomerCommunicationModel().compose(
+        CustomerCommunicationInput(
+            order_reference="ORDER-123",
+            delay_seconds=80 * 60 * 60,
+            compensation_review_required=True,
+            evidence_refs=("order:ORDER-123", "logistics:ORDER-123"),
+            synthetic_customer_text="不要自动处理，请转人工客服",
+        )
+    )
+
+    assert result.intent is CustomerReplyIntent.HUMAN_HANDOFF
+    assert result.escalation_required is True
+    assert result.evidence_refs == ("order:ORDER-123", "logistics:ORDER-123")

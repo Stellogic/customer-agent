@@ -932,6 +932,17 @@ async def test_ambiguous_order_creates_a_controlled_request_before_interrupt(
             assert headers["X-Agent-Operation"] == "CREATE_CUSTOMER_CLARIFICATION"
             return Response()
 
+        async def get(self, url: str, *, headers: dict[str, str]) -> Response:
+            assert url.endswith("/customer-communication-context")
+            assert headers["X-Agent-Operation"] == "READ_CUSTOMER_COMMUNICATION_CONTEXT"
+            response = Response()
+            response.json = lambda: {
+                "schemaVersion": "customer-communication-input-v1",
+                "syntheticCustomerText": "两个订单都可能，请问需要哪个？",
+                "publicConversation": [],
+            }
+            return response
+
     monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
     monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
     monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
@@ -941,12 +952,69 @@ async def test_ambiguous_order_creates_a_controlled_request_before_interrupt(
             "requested_by": "spring",
             "ticket_id": "ticket-16",
             "generation_id": "generation-16",
-            "facts": {"matchStatus": "AMBIGUOUS"},
+            "facts": {"matchStatus": "AMBIGUOUS", "orderReference": "ORDER-PENDING"},
         }
     )
 
     assert result["clarification"]["clarificationRequestId"] == "clarification-16"
-    assert calls[0][1] == {"reasonCode": "ORDER_AMBIGUOUS"}
+    assert calls[0][1]["reasonCode"] == "ORDER_AMBIGUOUS"
+    assert calls[0][1]["customerReply"]["intent"] == "CLARIFICATION_REQUIRED"
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_order_customer_human_request_uses_handoff_instead_of_clarification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    posts: list[tuple[str, dict]] = []
+
+    class Response:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, _url: str, *, headers: dict[str, str]) -> Response:
+            assert headers["X-Agent-Operation"] == "READ_CUSTOMER_COMMUNICATION_CONTEXT"
+            return Response(
+                {
+                    "schemaVersion": "customer-communication-input-v1",
+                    "syntheticCustomerText": "请直接转人工客服",
+                    "publicConversation": [],
+                }
+            )
+
+        async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
+            posts.append((url, json))
+            assert headers["X-Agent-Operation"] == "REQUEST_HUMAN_HANDOFF"
+            return Response({"reasonCode": "CUSTOMER_REQUESTED_HUMAN"})
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+
+    result = await request_clarification(
+        {
+            "requested_by": "spring",
+            "ticket_id": "ticket-16",
+            "generation_id": "generation-16",
+            "facts": {"matchStatus": "AMBIGUOUS", "orderReference": "ORDER-PENDING"},
+        }
+    )
+
+    assert result["handoff"]["reasonCode"] == "CUSTOMER_REQUESTED_HUMAN"
+    assert posts[0][0].endswith("/human-handoff")
+    assert posts[0][1]["reasonCode"] == "CUSTOMER_REQUESTED_HUMAN"
 
 
 def test_clarification_interrupt_and_checkpoint_contain_only_recovery_fields(

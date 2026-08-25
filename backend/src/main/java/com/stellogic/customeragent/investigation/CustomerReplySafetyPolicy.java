@@ -5,14 +5,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class CustomerReplySafetyPolicy {
-    private static final String NUMBER = "(?:\\d+(?:\\.\\d+)?|[零〇一二三四五六七八九十百千万亿两]+)";
+    private static final String NUMBER = "(?:\\d+(?:\\.\\d+)?|[零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬]+)";
     private static final Pattern MONEY_PATTERN =
             Pattern.compile(
                     "(?i)(?:[¥￥$]|USD|CNY|RMB)\\s*"
                             + NUMBER
                             + "|"
                             + NUMBER
-                            + "\\s*(?:元|美元|人民币|USD|CNY|RMB)");
+                            + "\\s*(?:元|块钱|美元|人民币|USD|CNY|RMB)");
+    private static final Pattern RESPONSE_TIME_PROMISE_PATTERN =
+            Pattern.compile(NUMBER + "\\s*(?:秒|分钟|小时|天|工作日)(?:之内|以内|内).{0,8}(?:回复|联系|处理|解决)");
     private static final Pattern ORDER_REFERENCE_PATTERN =
             Pattern.compile("ORDER-[A-Z0-9-]+", Pattern.CASE_INSENSITIVE);
 
@@ -42,6 +44,9 @@ final class CustomerReplySafetyPolicy {
         if (MONEY_PATTERN.matcher(reply.body()).find()) {
             return "CUSTOMER_REPLY_CONTAINS_AMOUNT";
         }
+        if (RESPONSE_TIME_PROMISE_PATTERN.matcher(reply.body()).find()) {
+            return "CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE";
+        }
         Matcher referencedOrders = ORDER_REFERENCE_PATTERN.matcher(reply.body());
         while (referencedOrders.find()) {
             if (!scopedOrderReference.equalsIgnoreCase(referencedOrders.group())) {
@@ -51,17 +56,30 @@ final class CustomerReplySafetyPolicy {
         if (!hasOnlyAllowedCompensationLanguage(reply.body(), reply.intent())) {
             return "CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE";
         }
-        if (!canonicalBody(scopedOrderReference, reply.intent()).equals(reply.body())) {
-            return "UNSAFE_CUSTOMER_REPLY";
+        if (!hasAuthorizedNarrative(reply.body(), scopedOrderReference, reply.intent())) {
+            return "CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT";
         }
         return null;
     }
 
-    private static String canonicalBody(String orderReference, CustomerReplyIntent intent) {
+    private static boolean hasAuthorizedNarrative(
+            String body, String orderReference, CustomerReplyIntent intent) {
+        String quotedOrder = Pattern.quote(orderReference);
+        String pattern;
         if (intent == CustomerReplyIntent.COMPENSATION_REVIEW_PENDING) {
-            return "订单 " + orderReference + " 的调查已完成，补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。";
+            pattern =
+                    "^(?:订单 "
+                            + quotedOrder
+                            + " 的调查已完成，|我们已核对订单 "
+                            + quotedOrder
+                            + " 的物流记录。)补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。$";
+        } else {
+            pattern =
+                    "^经核验，订单 "
+                            + quotedOrder
+                            + " 的本次物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。$";
         }
-        return "经核验，订单 " + orderReference + " 的本次物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。";
+        return Pattern.matches(pattern, body);
     }
 
     private static boolean hasOnlyAllowedCompensationLanguage(

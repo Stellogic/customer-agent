@@ -11,6 +11,7 @@ from baseline_agent.customer_communication_model import (
     CustomerCommunicationInput,
     CustomerCommunicationModel,
     CustomerConversationMessage,
+    CustomerReplyIntent,
     FixedFakeCustomerCommunicationModel,
     validate_customer_reply_envelope,
 )
@@ -332,6 +333,17 @@ async def investigate_ticket(state: BaselineState) -> BaselineState:
                 generation_id,
                 scope_headers,
                 "INVALID_MODEL_OUTPUT",
+                _controlled_summary_facts(facts),
+                action_records,
+            )
+        if customer_reply.intent is CustomerReplyIntent.HUMAN_HANDOFF:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "CUSTOMER_REQUESTED_HUMAN",
                 _controlled_summary_facts(facts),
                 action_records,
             )
@@ -860,13 +872,96 @@ async def request_clarification(state: BaselineState) -> BaselineState:
         "Idempotency-Key": f"{generation_id}:order-disambiguation",
     }
     async with httpx.AsyncClient(timeout=5.0) as client:
-        response = await client.post(
-            f"{os.environ['SPRING_INTERNAL_URL']}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/clarifications",
-            headers=headers,
-            json={"reasonCode": "ORDER_AMBIGUOUS"},
+        base_url = os.environ["SPRING_INTERNAL_URL"]
+        scope_headers = {
+            "Authorization": headers["Authorization"],
+            "X-Agent-Generation-Id": generation_id,
+        }
+        context = await _read_customer_communication_context(
+            client,
+            base_url,
+            ticket_id,
+            generation_id,
+            scope_headers,
         )
-        response.raise_for_status()
-        return {"clarification": response.json()}
+        if context is None:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_TOOL_RESPONSE",
+                [],
+            )
+        model_input = CustomerCommunicationInput(
+            order_reference=state["facts"]["orderReference"],
+            delay_seconds=None,
+            compensation_review_required=None,
+            evidence_refs=(),
+            synthetic_customer_text=context["syntheticCustomerText"],
+            public_conversation=tuple(
+                CustomerConversationMessage(message["author"], message["body"])
+                for message in context["publicConversation"]
+            ),
+        )
+        try:
+            customer_reply = await customer_communication_model.compose(model_input)
+            validate_customer_reply_envelope(model_input, customer_reply)
+        except Exception:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_MODEL_OUTPUT",
+                [],
+            )
+        if customer_reply.intent is CustomerReplyIntent.HUMAN_HANDOFF:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "CUSTOMER_REQUESTED_HUMAN",
+                [],
+            )
+        if customer_reply.intent is not CustomerReplyIntent.CLARIFICATION_REQUIRED:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_MODEL_OUTPUT",
+                [],
+            )
+        try:
+            response = await client.post(
+                f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/clarifications",
+                headers=headers,
+                json={
+                    "reasonCode": "ORDER_AMBIGUOUS",
+                    "customerReply": customer_reply.as_request_value(),
+                },
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_MODEL_OUTPUT",
+                [],
+            )
+        return {
+            "clarification": response.json(),
+            "customer_reply": customer_reply.as_request_value(),
+        }
 
 
 def await_clarification(state: BaselineState) -> BaselineState:
