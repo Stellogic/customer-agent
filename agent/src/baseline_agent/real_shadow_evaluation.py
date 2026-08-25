@@ -5,14 +5,16 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from baseline_agent.real_shadow_policy import (
+    REAL_SHADOW_PROVIDER_POLICY,
+    REQUIRED_REAL_SHADOW_SCENARIOS,
+)
 from baseline_agent.synthetic_evaluation import (
     FLASH_SHADOW_ADMISSION_THRESHOLDS,
     TokenPricing,
 )
 
 _REPORT_SCHEMA_VERSION = "issue-126-real-business-shadow-v1"
-_CANDIDATE_MODEL = "deepseek-v4-flash"
-_MAXIMUM_REAL_PROVIDER_ATTEMPTS = 6
 _REQUIRED_FAILURE_SIMULATIONS = frozenset({"MODEL_REFUSAL", "READ_TIMEOUT", "INVALID_JSON"})
 
 
@@ -84,6 +86,9 @@ def build_real_shadow_report(
         and result.side_effects_match_control
         for result in simulations
     )
+    real_scenarios_valid = {
+        result.scenario_id for result in real
+    } == REQUIRED_REAL_SHADOW_SCENARIOS and len(real) == len(REQUIRED_REAL_SHADOW_SCENARIOS)
     blocked_reason = next(
         (
             reason
@@ -95,8 +100,8 @@ def build_real_shadow_report(
     thresholds = FLASH_SHADOW_ADMISSION_THRESHOLDS
     gate_met = (
         prior_contract_admitted
-        and 0 < scenario_count <= _MAXIMUM_REAL_PROVIDER_ATTEMPTS
-        and attempts <= _MAXIMUM_REAL_PROVIDER_ATTEMPTS
+        and real_scenarios_valid
+        and attempts <= REAL_SHADOW_PROVIDER_POLICY.maximum_real_provider_attempts
         and retries == 0
         and all(
             result.comparison.get("outcome") == "MATCH"
@@ -120,21 +125,25 @@ def build_real_shadow_report(
         blocked_reason = "SHADOW_GATE_NOT_MET"
     return {
         "schemaVersion": _REPORT_SCHEMA_VERSION,
-        "candidateModel": _CANDIDATE_MODEL,
+        "candidateModel": REAL_SHADOW_PROVIDER_POLICY.candidate_model,
         "priorContractAdmitted": prior_contract_admitted,
         "pricingVersion": pricing_version,
         "pricingTier": pricing_tier,
         "limits": {
-            "maximumRealProviderAttempts": _MAXIMUM_REAL_PROVIDER_ATTEMPTS,
-            "maximumAttemptsPerScenario": 1,
-            "connectTimeoutSeconds": 3,
-            "readTimeoutSeconds": 12,
-            "callDeadlineSeconds": 20,
+            "maximumRealProviderAttempts": (
+                REAL_SHADOW_PROVIDER_POLICY.maximum_real_provider_attempts
+            ),
+            "maximumAttemptsPerScenario": (
+                REAL_SHADOW_PROVIDER_POLICY.maximum_attempts_per_scenario
+            ),
+            "connectTimeoutSeconds": REAL_SHADOW_PROVIDER_POLICY.connect_timeout_seconds,
+            "readTimeoutSeconds": REAL_SHADOW_PROVIDER_POLICY.read_timeout_seconds,
+            "callDeadlineSeconds": REAL_SHADOW_PROVIDER_POLICY.call_deadline_seconds,
         },
         "scenarioIds": [result.scenario_id for result in results],
         "attempts": {
             "actualReal": attempts,
-            "maximumReal": _MAXIMUM_REAL_PROVIDER_ATTEMPTS,
+            "maximumReal": REAL_SHADOW_PROVIDER_POLICY.maximum_real_provider_attempts,
             "retries": retries,
         },
         "auditEvidence": {

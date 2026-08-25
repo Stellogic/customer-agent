@@ -101,22 +101,6 @@ try {
     $env:DEEPSEEK_API_KEY = $providerKey
     Set-ShadowMode 'deepseek'
     Invoke-ShadowPhase 'real'
-    $realEvidence = Get-Content (Join-Path $evidenceDir 'real.json') -Raw | ConvertFrom-Json
-    foreach ($scenario in $realEvidence.scenarios) {
-        $status = $scenario.comparison.provider_http_status
-        $failure = $scenario.comparison.failure_classification
-        $statusCode = 0
-        $numericStatus = [int]::TryParse([string]$status, [ref]$statusCode)
-        if ($status -eq '402') {
-            throw 'INSUFFICIENT_BALANCE'
-        }
-        if ($status -in @('401', '403', '429') -or ($numericStatus -and $statusCode -ge 500)) {
-            throw 'SUPPLIER_UNAVAILABLE'
-        }
-        if ($failure -in @('CONNECTION_TIMEOUT', 'READ_TIMEOUT', 'DEADLINE_EXCEEDED', 'TRANSIENT_PROVIDER_ERROR', 'PROVIDER_FAILED')) {
-            throw 'SUPPLIER_FAILURE'
-        }
-    }
 
     Remove-Item Env:DEEPSEEK_API_KEY
     foreach ($fault in @('refusal', 'timeout', 'invalid-output')) {

@@ -47,7 +47,7 @@ def test_report_aggregates_real_business_shadow_without_raw_business_or_model_te
             side_effects_match_control=True,
             real_model_invoked=True,
         )
-        for scenario_id in ("normal", "boundary-24h", "ineligible-cancelled")
+        for scenario_id in ("normal", "boundary-24h", "ineligible-under-24h")
     ]
     faults = [
         RealShadowScenarioResult(
@@ -138,3 +138,40 @@ def test_balance_or_supplier_failure_stops_admission_without_model_switch() -> N
     assert report["admittedForFormalMode"] is False
     assert report["candidateModel"] == "deepseek-v4-flash"
     assert "fallback" not in json.dumps(report).lower()
+
+
+def test_admission_requires_every_frozen_real_scenario() -> None:
+    real = [
+        RealShadowScenarioResult(
+            scenario_id=scenario_id,
+            comparison=_comparison(),
+            side_effects_match_control=True,
+            real_model_invoked=True,
+        )
+        for scenario_id in ("normal", "boundary-24h")
+    ]
+    faults = [
+        RealShadowScenarioResult(
+            scenario_id=scenario_id,
+            comparison=_comparison("FAILED", failure=failure, status=""),
+            side_effects_match_control=True,
+            real_model_invoked=False,
+            expected_failure_classification=failure,
+        )
+        for scenario_id, failure in (
+            ("refusal", "MODEL_REFUSAL"),
+            ("timeout", "READ_TIMEOUT"),
+            ("invalid-output", "INVALID_JSON"),
+        )
+    ]
+
+    report = build_real_shadow_report(
+        [*real, *faults],
+        pricing=PRICING,
+        pricing_version="deepseek-time-of-use-2026-08-25",
+        pricing_tier="peak",
+        prior_contract_admitted=True,
+    )
+
+    assert report["admittedForFormalMode"] is False
+    assert report["blockedReason"] == "SHADOW_GATE_NOT_MET"

@@ -24,6 +24,7 @@ from baseline_agent.investigation_model import (
     InvestigationJudgmentInput,
     InvestigationJudgmentModel,
 )
+from baseline_agent.real_shadow_policy import REAL_SHADOW_PROVIDER_POLICY
 
 _SHADOW_MODE_ENVIRONMENT_KEY = "AGENT_INVESTIGATION_SHADOW_MODE"
 
@@ -111,15 +112,16 @@ def configured_shadow_candidate(
     if mode != "deepseek":
         raise ValueError("unsupported investigation shadow mode")
     audit = audit_sink or InMemoryModelCallAuditSink()
+    policy = REAL_SHADOW_PROVIDER_POLICY
     config = DeepSeekResponsesConfig(
         api_key=values.get("DEEPSEEK_API_KEY", ""),
-        model=values.get("DEEPSEEK_MODEL", DEEPSEEK_FLASH_MODEL),
-        connect_timeout_seconds=3,
-        read_timeout_seconds=12,
-        deadline_seconds=20,
-        max_attempts=1,
+        model=values.get("DEEPSEEK_MODEL", policy.candidate_model),
+        connect_timeout_seconds=policy.connect_timeout_seconds,
+        read_timeout_seconds=policy.read_timeout_seconds,
+        deadline_seconds=policy.call_deadline_seconds,
+        max_attempts=policy.maximum_attempts_per_scenario,
         retry_base_delay_seconds=0,
-        max_output_tokens=128,
+        max_output_tokens=policy.maximum_output_tokens,
     )
     return ShadowCandidate(
         model=DeepSeekResponsesInvestigationModel(
