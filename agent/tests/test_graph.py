@@ -10,6 +10,12 @@ from baseline_agent.graph import (
     probe_spring,
     request_clarification,
 )
+from baseline_agent.investigation_action_loop import (
+    ActionDecision,
+    ActionUsage,
+    DeterministicActionModel,
+    TerminalAction,
+)
 from baseline_agent.investigation_model import (
     InvestigationJudgment,
     InvestigationJudgmentInput,
@@ -28,6 +34,75 @@ class _OfflineShadowModel:
         if isinstance(self.result, Exception):
             raise self.result
         return self.result
+
+
+class _HandoffAfterFactsModel(DeterministicActionModel):
+    async def choose(self, facts: dict) -> ActionDecision:
+        if "policyVersion" in facts:
+            return ActionDecision.from_values(TerminalAction.HANDOFF, {}, ActionUsage())
+        return await super().choose(facts)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("force_handoff", [False, True])
+async def test_terminal_handoff_and_budget_failure_preserve_controlled_action_records(
+    monkeypatch: pytest.MonkeyPatch, force_handoff: bool
+) -> None:
+    posts: list[str] = []
+
+    class Response:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, *_: object, **__: object) -> Response:
+            return Response(_capability_catalog())
+
+        async def post(self, url: str, **_: object) -> Response:
+            posts.append(url)
+            if "/capabilities/" in url:
+                return Response(_capability_result(url, _unique_facts()))
+            if url.endswith("/conclusions"):
+                raise AssertionError("handoff path must not submit a conclusion")
+            return Response({"handlingMode": "HUMAN", "reasonCode": "UNSUPPORTED_SCENARIO"})
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    if force_handoff:
+        monkeypatch.setattr(
+            "baseline_agent.graph.investigation_action_model", _HandoffAfterFactsModel()
+        )
+    else:
+        monkeypatch.setenv("AGENT_INVESTIGATION_MAX_ACTIONS", "2")
+
+    result = await investigate_ticket(
+        {
+            "requested_by": "spring",
+            "ticket_id": "ticket-120",
+            "generation_id": "generation-120",
+        }
+    )
+
+    assert result["handoff"]["handlingMode"] == "HUMAN"
+    assert not any(url.endswith("/conclusions") for url in posts)
+    action_types = [record["actionType"] for record in result["investigation_actions"]]
+    if force_handoff:
+        assert action_types[-1] == "HANDOFF"
+    else:
+        assert action_types == ["CONFIRM_ORDER", "READ_LOGISTICS"]
 
 
 @pytest.mark.asyncio
@@ -460,9 +535,10 @@ async def test_transient_fact_tool_errors_retry_to_budget_then_handoff_without_w
     ]
 
 
+@pytest.mark.parametrize("failure_mode", ["retry_exhausted", "fact_conflict"])
 @pytest.mark.asyncio
 async def test_conclusion_tool_retry_exhaustion_uses_the_same_stable_handoff_identity(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, failure_mode: str
 ) -> None:
     conclusion_attempts = 0
     handoff_keys: list[str] = []
@@ -506,9 +582,14 @@ async def test_conclusion_tool_retry_exhaustion_uses_the_same_stable_handoff_ide
                 return Response(_capability_result(url, facts))
             if url.endswith("/conclusions"):
                 conclusion_attempts += 1
+                if failure_mode == "fact_conflict":
+                    request = httpx.Request("POST", url)
+                    response = httpx.Response(422, request=request)
+                    raise httpx.HTTPStatusError("fact conflict", request=request, response=response)
                 raise httpx.ConnectError("temporary conclusion failure")
             handoff_keys.append(headers["Idempotency-Key"])
-            return Response({"handlingMode": "HUMAN", "reasonCode": "TOOL_RETRY_EXHAUSTED"})
+            reason = "FACT_CONFLICT" if failure_mode == "fact_conflict" else "TOOL_RETRY_EXHAUSTED"
+            return Response({"handlingMode": "HUMAN", "reasonCode": reason})
 
     monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
     monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
@@ -530,13 +611,15 @@ async def test_conclusion_tool_retry_exhaustion_uses_the_same_stable_handoff_ide
         }
     )
 
-    assert conclusion_attempts == 6
-    assert (
-        first["handoff"]["reasonCode"] == replay["handoff"]["reasonCode"] == "TOOL_RETRY_EXHAUSTED"
-    )
+    expected_attempts = 2 if failure_mode == "fact_conflict" else 6
+    expected_reason = "FACT_CONFLICT" if failure_mode == "fact_conflict" else "TOOL_RETRY_EXHAUSTED"
+    assert conclusion_attempts == expected_attempts
+    assert first["handoff"]["reasonCode"] == replay["handoff"]["reasonCode"] == expected_reason
+    assert first["investigation_actions"][-1]["actionType"] == "SUBMIT_CONCLUSION"
+    assert replay["investigation_actions"] == first["investigation_actions"]
     assert handoff_keys == [
-        "generation-19:human-handoff:TOOL_RETRY_EXHAUSTED",
-        "generation-19:human-handoff:TOOL_RETRY_EXHAUSTED",
+        f"generation-19:human-handoff:{expected_reason}",
+        f"generation-19:human-handoff:{expected_reason}",
     ]
 
 
