@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -35,6 +36,7 @@ class AgentResumeDispatcherTest {
         AgentResumeStore store = org.mockito.Mockito.mock(AgentResumeStore.class);
         when(store.claim()).thenReturn(Optional.of(pending), Optional.of(pending));
         AtomicInteger posts = new AtomicInteger();
+        AtomicReference<String> postedBody = new AtomicReference<>();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(
                 "/threads/" + threadId + "/runs",
@@ -49,6 +51,10 @@ class AgentResumeDispatcherTest {
                         respond(exchange, 200, body);
                     } else {
                         posts.incrementAndGet();
+                        postedBody.set(
+                                new String(
+                                        exchange.getRequestBody().readAllBytes(),
+                                        StandardCharsets.UTF_8));
                         exchange.close();
                     }
                 });
@@ -70,6 +76,12 @@ class AgentResumeDispatcherTest {
                             org.mockito.ArgumentMatchers.any());
             verify(store).submitted(resumeId, "created-before-response-loss");
             org.junit.jupiter.api.Assertions.assertEquals(1, posts.get());
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    postedBody.get().contains(clarificationId.toString()));
+            org.junit.jupiter.api.Assertions.assertFalse(postedBody.get().contains("answerDigest"));
+            org.junit.jupiter.api.Assertions.assertFalse(
+                    postedBody.get().contains("answerSummary"));
+            org.junit.jupiter.api.Assertions.assertFalse(postedBody.get().contains("b".repeat(64)));
         } finally {
             server.stop(0);
         }

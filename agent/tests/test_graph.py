@@ -811,7 +811,7 @@ async def test_ambiguous_order_creates_a_controlled_request_before_interrupt(
     assert calls[0][1] == {"reasonCode": "ORDER_AMBIGUOUS"}
 
 
-def test_clarification_interrupt_contains_only_public_controlled_fields(
+def test_clarification_interrupt_and_checkpoint_contain_only_recovery_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: list[dict] = []
@@ -837,9 +837,5 @@ def test_clarification_interrupt_contains_only_public_controlled_fields(
             "question": "请回复订单确认码（A 或 B），以便继续调查。",
         }
     ]
-    assert result == {
-        "clarification_answer": {
-            "answerDigest": "digest",
-            "clarificationRequestId": "clarification-16",
-        }
-    }
+    assert result == {"clarification_answer": {"clarificationRequestId": "clarification-16"}}
+    assert "digest" not in repr(result)

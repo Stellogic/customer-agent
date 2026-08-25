@@ -3268,6 +3268,20 @@ def main() -> None:
                 time.sleep(0.25)
         raise AssertionError("clarification request was not published")
 
+    def claim_support_handoff_details(client: httpx.Client, ticket_id: str) -> dict:
+        unassigned = client.get(f"{spring_url}/api/support/workbench/tickets/{ticket_id}")
+        expect_status(unassigned, 404)
+        claim = client.post(f"{spring_url}/api/support/workbench/tickets/{ticket_id}/claims")
+        expect_status(claim, 201)
+        assigned = client.get(f"{spring_url}/api/support/workbench/tickets/{ticket_id}")
+        expect_status(assigned, 200)
+        projection = assigned.json()
+        serialized = json.dumps(projection)
+        assert "checkpoint" not in serialized
+        assert "answerDigest" not in serialized
+        assert "answerSummary" not in serialized
+        return projection
+
     clarification_ticket_id, clarification_projection = create_ambiguous_ticket("primary")
     clarification_request_id = clarification_projection["clarification"]["id"]
     assert clarification_projection["clarification"]["promptCode"] == "ORDER_CONFIRMATION_CODE"
@@ -3339,26 +3353,53 @@ def main() -> None:
             time.sleep(0.25)
         assert resume_status in {"SUBMITTED", "COMPLETED"}
 
+        resumed_projection = None
+        for _ in range(80):
+            projection_response = client.get(
+                f"{spring_url}/api/customer/tickets/{clarification_ticket_id}",
+            )
+            expect_status(projection_response, 200)
+            resumed_projection = projection_response.json()
+            if resumed_projection["ticket"]["lifecycleState"] == "RESOLVED":
+                break
+            time.sleep(0.25)
+        assert resumed_projection is not None
+        assert resumed_projection["ticket"]["lifecycleState"] == "RESOLVED"
+        assert resumed_projection["clarification"] is None
+
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-        clarification_generation = connection.execute(
-            "select g.id, g.thread_id, t.resolution_elapsed_seconds, t.resolution_running_since "
+        clarification_generation_row = connection.execute(
+            "select g.id, g.thread_id, t.resolution_elapsed_seconds, t.resolution_running_since, "
+            "g.status, g.generation_number, t.order_reference "
             "from agent_processing_generation g join support_ticket t on t.id = g.ticket_id "
             "where g.ticket_id = %s",
             (uuid.UUID(clarification_ticket_id),),
         ).fetchone()
-        assert clarification_generation is not None
-        assert clarification_generation[2] >= 0 and clarification_generation[3] is not None
+        assert clarification_generation_row is not None
+        (
+            clarification_generation_id,
+            clarification_thread_id,
+            resolution_elapsed_seconds,
+            resolution_running_since,
+            clarification_generation_status,
+            clarification_generation_number,
+            resolved_order_reference,
+        ) = clarification_generation_row
+        assert resolution_elapsed_seconds >= 0 and resolution_running_since is None
+        assert clarification_generation_status == "COMPLETED"
+        assert clarification_generation_number == 1
+        assert resolved_order_reference == "ORDER-DELAY-AMBIGUOUS-A"
         assert (
             connection.execute(
                 "select count(*) from agent_resume_request where generation_id = %s",
-                (clarification_generation[0],),
+                (clarification_generation_id,),
             ).fetchone()[0]
             == 1
         )
 
     with customer_browser_client(spring_url) as client:
         runs = client.get(
-            f"{agent_url}/threads/{clarification_generation[1]}/runs?limit=100",
+            f"{agent_url}/threads/{clarification_thread_id}/runs?limit=100",
             headers=spring_headers,
         )
         expect_status(runs, 200)
@@ -3368,6 +3409,39 @@ def main() -> None:
             sum(metadata.get("resume_request_id") == resume_request_id for metadata in run_metadata)
             == 1
         )
+        resumed_state = client.get(
+            f"{agent_url}/threads/{clarification_thread_id}/state",
+            headers=spring_headers,
+        )
+        expect_status(resumed_state, 200)
+        checkpoint_values = resumed_state.json()["values"]
+        assert checkpoint_values["clarification_answer"] == {
+            "clarificationRequestId": clarification_request_id
+        }
+        serialized_checkpoint = json.dumps(checkpoint_values)
+        assert "answerDigest" not in serialized_checkpoint
+        assert "answerSummary" not in serialized_checkpoint
+
+    with psycopg.connect(os.environ["AGENT_DATABASE_URI"]) as connection:
+        for forbidden_checkpoint_field in ("answerDigest", "answerSummary"):
+            encoded_field = forbidden_checkpoint_field.encode().hex()
+            persisted_matches = connection.execute(
+                "select (select count(*) from checkpoints where thread_id = %s "
+                "and checkpoint::text like %s) + "
+                "(select count(*) from checkpoint_blobs where thread_id = %s "
+                "and position(decode(%s, 'hex') in blob) > 0) + "
+                "(select count(*) from checkpoint_writes where thread_id = %s "
+                "and position(decode(%s, 'hex') in blob) > 0)",
+                (
+                    str(clarification_thread_id),
+                    f"%{forbidden_checkpoint_field}%",
+                    str(clarification_thread_id),
+                    encoded_field,
+                    str(clarification_thread_id),
+                    encoded_field,
+                ),
+            ).fetchone()[0]
+            assert persisted_matches == 0
 
     concurrent_ticket_id, concurrent_projection = create_ambiguous_ticket("concurrent")
     concurrent_request_id = concurrent_projection["clarification"]["id"]
@@ -3401,6 +3475,13 @@ def main() -> None:
         ).fetchone()
         assert handoff_generation_row is not None
         handoff_generation_id, handoff_clarification_request_key = handoff_generation_row
+        connection.execute(
+            "insert into investigation_fact "
+            "(generation_id, fact_type, fact_value, evidence_reference, recorded_at) "
+            "values (%s, 'ORDER', 'ORDER-DELAY-AMBIGUOUS', "
+            "'order:ORDER-DELAY-AMBIGUOUS', now())",
+            (handoff_generation_id,),
+        )
         lifecycle_before_handoff = connection.execute(
             "select lifecycle_state from support_ticket where id = %s",
             (uuid.UUID(handoff_ticket_id),),
@@ -3520,6 +3601,18 @@ def main() -> None:
             },
         )
         expect_status(late_conclusion, 403)
+        customer_handoff_support_projection = claim_support_handoff_details(
+            client, handoff_ticket_id
+        )
+        assert {
+            (fact["factType"], fact["factValue"], fact["evidenceReference"])
+            for fact in customer_handoff_support_projection["investigationFacts"]
+        } >= {("ORDER", "ORDER-DELAY-AMBIGUOUS", "order:ORDER-DELAY-AMBIGUOUS")}
+        customer_handoff_actions = {
+            event["eventType"] for event in customer_handoff_support_projection["businessTimeline"]
+        }
+        assert "AGENT_ORDER_AMBIGUITY_READ" in customer_handoff_actions
+        assert "CUSTOMER_HUMAN_HANDOFF_REQUEST_RECORDED" in customer_handoff_actions
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         handoff_state = connection.execute(
@@ -3698,6 +3791,21 @@ def main() -> None:
         )
         assert agent_handoff_queue_item["reasonCodes"] == ["AGENT_HUMAN_HANDOFF"]
         assert "summary" not in agent_handoff_queue_item
+        support_handoff_projection = claim_support_handoff_details(client, agent_handoff_ticket_id)
+        assert {
+            (fact["factType"], fact["factValue"], fact["evidenceReference"])
+            for fact in support_handoff_projection["investigationFacts"]
+        } >= {
+            ("ORDER", "ORDER-DELAY-AMBIGUOUS-A", "order:ORDER-DELAY-AMBIGUOUS-A"),
+            (
+                "LOGISTICS_DELAY_SECONDS",
+                "288000",
+                "logistics:ORDER-DELAY-AMBIGUOUS-A",
+            ),
+        }
+        assert "AGENT_HUMAN_HANDOFF_REQUEST_RECORDED" in {
+            event["eventType"] for event in support_handoff_projection["businessTimeline"]
+        }
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert connection.execute(
