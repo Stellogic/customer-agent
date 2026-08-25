@@ -759,12 +759,9 @@ def await_clarification(state: BaselineState) -> BaselineState:
         "promptCode": clarification["promptCode"],
         "question": clarification["question"],
     }
-    answer = interrupt(public_interrupt)
-    if not isinstance(answer, dict):
-        answer = {}
+    interrupt(public_interrupt)
     return {
         "clarification_answer": {
-            **answer,
             "clarificationRequestId": clarification["clarificationRequestId"],
         }
     }
