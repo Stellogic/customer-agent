@@ -39,10 +39,20 @@ def _response(
         content.append({"type": "output_text", "text": text})
     return {
         "id": response_id,
+        "object": "response",
+        "created_at": 1_787_616_000,
         "status": status,
         "model": "deepseek-v4-flash-202608",
         "system_fingerprint": "fp_202608",
-        "output": [{"type": "message", "status": "completed", "content": content}],
+        "output": [
+            {
+                "id": "message-1",
+                "type": "message",
+                "status": "completed",
+                "role": "assistant",
+                "content": content,
+            }
+        ],
         "usage": {
             "input_tokens": 19,
             "input_tokens_details": {"cached_tokens": 7},
@@ -148,10 +158,55 @@ async def test_deepseek_adapter_records_minimal_metadata_without_raw_material() 
     assert record.cache_hit is True
     assert record.provider == "deepseek"
     assert record.failure_classification is None
+    assert record.strict_schema_requested is True
+    assert record.thinking_disabled is True
+    assert record.allowed_parameters_only is True
+    assert record.actual_response_shape_valid is True
+    assert record.usage_reported is True
+    assert record.cache_metrics_reported is True
+    assert record.reasoning_tokens == 0
     rendered = repr(record)
     assert "deepseek-test-secret" not in rendered
     assert "ORDER-DELAY-001" not in rendered
     assert "compensationReviewRequired" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_deepseek_adapter_observes_actual_non_thinking_response() -> None:
+    payload = _response()
+    output = payload["output"]
+    assert isinstance(output, list)
+    payload["output"] = [
+        {
+            "id": "reasoning-1",
+            "type": "reasoning",
+            "status": "completed",
+            "content": [{"type": "reasoning_text", "text": "private"}],
+        },
+        *output,
+    ]
+    usage = payload["usage"]
+    assert isinstance(usage, dict)
+    usage["output_tokens_details"] = {"reasoning_tokens": 1}
+    model, audit = _model(lambda _: httpx.Response(200, json=payload))
+
+    await model.judge(MODEL_INPUT)
+
+    assert audit.records[0].thinking_disabled is False
+    assert audit.records[0].reasoning_tokens == 1
+
+
+@pytest.mark.asyncio
+async def test_deepseek_adapter_flags_malformed_observed_response_shape() -> None:
+    payload = _response()
+    output = payload["output"]
+    assert isinstance(output, list) and isinstance(output[0], dict)
+    output[0].pop("role")
+    model, audit = _model(lambda _: httpx.Response(200, json=payload))
+
+    await model.judge(MODEL_INPUT)
+
+    assert audit.records[0].actual_response_shape_valid is False
 
 
 @pytest.mark.parametrize(

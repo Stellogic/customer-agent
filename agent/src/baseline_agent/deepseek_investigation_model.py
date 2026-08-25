@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 import uuid
 from collections.abc import Mapping
@@ -93,7 +94,15 @@ class ModelCallAttemptRecord:
     total_tokens: int | None
     cached_tokens: int | None
     cache_hit: bool | None
-    failure_classification: DeepSeekFailureClassification | None
+    failure_classification: DeepSeekFailureClassification | None = None
+    provider_http_status: int | None = None
+    strict_schema_requested: bool = False
+    thinking_disabled: bool = False
+    allowed_parameters_only: bool = False
+    actual_response_shape_valid: bool = False
+    usage_reported: bool = False
+    cache_metrics_reported: bool = False
+    reasoning_tokens: int | None = None
 
 
 class ModelCallAuditSink(Protocol):
@@ -156,9 +165,20 @@ class DeepSeekResponsesInvestigationModel:
                         attempt_id,
                         attempt_number,
                         attempt_started,
+                        request_body,
                         classification,
                     )
                     raise _model_call_failure() from None
+                except asyncio.CancelledError:
+                    await self._record_attempt(
+                        internal_call_id,
+                        attempt_id,
+                        attempt_number,
+                        attempt_started,
+                        request_body,
+                        DeepSeekFailureClassification.DEADLINE_EXCEEDED,
+                    )
+                    raise
                 except httpx.TransportError as error:
                     if isinstance(error, httpx.ConnectTimeout):
                         classification = DeepSeekFailureClassification.CONNECTION_TIMEOUT
@@ -171,6 +191,7 @@ class DeepSeekResponsesInvestigationModel:
                         attempt_id,
                         attempt_number,
                         attempt_started,
+                        request_body,
                         classification,
                     )
                     if await self._can_retry(attempt_number, call_started):
@@ -188,7 +209,9 @@ class DeepSeekResponsesInvestigationModel:
                         attempt_id,
                         attempt_number,
                         attempt_started,
+                        request_body,
                         classification,
+                        provider_http_status=response.status_code,
                     )
                     if response.status_code in _TRANSIENT_HTTP_STATUSES and await self._can_retry(
                         attempt_number, call_started
@@ -205,6 +228,7 @@ class DeepSeekResponsesInvestigationModel:
                         attempt_id,
                         attempt_number,
                         attempt_started,
+                        request_body,
                         classification,
                     )
                     raise _model_call_failure() from None
@@ -216,6 +240,7 @@ class DeepSeekResponsesInvestigationModel:
                         attempt_id,
                         attempt_number,
                         attempt_started,
+                        request_body,
                         classification,
                     )
                     raise _model_call_failure()
@@ -228,8 +253,10 @@ class DeepSeekResponsesInvestigationModel:
                         attempt_id,
                         attempt_number,
                         attempt_started,
+                        request_body,
                         failure.classification,
                         payload,
+                        provider_http_status=response.status_code,
                     )
                     raise _model_call_failure() from None
                 await self._record_attempt(
@@ -237,8 +264,10 @@ class DeepSeekResponsesInvestigationModel:
                     attempt_id,
                     attempt_number,
                     attempt_started,
+                    request_body,
                     None,
                     payload,
+                    provider_http_status=response.status_code,
                 )
                 return judgment
 
@@ -261,14 +290,33 @@ class DeepSeekResponsesInvestigationModel:
         attempt_id: str,
         attempt_number: int,
         attempt_started: float,
+        request_body: dict[str, Any],
         failure_classification: DeepSeekFailureClassification | None,
         payload: dict[str, Any] | None = None,
+        *,
+        provider_http_status: int | None = None,
     ) -> None:
         usage = payload.get("usage") if payload else None
         usage = usage if isinstance(usage, dict) else {}
         input_details = usage.get("input_tokens_details")
         input_details = input_details if isinstance(input_details, dict) else {}
+        output_details = usage.get("output_tokens_details")
+        output_details = output_details if isinstance(output_details, dict) else {}
         cached_tokens = _optional_int(input_details.get("cached_tokens"))
+        reasoning_tokens = _optional_int(output_details.get("reasoning_tokens"))
+        response_model = _optional_string(payload.get("model")) if payload else None
+        response_shape_valid = failure_classification is None and _has_expected_response_shape(
+            payload, self._config.model
+        )
+        allowed_parameters_only = set(request_body) == {
+            "model",
+            "instructions",
+            "input",
+            "max_output_tokens",
+            "reasoning",
+            "stream",
+            "text",
+        }
         await self.audit_sink.record(
             ModelCallAttemptRecord(
                 internal_call_id=internal_call_id,
@@ -278,7 +326,7 @@ class DeepSeekResponsesInvestigationModel:
                 provider_response_id=_optional_string(payload.get("id")) if payload else None,
                 response_status=_optional_string(payload.get("status")) if payload else None,
                 request_model=self._config.model,
-                response_model=_optional_string(payload.get("model")) if payload else None,
+                response_model=response_model,
                 backend_fingerprint=(
                     _optional_string(payload.get("system_fingerprint")) if payload else None
                 ),
@@ -291,6 +339,24 @@ class DeepSeekResponsesInvestigationModel:
                 cached_tokens=cached_tokens,
                 cache_hit=cached_tokens > 0 if cached_tokens is not None else None,
                 failure_classification=failure_classification,
+                provider_http_status=provider_http_status,
+                strict_schema_requested=_strict_schema_requested(request_body),
+                thinking_disabled=(
+                    request_body.get("reasoning") == {"effort": "none"}
+                    and reasoning_tokens == 0
+                    and not _contains_reasoning_item(payload)
+                ),
+                allowed_parameters_only=allowed_parameters_only,
+                actual_response_shape_valid=response_shape_valid,
+                usage_reported=(
+                    _optional_int(usage.get("input_tokens")) is not None
+                    and _optional_int(usage.get("output_tokens")) is not None
+                    and _optional_int(usage.get("total_tokens")) is not None
+                ),
+                cache_metrics_reported=(
+                    "cached_tokens" in input_details and cached_tokens is not None
+                ),
+                reasoning_tokens=reasoning_tokens,
             )
         )
 
@@ -412,6 +478,101 @@ def _optional_string(value: object) -> str | None:
 
 def _optional_int(value: object) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+def _has_expected_response_shape(payload: dict[str, Any] | None, request_model: str) -> bool:
+    if not payload:
+        return False
+    response_model = _optional_string(payload.get("model"))
+    output = payload.get("output")
+    usage = payload.get("usage")
+    if not (
+        _optional_string(payload.get("id"))
+        and payload.get("object") == "response"
+        and _optional_int(payload.get("created_at")) is not None
+        and payload.get("status") == "completed"
+        and payload.get("error") is None
+        and payload.get("incomplete_details") is None
+        and response_model
+        and _response_model_matches(response_model, request_model)
+        and isinstance(output, list)
+        and output
+        and isinstance(usage, dict)
+    ):
+        return False
+    input_tokens = _optional_int(usage.get("input_tokens"))
+    output_tokens = _optional_int(usage.get("output_tokens"))
+    total_tokens = _optional_int(usage.get("total_tokens"))
+    input_details = usage.get("input_tokens_details")
+    output_details = usage.get("output_tokens_details")
+    cached_tokens = (
+        _optional_int(input_details.get("cached_tokens"))
+        if isinstance(input_details, dict)
+        else None
+    )
+    reasoning_tokens = (
+        _optional_int(output_details.get("reasoning_tokens"))
+        if isinstance(output_details, dict)
+        else None
+    )
+    return bool(
+        input_tokens is not None
+        and output_tokens is not None
+        and total_tokens == input_tokens + output_tokens
+        and cached_tokens is not None
+        and cached_tokens <= input_tokens
+        and reasoning_tokens is not None
+        and reasoning_tokens <= output_tokens
+        and any(_is_completed_message(item) for item in output)
+    )
+
+
+def _response_model_matches(response_model: str, request_model: str) -> bool:
+    return bool(
+        response_model == request_model
+        or re.fullmatch(rf"{re.escape(request_model)}-[0-9]{{4,8}}", response_model)
+    )
+
+
+def _is_completed_message(item: object) -> bool:
+    if not isinstance(item, dict):
+        return False
+    content = item.get("content")
+    return bool(
+        item.get("type") == "message"
+        and _optional_string(item.get("id"))
+        and item.get("status") == "completed"
+        and item.get("role") == "assistant"
+        and isinstance(content, list)
+        and content
+        and all(
+            isinstance(part, dict)
+            and part.get("type") == "output_text"
+            and isinstance(part.get("text"), str)
+            and bool(part["text"].strip())
+            for part in content
+        )
+    )
+
+
+def _contains_reasoning_item(payload: dict[str, Any] | None) -> bool:
+    output = payload.get("output") if payload else None
+    return isinstance(output, list) and any(
+        isinstance(item, dict) and item.get("type") == "reasoning" for item in output
+    )
+
+
+def _strict_schema_requested(request_body: dict[str, Any]) -> bool:
+    text = request_body.get("text")
+    output_format = text.get("format") if isinstance(text, dict) else None
+    schema = output_format.get("schema") if isinstance(output_format, dict) else None
+    return bool(
+        isinstance(output_format, dict)
+        and output_format.get("type") == "json_schema"
+        and output_format.get("strict") is True
+        and isinstance(schema, dict)
+        and schema.get("additionalProperties") is False
+    )
 
 
 class _DeepSeekResponseFailure(Exception):
