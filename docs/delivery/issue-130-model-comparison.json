@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "issue-130-deepseek-model-comparison-v1",
+  "dataset": {"version": "b0-synthetic-evaluation-v1", "repetitions": 5, "scenarioCountPerModel": 60, "providerAttemptsPerModel": 55, "identicalForAllCandidates": true},
+  "fixedCandidates": ["deepseek-v4-flash", "deepseek-v4-pro"],
+  "automaticModelSwitching": false,
+  "sharedContract": {"promptVersion": "investigation-judgment-v1", "schemaVersion": "investigation-judgment-v1", "thinking": "disabled", "strictJsonSchema": true, "maximumAttemptsPerScenario": 1},
+  "pricing": {
+    "version": "deepseek-cny-time-of-use-observed-2026-08-26",
+    "tier": "off-peak",
+    "observedAtUtc": "2026-08-26T12:59:16.757943Z",
+    "cnyPerMillionTokens": {
+      "deepseek-v4-flash": {"cachedInput": 0.05, "uncachedInput": 1.5, "output": 4.5},
+      "deepseek-v4-pro": {"cachedInput": 0.15, "uncachedInput": 4.5, "output": 13.5}
+    }
+  },
+  "spend": {"maximumCny": 6.0, "preflightWorstCaseCny": 1.4784, "actualCny": 0.0419578, "withinBudget": true},
+  "attempts": {"actual": 110, "maximum": 110, "retries": 0},
+  "candidates": [
+    {
+      "requestModel": "deepseek-v4-flash",
+      "evaluation": {
+        "schemaVersion": "b0-evaluation-report-v1", "datasetVersion": "b0-synthetic-evaluation-v1", "candidateModel": "deepseek-v4-flash", "realModelInvoked": true, "scenarioCount": 60,
+        "metrics": {"schemaSuccessRate": 1.0, "businessCorrectnessRate": 1.0, "safetyInvariantRate": 1.0, "refusalOrEmptyRate": 0.0, "failureRate": 0.0, "p50LatencyMs": 840, "p95LatencyMs": 1242, "costMeasurementRate": 1.0, "averageCostCny": 0.00015754166666666667},
+        "failureCounts": {}, "failedScenarioIds": []
+      },
+      "attempts": {"actual": 55, "maximum": 55, "retries": 0},
+      "contractChecks": {"strictSchema": true, "completedStatus": true, "thinkingDisabled": true, "allowedParametersOnly": true, "actualResponseShape": true, "usageReported": true, "cacheReported": true},
+      "usage": {"inputTokens": 10065, "outputTokens": 1014, "totalTokens": 11079, "cachedInputTokens": 7040, "cacheHitAttempts": 55},
+      "costCny": 0.0094525,
+      "observedProvider": {"responseModels": ["deepseek-v4-flash"], "backendFingerprints": [], "backendFingerprintReportedAttempts": 0, "backendFingerprintMissingAttempts": 55, "failureClassifications": []}
+    },
+    {
+      "requestModel": "deepseek-v4-pro",
+      "evaluation": {
+        "schemaVersion": "b0-evaluation-report-v1", "datasetVersion": "b0-synthetic-evaluation-v1", "candidateModel": "deepseek-v4-pro", "realModelInvoked": true, "scenarioCount": 60,
+        "metrics": {"schemaSuccessRate": 0.95, "businessCorrectnessRate": 0.8833333333333333, "safetyInvariantRate": 0.95, "refusalOrEmptyRate": 0.0, "failureRate": 0.05, "p50LatencyMs": 1547, "p95LatencyMs": 1904, "costMeasurementRate": 1.0, "averageCostCny": 0.000541755},
+        "failureCounts": {"INVALID_OUTPUT": 3},
+        "failedScenarioIds": ["delay-before-48h", "delay-before-48h", "delay-before-48h", "delay-before-48h", "delay-before-48h", "delay-at-48h", "cancelled-order"]
+      },
+      "attempts": {"actual": 55, "maximum": 55, "retries": 0},
+      "contractChecks": {"strictSchema": true, "completedStatus": true, "thinkingDisabled": true, "allowedParametersOnly": true, "actualResponseShape": true, "usageReported": true, "cacheReported": true},
+      "usage": {"inputTokens": 10065, "outputTokens": 1280, "totalTokens": 11345, "cachedInputTokens": 6912, "cacheHitAttempts": 54},
+      "costCny": 0.0325053,
+      "observedProvider": {"responseModels": ["deepseek-v4-pro"], "backendFingerprints": [], "backendFingerprintReportedAttempts": 0, "backendFingerprintMissingAttempts": 55, "failureClassifications": ["INVALID_JSON"]}
+    }
+  ],
+  "comparison": {
+    "qualityDeltaProMinusFlash": {"schemaSuccessRate": -0.05, "businessCorrectnessRate": -0.116666667, "safetyInvariantRate": -0.05, "refusalOrEmptyRate": 0.0, "failureRate": 0.05},
+    "latencyDeltaMsProMinusFlash": {"p50LatencyMs": 707, "p95LatencyMs": 662},
+    "costDeltaCnyProMinusFlash": 0.0230528,
+    "responseModelBehaviorDiffers": true
+  },
+  "conclusion": {"decision": "CONTINUE_FLASH", "basis": "Pro 未提供更高质量，Flash 在相同契约下成本不高于 Pro。"},
+  "blockedReason": null
+}
