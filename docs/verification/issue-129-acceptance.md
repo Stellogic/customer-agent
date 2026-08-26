@@ -61,13 +61,14 @@ Chromium 的剩余失败离线定位到验收器：该路径等待固定 fake �
 包含 Spring 已接受的该意图客户回复及上述权威终态，但按数据最小化规则未保存正文，因此不伪造具体
 措辞。验收器现改为等待所有合法变体共有的“补偿建议正在等待人工审批”语义，同时断言页面为“调查中”
 与“智能客服处理中”，且不存在已批准、已执行或补偿金额。离线契约测试已先复现固定正文绑定并验证
-新断言契约；恢复授权后，fixed-fake 完整 Chromium 主矩阵 25/25 通过，其中澄清恢复路径按上述语义与
+新断言契约；恢复授权后，fixed-fake 完整 HTTPS Chromium 主矩阵 24/24 通过，其中澄清恢复路径按上述语义与
 Spring 权威终态验收通过。没有再次调用供应商。
 
 完整门禁首次暴露既有 Issue #99 窄屏队列表格没有确定形成容器内横向滚动：真实浏览器测得滚动宽度
 等于可视宽度，证明不是等待时间、动画、调度或选择器问题。最小 fake Chromium 夹具先稳定变红；产品
-CSS 增加确定的表格最小宽度后连续 3 次通过，且页面本身没有横向溢出。浏览器测试镜像同步显式打包
-实际 `styles.css`，随后完整真实 Chromium 中 Issue #99 路径与最小夹具均通过；没有扩大 5 秒等待。
+CSS 增加确定的表格最小宽度后连续 3 次通过，且页面本身没有横向溢出。随后完整 HTTPS Chromium 中
+真实 React Issue #99 路径通过；临时 `page.setContent` 诊断夹具按浏览器验收 ADR 清理，没有进入长期
+主矩阵，也没有扩大 5 秒等待。
 
 ## 安全与异常结果
 
@@ -80,7 +81,7 @@ CSS 增加确定的表格最小宽度后连续 3 次通过，且页面本身没�
 - Agent 组件规范化门禁：190 passed；Ruff、Pyright 均通过。
 - 恢复后的完整 `pwsh ./scripts/check.ps1` 在唯一 gate project/tag/端口下退出码为 0；Backend、Agent、Frontend 三组件、FULL_RESET_GATE、集成测试和敏感内容扫描均通过。
 - Issue #129 最新真实 Flash Chromium：业务链路成功，进程因已修复的固定正文断言记为 1 failed；失败后未重试。
-- 完整规范化 Chromium：主矩阵 25 passed；后端重启和加速 Session 到期矩阵共 3 passed、3 conditional skips。独立最小布局夹具另连续 3 passed。
+- 完整规范化 HTTPS Chromium：主矩阵 24 passed；后端重启和加速 Session 到期矩阵共 3 passed、3 conditional skips。临时最小布局诊断夹具另连续 3 passed 后已清理。
 
 ## 资源隔离与清理
 

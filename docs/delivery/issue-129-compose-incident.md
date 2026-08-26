@@ -39,6 +39,6 @@
 ## 恢复与验证结果
 
 - 重建仅创建 `customer-agent-baseline` 的 7 个容器、4 个网络与 1 个全新 PostgreSQL 卷；两个迁移任务退出码为 0，5 个运行服务保持 healthy，系统状态为 `UP`，合成夹具可用。
-- 重建后在唯一 `customer-agent-gate-*` project、匹配镜像 tag 与独立端口下运行完整 `pwsh ./scripts/check.ps1`，退出码为 0；主 Chromium 矩阵 25 项通过，会话矩阵 3 项通过、3 项按条件跳过。
+- 重建后在唯一 `customer-agent-gate-*` project、匹配镜像 tag 与独立端口下运行完整 `pwsh ./scripts/check.ps1`，退出码为 0；真实 HTTPS Chromium 主矩阵 24 项通过，会话矩阵 3 项通过、3 项按条件跳过；另有 1 个仅用于红绿诊断的临时静态布局夹具通过后按 ADR 清理。
 - gate 与浏览器子项目清理后，容器、卷、网络均精确回读为 0；baseline 仍为 7 个容器、1 个卷、4 个网络，运行服务 healthy，系统状态 `UP`；main-preview 卷保持存在。
 - 恢复与门禁的机器可读脱敏摘要见 `docs/delivery/issue-129-baseline-recovery.json`。事故前旧 baseline 数据不可恢复，本次只证明新建合成运行时可用。

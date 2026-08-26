@@ -48,10 +48,10 @@
     "frontendPort": 60804,
     "canonicalCheckExitCode": 0,
     "chromium": {
-      "mainMatrixPassed": 25,
+      "httpsMainMatrixPassed": 24,
       "sessionMatrixPassed": 3,
       "sessionMatrixConditionalSkips": 3,
-      "layoutRegressionRepeatedPassed": 3
+      "throwawayLayoutDiagnosticRepeatedPassed": 3
     },
     "cleanupReadback": {
       "gateContainers": 0,
