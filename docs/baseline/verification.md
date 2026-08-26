@@ -13,9 +13,12 @@
 - 验证 Agent Server 进程环境中不存在补偿执行器令牌。
 - 扫描生产前端静态文件，拒绝 Agent 地址、本地令牌和数据库 URI。
 
-统一命令：
+统一命令（`<unique>` 必须为本轮唯一的小写字母、数字或连字符后缀；端口不得使用 baseline 的 4180）：
 
 ```powershell
+$env:COMPOSE_PROJECT_NAME = 'customer-agent-gate-<unique>'
+$env:CUSTOMER_AGENT_IMAGE_TAG = 'gate-<unique>'
+$env:CUSTOMER_AGENT_FRONTEND_PORT = '<isolated-port>'
 pwsh -File scripts/smoke.ps1 -Reset
 ```
 

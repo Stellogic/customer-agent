@@ -12,8 +12,13 @@ from baseline_agent.customer_communication_model import (
     CustomerCommunicationModel,
     CustomerConversationMessage,
     CustomerReplyIntent,
-    FixedFakeCustomerCommunicationModel,
     validate_customer_reply_envelope,
+)
+from baseline_agent.customer_communication_model_runtime import (
+    configured_customer_communication_model,
+)
+from baseline_agent.deepseek_customer_communication_model import (
+    DeepSeekResponsesCustomerCommunicationModel,
 )
 from baseline_agent.deepseek_investigation_model import (
     DEEPSEEK_FLASH_MODEL,
@@ -74,6 +79,7 @@ class BaselineState(TypedDict, total=False):
     investigation_actions: list[dict[str, object]]
     investigation_run_evidence: dict[str, object]
     investigation_judgment_evidence: dict[str, object]
+    customer_communication_evidence: dict[str, object]
     investigation_progress: dict[str, object] | None
 
 
@@ -108,7 +114,11 @@ investigation_model_mode = _configured_investigation_model.mode
 _configured_action_model = configured_investigation_action_model(os.environ)
 investigation_action_model = _configured_action_model.model
 investigation_action_model_mode = _configured_action_model.mode
-customer_communication_model: CustomerCommunicationModel = FixedFakeCustomerCommunicationModel()
+_configured_customer_communication_model = configured_customer_communication_model(os.environ)
+customer_communication_model: CustomerCommunicationModel = (
+    _configured_customer_communication_model.model
+)
+customer_communication_model_mode = _configured_customer_communication_model.mode
 shadow_candidate_factory: Callable[[], ShadowCandidate | None] = configured_shadow_candidate
 
 
@@ -266,7 +276,9 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 "UNSUPPORTED_SCENARIO",
                 _controlled_summary_facts(facts),
                 action_records,
-                _completed_run_evidence(loop_result, "HANDOFF_SELECTED"),
+                _completed_run_evidence(
+                    loop_result, "HANDOFF_SELECTED", state.get("investigation_run_evidence")
+                ),
             )
         if loop_result.terminal_action is TerminalAction.REQUEST_CLARIFICATION:
             if _clarification_facts_reason(facts) is not None:
@@ -286,7 +298,9 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 "investigation_progress": None,
                 "investigation_actions": action_records,
                 "investigation_run_evidence": _completed_run_evidence(
-                    loop_result, "CLARIFICATION_SELECTED"
+                    loop_result,
+                    "CLARIFICATION_SELECTED",
+                    state.get("investigation_run_evidence"),
                 ),
             }
         unsafe_reason = _unsafe_facts_reason(facts)
@@ -300,7 +314,9 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 unsafe_reason,
                 _controlled_summary_facts(facts),
                 action_records,
-                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                _completed_run_evidence(
+                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                ),
             )
         assert isinstance(facts, dict)
         if loop_result.terminal_action is not TerminalAction.SUBMIT_CONCLUSION:
@@ -313,7 +329,9 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 "INVALID_TOOL_RESPONSE",
                 _controlled_summary_facts(facts),
                 action_records,
-                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                _completed_run_evidence(
+                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                ),
             )
         judgment_audit_offset = _judgment_audit_offset()
         try:
@@ -334,7 +352,9 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 "INVALID_MODEL_OUTPUT",
                 _controlled_summary_facts(facts),
                 action_records,
-                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                _completed_run_evidence(
+                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                ),
                 _judgment_call_evidence(judgment_audit_offset, "MODEL_CALL_FAILED"),
             )
         judgment_evidence = _judgment_call_evidence(judgment_audit_offset, "")
@@ -351,7 +371,9 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 "INVALID_TOOL_RESPONSE",
                 _controlled_summary_facts(facts),
                 action_records,
-                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                _completed_run_evidence(
+                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                ),
                 judgment_evidence,
             )
         conclusion = _build_conclusion(facts, judgment)
@@ -366,10 +388,14 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 for message in communication_context["publicConversation"]
             ),
         )
+        communication_audit_offset = _communication_audit_offset()
         try:
             customer_reply = await customer_communication_model.compose(communication_input)
             validate_customer_reply_envelope(communication_input, customer_reply)
         except Exception:
+            communication_evidence = _communication_call_evidence(
+                communication_audit_offset, "MODEL_CALL_FAILED"
+            )
             return await _human_handoff(
                 client,
                 base_url,
@@ -379,10 +405,14 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 "INVALID_MODEL_OUTPUT",
                 _controlled_summary_facts(facts),
                 action_records,
-                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                _completed_run_evidence(
+                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                ),
                 judgment_evidence,
+                communication_evidence,
             )
         if customer_reply.intent is CustomerReplyIntent.HUMAN_HANDOFF:
+            communication_evidence = _communication_call_evidence(communication_audit_offset, "")
             return await _human_handoff(
                 client,
                 base_url,
@@ -392,8 +422,11 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 "CUSTOMER_REQUESTED_HUMAN",
                 _controlled_summary_facts(facts),
                 action_records,
-                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                _completed_run_evidence(
+                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                ),
                 judgment_evidence,
+                communication_evidence,
             )
         completion = {**conclusion, "customerReply": customer_reply.as_request_value()}
         try:
@@ -419,7 +452,9 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                     "FACT_CONFLICT",
                     _controlled_summary_facts(facts),
                     action_records,
-                    _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                    _completed_run_evidence(
+                        loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                    ),
                     judgment_evidence,
                 )
             raise
@@ -433,7 +468,9 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 "TOOL_RETRY_EXHAUSTED",
                 _controlled_summary_facts(facts),
                 action_records,
-                _completed_run_evidence(loop_result, "SAFE_HANDOFF"),
+                _completed_run_evidence(
+                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                ),
                 judgment_evidence,
             )
         return {
@@ -444,9 +481,16 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
             "investigation_progress": None,
             "investigation_actions": action_records,
             "investigation_run_evidence": _completed_run_evidence(
-                loop_result, "CONCLUSION_SUBMITTED"
+                loop_result,
+                "CONCLUSION_SUBMITTED",
+                state.get("investigation_run_evidence"),
             ),
             "investigation_judgment_evidence": judgment_evidence,
+            "customer_communication_evidence": _communication_call_evidence(
+                communication_audit_offset,
+                "",
+                state.get("customer_communication_evidence"),
+            ),
         }
 
 
@@ -572,9 +616,13 @@ async def _advance_investigation_action_loop(
 
 
 def _combined_model_mode() -> str:
-    if investigation_action_model_mode == "deterministic-action-model-v1":
-        return investigation_model_mode
-    return f"{investigation_action_model_mode}+{investigation_model_mode}"
+    modes = []
+    if investigation_action_model_mode != "deterministic-action-model-v1":
+        modes.append(investigation_action_model_mode)
+    modes.append(investigation_model_mode)
+    if customer_communication_model_mode != "fixed-fake-customer-communication-v1":
+        modes.append(customer_communication_model_mode)
+    return "+".join(modes)
 
 
 def _action_loop_handoff_reason(code: ActionLoopFailureCode) -> str:
@@ -613,28 +661,40 @@ def _checkpoint_action_records(records: tuple[ActionRecord, ...]) -> list[dict[s
 
 
 def _failed_run_evidence(error: ActionLoopFailure) -> dict[str, object]:
-    return {
+    evidence: dict[str, object] = {
         "outcome": "SAFE_HANDOFF",
-        "failureClassification": error.code.value,
+        "failureClassification": error.failure_classification or error.code.value,
         "providerAttempts": error.provider_attempts,
         "toolRounds": len(error.records),
         "modelCalls": _model_call_evidence(error.model_calls),
     }
+    tokens = sum(call.tokens for call in error.model_calls)
+    cost_micros = sum(call.cost_micros for call in error.model_calls)
+    if tokens or cost_micros:
+        evidence["tokens"] = tokens
+        evidence["costMicros"] = cost_micros
+    return evidence
 
 
-def _completed_run_evidence(result: ActionLoopResult, outcome: str) -> dict[str, object]:
+def _completed_run_evidence(
+    result: ActionLoopResult, outcome: str, prior: object = None
+) -> dict[str, object]:
     tool_rounds = sum(
         record.action_type in {capability.value for capability in InvestigationCapability}
         for record in result.records
     )
+    previous = prior if isinstance(prior, dict) else {}
+    previous_calls = previous.get("modelCalls")
+    previous_calls = previous_calls if isinstance(previous_calls, list) else []
     return {
         "outcome": outcome,
         "failureClassification": "",
-        "providerAttempts": result.provider_attempts,
-        "toolRounds": tool_rounds,
-        "tokens": result.tokens,
-        "costMicros": result.cost_micros,
-        "modelCalls": _model_call_evidence(result.model_calls),
+        "providerAttempts": _evidence_int(previous.get("providerAttempts"))
+        + result.provider_attempts,
+        "toolRounds": _evidence_int(previous.get("toolRounds")) + tool_rounds,
+        "tokens": _evidence_int(previous.get("tokens")) + result.tokens,
+        "costMicros": _evidence_int(previous.get("costMicros")) + result.cost_micros,
+        "modelCalls": [*previous_calls, *_model_call_evidence(result.model_calls)],
     }
 
 
@@ -689,6 +749,76 @@ def _judgment_call_evidence(offset: int | None, failure: str) -> dict[str, objec
         "costMicros": estimate_flash_cost_micros(input_tokens, output_tokens),
         "failureClassification": failure or (sorted(classifications)[0] if classifications else ""),
     }
+
+
+def _communication_audit_offset() -> int | None:
+    if not isinstance(customer_communication_model, DeepSeekResponsesCustomerCommunicationModel):
+        return None
+    sink = customer_communication_model.audit_sink
+    return len(sink.records) if isinstance(sink, InMemoryModelCallAuditSink) else None
+
+
+def _communication_call_evidence(
+    offset: int | None,
+    failure: str,
+    previous: dict[str, object] | None = None,
+) -> dict[str, object]:
+    if offset is None or not isinstance(
+        customer_communication_model, DeepSeekResponsesCustomerCommunicationModel
+    ):
+        current = {
+            "logicalCalls": 0,
+            "providerAttempts": 0,
+            "tokens": 0,
+            "costMicros": 0,
+            "durationMs": 0,
+            "failureClassification": failure,
+        }
+        return _merge_communication_evidence(previous, current)
+    sink = customer_communication_model.audit_sink
+    if not isinstance(sink, InMemoryModelCallAuditSink):
+        raise RuntimeError("formal communication audit sink is not readable")
+    records = sink.records[offset:]
+    input_tokens = sum(record.input_tokens or 0 for record in records)
+    output_tokens = sum(record.output_tokens or 0 for record in records)
+    classifications = {
+        record.failure_classification.value
+        for record in records
+        if record.failure_classification is not None
+    }
+    current = {
+        "logicalCalls": 1 if records else 0,
+        "providerAttempts": len(records),
+        "tokens": sum(record.total_tokens or 0 for record in records),
+        "costMicros": estimate_flash_cost_micros(input_tokens, output_tokens),
+        "durationMs": sum(record.duration_ms for record in records),
+        "failureClassification": failure or (sorted(classifications)[0] if classifications else ""),
+    }
+    return _merge_communication_evidence(previous, current)
+
+
+def _merge_communication_evidence(
+    previous: dict[str, object] | None, current: dict[str, object]
+) -> dict[str, object]:
+    if not previous:
+        return current
+    failure = str(current["failureClassification"] or previous.get("failureClassification", ""))
+    return {
+        "logicalCalls": _evidence_int(previous.get("logicalCalls"))
+        + _evidence_int(current.get("logicalCalls")),
+        "providerAttempts": _evidence_int(previous.get("providerAttempts"))
+        + _evidence_int(current.get("providerAttempts")),
+        "tokens": _evidence_int(previous.get("tokens")) + _evidence_int(current.get("tokens")),
+        "costMicros": _evidence_int(previous.get("costMicros"))
+        + _evidence_int(current.get("costMicros")),
+        "durationMs": _evidence_int(previous.get("durationMs"))
+        + _evidence_int(current.get("durationMs")),
+        "failureClassification": failure,
+    }
+
+
+def _evidence_int(value: object) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
 
 
 def _valid_capability_evidence(
@@ -1002,6 +1132,7 @@ async def _human_handoff(
     action_records: list[dict[str, object]] | None = None,
     run_evidence: dict[str, object] | None = None,
     judgment_evidence: dict[str, object] | None = None,
+    communication_evidence: dict[str, object] | None = None,
 ) -> BaselineState:
     response = await client.post(
         f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/human-handoff",
@@ -1026,6 +1157,8 @@ async def _human_handoff(
         result["investigation_run_evidence"] = run_evidence
     if judgment_evidence is not None:
         result["investigation_judgment_evidence"] = judgment_evidence
+    if communication_evidence is not None:
+        result["customer_communication_evidence"] = communication_evidence
     return result
 
 
@@ -1077,10 +1210,14 @@ async def request_clarification(state: BaselineState) -> BaselineState:
                 for message in context["publicConversation"]
             ),
         )
+        communication_audit_offset = _communication_audit_offset()
         try:
             customer_reply = await customer_communication_model.compose(model_input)
             validate_customer_reply_envelope(model_input, customer_reply)
         except Exception:
+            communication_evidence = _communication_call_evidence(
+                communication_audit_offset, "MODEL_CALL_FAILED"
+            )
             return await _human_handoff(
                 client,
                 base_url,
@@ -1089,8 +1226,10 @@ async def request_clarification(state: BaselineState) -> BaselineState:
                 scope_headers,
                 "INVALID_MODEL_OUTPUT",
                 [],
+                communication_evidence=communication_evidence,
             )
         if customer_reply.intent is CustomerReplyIntent.HUMAN_HANDOFF:
+            communication_evidence = _communication_call_evidence(communication_audit_offset, "")
             return await _human_handoff(
                 client,
                 base_url,
@@ -1099,6 +1238,7 @@ async def request_clarification(state: BaselineState) -> BaselineState:
                 scope_headers,
                 "CUSTOMER_REQUESTED_HUMAN",
                 [],
+                communication_evidence=communication_evidence,
             )
         if customer_reply.intent is not CustomerReplyIntent.CLARIFICATION_REQUIRED:
             return await _human_handoff(
@@ -1133,6 +1273,11 @@ async def request_clarification(state: BaselineState) -> BaselineState:
         return {
             "clarification": response.json(),
             "customer_reply": customer_reply.as_request_value(),
+            "customer_communication_evidence": _communication_call_evidence(
+                communication_audit_offset,
+                "",
+                state.get("customer_communication_evidence"),
+            ),
         }
 
 

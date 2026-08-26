@@ -34,6 +34,10 @@ jobs:
   fullstack-acceptance:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: customer-agent-gate-${{ github.run_id }}-${{ github.run_attempt }}
+      CUSTOMER_AGENT_IMAGE_TAG: gate-${{ github.run_id }}-${{ github.run_attempt }}
+      CUSTOMER_AGENT_FRONTEND_PORT: 4280
     steps:
       - uses: actions/checkout@v4
       - name: Run empty-database deterministic full-stack acceptance

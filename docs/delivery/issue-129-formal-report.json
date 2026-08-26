@@ -1,0 +1,20 @@
+{
+  "customerCommunication": {
+    "estimatedCostMicros": 778,
+    "logicalCalls": 2,
+    "providerAttempts": 2,
+    "totalDurationMs": 3191
+  },
+  "estimatedCostMicros": 3157,
+  "failureClassifications": {},
+  "generationResults": {
+    "handoffCount": 1,
+    "handoffWithModelCallsCount": 1,
+    "successCount": 2
+  },
+  "model": "deepseek-v4-flash",
+  "observedGenerationCount": 3,
+  "schemaVersion": "issue-129-aggregate-provider-metrics-v1",
+  "totalLogicalCalls": 18,
+  "totalProviderAttempts": 18
+}

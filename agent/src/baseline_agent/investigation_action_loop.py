@@ -145,12 +145,18 @@ class ActionLoopFailure(Exception):
         records: tuple[ActionRecord, ...] = (),
         provider_attempts: int = 0,
         model_calls: tuple[ActionModelCallRecord, ...] = (),
+        failure_classification: str = "",
+        tokens: int = 0,
+        cost_micros: int = 0,
     ) -> None:
         self.code = code
         self.facts = dict(facts or {})
         self.records = records
         self.provider_attempts = provider_attempts
         self.model_calls = model_calls
+        self.failure_classification = failure_classification
+        self.tokens = tokens
+        self.cost_micros = cost_micros
         super().__init__(code.value)
 
 
@@ -258,13 +264,19 @@ class ActionLoop:
                         call_number=len(failed_calls) + 1,
                         selected_action="",
                         provider_attempts=error.provider_attempts,
-                        tokens=0,
-                        cost_micros=0,
+                        tokens=error.tokens,
+                        cost_micros=error.cost_micros,
                     )
                 )
             progress.model_calls = failed_calls
             progress.provider_attempts += error.provider_attempts
-            raise self._progress_failure(error.code, progress) from error
+            progress.tokens += error.tokens
+            progress.cost_micros += error.cost_micros
+            raise self._progress_failure(
+                error.code,
+                progress,
+                failure_classification=error.failure_classification,
+            ) from error
         except Exception as error:
             raise self._progress_failure(ActionLoopFailureCode.UNKNOWN_ACTION, progress) from error
         if not isinstance(decision, ActionDecision):
@@ -352,7 +364,10 @@ class ActionLoop:
 
     @staticmethod
     def _progress_failure(
-        code: ActionLoopFailureCode, progress: _ActionLoopProgress
+        code: ActionLoopFailureCode,
+        progress: _ActionLoopProgress,
+        *,
+        failure_classification: str = "",
     ) -> ActionLoopFailure:
         return ActionLoopFailure(
             code,
@@ -360,6 +375,7 @@ class ActionLoop:
             tuple(progress.records),
             provider_attempts=progress.provider_attempts,
             model_calls=tuple(progress.model_calls),
+            failure_classification=failure_classification,
         )
 
 

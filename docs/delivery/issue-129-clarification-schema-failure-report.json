@@ -1,0 +1,52 @@
+{
+  "actionState": {
+    "checkpointTerminal": true,
+    "providerAttempts": 2,
+    "selectedActions": [
+      "CONFIRM_ORDER",
+      ""
+    ],
+    "toolResultCodes": [
+      "PROGRESSED"
+    ]
+  },
+  "clarification": {
+    "resumed": true,
+    "submitted": true
+  },
+  "customerReply": {
+    "generated": true,
+    "intent": "CLARIFICATION_REQUIRED"
+  },
+  "metrics": {
+    "customerCommunication": {
+      "estimatedCostMicros": 268,
+      "logicalCalls": 1,
+      "providerAttempts": 1,
+      "totalDurationMs": 976
+    },
+    "estimatedCostMicros": 558,
+    "failureClassifications": {
+      "SCHEMA_MISMATCH": 1
+    },
+    "generationResults": {
+      "handoffCount": 1,
+      "handoffWithModelCallsCount": 1,
+      "successCount": 0
+    },
+    "model": "deepseek-v4-flash",
+    "observedGenerationCount": 1,
+    "schemaVersion": "issue-129-aggregate-provider-metrics-v1",
+    "totalLogicalCalls": 3,
+    "totalProviderAttempts": 3
+  },
+  "model": "deepseek-v4-flash",
+  "schemaVersion": "issue-129-clarification-retest-evidence-v1",
+  "springState": {
+    "generationStatus": "HANDED_OFF",
+    "handlingMode": "HUMAN",
+    "handoffReasonCode": "INVALID_MODEL_OUTPUT",
+    "lifecycleState": "INVESTIGATING",
+    "submissionStatus": "COMPLETED"
+  }
+}

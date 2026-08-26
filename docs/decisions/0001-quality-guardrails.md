@@ -19,6 +19,9 @@ Coding，因此需要把可自动验证的规则下沉到本地 canonical check 
   固化可由当前包结构真实表达的依赖边界。
 - 三端 Docker `test` target 运行各自完整质量门禁；根目录
   `scripts/check.ps1` 是开发者与 CI 共用的唯一规范化入口。
+- 完整门禁包含 destructive Compose reset，调用者必须显式提供匹配的唯一
+  `customer-agent-gate-*` project、`gate-*` 镜像 tag 与非 baseline 端口；入口在任何 Docker
+  操作前读回有效 Compose 配置并 fail closed。组件级 `-SkipAcceptance` 检查不执行该 reset。
 - 保留独立的 full-stack acceptance，避免组件检查替代跨服务行为验证。
 
 ## 被否决的方案
