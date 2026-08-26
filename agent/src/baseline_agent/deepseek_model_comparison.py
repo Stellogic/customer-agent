@@ -17,6 +17,7 @@ from baseline_agent.deepseek_investigation_model import (
     InMemoryModelCallAuditSink,
     ModelCallAttemptRecord,
 )
+from baseline_agent.deepseek_pricing import time_of_use_tier_at
 from baseline_agent.deepseek_real_evaluation_policy import supplier_block_reason
 from baseline_agent.investigation_model import (
     InvestigationJudgmentFailure,
@@ -26,6 +27,7 @@ from baseline_agent.synthetic_evaluation import (
     AuditedInvestigationEvaluationModel,
     TokenPricing,
     evaluate_candidate,
+    nearest_rank,
     synthetic_evaluation_scenarios,
 )
 
@@ -78,13 +80,8 @@ _PEAK_PRICING = {
 def deepseek_pricing_at(
     observed_at: datetime,
 ) -> tuple[str, dict[str, CnyTokenPricing]]:
-    if observed_at.tzinfo is None:
-        raise ValueError("pricing observation must be timezone-aware")
-    observed_utc = observed_at.astimezone(UTC)
-    is_peak = observed_utc.weekday() < 5 and (
-        1 <= observed_utc.hour < 4 or 6 <= observed_utc.hour < 10
-    )
-    return ("peak", _PEAK_PRICING) if is_peak else ("off-peak", _OFF_PEAK_PRICING)
+    tier = time_of_use_tier_at(observed_at)
+    return (tier, _PEAK_PRICING) if tier == "peak" else (tier, _OFF_PEAK_PRICING)
 
 
 def _validate_environment(environment: Mapping[str, str]) -> None:
@@ -322,8 +319,8 @@ def _candidate_report(
             _DATASET_REPETITIONS - failed_prompt_injection
         ) / _DATASET_REPETITIONS
         provider_latencies = [record.duration_ms for record in records]
-        metrics["p50LatencyMs"] = _nearest_rank(provider_latencies, 0.50)
-        metrics["p95LatencyMs"] = _nearest_rank(provider_latencies, 0.95)
+        metrics["p50LatencyMs"] = nearest_rank(provider_latencies, 0.50)
+        metrics["p95LatencyMs"] = nearest_rank(provider_latencies, 0.95)
         metrics["latencySampleCount"] = len(provider_latencies)
         metrics["latencyPopulation"] = "provider-attempts-only"
     successful = [record for record in records if record.failure_classification is None]
@@ -450,14 +447,6 @@ def _metrics(candidate: dict[str, object]) -> dict[str, Any]:
 
 def _as_float(value: object) -> float:
     return float(value) if isinstance(value, int | float) and not isinstance(value, bool) else 0.0
-
-
-def _nearest_rank(values: list[int], percentile: float) -> int:
-    if not values:
-        return 0
-    ordered = sorted(values)
-    rank = max(1, int(len(ordered) * percentile + 0.999999999))
-    return ordered[min(rank - 1, len(ordered) - 1)]
 
 
 def _quality_tuple(candidate: dict[str, object]) -> tuple[float, ...]:

@@ -15,6 +15,7 @@ from baseline_agent.deepseek_investigation_model import (
     InMemoryModelCallAuditSink,
     ModelCallAttemptRecord,
 )
+from baseline_agent.deepseek_pricing import time_of_use_tier_at
 from baseline_agent.deepseek_real_evaluation_policy import supplier_block_reason
 from baseline_agent.investigation_model import (
     InvestigationJudgmentFailure,
@@ -95,12 +96,8 @@ def _validate_environment(environment: Mapping[str, str]) -> None:
 
 
 def deepseek_flash_pricing_at(observed_at: datetime) -> tuple[str, TokenPricing]:
-    if observed_at.tzinfo is None:
-        raise ValueError("pricing observation must be timezone-aware")
-    observed_utc = observed_at.astimezone(UTC)
-    hour = observed_utc.hour
-    is_peak = observed_utc.weekday() < 5 and (1 <= hour < 4 or 6 <= hour < 10)
-    if is_peak:
+    tier = time_of_use_tier_at(observed_at)
+    if tier == "peak":
         return "peak", _FLASH_PEAK_PRICING
     return "off-peak", _FLASH_OFF_PEAK_PRICING
 

@@ -112,9 +112,9 @@ LangGraph 调查、Spring 权威复核和 React 浏览器验收，并保留失�
 
 2026-08-26 从仓库根目录使用以下隔离配置运行完整门禁：
 
-- Compose project：`customer-agent-gate-130-8ebe-a13f9c`
-- 镜像 tag：`gate-130-8ebe-a13f9c`
-- 前端端口：`43130`
+- Compose project：`customer-agent-gate-130-final2-8ebe-c39d5e`
+- 镜像 tag：`gate-130-final2-8ebe-c39d5e`
+- 前端端口：`43132`
 
 执行前 `docker compose config --format json` 读回确认 project、镜像、卷、网络和端口均属于本轮，
 且不包含 `customer-agent-baseline` 或 `customer-agent-main-preview` 资源。随后运行：
@@ -127,6 +127,6 @@ pwsh ./scripts/check.ps1
 集成 smoke、前端实时验收和敏感内容扫描均通过；Agent 为 196 项，HTTPS Chromium 主矩阵为
 24/24，Session 重启/到期三轮各 1 passed、1 conditional skip。
 
-门禁结束后仅对 `customer-agent-gate-130-8ebe-a13f9c` 执行 `down --volumes --remove-orphans`；
+门禁结束后仅对 `customer-agent-gate-130-final2-8ebe-c39d5e` 执行 `down --volumes --remove-orphans`；
 回读本轮容器、卷和网络均为 0。`customer-agent-baseline` 的 5 个常驻运行服务仍保持 Up/healthy，
 `main-preview` 未触碰。
