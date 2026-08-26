@@ -37,6 +37,17 @@ incomplete、空正文、非法 JSON 或 schema 越界。离线重放定位到�
 `OUTPUT_TRUNCATED`、`MODEL_REFUSAL`、`EMPTY_OUTPUT`、`INVALID_JSON` 与 `SCHEMA_MISMATCH`，同时在
 失败 checkpoint 中保留脱敏 token/费用。历史失败证据不改写，也不伪造更细分类。
 
+修复后的唯一获批复验仍按首错即停：3 次逻辑调用、3 次供应商尝试、558 micro-USD，其中客户沟通
+1 次、976 ms、268 micro-USD。新的脱敏分类为 `SCHEMA_MISMATCH`；澄清已提交并恢复，
+`CLARIFICATION_REQUIRED` 安全客户回复已生成，但恢复后的事实读取 action 响应校验失败，Spring
+权威终态为 `HANDED_OFF/HUMAN/INVALID_MODEL_OUTPUT`。这排除了等待条件、澄清恢复状态和客户沟通
+envelope。恢复轮第 1 次 `CONFIRM_ORDER` 已通过相同 envelope、JSON 反序列化和 usage 校验；第 2 次
+事实读取 action 唯一新增的跨层约束，是由供应商回显 `orderReference`、动态 schema 要求字符串常量，
+领域解析器再与权威事实精确比较。最小离线夹具证明该重复约束会把 action 选择变成
+`SCHEMA_MISMATCH`；修复后模型只返回受控 action，引用由本地已校验 state 确定性注入。历史证据未保存
+供应商返回的是 null 还是非精确字符串，因此不伪造该子细节。最新证据位于
+`docs/delivery/issue-129-clarification-retest-report.json`；未经新的明确批准不再复验。
+
 ## 安全与异常结果
 
 - 离线受控测试覆盖 429/503 有界重试、非法或越权 envelope、提示注入、未经批准的补偿或退款宣告、意图与证据不匹配以及配置缺失；全部失败关闭且无 fake 回退。
@@ -45,7 +56,7 @@ incomplete、空正文、非法 JSON 或 schema 越界。离线重放定位到�
 
 ## 测试与浏览器验收数
 
-- Agent 组件规范化门禁：189 passed；Ruff、Pyright 均通过。
+- Agent 组件规范化门禁：190 passed；Ruff、Pyright 均通过。
 - 完整 `pwsh ./scripts/check.ps1`：Backend、Agent、Frontend 三组件门禁 3/3，通过完整 PostgreSQL/Spring/LangGraph/React 集成与 FULL_RESET_GATE。
 - Issue #129 最新真实 Flash Chromium：1 passed、1 failed、3 not run；失败后未重试。
 - 完整规范化 Chromium：主矩阵 24 passed；后端重启和加速 Session 到期矩阵共 3 passed、3 conditional skips。

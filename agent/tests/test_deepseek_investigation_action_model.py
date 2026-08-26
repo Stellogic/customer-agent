@@ -18,7 +18,7 @@ from baseline_agent.investigation_action_loop import (
 )
 
 
-def _completed_action(action: str, order_reference: str | None) -> dict:
+def _completed_action(action: str) -> dict:
     return {
         "id": "response-128",
         "status": "completed",
@@ -30,7 +30,7 @@ def _completed_action(action: str, order_reference: str | None) -> dict:
                 "content": [
                     {
                         "type": "output_text",
-                        "text": json.dumps({"action": action, "orderReference": order_reference}),
+                        "text": json.dumps({"action": action}),
                     }
                 ],
             }
@@ -51,7 +51,7 @@ async def test_flash_selects_one_strict_action_from_minimal_normalized_facts() -
         captured.append(request)
         return httpx.Response(
             200,
-            json=_completed_action("READ_LOGISTICS", "ORDER-128"),
+            json=_completed_action("READ_LOGISTICS"),
         )
 
     model = DeepSeekResponsesInvestigationActionModel(
@@ -97,11 +97,32 @@ async def test_flash_selects_one_strict_action_from_minimal_normalized_facts() -
 
 
 @pytest.mark.asyncio
+async def test_fact_action_derives_authoritative_reference_without_supplier_echo() -> None:
+    payload = _completed_action("READ_LOGISTICS")
+    payload["output"][0]["content"][0]["text"] = json.dumps({"action": "READ_LOGISTICS"})
+    model = DeepSeekResponsesInvestigationActionModel(
+        DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=payload)),
+    )
+
+    decision = await model.choose(
+        {
+            "matchStatus": "UNIQUE",
+            "orderReference": "ORDER-128",
+            "evidenceRefs": ["order:ORDER-128"],
+        }
+    )
+
+    assert decision.action.kind is InvestigationCapability.READ_LOGISTICS
+    assert decision.action.parameter_map == {"orderReference": "ORDER-128"}
+
+
+@pytest.mark.asyncio
 async def test_flash_allows_terminal_action_without_order_parameter() -> None:
     model = DeepSeekResponsesInvestigationActionModel(
         DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
         transport=httpx.MockTransport(
-            lambda _: httpx.Response(200, json=_completed_action("SUBMIT_CONCLUSION", None))
+            lambda _: httpx.Response(200, json=_completed_action("SUBMIT_CONCLUSION"))
         ),
     )
 
@@ -130,7 +151,7 @@ async def test_flash_allows_only_clarification_for_an_ambiguous_match() -> None:
 
     def supplier(request: httpx.Request) -> httpx.Response:
         captured.append(request)
-        return httpx.Response(200, json=_completed_action("HANDOFF", None))
+        return httpx.Response(200, json=_completed_action("HANDOFF"))
 
     model = DeepSeekResponsesInvestigationActionModel(
         DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
@@ -143,7 +164,7 @@ async def test_flash_allows_only_clarification_for_an_ambiguous_match() -> None:
     body = json.loads(captured[0].content)
     allowed = body["text"]["format"]["schema"]["properties"]["action"]["enum"]
     assert allowed == ["REQUEST_CLARIFICATION"]
-    assert body["text"]["format"]["schema"]["properties"]["orderReference"] == {"type": "null"}
+    assert set(body["text"]["format"]["schema"]["properties"]) == {"action"}
 
 
 @pytest.mark.asyncio
@@ -152,7 +173,7 @@ async def test_flash_schema_requires_handoff_for_known_fact_conflict() -> None:
 
     def supplier(request: httpx.Request) -> httpx.Response:
         captured.append(request)
-        return httpx.Response(200, json=_completed_action("HANDOFF", None))
+        return httpx.Response(200, json=_completed_action("HANDOFF"))
 
     model = DeepSeekResponsesInvestigationActionModel(
         DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
@@ -188,7 +209,7 @@ async def test_flash_rejects_a_capability_after_its_facts_are_already_known() ->
         captured.append(request)
         return httpx.Response(
             200,
-            json=_completed_action("READ_LOGISTICS", "ORDER-128"),
+            json=_completed_action("READ_LOGISTICS"),
         )
 
     model = DeepSeekResponsesInvestigationActionModel(
@@ -216,9 +237,9 @@ async def test_flash_rejects_a_capability_after_its_facts_are_already_known() ->
 @pytest.mark.parametrize(
     "payload",
     [
-        _completed_action("READ_LOGISTICS", None),
-        _completed_action("SUBMIT_CONCLUSION", "ORDER-128"),
-        _completed_action("DELETE_TICKET", None),
+        _completed_action("READ_LOGISTICS"),
+        _completed_action("SUBMIT_CONCLUSION"),
+        _completed_action("DELETE_TICKET"),
         {"status": "completed", "output": []},
     ],
 )
@@ -250,14 +271,14 @@ async def test_invalid_or_unauthorized_output_fails_closed(payload: dict) -> Non
         ),
         (
             {
-                **_completed_action("CONFIRM_ORDER", None),
+                **_completed_action("CONFIRM_ORDER"),
                 "output": [{"type": "message", "content": [{"type": "refusal"}]}],
             },
             DeepSeekFailureClassification.MODEL_REFUSAL,
         ),
         (
             {
-                **_completed_action("CONFIRM_ORDER", None),
+                **_completed_action("CONFIRM_ORDER"),
                 "output": [
                     {
                         "type": "message",
@@ -269,7 +290,7 @@ async def test_invalid_or_unauthorized_output_fails_closed(payload: dict) -> Non
         ),
         (
             {
-                **_completed_action("CONFIRM_ORDER", None),
+                **_completed_action("CONFIRM_ORDER"),
                 "output": [
                     {
                         "type": "message",
@@ -280,7 +301,7 @@ async def test_invalid_or_unauthorized_output_fails_closed(payload: dict) -> Non
             DeepSeekFailureClassification.INVALID_JSON,
         ),
         (
-            _completed_action("DELETE_TICKET", None),
+            _completed_action("DELETE_TICKET"),
             DeepSeekFailureClassification.SCHEMA_MISMATCH,
         ),
     ],

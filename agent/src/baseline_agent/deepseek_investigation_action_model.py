@@ -362,31 +362,19 @@ def _build_request(
     facts: dict[str, object],
     allowed_actions: tuple[str, ...],
 ) -> dict[str, Any]:
-    actions_requiring_reference = {
-        capability.value
-        for capability, parameters in CAPABILITY_PARAMETER_NAMES.items()
-        if parameters
-    }
-    reference_schema: dict[str, object]
-    if set(allowed_actions).issubset(actions_requiring_reference):
-        reference_schema = {"type": "string", "const": facts.get("orderReference")}
-    else:
-        reference_schema = {"type": "null"}
     schema = {
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": list(allowed_actions)},
-            "orderReference": reference_schema,
         },
-        "required": ["action", "orderReference"],
+        "required": ["action"],
         "additionalProperties": False,
     }
     return {
         "model": config.model,
         "instructions": (
             "Choose exactly one next action for a synthetic support-ticket investigation. "
-            "Use only the enumerated action. CONFIRM_ORDER and terminal actions require a null "
-            "orderReference. Fact-reading actions require the exact supplied orderReference. "
+            "Use only the enumerated action and return no facts or identifiers. "
             "Missing facts are expected investigation work, not uncertainty: when matchStatus is "
             "missing select CONFIRM_ORDER; when it is AMBIGUOUS select REQUEST_CLARIFICATION; "
             "when it is UNIQUE select any one still-unread fact capability. Submit only after all "
@@ -465,11 +453,10 @@ def _parse_response(
         structured = json.loads(texts[0])
     except json.JSONDecodeError:
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.INVALID_JSON) from None
-    if not isinstance(structured, dict) or set(structured) != {"action", "orderReference"}:
+    if not isinstance(structured, dict) or set(structured) != {"action"}:
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     action = structured["action"]
-    reference = structured["orderReference"]
-    if not isinstance(action, str) or (reference is not None and not isinstance(reference, str)):
+    if not isinstance(action, str):
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     if action not in allowed_actions:
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
@@ -485,12 +472,11 @@ def _parse_response(
                 DeepSeekFailureClassification.SCHEMA_MISMATCH
             ) from None
     if capability is not None and CAPABILITY_PARAMETER_NAMES[capability]:
-        if not reference or reference != facts.get("orderReference"):
+        reference = facts.get("orderReference")
+        if not isinstance(reference, str) or not reference:
             raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
         parameters = {"orderReference": reference}
     else:
-        if reference is not None:
-            raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
         parameters = {}
     usage = payload.get("usage")
     if not isinstance(usage, dict):
