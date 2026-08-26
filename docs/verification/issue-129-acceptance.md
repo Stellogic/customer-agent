@@ -17,7 +17,8 @@
 - 客户沟通：2 次逻辑调用、2 次供应商尝试、累计 3191 ms、778 micro-USD。
 - Spring 结果：2 个代次完成、1 个代次转人工；转人工代次包含真实模型调用。
 - 失败点：第一条自动安全回复 Chromium 路径通过；第二条澄清路径未出现等待客户回复状态，而是非预期转人工。其余三条路径按首错即停规则未执行。
-- 当前结论：脱敏证据完整，但正式真实浏览器验收未通过，Issue #129 尚未达到正式交付条件。
+- 当时结论：脱敏证据完整，但该次正式真实浏览器验收未通过；该历史结论随后由获批单路径的
+  11/11 成功业务证据、离线断言根因修复与完整 HTTPS Chromium 门禁取代。
 
 机器可读脱敏指标位于 `docs/delivery/issue-129-formal-report.json`。
 
@@ -64,6 +65,11 @@ Chromium 的剩余失败离线定位到验收器：该路径等待固定 fake �
 新断言契约；恢复授权后，fixed-fake 完整 HTTPS Chromium 主矩阵 24/24 通过，其中澄清恢复路径按上述语义与
 Spring 权威终态验收通过。没有再次调用供应商。
 
+当前正式结论：真实 Flash 的受约束客户沟通业务链路已经成功，历史 Chromium 失败被证明是固定正文
+断言缺陷；修复后真实 React/Spring/LangGraph/PostgreSQL 的 fixed-fake HTTPS 浏览器矩阵与完整规范门禁
+全部通过。按后续明确授权复用既有 11/11、1749 micro-USD 成功证据，不再调用供应商，Issue #129 的 C
+交付条件已满足。
+
 完整门禁首次暴露既有 Issue #99 窄屏队列表格没有确定形成容器内横向滚动：真实浏览器测得滚动宽度
 等于可视宽度，证明不是等待时间、动画、调度或选择器问题。最小 fake Chromium 夹具先稳定变红；产品
 CSS 增加确定的表格最小宽度后连续 3 次通过，且页面本身没有横向溢出。随后完整 HTTPS Chromium 中
@@ -80,7 +86,7 @@ CSS 增加确定的表格最小宽度后连续 3 次通过，且页面本身没�
 
 - Agent 组件规范化门禁：190 passed；Ruff、Pyright 均通过。
 - 恢复后的完整 `pwsh ./scripts/check.ps1` 在唯一 gate project/tag/端口下退出码为 0；Backend、Agent、Frontend 三组件、FULL_RESET_GATE、集成测试和敏感内容扫描均通过。
-- Issue #129 最新真实 Flash Chromium：业务链路成功，进程因已修复的固定正文断言记为 1 failed；失败后未重试。
+- Issue #129 最后一次真实 Flash Chromium 的历史 runner 结果：业务链路成功，进程因后来已修复的固定正文断言记为 1 failed；失败后未重试，该 runner 结果不改写。
 - 完整规范化 HTTPS Chromium：主矩阵 24 passed；后端重启和加速 Session 到期矩阵共 3 passed、3 conditional skips。临时最小布局诊断夹具另连续 3 passed 后已清理。
 
 ## 资源隔离与清理
