@@ -101,9 +101,10 @@ def collect_formal_metrics() -> dict[str, object]:
         if response.status_code != 200:
             raise RuntimeError("formal checkpoint metrics are incomplete")
         values = response.json().get("values")
-        if isinstance(values, dict):
-            checkpoints.append(values)
-            terminal_states.append(str(status))
+        if not isinstance(values, dict):
+            raise RuntimeError("formal checkpoint metrics are incomplete")
+        checkpoints.append(values)
+        terminal_states.append(str(status))
     return aggregate_checkpoint_metrics(checkpoints, terminal_states)
 
 

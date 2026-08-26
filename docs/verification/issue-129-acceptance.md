@@ -45,7 +45,7 @@ incomplete、空正文、非法 JSON 或 schema 越界。离线重放定位到�
 
 ## 测试与浏览器验收数
 
-- Agent 组件规范化门禁：187 passed；Ruff、Pyright 均通过。
+- Agent 组件规范化门禁：189 passed；Ruff、Pyright 均通过。
 - 完整 `pwsh ./scripts/check.ps1`：Backend、Agent、Frontend 三组件门禁 3/3，通过完整 PostgreSQL/Spring/LangGraph/React 集成与 FULL_RESET_GATE。
 - Issue #129 最新真实 Flash Chromium：1 passed、1 failed、3 not run；失败后未重试。
 - 完整规范化 Chromium：主矩阵 24 passed；后端重启和加速 Session 到期矩阵共 3 passed、3 conditional skips。

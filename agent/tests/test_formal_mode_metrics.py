@@ -1,4 +1,9 @@
-from baseline_agent.formal_mode_metrics import aggregate_checkpoint_metrics
+import pytest
+
+from baseline_agent.formal_mode_metrics import (
+    aggregate_checkpoint_metrics,
+    collect_formal_metrics,
+)
 
 
 def test_aggregates_only_formal_customer_communication_checkpoints_without_identifiers() -> None:
@@ -47,3 +52,37 @@ def test_aggregates_only_formal_customer_communication_checkpoints_without_ident
         "handoffWithModelCallsCount": 0,
     }
     assert "thread" not in str(report).lower()
+
+
+def test_formal_metrics_fail_closed_when_checkpoint_values_are_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Connection:
+        def __enter__(self) -> "Connection":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, _: str) -> "Connection":
+            return self
+
+        def fetchall(self) -> list[tuple[str, str]]:
+            return [("synthetic-thread", "COMPLETED")]
+
+    class Response:
+        status_code = 200
+
+        def json(self) -> dict[str, object]:
+            return {"values": None}
+
+    monkeypatch.setenv("SPRING_FORMAL_DATABASE_URI", "synthetic-database-uri")
+    monkeypatch.setenv("AGENT_SERVER_URL", "http://agent")
+    monkeypatch.setenv("SPRING_TO_AGENT_TOKEN", "synthetic-token")
+    monkeypatch.setattr(
+        "baseline_agent.formal_mode_metrics.psycopg.connect", lambda _: Connection()
+    )
+    monkeypatch.setattr("baseline_agent.formal_mode_metrics.httpx.get", lambda *_, **__: Response())
+
+    with pytest.raises(RuntimeError, match="incomplete"):
+        collect_formal_metrics()
