@@ -145,24 +145,45 @@ class DeepSeekResponsesInvestigationActionModel:
                 payload: object | None = None
                 try:
                     payload = response.json()
-                    decision = _parse_response(
-                        payload,
-                        controlled_facts,
-                        allowed_actions,
-                        attempt_number,
-                    )
-                except (ValueError, TypeError, KeyError, ActionLoopFailure):
+                except ValueError:
+                    classification = DeepSeekFailureClassification.INVALID_JSON
                     await self._record_attempt(
                         internal_call_id,
                         attempt_id,
                         attempt_number,
                         attempt_started,
                         request_body,
-                        DeepSeekFailureClassification.SCHEMA_MISMATCH,
+                        classification,
+                        provider_http_status=response.status_code,
+                    )
+                    raise _failure(
+                        attempt_number, failure_classification=classification.value
+                    ) from None
+                try:
+                    decision = _parse_response(
+                        payload,
+                        controlled_facts,
+                        allowed_actions,
+                        attempt_number,
+                    )
+                except _DeepSeekActionResponseFailure as failure:
+                    await self._record_attempt(
+                        internal_call_id,
+                        attempt_id,
+                        attempt_number,
+                        attempt_started,
+                        request_body,
+                        failure.classification,
                         payload if isinstance(payload, dict) else None,
                         provider_http_status=response.status_code,
                     )
-                    raise _failure(attempt_number) from None
+                    tokens, cost_micros = _failure_usage(payload)
+                    raise _failure(
+                        attempt_number,
+                        failure_classification=failure.classification.value,
+                        tokens=tokens,
+                        cost_micros=cost_micros,
+                    ) from None
                 assert isinstance(payload, dict)
                 await self._record_attempt(
                     internal_call_id,
@@ -341,11 +362,21 @@ def _build_request(
     facts: dict[str, object],
     allowed_actions: tuple[str, ...],
 ) -> dict[str, Any]:
+    actions_requiring_reference = {
+        capability.value
+        for capability, parameters in CAPABILITY_PARAMETER_NAMES.items()
+        if parameters
+    }
+    reference_schema: dict[str, object]
+    if set(allowed_actions).issubset(actions_requiring_reference):
+        reference_schema = {"type": "string", "const": facts.get("orderReference")}
+    else:
+        reference_schema = {"type": "null"}
     schema = {
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": list(allowed_actions)},
-            "orderReference": {"type": ["string", "null"]},
+            "orderReference": reference_schema,
         },
         "required": ["action", "orderReference"],
         "additionalProperties": False,
@@ -387,14 +418,28 @@ def _parse_response(
     allowed_actions: tuple[str, ...],
     attempts: int,
 ) -> ActionDecision:
-    if not isinstance(payload, dict) or payload.get("status") != "completed":
-        raise _failure()
+    if not isinstance(payload, dict):
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
+    status = payload.get("status")
+    if status == "failed":
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.PROVIDER_FAILED)
+    if status == "incomplete":
+        details = payload.get("incomplete_details")
+        reason = details.get("reason") if isinstance(details, dict) else None
+        classification = (
+            DeepSeekFailureClassification.OUTPUT_TRUNCATED
+            if reason == "max_output_tokens"
+            else DeepSeekFailureClassification.PROVIDER_INCOMPLETE
+        )
+        raise _DeepSeekActionResponseFailure(classification)
+    if status != "completed":
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.PROVIDER_INCOMPLETE)
     response_model = payload.get("model")
     if not isinstance(response_model, str) or not response_model.startswith(DEEPSEEK_FLASH_MODEL):
-        raise _failure()
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     output = payload.get("output")
     if not isinstance(output, list):
-        raise _failure()
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     texts = [
         part["text"]
         for item in output
@@ -410,17 +455,24 @@ def _parse_response(
         if isinstance(item, dict)
         for part in item.get("content", [])
     )
-    if refused or len(texts) != 1:
-        raise _failure()
-    structured = json.loads(texts[0])
+    if refused:
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.MODEL_REFUSAL)
+    if not texts or all(not text.strip() for text in texts):
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.EMPTY_OUTPUT)
+    if len(texts) != 1:
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
+    try:
+        structured = json.loads(texts[0])
+    except json.JSONDecodeError:
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.INVALID_JSON) from None
     if not isinstance(structured, dict) or set(structured) != {"action", "orderReference"}:
-        raise _failure()
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     action = structured["action"]
     reference = structured["orderReference"]
     if not isinstance(action, str) or (reference is not None and not isinstance(reference, str)):
-        raise _failure()
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     if action not in allowed_actions:
-        raise _failure()
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     try:
         capability = InvestigationCapability(action)
         terminal = None
@@ -429,25 +481,27 @@ def _parse_response(
         try:
             terminal = TerminalAction(action)
         except ValueError:
-            raise _failure() from None
+            raise _DeepSeekActionResponseFailure(
+                DeepSeekFailureClassification.SCHEMA_MISMATCH
+            ) from None
     if capability is not None and CAPABILITY_PARAMETER_NAMES[capability]:
         if not reference or reference != facts.get("orderReference"):
-            raise _failure()
+            raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
         parameters = {"orderReference": reference}
     else:
         if reference is not None:
-            raise _failure()
+            raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
         parameters = {}
     usage = payload.get("usage")
     if not isinstance(usage, dict):
-        raise _failure()
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     input_tokens = _optional_int(usage.get("input_tokens"))
     output_tokens = _optional_int(usage.get("output_tokens"))
     total_tokens = _optional_int(usage.get("total_tokens"))
     if input_tokens is None or output_tokens is None or total_tokens is None:
-        raise _failure()
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     if total_tokens < input_tokens + output_tokens:
-        raise _failure()
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     cost_micros = estimate_flash_cost_micros(input_tokens, output_tokens)
     selected_action = capability if capability is not None else terminal
     assert selected_action is not None
@@ -470,8 +524,35 @@ def _optional_int(value: object) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
 
 
-def _failure(provider_attempts: int = 0) -> ActionLoopFailure:
+class _DeepSeekActionResponseFailure(Exception):
+    def __init__(self, classification: DeepSeekFailureClassification) -> None:
+        self.classification = classification
+        super().__init__(classification.value)
+
+
+def _failure_usage(payload: object) -> tuple[int, int]:
+    if not isinstance(payload, dict) or not isinstance(payload.get("usage"), dict):
+        return 0, 0
+    usage = payload["usage"]
+    input_tokens = _optional_int(usage.get("input_tokens"))
+    output_tokens = _optional_int(usage.get("output_tokens"))
+    total_tokens = _optional_int(usage.get("total_tokens"))
+    if input_tokens is None or output_tokens is None or total_tokens is None:
+        return 0, 0
+    return total_tokens, estimate_flash_cost_micros(input_tokens, output_tokens)
+
+
+def _failure(
+    provider_attempts: int = 0,
+    *,
+    failure_classification: str = "",
+    tokens: int = 0,
+    cost_micros: int = 0,
+) -> ActionLoopFailure:
     return ActionLoopFailure(
         ActionLoopFailureCode.MODEL_CALL_FAILED,
         provider_attempts=provider_attempts,
+        failure_classification=failure_classification,
+        tokens=tokens,
+        cost_micros=cost_micros,
     )

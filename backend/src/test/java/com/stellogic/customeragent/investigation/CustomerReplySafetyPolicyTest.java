@@ -19,6 +19,13 @@ class CustomerReplySafetyPolicyTest {
                                         EVIDENCE,
                                         ORDER)))
                 .isNull();
+        assertThat(
+                        rejection(
+                                reply(
+                                        "调查结果显示，订单 ORDER-122 的物流出现延迟。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+                                        EVIDENCE,
+                                        ORDER)))
+                .isNull();
     }
 
     @Test

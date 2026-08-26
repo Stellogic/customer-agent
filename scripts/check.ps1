@@ -10,6 +10,7 @@ $components = if ($Component -eq "all") { @("backend", "agent", "frontend") } el
 & "$PSScriptRoot/test-runtime-log-policy.ps1"
 & "$PSScriptRoot/test-gradle-proxy.ps1"
 & "$PSScriptRoot/test-compose-network-policy.ps1"
+& "$PSScriptRoot/test-issue129-acceptance-contract.ps1"
 & "$PSScriptRoot/assert-deprecated-human-auth-contract.ps1"
 
 foreach ($current in $components) {

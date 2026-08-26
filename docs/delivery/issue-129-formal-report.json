@@ -1,109 +1,20 @@
 {
-  "actionModelMode": "deepseek-v4-flash-action-formal-v1+deepseek-v4-flash-formal-v1+deepseek-v4-flash-customer-communication-formal-v1",
-  "boundedProviderAttempts": 2,
-  "checkpointEvidence": {
-    "actionOrder": [
-      "CONFIRM_ORDER",
-      "READ_LOGISTICS",
-      "READ_PAYMENT_AND_REFUNDS",
-      "READ_COMPENSATION_AND_PENDING_ACTIONS",
-      "READ_APPLICABLE_POLICY",
-      "SUBMIT_CONCLUSION"
-    ],
-    "actionRun": {
-      "costMicros": 962,
-      "failureClassification": "",
-      "modelCalls": [
-        {
-          "callNumber": 1,
-          "costMicros": 128,
-          "providerAttempts": 1,
-          "selectedAction": "CONFIRM_ORDER",
-          "tokens": 258
-        },
-        {
-          "callNumber": 2,
-          "costMicros": 159,
-          "providerAttempts": 1,
-          "selectedAction": "READ_LOGISTICS",
-          "tokens": 317
-        },
-        {
-          "callNumber": 3,
-          "costMicros": 169,
-          "providerAttempts": 1,
-          "selectedAction": "READ_PAYMENT_AND_REFUNDS",
-          "tokens": 328
-        },
-        {
-          "callNumber": 4,
-          "costMicros": 173,
-          "providerAttempts": 1,
-          "selectedAction": "READ_COMPENSATION_AND_PENDING_ACTIONS",
-          "tokens": 333
-        },
-        {
-          "callNumber": 5,
-          "costMicros": 168,
-          "providerAttempts": 1,
-          "selectedAction": "READ_APPLICABLE_POLICY",
-          "tokens": 329
-        },
-        {
-          "callNumber": 6,
-          "costMicros": 165,
-          "providerAttempts": 1,
-          "selectedAction": "SUBMIT_CONCLUSION",
-          "tokens": 332
-        }
-      ],
-      "outcome": "CONCLUSION_SUBMITTED",
-      "providerAttempts": 6,
-      "tokens": 1897,
-      "toolRounds": 5
-    },
-    "customerCommunicationRun": {
-      "costMicros": 348,
-      "durationMs": 1159,
-      "failureClassification": "",
-      "logicalCalls": 1,
-      "providerAttempts": 1,
-      "tokens": 556
-    },
-    "estimatedCostMicros": 1415,
-    "judgmentRun": {
-      "costMicros": 105,
-      "failureClassification": "",
-      "logicalCalls": 1,
-      "providerAttempts": 1,
-      "tokens": 201
-    },
-    "modelMode": "deepseek-v4-flash-action-formal-v1+deepseek-v4-flash-formal-v1+deepseek-v4-flash-customer-communication-formal-v1",
-    "totalLogicalCalls": 8,
-    "totalProviderAttempts": 8
+  "customerCommunication": {
+    "estimatedCostMicros": 778,
+    "logicalCalls": 2,
+    "providerAttempts": 2,
+    "totalDurationMs": 3191
   },
-  "customerCommunicationModelMode": "deepseek-v4-flash-customer-communication-formal-v1",
-  "expectation": "success",
+  "estimatedCostMicros": 3157,
+  "failureClassifications": {},
+  "generationResults": {
+    "handoffCount": 1,
+    "handoffWithModelCallsCount": 1,
+    "successCount": 2
+  },
   "model": "deepseek-v4-flash",
-  "modelMode": "deepseek-formal",
-  "publicFailureClassification": "",
-  "publicHandoffReason": "",
-  "result": "PASSED",
-  "schemaVersion": "issue-129-formal-customer-communication-acceptance-v1",
-  "springState": {
-    "agentCommandCount": 6,
-    "authoritativeFactCount": 8,
-    "generationStatus": "COMPLETED",
-    "handlingMode": "AGENT",
-    "handoffReasonCode": null,
-    "handoffRequestCount": 0,
-    "lifecycleState": "INVESTIGATING",
-    "proposalCount": 1,
-    "submissionStatus": "COMPLETED"
-  },
-  "browserAcceptance": {
-    "testCount": 3,
-    "browser": "Chromium",
-    "result": "PASSED"
-  }
+  "observedGenerationCount": 3,
+  "schemaVersion": "issue-129-aggregate-provider-metrics-v1",
+  "totalLogicalCalls": 18,
+  "totalProviderAttempts": 18
 }

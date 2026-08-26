@@ -12,6 +12,7 @@ from baseline_agent.customer_communication_model import (
     CustomerReplyIntent,
     FixedFakeCustomerCommunicationModel,
     StructuredCustomerCommunicationModel,
+    default_customer_reply_body,
 )
 
 
@@ -132,7 +133,7 @@ async def test_programmable_provider_supports_only_the_frozen_reply_intents(
         async def generate(self, _request: dict[str, object]) -> dict[str, object]:
             return {
                 "schemaVersion": "customer-reply-v1",
-                "body": "为确保处理安全，此工单已转由客服继续调查。客服将在此工单中与您联系。",
+                "body": default_customer_reply_body("ORDER-123", CustomerReplyIntent(intent)),
                 "intent": intent,
                 "evidenceRefs": evidence,
                 "escalationRequired": escalation,

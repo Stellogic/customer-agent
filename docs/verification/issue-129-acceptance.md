@@ -10,15 +10,32 @@
 
 ## 真实 Flash 可复核指标
 
-2026-08-25 至 2026-08-26 使用 `D:\customer-agent\.env` 中显式配置的 `deepseek-v4-flash`，在专用 Compose project 中完成一次正式成功路径：
+2026-08-26 使用 `D:\customer-agent\.env` 中显式配置的 `deepseek-v4-flash`，按批准的 43 次逻辑调用、49 次供应商尝试与 400000 micro-USD 三重硬上限执行唯一一次最小完整复验。复验在第二条 Chromium 路径出现非预期转人工后立即停止：
 
-- 逻辑模型调用：8；供应商尝试：8；没有重试或模型切换。
-- 估算总费用：1415 micro-USD。
-- 客户沟通：1 次逻辑调用、1 次供应商尝试、556 tokens、348 micro-USD、1159 ms。
-- 结果：业务路径成功；客户沟通失败分类为空；未转人工。
-- 调查行动、调查判断和客户沟通分别占 6、1、1 次逻辑调用；Spring 终态为 generation/submission 完成、`AGENT` 处理模式、提案等待人工审批。
+- 累计逻辑模型调用：18；供应商尝试：18；没有重试或模型切换。
+- 累计估算费用：3157 micro-USD。
+- 客户沟通：2 次逻辑调用、2 次供应商尝试、累计 3191 ms、778 micro-USD。
+- Spring 结果：2 个代次完成、1 个代次转人工；转人工代次包含真实模型调用。
+- 失败点：第一条自动安全回复 Chromium 路径通过；第二条澄清路径未出现等待客户回复状态，而是非预期转人工。其余三条路径按首错即停规则未执行。
+- 当前结论：脱敏证据完整，但正式真实浏览器验收未通过，Issue #129 尚未达到正式交付条件。
 
 机器可读脱敏指标位于 `docs/delivery/issue-129-formal-report.json`。
+
+### 澄清单路径复验与离线根因
+
+获批的首次单路径复验在第 2 次 action 调用后按首错即停规则安全转人工；失败证据原样保留于
+`docs/delivery/issue-129-clarification-retest-report.json`：2 次逻辑调用、2 次供应商尝试、
+记录估算费用 0 micro-USD，未提交或恢复澄清、未生成客户回复，Spring 权威终态为
+`HANDED_OFF/HUMAN/INVALID_MODEL_OUTPUT`。失败响应未留下可计费 usage，因此 0 仅表示已记录估算，
+不能证明供应商实际未计费。
+
+脱敏 checkpoint 只保留了通用 `MODEL_CALL_FAILED`，不足以事后唯一判定供应商响应属于 refusal、
+incomplete、空正文、非法 JSON 或 schema 越界。离线重放定位到可确定的最窄契约缺陷：
+`REQUEST_CLARIFICATION` 的动态 JSON Schema 允许非空订单引用，而解析器要求所有终止动作必须为
+`null`；供应商可返回 schema 合法但被本地解析器拒绝的结果。修复将终止动作字段收紧为 `null`，
+事实读取动作收紧为权威引用常量，并使 action adapter 分别保留 `PROVIDER_INCOMPLETE`、
+`OUTPUT_TRUNCATED`、`MODEL_REFUSAL`、`EMPTY_OUTPUT`、`INVALID_JSON` 与 `SCHEMA_MISMATCH`，同时在
+失败 checkpoint 中保留脱敏 token/费用。历史失败证据不改写，也不伪造更细分类。
 
 ## 安全与异常结果
 
@@ -28,13 +45,13 @@
 
 ## 测试与浏览器验收数
 
-- Agent 组件规范化门禁：179 passed；Ruff、Pyright 均通过。
+- Agent 组件规范化门禁：187 passed；Ruff、Pyright 均通过。
 - 完整 `pwsh ./scripts/check.ps1`：Backend、Agent、Frontend 三组件门禁 3/3，通过完整 PostgreSQL/Spring/LangGraph/React 集成与 FULL_RESET_GATE。
-- Issue #129 真实 Flash Chromium：3 passed，覆盖提示注入下无需补偿自动回复与 SSE 恢复、客户澄清后等待人工审批、客户人工偏好与客服领取前后授权隔离；网络、SSE 与 bundle 泄漏检查同步通过。
+- Issue #129 最新真实 Flash Chromium：1 passed、1 failed、3 not run；失败后未重试。
 - 完整规范化 Chromium：主矩阵 24 passed；后端重启和加速 Session 到期矩阵共 3 passed、3 conditional skips。
 
 ## 资源隔离与清理
 
 - 真实模型验收使用专用 project、随机宿主端口、独立卷/网络和 `issue129-*` 镜像 tag；执行前通过 `docker compose config --format json` 读回确认。
 - 完整规范化门禁另用独立 `customer-agent-issue129-final-*` project；Issue #80 浏览器门禁继续使用其自有随机 project。
-- 三组自有容器、卷和网络在完成后均回读为空；既有 `customer-agent-baseline` 未被停止、重建或清理。
+- 本次失败复验的自有容器、卷和网络均回读为空；既有 `customer-agent-baseline` 保持 5 个容器运行，未被停止、重建或清理。

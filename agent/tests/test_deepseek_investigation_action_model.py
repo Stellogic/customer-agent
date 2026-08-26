@@ -7,6 +7,10 @@ from baseline_agent.deepseek_investigation_action_model import (
     DeepSeekActionConfig,
     DeepSeekResponsesInvestigationActionModel,
 )
+from baseline_agent.deepseek_investigation_model import (
+    DeepSeekFailureClassification,
+    InMemoryModelCallAuditSink,
+)
 from baseline_agent.investigation_action_loop import (
     ActionLoopFailure,
     InvestigationCapability,
@@ -139,6 +143,7 @@ async def test_flash_allows_only_clarification_for_an_ambiguous_match() -> None:
     body = json.loads(captured[0].content)
     allowed = body["text"]["format"]["schema"]["properties"]["action"]["enum"]
     assert allowed == ["REQUEST_CLARIFICATION"]
+    assert body["text"]["format"]["schema"]["properties"]["orderReference"] == {"type": "null"}
 
 
 @pytest.mark.asyncio
@@ -225,6 +230,76 @@ async def test_invalid_or_unauthorized_output_fails_closed(payload: dict) -> Non
 
     with pytest.raises(ActionLoopFailure):
         await model.choose({})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        (
+            {"status": "incomplete", "model": "deepseek-v4-flash-202608"},
+            DeepSeekFailureClassification.PROVIDER_INCOMPLETE,
+        ),
+        (
+            {
+                "status": "incomplete",
+                "model": "deepseek-v4-flash-202608",
+                "incomplete_details": {"reason": "max_output_tokens"},
+            },
+            DeepSeekFailureClassification.OUTPUT_TRUNCATED,
+        ),
+        (
+            {
+                **_completed_action("CONFIRM_ORDER", None),
+                "output": [{"type": "message", "content": [{"type": "refusal"}]}],
+            },
+            DeepSeekFailureClassification.MODEL_REFUSAL,
+        ),
+        (
+            {
+                **_completed_action("CONFIRM_ORDER", None),
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": " "}],
+                    }
+                ],
+            },
+            DeepSeekFailureClassification.EMPTY_OUTPUT,
+        ),
+        (
+            {
+                **_completed_action("CONFIRM_ORDER", None),
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "{"}],
+                    }
+                ],
+            },
+            DeepSeekFailureClassification.INVALID_JSON,
+        ),
+        (
+            _completed_action("DELETE_TICKET", None),
+            DeepSeekFailureClassification.SCHEMA_MISMATCH,
+        ),
+    ],
+)
+async def test_flash_preserves_sanitized_output_failure_classification(
+    payload: dict, expected: DeepSeekFailureClassification
+) -> None:
+    audit = InMemoryModelCallAuditSink()
+    model = DeepSeekResponsesInvestigationActionModel(
+        DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=payload)),
+        audit_sink=audit,
+    )
+
+    with pytest.raises(ActionLoopFailure) as captured:
+        await model.choose({})
+
+    assert audit.records[0].failure_classification is expected
+    assert captured.value.failure_classification == expected.value
 
 
 @pytest.mark.asyncio

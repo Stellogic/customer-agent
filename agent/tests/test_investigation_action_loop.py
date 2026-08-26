@@ -186,6 +186,9 @@ async def test_loop_preserves_sanitized_model_failure_attempts_after_completed_t
             raise ActionLoopFailure(
                 ActionLoopFailureCode.MODEL_CALL_FAILED,
                 provider_attempts=2,
+                failure_classification="INVALID_JSON",
+                tokens=40,
+                cost_micros=2,
             ) from None
 
     with pytest.raises(ActionLoopFailure) as captured:
@@ -195,10 +198,13 @@ async def test_loop_preserves_sanitized_model_failure_attempts_after_completed_t
 
     assert captured.value.code is ActionLoopFailureCode.MODEL_CALL_FAILED
     assert captured.value.provider_attempts == 3
+    assert captured.value.failure_classification == "INVALID_JSON"
     assert [record.action_type for record in captured.value.records] == ["CONFIRM_ORDER"]
     assert [call.call_number for call in captured.value.model_calls] == [1, 2]
     assert captured.value.model_calls[-1].selected_action == ""
     assert captured.value.model_calls[-1].provider_attempts == 2
+    assert captured.value.model_calls[-1].tokens == 40
+    assert captured.value.model_calls[-1].cost_micros == 2
 
 
 @pytest.mark.asyncio

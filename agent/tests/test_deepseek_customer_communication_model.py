@@ -30,6 +30,9 @@ def _input(*, review_required: bool | None = True) -> CustomerCommunicationInput
 
 
 def _completed(body: str, intent: str = "COMPENSATION_REVIEW_PENDING") -> dict[str, object]:
+    evidence = (
+        [] if intent == "CLARIFICATION_REQUIRED" else ["order:ORDER-C129", "logistics:ORDER-C129"]
+    )
     return {
         "id": "response-c129",
         "status": "completed",
@@ -46,10 +49,7 @@ def _completed(body: str, intent: str = "COMPENSATION_REVIEW_PENDING") -> dict[s
                                 "schemaVersion": "customer-reply-v1",
                                 "body": body,
                                 "intent": intent,
-                                "evidenceRefs": [
-                                    "order:ORDER-C129",
-                                    "logistics:ORDER-C129",
-                                ],
+                                "evidenceRefs": evidence,
                                 "escalationRequired": False,
                                 "referencedOrder": "ORDER-C129",
                             },
@@ -69,7 +69,13 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
 
     def supplier(request: httpx.Request) -> httpx.Response:
         captured.append(request)
-        return httpx.Response(200, json=_completed("调查已完成，相关建议正在等待人工审批。"))
+        return httpx.Response(
+            200,
+            json=_completed(
+                "调查结果显示，订单 ORDER-C129 的物流出现延迟。"
+                "补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
+            ),
+        )
 
     model = DeepSeekResponsesCustomerCommunicationModel(
         DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
@@ -92,14 +98,48 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
     assert request["model"] == "deepseek-v4-flash"
     assert request["reasoning"] == {"effort": "none"}
     assert request["text"]["format"]["strict"] is True
+    body_schema = request["text"]["format"]["schema"]["properties"]["body"]
+    assert "pattern" in body_schema
+    assert "enum" not in body_schema
     sent = json.loads(request["input"])
-    assert set(sent) == {"untrustedCustomerData", "authorizedInvestigation"}
+    assert set(sent) == {
+        "schemaVersion",
+        "untrustedCustomerData",
+        "authorizedInvestigation",
+    }
     assert sent["authorizedInvestigation"]["compensationReviewRequired"] is True
     assert "synthetic-test-key" not in captured[0].content.decode()
     assert len(model.audit_sink.records) == 1
     record = model.audit_sink.records[0]
     assert record.total_tokens == 110
     assert record.failure_classification is None
+
+
+@pytest.mark.asyncio
+async def test_clarification_schema_does_not_allow_unrequested_human_handoff() -> None:
+    captured: list[httpx.Request] = []
+
+    def supplier(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(
+            200,
+            json=_completed(
+                "为确认需要调查的订单，请回复订单确认码（A 或 B）。",
+                "CLARIFICATION_REQUIRED",
+            ),
+        )
+
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(supplier),
+    )
+    clarification = _input(review_required=None)
+    await model.compose(clarification)
+
+    request = json.loads(captured[0].content)
+    schema = request["text"]["format"]["schema"]
+    assert schema["properties"]["intent"]["enum"] == ["CLARIFICATION_REQUIRED"]
+    assert "已按您的要求转由人工客服继续处理" not in schema["properties"]["body"]["pattern"]
 
 
 @pytest.mark.asyncio

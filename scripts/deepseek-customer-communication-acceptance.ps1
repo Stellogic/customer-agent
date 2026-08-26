@@ -20,6 +20,16 @@ $projectName = "customer-agent-issue129-$runId"
 $imageTag = "issue129-$runId"
 $evidenceDir = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetTempPath()) $projectName))
 $persistentEvidencePath = Join-Path $repoRoot 'docs\delivery\issue-129-formal-report.json'
+$formalReportPath = Join-Path $evidenceDir 'formal.json'
+$aggregateReportPath = Join-Path $evidenceDir 'report.json'
+$acceptancePlan = Import-PowerShellDataFile (Join-Path $PSScriptRoot 'issue129-acceptance-plan.psd1')
+$logicalCallLimit = [int]$acceptancePlan.LogicalCallLimit
+$providerAttemptLimit = [int]$acceptancePlan.ProviderAttemptLimit
+$costLimitMicros = [int]$acceptancePlan.CostLimitMicros
+$forbiddenEvidenceNames = @(
+    'apiKey', 'prompt', 'responseBody', 'providerPayload', 'threadId',
+    'ticketId', 'orderReference', 'evidenceReferences'
+)
 [void](New-Item -ItemType Directory -Path $evidenceDir)
 $evidenceVerified = $false
 $priorEnvironment = @{}
@@ -44,6 +54,53 @@ foreach ($name in $environmentNames) {
     $priorEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
 }
 
+function Write-AggregateEvidence([switch]$Final) {
+    docker compose --profile formal run --rm --volume "${evidenceDir}:/evidence" `
+        --entrypoint python formal-mode-smoke -m baseline_agent.formal_mode_metrics `
+        --report-path /evidence/report.json
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Issue #129 真实模型调用聚合失败。'
+    }
+    $reportText = Get-Content -LiteralPath $aggregateReportPath -Raw
+    $report = $reportText | ConvertFrom-Json
+    if (
+        $report.schemaVersion -ne 'issue-129-aggregate-provider-metrics-v1' -or
+        $report.model -ne 'deepseek-v4-flash' -or
+        [int]$report.totalLogicalCalls -gt $logicalCallLimit -or
+        [int]$report.totalProviderAttempts -gt $providerAttemptLimit -or
+        [int]$report.estimatedCostMicros -gt $costLimitMicros -or
+        @($forbiddenEvidenceNames | Where-Object { $reportText -match [regex]::Escape($_) }).Count -ne 0
+    ) {
+        throw 'Issue #129 脱敏指标无效或真实调用硬上限已触发。'
+    }
+    Copy-Item -LiteralPath $aggregateReportPath -Destination $persistentEvidencePath -Force
+    if ($Final -and (
+        [int]$report.observedGenerationCount -lt 5 -or
+        [int]$report.totalLogicalCalls -le 8 -or
+        [int]$report.totalProviderAttempts -lt [int]$report.totalLogicalCalls -or
+        [int]$report.customerCommunication.logicalCalls -lt 4 -or
+        [int]$report.customerCommunication.providerAttempts -lt [int]$report.customerCommunication.logicalCalls -or
+        [int]$report.customerCommunication.totalDurationMs -lt 1 -or
+        [int]$report.estimatedCostMicros -lt 1 -or
+        [int]$report.generationResults.successCount -lt 3 -or
+        [int]$report.generationResults.handoffCount -lt 2 -or
+        [int]$report.generationResults.handoffWithModelCallsCount -lt 2
+    )) {
+        throw 'Issue #129 脱敏调用、延迟或 Spring 终态证据不完整。'
+    }
+    return $report
+}
+
+function Invoke-BrowserScenario([string]$File, [string]$Title) {
+    docker compose --profile smoke run --rm browser-acceptance `
+        --max-failures=1 --grep $Title $File
+    if ($LASTEXITCODE -ne 0) {
+        Write-AggregateEvidence | Out-Null
+        throw 'Issue #129 真实 Chromium 路径失败。'
+    }
+    Write-AggregateEvidence | Out-Null
+}
+
 try {
     $env:COMPOSE_PROJECT_NAME = $projectName
     $env:COMPOSE_DISABLE_ENV_FILE = 'true'
@@ -59,7 +116,7 @@ try {
     $env:AGENT_INVESTIGATION_MAX_ACTIONS = '6'
     $env:AGENT_INVESTIGATION_MAX_WALL_CLOCK_MS = '120000'
     $env:AGENT_INVESTIGATION_MAX_TOKENS = '16000'
-    $env:AGENT_INVESTIGATION_MAX_COST_MICROS = '150000'
+    $env:AGENT_INVESTIGATION_MAX_COST_MICROS = '50000'
     $env:AGENT_INVESTIGATION_MAX_PROVIDER_ATTEMPTS = '6'
     $env:AGENT_INVESTIGATION_MAX_REPEATED_ACTIONS = '0'
 
@@ -85,6 +142,7 @@ try {
         $agentEnvironment.AGENT_CUSTOMER_COMMUNICATION_MODEL_MODE -ne 'deepseek-formal' -or
         $agentEnvironment.AGENT_INVESTIGATION_SHADOW_MODE -ne 'disabled' -or
         [int]$agentEnvironment.AGENT_INVESTIGATION_MAX_ACTIONS -ne 6 -or
+        [int]$agentEnvironment.AGENT_INVESTIGATION_MAX_COST_MICROS -ne 50000 -or
         [int]$agentEnvironment.AGENT_INVESTIGATION_MAX_PROVIDER_ATTEMPTS -ne 6
     ) {
         throw 'Issue #129 三个 Flash 模型接缝或调用预算未按冻结值解析。'
@@ -102,63 +160,61 @@ try {
         formal-mode-smoke --expect success --run-id $runId `
         --expected-action-model-mode $combinedMode `
         --expected-customer-communication-mode deepseek-v4-flash-customer-communication-formal-v1 `
-        --report-path /evidence/report.json
+        --report-path /evidence/formal.json
     if ($LASTEXITCODE -ne 0) {
         throw 'Issue #129 真实模型业务路径失败。'
     }
-    docker compose --profile smoke run --rm browser-acceptance `
-        e2e/issue124.offline-fullstack-readiness.spec.ts
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Issue #129 真实 Chromium 客户、客服与泄漏矩阵失败。'
+    $formalReportText = Get-Content -LiteralPath $formalReportPath -Raw
+    $formalReport = $formalReportText | ConvertFrom-Json
+    if (
+        $formalReport.schemaVersion -ne 'issue-129-formal-customer-communication-acceptance-v1' -or
+        $formalReport.model -ne 'deepseek-v4-flash' -or
+        $formalReport.result -ne 'PASSED' -or
+        @($forbiddenEvidenceNames | Where-Object { $formalReportText -match [regex]::Escape($_) }).Count -ne 0
+    ) {
+        throw 'Issue #129 真实模型 smoke 脱敏证据不完整。'
+    }
+    Copy-Item -LiteralPath $formalReportPath -Destination $persistentEvidencePath -Force
+    Write-AggregateEvidence | Out-Null
+
+    foreach ($scenario in $acceptancePlan.Scenarios) {
+        if ($scenario.Fixture) {
+            Get-Content -LiteralPath $scenario.Fixture -Raw | `
+                docker compose exec --no-TTY postgres psql --username postgres --dbname customer_agent
+            if ($LASTEXITCODE -ne 0) {
+                throw 'Issue #129 浏览器合成 fixture 导入失败。'
+            }
+        }
+        Invoke-BrowserScenario $scenario.File $scenario.Title
     }
 
-    $temporaryReportPath = Join-Path $evidenceDir 'report.json'
-    $reportText = Get-Content -LiteralPath $temporaryReportPath -Raw
-    $report = $reportText | ConvertFrom-Json
-    $forbiddenEvidenceNames = @(
-        'apiKey', 'prompt', 'responseBody', 'providerPayload', 'threadId',
-        'ticketId', 'orderReference', 'evidenceReferences'
-    )
-    if (
-        $report.schemaVersion -ne 'issue-129-formal-customer-communication-acceptance-v1' -or
-        $report.model -ne 'deepseek-v4-flash' -or
-        $report.result -ne 'PASSED' -or
-        [int]$report.checkpointEvidence.totalLogicalCalls -ne 8 -or
-        [int]$report.checkpointEvidence.totalProviderAttempts -gt 9 -or
-        [int]$report.checkpointEvidence.customerCommunicationRun.logicalCalls -ne 1 -or
-        [int]$report.checkpointEvidence.customerCommunicationRun.providerAttempts -gt 2 -or
-        [int]$report.checkpointEvidence.customerCommunicationRun.durationMs -lt 0 -or
-        -not [string]::IsNullOrEmpty(
-            [string]$report.checkpointEvidence.customerCommunicationRun.failureClassification
-        ) -or
-        [int]$report.checkpointEvidence.estimatedCostMicros -lt 1 -or
-        $report.springState.generationStatus -ne 'COMPLETED' -or
-        $report.springState.submissionStatus -ne 'COMPLETED' -or
-        $report.springState.handlingMode -ne 'AGENT' -or
-        @($forbiddenEvidenceNames | Where-Object { $reportText -match [regex]::Escape($_) }).Count -ne 0
-    ) {
-        throw 'Issue #129 脱敏调用、成本、延迟或 Spring 终态证据不完整。'
-    }
+    $report = Write-AggregateEvidence -Final
     $report | Add-Member -NotePropertyName browserAcceptance -NotePropertyValue ([pscustomobject]@{
-        testCount = 3
+        testCount = $acceptancePlan.Scenarios.Count
         browser = 'Chromium'
         result = 'PASSED'
+        customerSuccessScenarios = 2
+        customerHandoffScenarios = 2
+        approvalIsolationScenarios = 1
     })
-    $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $temporaryReportPath -Encoding utf8
-    Copy-Item -LiteralPath $temporaryReportPath -Destination $persistentEvidencePath -Force
+    $report | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $aggregateReportPath -Encoding utf8
+    Copy-Item -LiteralPath $aggregateReportPath -Destination $persistentEvidencePath -Force
     $evidenceVerified = $true
+} catch {
+    if (docker ps --quiet --filter "label=com.docker.compose.project=$projectName") {
+        Write-AggregateEvidence | Out-Null
+    }
+    throw
 } finally {
     $nativeErrorPreference = $PSNativeCommandUseErrorActionPreference
     $PSNativeCommandUseErrorActionPreference = $false
     Remove-Item Env:DEEPSEEK_API_KEY -ErrorAction SilentlyContinue
-    if ($evidenceVerified) {
-        docker compose --profile smoke --profile formal down --volumes --remove-orphans 2>$null
-        $ownedContainers = @(docker ps --all --quiet --filter "label=com.docker.compose.project=$projectName")
-        $ownedVolumes = @(docker volume ls --quiet --filter "label=com.docker.compose.project=$projectName")
-        $ownedNetworks = @(docker network ls --quiet --filter "label=com.docker.compose.project=$projectName")
-        if ($ownedContainers.Count -gt 0 -or $ownedVolumes.Count -gt 0 -or $ownedNetworks.Count -gt 0) {
-            throw 'Issue #129 自有容器、卷或网络清理回读不为空。'
-        }
+    docker compose --profile smoke --profile formal down --volumes --remove-orphans 2>$null
+    $ownedContainers = @(docker ps --all --quiet --filter "label=com.docker.compose.project=$projectName")
+    $ownedVolumes = @(docker volume ls --quiet --filter "label=com.docker.compose.project=$projectName")
+    $ownedNetworks = @(docker network ls --quiet --filter "label=com.docker.compose.project=$projectName")
+    if ($ownedContainers.Count -gt 0 -or $ownedVolumes.Count -gt 0 -or $ownedNetworks.Count -gt 0) {
+        throw 'Issue #129 自有容器、卷或网络清理回读不为空。'
     }
     foreach ($name in $priorEnvironment.Keys) {
         [Environment]::SetEnvironmentVariable($name, $priorEnvironment[$name], 'Process')
