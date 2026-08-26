@@ -24,7 +24,7 @@
 ### 澄清单路径复验与离线根因
 
 获批的首次单路径复验在第 2 次 action 调用后按首错即停规则安全转人工；失败证据原样保留于
-`docs/delivery/issue-129-clarification-retest-report.json`：2 次逻辑调用、2 次供应商尝试、
+`docs/delivery/issue-129-clarification-failure-report.json`：2 次逻辑调用、2 次供应商尝试、
 记录估算费用 0 micro-USD，未提交或恢复澄清、未生成客户回复，Spring 权威终态为
 `HANDED_OFF/HUMAN/INVALID_MODEL_OUTPUT`。失败响应未留下可计费 usage，因此 0 仅表示已记录估算，
 不能证明供应商实际未计费。
