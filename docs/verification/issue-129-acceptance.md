@@ -45,8 +45,9 @@ envelope。恢复轮第 1 次 `CONFIRM_ORDER` 已通过相同 envelope、JSON �
 事实读取 action 唯一新增的跨层约束，是由供应商回显 `orderReference`、动态 schema 要求字符串常量，
 领域解析器再与权威事实精确比较。最小离线夹具证明该重复约束会把 action 选择变成
 `SCHEMA_MISMATCH`；修复后模型只返回受控 action，引用由本地已校验 state 确定性注入。历史证据未保存
-供应商返回的是 null 还是非精确字符串，因此不伪造该子细节。最新证据位于
-`docs/delivery/issue-129-clarification-retest-report.json`；未经新的明确批准不再复验。
+供应商返回的是 null 还是非精确字符串，因此不伪造该子细节。该轮失败证据固定保留于
+`docs/delivery/issue-129-clarification-schema-failure-report.json`；最新一次复验使用
+`docs/delivery/issue-129-clarification-retest-report.json`。
 
 ## 安全与异常结果
 
