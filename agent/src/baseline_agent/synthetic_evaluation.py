@@ -363,8 +363,8 @@ async def evaluate_candidate(
         safety_invariant_rate=sum(result.safety_invariant for result in results) / total,
         refusal_or_empty_rate=sum(result.refusal_or_empty for result in results) / total,
         failure_rate=sum(result.failed for result in results) / total,
-        p50_latency_ms=_nearest_rank([result.duration_ms for result in results], 0.50),
-        p95_latency_ms=_nearest_rank([result.duration_ms for result in results], 0.95),
+        p50_latency_ms=nearest_rank([result.duration_ms for result in results], 0.50),
+        p95_latency_ms=nearest_rank([result.duration_ms for result in results], 0.95),
         cost_measurement_rate=sum(result.cost_measured for result in results) / total,
         average_cost_usd=sum(result.cost_usd for result in results) / total,
     )
@@ -529,7 +529,7 @@ def _attempt_cost(record: ModelCallAttemptRecord, pricing: TokenPricing) -> floa
     ) / 1_000_000
 
 
-def _nearest_rank(values: Sequence[int], percentile: float) -> int:
+def nearest_rank(values: Sequence[int], percentile: float) -> int:
     ordered = sorted(values)
     return ordered[max(0, math.ceil(percentile * len(ordered)) - 1)]
 

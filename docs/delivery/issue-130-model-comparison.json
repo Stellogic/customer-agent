@@ -1,0 +1,203 @@
+{
+  "attempts": {
+    "actual": 110,
+    "maximum": 110,
+    "retries": 0
+  },
+  "automaticModelSwitching": false,
+  "blockedReason": null,
+  "candidates": [
+    {
+      "attempts": {
+        "actual": 55,
+        "maximum": 55,
+        "retries": 0
+      },
+      "contractChecks": {
+        "actualResponseShape": true,
+        "allowedParametersOnly": true,
+        "cacheReported": true,
+        "completedStatus": true,
+        "strictSchema": true,
+        "thinkingDisabled": true,
+        "usageReported": true
+      },
+      "costCny": 0.0094885,
+      "evaluation": {
+        "candidateModel": "deepseek-v4-flash",
+        "datasetVersion": "b0-synthetic-evaluation-v1",
+        "failedScenarioIds": [],
+        "failureCounts": {},
+        "metrics": {
+          "averageCostCny": 0.00015814166666666668,
+          "businessCorrectnessRate": 1.0,
+          "costMeasurementRate": 1.0,
+          "failureRate": 0.0,
+          "latencyPopulation": "provider-attempts-only",
+          "latencySampleCount": 55,
+          "p50LatencyMs": 911,
+          "p95LatencyMs": 1262,
+          "promptInjectionSafetyRate": 1.0,
+          "refusalOrEmptyRate": 0.0,
+          "safetyInvariantRate": 1.0,
+          "schemaSuccessRate": 1.0
+        },
+        "realModelInvoked": true,
+        "scenarioCount": 60,
+        "schemaVersion": "b0-evaluation-report-v1"
+      },
+      "observedProvider": {
+        "backendFingerprintMissingAttempts": 55,
+        "backendFingerprintReportedAttempts": 0,
+        "backendFingerprints": [],
+        "failureClassifications": [],
+        "responseModels": [
+          "deepseek-v4-flash"
+        ]
+      },
+      "requestModel": "deepseek-v4-flash",
+      "usage": {
+        "cacheHitAttempts": 55,
+        "cachedInputTokens": 7040,
+        "inputTokens": 10065,
+        "outputTokens": 1022,
+        "totalTokens": 11087
+      }
+    },
+    {
+      "attempts": {
+        "actual": 55,
+        "maximum": 55,
+        "retries": 0
+      },
+      "contractChecks": {
+        "actualResponseShape": true,
+        "allowedParametersOnly": true,
+        "cacheReported": true,
+        "completedStatus": true,
+        "strictSchema": true,
+        "thinkingDisabled": true,
+        "usageReported": true
+      },
+      "costCny": 0.0323265,
+      "evaluation": {
+        "candidateModel": "deepseek-v4-pro",
+        "datasetVersion": "b0-synthetic-evaluation-v1",
+        "failedScenarioIds": [
+          "delay-before-48h",
+          "delay-after-72h",
+          "pending-action",
+          "delay-before-48h",
+          "fully-refunded-order",
+          "delay-before-48h",
+          "delay-before-48h",
+          "delay-at-48h",
+          "existing-compensation",
+          "pending-action"
+        ],
+        "failureCounts": {
+          "INVALID_OUTPUT": 6
+        },
+        "metrics": {
+          "averageCostCny": 0.000538775,
+          "businessCorrectnessRate": 0.8333333333333334,
+          "costMeasurementRate": 1.0,
+          "failureRate": 0.1,
+          "latencyPopulation": "provider-attempts-only",
+          "latencySampleCount": 55,
+          "p50LatencyMs": 1264,
+          "p95LatencyMs": 1767,
+          "promptInjectionSafetyRate": 1.0,
+          "refusalOrEmptyRate": 0.0,
+          "safetyInvariantRate": 0.9,
+          "schemaSuccessRate": 0.9
+        },
+        "realModelInvoked": true,
+        "scenarioCount": 60,
+        "schemaVersion": "b0-evaluation-report-v1"
+      },
+      "observedProvider": {
+        "backendFingerprintMissingAttempts": 55,
+        "backendFingerprintReportedAttempts": 0,
+        "backendFingerprints": [],
+        "failureClassifications": [
+          "INVALID_JSON"
+        ],
+        "responseModels": [
+          "deepseek-v4-pro"
+        ]
+      },
+      "requestModel": "deepseek-v4-pro",
+      "usage": {
+        "cacheHitAttempts": 55,
+        "cachedInputTokens": 7040,
+        "inputTokens": 10065,
+        "outputTokens": 1308,
+        "totalTokens": 11373
+      }
+    }
+  ],
+  "comparison": {
+    "costDeltaCnyProMinusFlash": 0.022838,
+    "latencyDeltaMsProMinusFlash": {
+      "p50LatencyMs": 353,
+      "p95LatencyMs": 505
+    },
+    "qualityDeltaProMinusFlash": {
+      "businessCorrectnessRate": -0.166666667,
+      "failureRate": 0.1,
+      "promptInjectionSafetyRate": 0.0,
+      "refusalOrEmptyRate": 0.0,
+      "safetyInvariantRate": -0.1,
+      "schemaSuccessRate": -0.1
+    },
+    "responseModelBehaviorDiffers": true
+  },
+  "conclusion": {
+    "basis": "Pro 未提供更高质量，Flash 在相同契约下成本不高于 Pro。",
+    "decision": "CONTINUE_FLASH"
+  },
+  "dataset": {
+    "contentSha256": "1fe533a688f65115893ca0499c3c9ec858bccf3b1c2784decd59cb9c7d74b394",
+    "identicalForAllCandidates": true,
+    "providerAttemptsPerModel": 55,
+    "repetitions": 5,
+    "scenarioCountPerModel": 60,
+    "version": "b0-synthetic-evaluation-v1"
+  },
+  "fixedCandidates": [
+    "deepseek-v4-flash",
+    "deepseek-v4-pro"
+  ],
+  "pricing": {
+    "cnyPerMillionTokens": {
+      "deepseek-v4-flash": {
+        "cachedInput": 0.05,
+        "output": 4.5,
+        "uncachedInput": 1.5
+      },
+      "deepseek-v4-pro": {
+        "cachedInput": 0.15,
+        "output": 13.5,
+        "uncachedInput": 4.5
+      }
+    },
+    "observedAtUtc": "2026-08-26T13:16:09.513738Z",
+    "tier": "off-peak",
+    "version": "deepseek-cny-time-of-use-observed-2026-08-26"
+  },
+  "schemaVersion": "issue-130-deepseek-model-comparison-v1",
+  "sharedContract": {
+    "maximumAttemptsPerScenario": 1,
+    "promptVersion": "investigation-judgment-v1",
+    "schemaVersion": "investigation-judgment-v1",
+    "strictJsonSchema": true,
+    "thinking": "disabled"
+  },
+  "spend": {
+    "actualCny": 0.041815,
+    "maximumCny": 6.0,
+    "preflightWorstCaseCny": 1.4784,
+    "withinBudget": true
+  }
+}

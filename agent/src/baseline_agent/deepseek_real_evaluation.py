@@ -10,12 +10,13 @@ import httpx
 
 from baseline_agent.deepseek_investigation_model import (
     DEEPSEEK_FLASH_MODEL,
-    DeepSeekFailureClassification,
     DeepSeekResponsesConfig,
     DeepSeekResponsesInvestigationModel,
     InMemoryModelCallAuditSink,
     ModelCallAttemptRecord,
 )
+from baseline_agent.deepseek_pricing import time_of_use_tier_at
+from baseline_agent.deepseek_real_evaluation_policy import supplier_block_reason
 from baseline_agent.investigation_model import (
     InvestigationJudgmentFailure,
     validate_investigation_judgment_input,
@@ -79,33 +80,10 @@ class _FailFastEvaluationModel:
         if not new_records:
             return result
         final = new_records[-1]
-        reason = _supplier_block_reason(final)
+        reason = supplier_block_reason(final)
         if reason is not None:
             raise _FailFastSupplierError(reason)
         return result
-
-
-def _supplier_block_reason(record: ModelCallAttemptRecord) -> str | None:
-    if record.provider_http_status == 401:
-        return "SUPPLIER_AUTHENTICATION_FAILED"
-    if record.provider_http_status == 402:
-        return "INSUFFICIENT_BALANCE"
-    if record.provider_http_status in {403, 429}:
-        return "SUPPLIER_REQUEST_BLOCKED"
-    if record.provider_http_status is not None and record.provider_http_status >= 500:
-        return "SUPPLIER_UNAVAILABLE"
-    if record.provider_http_status is not None and record.provider_http_status >= 400:
-        return "SUPPLIER_REQUEST_REJECTED"
-    if record.failure_classification in {
-        DeepSeekFailureClassification.CONNECTION_TIMEOUT,
-        DeepSeekFailureClassification.READ_TIMEOUT,
-        DeepSeekFailureClassification.DEADLINE_EXCEEDED,
-        DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR,
-    }:
-        return "SUPPLIER_NETWORK_FAILURE"
-    if record.failure_classification is DeepSeekFailureClassification.PROVIDER_FAILED:
-        return "SUPPLIER_FAILED"
-    return None
 
 
 def _validate_environment(environment: Mapping[str, str]) -> None:
@@ -118,12 +96,8 @@ def _validate_environment(environment: Mapping[str, str]) -> None:
 
 
 def deepseek_flash_pricing_at(observed_at: datetime) -> tuple[str, TokenPricing]:
-    if observed_at.tzinfo is None:
-        raise ValueError("pricing observation must be timezone-aware")
-    observed_utc = observed_at.astimezone(UTC)
-    hour = observed_utc.hour
-    is_peak = observed_utc.weekday() < 5 and (1 <= hour < 4 or 6 <= hour < 10)
-    if is_peak:
+    tier = time_of_use_tier_at(observed_at)
+    if tier == "peak":
         return "peak", _FLASH_PEAK_PRICING
     return "off-peak", _FLASH_OFF_PEAK_PRICING
 

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "issue-130-cost-ledger-v1",
+  "maximumAuthorizedCny": 6.0,
+  "runs": [
+    {
+      "purpose": "initial-comparison-superseded-for-latency",
+      "providerAttempts": 110,
+      "retries": 0,
+      "usageMeasuredCostCny": 0.0419578
+    },
+    {
+      "purpose": "final-provider-attempt-latency-comparison",
+      "providerAttempts": 110,
+      "retries": 0,
+      "usageMeasuredCostCny": 0.041815
+    }
+  ],
+  "cumulativeProviderAttempts": 220,
+  "cumulativeRetries": 0,
+  "cumulativeUsageMeasuredCostCny": 0.0837728,
+  "withinAuthorizedBudget": true,
+  "containsCredentialOrRawProviderPayload": false
+}

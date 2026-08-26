@@ -24,6 +24,7 @@ from baseline_agent.investigation_model import (
 
 _RESPONSES_ENDPOINT = "https://api.deepseek.com/responses"
 DEEPSEEK_FLASH_MODEL = "deepseek-v4-flash"
+DEEPSEEK_PRO_MODEL = "deepseek-v4-pro"
 INVESTIGATION_JUDGMENT_PROMPT_VERSION = "investigation-judgment-v1"
 INVESTIGATION_JUDGMENT_SCHEMA_VERSION = "investigation-judgment-v1"
 _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 503})
@@ -56,11 +57,17 @@ class DeepSeekResponsesConfig:
     max_attempts: int = 3
     retry_base_delay_seconds: float = 0.2
     max_output_tokens: int = 128
+    _model_comparison_candidate: bool = field(default=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if (
             not self.api_key.strip()
-            or self.model != DEEPSEEK_FLASH_MODEL
+            or self.model
+            not in (
+                {DEEPSEEK_FLASH_MODEL, DEEPSEEK_PRO_MODEL}
+                if self._model_comparison_candidate
+                else {DEEPSEEK_FLASH_MODEL}
+            )
             or self.connect_timeout_seconds <= 0
             or self.read_timeout_seconds <= 0
             or self.deadline_seconds <= 0
@@ -69,6 +76,31 @@ class DeepSeekResponsesConfig:
             or not 32 <= self.max_output_tokens <= 256
         ):
             raise InvestigationJudgmentFailure(InvestigationJudgmentFailureCode.CONFIGURATION_ERROR)
+
+    @classmethod
+    def for_model_comparison(
+        cls,
+        *,
+        api_key: str,
+        model: str,
+        connect_timeout_seconds: float,
+        read_timeout_seconds: float,
+        deadline_seconds: float,
+        max_attempts: int,
+        retry_base_delay_seconds: float,
+        max_output_tokens: int,
+    ) -> DeepSeekResponsesConfig:
+        return cls(
+            api_key=api_key,
+            model=model,
+            connect_timeout_seconds=connect_timeout_seconds,
+            read_timeout_seconds=read_timeout_seconds,
+            deadline_seconds=deadline_seconds,
+            max_attempts=max_attempts,
+            retry_base_delay_seconds=retry_base_delay_seconds,
+            max_output_tokens=max_output_tokens,
+            _model_comparison_candidate=True,
+        )
 
     @classmethod
     def from_environment(cls, environment: Mapping[str, str]) -> DeepSeekResponsesConfig:
