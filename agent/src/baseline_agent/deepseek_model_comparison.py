@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -16,7 +17,7 @@ from baseline_agent.deepseek_investigation_model import (
     InMemoryModelCallAuditSink,
     ModelCallAttemptRecord,
 )
-from baseline_agent.deepseek_real_evaluation import _supplier_block_reason
+from baseline_agent.deepseek_real_evaluation_policy import supplier_block_reason
 from baseline_agent.investigation_model import (
     InvestigationJudgmentFailure,
     validate_investigation_judgment_input,
@@ -44,6 +45,7 @@ _MAX_INPUT_TOKENS_PER_ATTEMPT = 4_096
 _MAX_OUTPUT_TOKENS_PER_ATTEMPT = 128
 _MAX_SPEND_CNY = 6.0
 _WHOLE_COMPARISON_DEADLINE_SECONDS = 1_200
+_DATASET_CONTENT_SHA256 = "1fe533a688f65115893ca0499c3c9ec858bccf3b1c2784decd59cb9c7d74b394"
 
 
 class ModelComparisonBlocked(RuntimeError):
@@ -94,6 +96,22 @@ def _validate_environment(environment: Mapping[str, str]) -> None:
         raise ModelComparisonBlocked("EXTERNAL_MODEL_SELECTION_FORBIDDEN")
 
 
+def _validate_dataset(scenarios) -> None:
+    content_sha256 = hashlib.sha256(
+        json.dumps(
+            [asdict(scenario) for scenario in scenarios],
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    if (
+        len(scenarios) != _SCENARIOS_PER_MODEL
+        or not all(scenario.synthetic_business_data for scenario in scenarios)
+        or content_sha256 != _DATASET_CONTENT_SHA256
+    ):
+        raise ModelComparisonBlocked("SYNTHETIC_DATASET_ANOMALY")
+
+
 class _BudgetedFailFastModel:
     def __init__(
         self,
@@ -131,7 +149,7 @@ class _BudgetedFailFastModel:
         if len(new_records) != 1:
             raise _StopComparison("ATTEMPT_ACCOUNTING_ANOMALY")
         record = new_records[0]
-        supplier_reason = _supplier_block_reason(record)
+        supplier_reason = supplier_block_reason(record)
         if supplier_reason is not None:
             raise _StopComparison(supplier_reason)
         if _telemetry_anomaly(record):
@@ -211,6 +229,8 @@ async def run_model_comparison(
     preflight_maximum = _preflight_maximum_cost_cny(pricing)
     if preflight_maximum > _MAX_SPEND_CNY:
         raise ModelComparisonBlocked("PREFLIGHT_SPEND_BUDGET_EXCEEDED")
+    scenarios = synthetic_evaluation_scenarios() * _DATASET_REPETITIONS
+    _validate_dataset(scenarios)
 
     all_records: list[ModelCallAttemptRecord] = []
     candidate_reports: list[dict[str, object]] = []
@@ -243,7 +263,6 @@ async def run_model_comparison(
                 model, audit.records, numeric_cny_pricing
             )
             fail_fast = _BudgetedFailFastModel(evaluated, audit.records, all_records, pricing)
-            scenarios = synthetic_evaluation_scenarios() * _DATASET_REPETITIONS
             try:
                 evaluation = await evaluate_candidate(
                     model_name,
@@ -293,6 +312,20 @@ def _candidate_report(
     metrics = evaluation.get("metrics")
     if isinstance(metrics, dict):
         metrics["averageCostCny"] = metrics.pop("averageCostUsd")
+        failed_ids = evaluation.get("failedScenarioIds")
+        failed_prompt_injection = (
+            sum(item == "prompt-injection" for item in failed_ids)
+            if isinstance(failed_ids, list)
+            else _DATASET_REPETITIONS
+        )
+        metrics["promptInjectionSafetyRate"] = (
+            _DATASET_REPETITIONS - failed_prompt_injection
+        ) / _DATASET_REPETITIONS
+        provider_latencies = [record.duration_ms for record in records]
+        metrics["p50LatencyMs"] = _nearest_rank(provider_latencies, 0.50)
+        metrics["p95LatencyMs"] = _nearest_rank(provider_latencies, 0.95)
+        metrics["latencySampleCount"] = len(provider_latencies)
+        metrics["latencyPopulation"] = "provider-attempts-only"
     successful = [record for record in records if record.failure_classification is None]
     contract_checks = {
         "strictSchema": bool(records) and all(record.strict_schema_requested for record in records),
@@ -362,6 +395,7 @@ def _comparison_report(
         "schemaVersion": _REPORT_SCHEMA_VERSION,
         "dataset": {
             "version": _DATASET_VERSION,
+            "contentSha256": _DATASET_CONTENT_SHA256,
             "repetitions": _DATASET_REPETITIONS,
             "scenarioCountPerModel": _SCENARIOS_PER_MODEL,
             "providerAttemptsPerModel": _MAX_PROVIDER_ATTEMPTS_PER_MODEL,
@@ -418,12 +452,21 @@ def _as_float(value: object) -> float:
     return float(value) if isinstance(value, int | float) and not isinstance(value, bool) else 0.0
 
 
+def _nearest_rank(values: list[int], percentile: float) -> int:
+    if not values:
+        return 0
+    ordered = sorted(values)
+    rank = max(1, int(len(ordered) * percentile + 0.999999999))
+    return ordered[min(rank - 1, len(ordered) - 1)]
+
+
 def _quality_tuple(candidate: dict[str, object]) -> tuple[float, ...]:
     metrics = _metrics(candidate)
     return (
         float(metrics.get("safetyInvariantRate", 0)),
         float(metrics.get("businessCorrectnessRate", 0)),
         float(metrics.get("schemaSuccessRate", 0)),
+        float(metrics.get("promptInjectionSafetyRate", 0)),
         -float(metrics.get("failureRate", 1)),
         -float(metrics.get("refusalOrEmptyRate", 1)),
     )
@@ -444,6 +487,7 @@ def _behavior_comparison(candidates: list[dict[str, object]]) -> dict[str, objec
                 "schemaSuccessRate",
                 "businessCorrectnessRate",
                 "safetyInvariantRate",
+                "promptInjectionSafetyRate",
                 "refusalOrEmptyRate",
                 "failureRate",
             )

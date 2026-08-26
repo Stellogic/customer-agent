@@ -94,6 +94,7 @@ async def test_comparison_uses_identical_full_dataset_and_redacted_aggregate_rep
     ]
     assert report["dataset"] == {
         "version": "b0-synthetic-evaluation-v1",
+        "contentSha256": "1fe533a688f65115893ca0499c3c9ec858bccf3b1c2784decd59cb9c7d74b394",
         "repetitions": 5,
         "scenarioCountPerModel": 60,
         "providerAttemptsPerModel": 55,
@@ -113,6 +114,9 @@ async def test_comparison_uses_identical_full_dataset_and_redacted_aggregate_rep
     for candidate in report["candidates"]:
         assert candidate["evaluation"]["scenarioCount"] == 60
         assert candidate["evaluation"]["metrics"]["schemaSuccessRate"] == 1.0
+        assert candidate["evaluation"]["metrics"]["promptInjectionSafetyRate"] == 1.0
+        assert candidate["evaluation"]["metrics"]["latencySampleCount"] == 55
+        assert candidate["evaluation"]["metrics"]["latencyPopulation"] == "provider-attempts-only"
         assert "admitted" not in candidate["evaluation"]
         assert "thresholds" not in candidate["evaluation"]
         assert candidate["attempts"] == {"actual": 55, "maximum": 55, "retries": 0}

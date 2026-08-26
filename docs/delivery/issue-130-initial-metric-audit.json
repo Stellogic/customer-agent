@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "issue-130-initial-metric-audit-v1",
+  "status": "SUPERSEDED_FOR_LATENCY",
+  "providerAttempts": 110,
+  "retries": 0,
+  "usageMeasuredCostCny": 0.0419578,
+  "finding": "P50/P95 included five expected local input rejections per candidate instead of provider attempts only",
+  "preservedEvidence": [
+    "quality aggregates",
+    "usage and cache aggregates",
+    "cost aggregates",
+    "request and response model observations",
+    "backend fingerprint absence counts"
+  ],
+  "invalidatedEvidence": [
+    "candidate P50 latency",
+    "candidate P95 latency"
+  ],
+  "containsRawPromptOrResponse": false,
+  "containsCredentialOrBusinessIdentifier": false
+}
