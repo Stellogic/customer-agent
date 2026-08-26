@@ -49,6 +49,26 @@ envelope。恢复轮第 1 次 `CONFIRM_ORDER` 已通过相同 envelope、JSON �
 `docs/delivery/issue-129-clarification-schema-failure-report.json`；最新一次复验使用
 `docs/delivery/issue-129-clarification-retest-report.json`。
 
+获批的后续唯一复验完成了全部业务链路：11 次逻辑调用、11 次供应商尝试、1749 micro-USD，客户沟通
+2 次、3079 ms、661 micro-USD；无失败分类、无转人工。澄清已提交并恢复，最终
+`COMPENSATION_REVIEW_PENDING` 客户回复已生成，checkpoint 已终止，Spring 权威终态为
+`COMPLETED/AGENT/INVESTIGATING`。这里 `COMPLETED` 分别表示当前 Agent generation 与结论提交完成，
+`AGENT` 表示没有转人工，`INVESTIGATING` 表示补偿提案仍在等待人工审批；这与既有 Issue #124/#128
+契约及 Spring 的 `PENDING_APPROVAL` 写入语义一致，不应改成已解决或人工处理。
+
+Chromium 的剩余失败离线定位到验收器：该路径等待固定 fake 的完整客户句子，而 Agent 与 Spring 的
+共同安全契约明确允许同一 `COMPENSATION_REVIEW_PENDING` 意图下的多种受控叙述。真实证据证明实际投影
+包含 Spring 已接受的该意图客户回复及上述权威终态，但按数据最小化规则未保存正文，因此不伪造具体
+措辞。验收器现改为等待所有合法变体共有的“补偿建议正在等待人工审批”语义，同时断言页面为“调查中”
+与“智能客服处理中”，且不存在已批准、已执行或补偿金额。离线契约测试已先复现固定正文绑定并验证
+新断言契约；恢复授权后，fixed-fake 完整 Chromium 主矩阵 25/25 通过，其中澄清恢复路径按上述语义与
+Spring 权威终态验收通过。没有再次调用供应商。
+
+完整门禁首次暴露既有 Issue #99 窄屏队列表格没有确定形成容器内横向滚动：真实浏览器测得滚动宽度
+等于可视宽度，证明不是等待时间、动画、调度或选择器问题。最小 fake Chromium 夹具先稳定变红；产品
+CSS 增加确定的表格最小宽度后连续 3 次通过，且页面本身没有横向溢出。浏览器测试镜像同步显式打包
+实际 `styles.css`，随后完整真实 Chromium 中 Issue #99 路径与最小夹具均通过；没有扩大 5 秒等待。
+
 ## 安全与异常结果
 
 - 离线受控测试覆盖 429/503 有界重试、非法或越权 envelope、提示注入、未经批准的补偿或退款宣告、意图与证据不匹配以及配置缺失；全部失败关闭且无 fake 回退。
@@ -58,12 +78,13 @@ envelope。恢复轮第 1 次 `CONFIRM_ORDER` 已通过相同 envelope、JSON �
 ## 测试与浏览器验收数
 
 - Agent 组件规范化门禁：190 passed；Ruff、Pyright 均通过。
-- 完整 `pwsh ./scripts/check.ps1`：Backend、Agent、Frontend 三组件门禁 3/3，通过完整 PostgreSQL/Spring/LangGraph/React 集成与 FULL_RESET_GATE。
-- Issue #129 最新真实 Flash Chromium：1 passed、1 failed、3 not run；失败后未重试。
-- 完整规范化 Chromium：主矩阵 24 passed；后端重启和加速 Session 到期矩阵共 3 passed、3 conditional skips。
+- 恢复后的完整 `pwsh ./scripts/check.ps1` 在唯一 gate project/tag/端口下退出码为 0；Backend、Agent、Frontend 三组件、FULL_RESET_GATE、集成测试和敏感内容扫描均通过。
+- Issue #129 最新真实 Flash Chromium：业务链路成功，进程因已修复的固定正文断言记为 1 failed；失败后未重试。
+- 完整规范化 Chromium：主矩阵 25 passed；后端重启和加速 Session 到期矩阵共 3 passed、3 conditional skips。独立最小布局夹具另连续 3 passed。
 
 ## 资源隔离与清理
 
 - 真实模型验收使用专用 project、随机宿主端口、独立卷/网络和 `issue129-*` 镜像 tag；执行前通过 `docker compose config --format json` 读回确认。
-- 完整规范化门禁另用独立 `customer-agent-issue129-final-*` project；Issue #80 浏览器门禁继续使用其自有随机 project。
-- 本次失败复验的自有容器、卷和网络均回读为空；既有 `customer-agent-baseline` 保持 5 个容器运行，未被停止、重建或清理。
+- 恢复后的完整规范化门禁使用独立 `customer-agent-gate-*` project；Issue #80 浏览器门禁继续使用其自有随机 project。
+- 真实复验结束时，其自有容器、卷和网络均回读为空。后续离线完整门禁曾因缺少隔离前置检查误删 baseline；事故、影响与预防措施见 `docs/delivery/issue-129-compose-incident.md`。
+- 用户授权后从干净、核验到当前 `origin/main` 的配置重建全新 baseline，仅使用迁移和合成夹具，不恢复旧运行时数据。最终 gate 与浏览器项目容器、卷、网络均为 0；baseline 保持 7 个容器、1 个卷、4 个网络，运行服务 healthy、系统状态 `UP`，main-preview 卷未被触碰。机器可读摘要见 `docs/delivery/issue-129-baseline-recovery.json`。

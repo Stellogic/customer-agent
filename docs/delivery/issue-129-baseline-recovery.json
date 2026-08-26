@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "issue-129-baseline-recovery-v1",
+  "source": {
+    "originMain": "d649a5dbd9b40fe65a342ff7f678dc2bb56b7a35"
+  },
+  "preRecovery": {
+    "observedAt": "2026-08-26T19:35:38.2680191+08:00",
+    "baseline": {
+      "containers": 0,
+      "networks": 0,
+      "volumes": 0
+    },
+    "composeProjects": [],
+    "excludedResources": {
+      "volumes": [
+        "customer-agent-main-preview_postgres-data"
+      ]
+    },
+    "systemNetworks": [
+      "bridge",
+      "host",
+      "none"
+    ]
+  },
+  "recovery": {
+    "status": "COMPLETED",
+    "sourceWorktree": "clean-detached-origin-main",
+    "composeProject": "customer-agent-baseline",
+    "createdResources": {
+      "containers": 7,
+      "networks": 4,
+      "volumes": 1
+    },
+    "runtime": {
+      "runningServices": 5,
+      "successfulMigrationJobs": 2,
+      "springMigrations": 22,
+      "syntheticOrders": 26,
+      "dockerHealth": "HEALTHY",
+      "systemStatus": "UP"
+    },
+    "oldRuntimeDataRestored": false,
+    "mainPreviewPreserved": true
+  },
+  "isolatedValidation": {
+    "status": "PASSED",
+    "composeProject": "customer-agent-gate-129final3-7a1e4c92",
+    "frontendPort": 60804,
+    "canonicalCheckExitCode": 0,
+    "chromium": {
+      "mainMatrixPassed": 25,
+      "sessionMatrixPassed": 3,
+      "sessionMatrixConditionalSkips": 3,
+      "layoutRegressionRepeatedPassed": 3
+    },
+    "cleanupReadback": {
+      "gateContainers": 0,
+      "gateNetworks": 0,
+      "gateVolumes": 0,
+      "browserContainers": 0,
+      "browserNetworks": 0,
+      "browserVolumes": 0
+    }
+  },
+  "postValidation": {
+    "baseline": {
+      "containers": 7,
+      "networks": 4,
+      "volumes": 1,
+      "dockerHealth": "HEALTHY",
+      "systemStatus": "UP",
+      "systemStatusLatencyMs": 21227
+    },
+    "mainPreviewPreserved": true,
+    "providerCalls": 0
+  }
+}

@@ -11,6 +11,7 @@ $imageTag = if ($env:CUSTOMER_AGENT_IMAGE_TAG) { $env:CUSTOMER_AGENT_IMAGE_TAG }
 $env:CUSTOMER_AGENT_IMAGE_TAG = $imageTag
 $env:AGENT_INVESTIGATION_SHADOW_MODE = 'offline'
 $frontendPort = if ($env:CUSTOMER_AGENT_FRONTEND_PORT) { $env:CUSTOMER_AGENT_FRONTEND_PORT } else { '4180' }
+$projectName = [Environment]::GetEnvironmentVariable('COMPOSE_PROJECT_NAME', 'Process')
 $suiteName = if ($Reset) { 'FULL_RESET_GATE' } else { 'PERSISTENT_RERUN_SUITE' }
 Write-Host "smoke suite: $suiteName"
 if (-not $Reset) {
@@ -18,7 +19,11 @@ if (-not $Reset) {
 }
 
 if ($Reset) {
-    docker compose down --volumes --remove-orphans
+    & "$PSScriptRoot/confirm-compose-reset-isolation.ps1" `
+        -ProjectName $projectName `
+        -ImageTag $imageTag `
+        -FrontendPort $frontendPort
+    docker compose -p $projectName down --volumes --remove-orphans
 }
 
 if (-not $SkipBuild) {

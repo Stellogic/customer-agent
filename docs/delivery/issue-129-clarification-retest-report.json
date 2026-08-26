@@ -1,13 +1,41 @@
 {
   "actionState": {
     "checkpointTerminal": true,
-    "providerAttempts": 2,
+    "providerAttempts": 8,
     "selectedActions": [
       "CONFIRM_ORDER",
-      ""
+      "REQUEST_CLARIFICATION",
+      "CONFIRM_ORDER",
+      "READ_LOGISTICS",
+      "READ_PAYMENT_AND_REFUNDS",
+      "READ_COMPENSATION_AND_PENDING_ACTIONS",
+      "READ_APPLICABLE_POLICY",
+      "SUBMIT_CONCLUSION"
     ],
     "toolResultCodes": [
-      "PROGRESSED"
+      "PROGRESSED",
+      "PROGRESSED",
+      "PROGRESSED",
+      "PROGRESSED",
+      "PROGRESSED",
+      "SELECTED"
+    ]
+  },
+  "browserAcceptance": {
+    "browser": "Chromium",
+    "failureLayer": "EXACT_REPLY_TEXT_ASSERTION",
+    "result": "FAILED",
+    "testCount": 1
+  },
+  "offlineDiagnosis": {
+    "authoritativeStateSemantics": "GENERATION_AND_SUBMISSION_COMPLETE_PROPOSAL_PENDING_APPROVAL",
+    "fixedFakeBodyBindingRemoved": true,
+    "providerCallsAdded": 0,
+    "stableProjectionAssertions": [
+      "COMPENSATION_REVIEW_PENDING_LANGUAGE",
+      "INVESTIGATING",
+      "AGENT",
+      "NO_APPROVAL_OR_EXECUTION"
     ]
   },
   "clarification": {
@@ -16,36 +44,34 @@
   },
   "customerReply": {
     "generated": true,
-    "intent": "CLARIFICATION_REQUIRED"
+    "intent": "COMPENSATION_REVIEW_PENDING"
   },
   "metrics": {
     "customerCommunication": {
-      "estimatedCostMicros": 268,
-      "logicalCalls": 1,
-      "providerAttempts": 1,
-      "totalDurationMs": 976
+      "estimatedCostMicros": 661,
+      "logicalCalls": 2,
+      "providerAttempts": 2,
+      "totalDurationMs": 3079
     },
-    "estimatedCostMicros": 558,
-    "failureClassifications": {
-      "SCHEMA_MISMATCH": 1
-    },
+    "estimatedCostMicros": 1749,
+    "failureClassifications": {},
     "generationResults": {
-      "handoffCount": 1,
-      "handoffWithModelCallsCount": 1,
-      "successCount": 0
+      "handoffCount": 0,
+      "handoffWithModelCallsCount": 0,
+      "successCount": 1
     },
     "model": "deepseek-v4-flash",
     "observedGenerationCount": 1,
     "schemaVersion": "issue-129-aggregate-provider-metrics-v1",
-    "totalLogicalCalls": 3,
-    "totalProviderAttempts": 3
+    "totalLogicalCalls": 11,
+    "totalProviderAttempts": 11
   },
   "model": "deepseek-v4-flash",
   "schemaVersion": "issue-129-clarification-retest-evidence-v1",
   "springState": {
-    "generationStatus": "HANDED_OFF",
-    "handlingMode": "HUMAN",
-    "handoffReasonCode": "INVALID_MODEL_OUTPUT",
+    "generationStatus": "COMPLETED",
+    "handlingMode": "AGENT",
+    "handoffReasonCode": null,
     "lifecycleState": "INVESTIGATING",
     "submissionStatus": "COMPLETED"
   }

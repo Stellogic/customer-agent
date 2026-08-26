@@ -6,10 +6,16 @@ param(
 
 $ErrorActionPreference = "Stop"
 $components = if ($Component -eq "all") { @("backend", "agent", "frontend") } else { @($Component) }
+$runsFullAcceptance = -not $SkipAcceptance -and $Component -eq "all"
+
+if ($runsFullAcceptance) {
+    & "$PSScriptRoot/confirm-compose-reset-isolation.ps1"
+}
 
 & "$PSScriptRoot/test-runtime-log-policy.ps1"
 & "$PSScriptRoot/test-gradle-proxy.ps1"
 & "$PSScriptRoot/test-compose-network-policy.ps1"
+& "$PSScriptRoot/test-compose-reset-isolation.ps1"
 & "$PSScriptRoot/test-issue129-acceptance-contract.ps1"
 & "$PSScriptRoot/assert-deprecated-human-auth-contract.ps1"
 
@@ -20,7 +26,7 @@ foreach ($current in $components) {
     }
 }
 
-if (-not $SkipAcceptance -and $Component -eq "all") {
+if ($runsFullAcceptance) {
     & "$PSScriptRoot/smoke.ps1" -Reset
     & "$PSScriptRoot/issue80-acceptance.ps1"
 }

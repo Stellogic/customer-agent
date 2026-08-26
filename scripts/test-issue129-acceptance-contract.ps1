@@ -61,4 +61,16 @@ if (
     throw 'Issue #129 单路径复验器包含未批准的 smoke 或浏览器路径。'
 }
 
+$browserSource = Get-Content -LiteralPath (
+    Join-Path $PSScriptRoot '..\frontend\e2e\issue124.offline-fullstack-readiness.spec.ts'
+) -Raw
+$fixedFakeReply = '订单 ORDER-DELAY-AMBIGUOUS-B 的调查已完成，补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。'
+if (
+    $browserSource.Contains($fixedFakeReply) -or
+    $browserSource -notmatch 'getByText\(/补偿建议正在等待人工审批/' -or
+    $browserSource -notmatch 'getByText\(/已批准\|已执行\|补偿金额/'
+) {
+    throw 'Issue #129 澄清恢复浏览器路径必须断言稳定业务语义，不得绑定固定 fake 的完整客户正文。'
+}
+
 Write-Host 'Issue #129 单路径复验器离线契约检查通过。'
