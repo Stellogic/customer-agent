@@ -99,12 +99,56 @@ async function openCustomer(browser: Browser) {
 async function createTicket(page: Page, orderReference: string, description: string) {
   await page.getByLabel("订单编号").fill(orderReference);
   await page.getByLabel("问题描述").fill(description);
-  const createdResponse = page.waitForResponse(
+  const intakeResponse = page.waitForResponse(
     (response) =>
-      response.url().endsWith("/api/customer/v2/tickets") && response.status() === 201,
+      new URL(response.url()).pathname === "/api/customer/v2/intakes" && response.status() === 201,
   );
   await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await intakeResponse;
+  await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  const createdResponse = page.waitForResponse(
+    (response) =>
+      /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(
+        new URL(response.url()).pathname,
+      ) && response.status() === 201,
+  );
+  await page.getByRole("button", { name: "确认，就是这个问题" }).click();
   return (await (await createdResponse).json()) as { ticketId: string };
+}
+
+async function openPreexistingClarificationTicket(
+  page: Page,
+  orderReference: string,
+  description: string,
+) {
+  // 本用例验证 #124 已存在工单的调查澄清，而不是 #152 的建单流程；该特殊
+  // 别名不是 customer_intake 可确认的真实订单，因此显式构造旧领域夹具。
+  const created = await page.evaluate(
+    async ({ reference, issue }) => {
+      const csrf = (await (
+        await fetch("/api/auth/csrf", { credentials: "same-origin", cache: "no-store" })
+      ).json()) as { token: string; headerName: string };
+      const response = await fetch("/api/customer/v2/tickets", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          [csrf.headerName]: csrf.token,
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          schema: "public-conversation-v2",
+          orderReference: reference,
+          description: issue,
+        }),
+      });
+      if (!response.ok) throw new Error(`ticket fixture failed: ${response.status}`);
+      return (await response.json()) as { ticketId: string };
+    },
+    { reference: orderReference, issue: description },
+  );
+  await page.goto(`/help?ticket=${created.ticketId}`);
+  return created;
 }
 
 async function closeContext(context: BrowserContext, evidence: BrowserEvidence) {
@@ -153,7 +197,7 @@ test("Issue #124 客户通过真实全栈完成安全自动回复并从 SSE 断�
 test("Issue #124 客户澄清在原工单恢复并收到等待人工审批回复", async ({ browser }) => {
   test.setTimeout(90_000);
   const { context, page, evidence } = await openCustomer(browser);
-  const created = await createTicket(
+  const created = await openPreexistingClarificationTicket(
     page,
     "ORDER-DELAY-AMBIGUOUS",
     "我的合成订单可能是 A 或 B，请先询问必要信息。",

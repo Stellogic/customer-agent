@@ -14,15 +14,36 @@ describe("客户帮助中心", () => {
     globalThis.history.replaceState(null, "", "/");
   });
 
-  it("提交后读取 PUBLIC_CONVERSATION v2 权威快照并显示受理结果", async () => {
+  it("自然语言受理确认后读取 PUBLIC_CONVERSATION v2 权威快照", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            schema: "public-conversation-v2",
+            schema: "customer-intake-v1",
+            intakeId: "intake-152",
+            status: "READY_TO_CONFIRM",
+            candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
+            issue: { kind: "LOGISTICS_DELAY", summary: "物流已经延迟多日" },
+            assistantMessage: "请确认我的理解。",
+            ticketId: null,
+            confirmed: false,
+            replayed: false,
+          }),
+          { status: 201 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            schema: "customer-intake-v1",
+            intakeId: "intake-152",
+            status: "CONFIRMED",
+            candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
+            issue: { kind: "LOGISTICS_DELAY", summary: "物流已经延迟多日" },
+            assistantMessage: "已确认，客服工单正在独立处理。",
             ticketId: "ticket-13",
-            accepted: true,
+            confirmed: true,
             replayed: false,
           }),
           { status: 201 },
@@ -72,21 +93,63 @@ describe("客户帮助中心", () => {
     fireEvent.change(screen.getByLabelText("问题描述"), { target: { value: "物流已经延迟多日" } });
     fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
 
+    expect(await screen.findByRole("heading", { name: "请确认我的理解" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("您的问题已受理")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认，就是这个问题" }));
+
     expect(await screen.findByText("您的问题已受理")).toBeInTheDocument();
     expect(await screen.findByText("正在核对物流轨迹")).toBeInTheDocument();
     expect(await screen.findByText("等待你的回复")).toBeInTheDocument();
     expect(screen.getByLabelText("订单确认码")).toBeInTheDocument();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
     const createHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
     expect(createHeaders.get("X-CSRF-TOKEN")).toBe("customer-csrf");
     expect(createHeaders.get("X-Synthetic-Customer-Id")).toBeNull();
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
-      schema: "public-conversation-v2",
-      orderReference: "ORDER-DELAY-001",
-      description: "物流已经延迟多日",
+      schema: "customer-intake-v1",
+      message: "订单 ORDER-DELAY-001 的物流延迟问题：物流已经延迟多日",
     });
-    expect(fetchMock.mock.calls[1][0]).toBe("/api/customer/v2/tickets/ticket-13");
-    expect(fetchMock.mock.calls[2][0]).toBe("/api/customer/v2/tickets/ticket-13/events");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/customer/v2/intakes/intake-152/messages");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/customer/v2/tickets/ticket-13");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/customer/v2/tickets/ticket-13/events");
+  });
+
+  it("不选择订单或问题类型即可看到候选、问题理解与确认边界", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          schema: "customer-intake-v1",
+          intakeId: "intake-natural-language",
+          status: "READY_TO_CONFIRM",
+          candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
+          issue: { kind: "LOGISTICS_DELAY", summary: "包裹好几天没有动了" },
+          assistantMessage: "我理解为这笔订单的物流延迟问题，请确认是否正确。",
+          ticketId: null,
+          confirmed: false,
+          replayed: false,
+        }),
+        { status: 201 },
+      ),
+    );
+
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("问题描述"), {
+      target: { value: "包裹好几天没有动了" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+
+    expect(await screen.findByRole("heading", { name: "请确认我的理解" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "订单候选" })).toHaveTextContent("ORDER-DELAY-001");
+    expect(screen.getByRole("article", { name: "问题理解" })).toHaveTextContent(
+      "确认前不会创建正式工单",
+    );
+    expect(screen.getByRole("button", { name: "确认，就是这个问题" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      schema: "customer-intake-v1",
+      message: "包裹好几天没有动了",
+    });
   });
 
   it("澄清恢复响应丢失时按稳定 resumeRequestId 查询而不创建第二次恢复", async () => {

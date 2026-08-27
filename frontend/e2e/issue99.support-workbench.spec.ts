@@ -15,9 +15,13 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
   await customer.getByLabel("问题描述").fill(description);
   const createdResponse = customer.waitForResponse(
     (response) =>
-      response.url().endsWith("/api/customer/v2/tickets") && response.status() === 201,
+      /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(
+        new URL(response.url()).pathname,
+      ) && response.status() === 201,
   );
   await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await expect(customer.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };
   await customer.getByRole("button", { name: "转人工处理" }).click();
   await customer.getByRole("button", { name: "确认转人工" }).click();
