@@ -2,10 +2,10 @@
 
 > 父规格：[#149 规格 重塑自然语言多工单客服 Agent 与知识工作台](../../specs/issue-149.md)
 > 来源：[https://github.com/Stellogic/customer-agent/issues/150](https://github.com/Stellogic/customer-agent/issues/150)
-> Issue 状态：OPEN
+> Issue 状态：CLOSED
 > 创建时间：2026-08-27T17:24:34Z
-> 最后更新时间：2026-08-27T17:32:56Z
-> 关闭时间：—
+> 最后更新时间：2026-08-27T17:47:42Z
+> 关闭时间：2026-08-27T17:47:42Z
 > 同步日期：2026-08-28
 > 说明：本文件是 GitHub 实施票据正文的只读镜像；GitHub Issue 仍是票据事实源。票据不替代父规格、已接受 ADR 或当前产品契约。
 
