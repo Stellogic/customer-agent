@@ -13,3 +13,5 @@ final class InvalidCustomerRequestException extends RuntimeException {
 final class CustomerAuthenticationException extends RuntimeException {}
 
 final class ProjectionCursorException extends RuntimeException {}
+
+final class IncompatibleCustomerSchemaException extends RuntimeException {}

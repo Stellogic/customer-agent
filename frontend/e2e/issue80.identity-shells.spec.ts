@@ -126,6 +126,36 @@ test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
     await login(customer, "customer", "customer-demo");
     await expect(customer.getByText("当前客户：演示客户")).toBeVisible();
     await expect(customer.getByRole("button", { name: "退出登录" })).toBeVisible();
+    await customer.getByLabel("订单编号").fill("ORDER-DELAY-UNDER-24");
+    await customer.getByLabel("问题描述").fill("Issue #151 窄屏真实 v2 公开沟通验收");
+    const createdResponse = customer.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/customer/v2/tickets") &&
+        [200, 201].includes(response.status()),
+    );
+    const snapshotResponse = customer.waitForResponse(
+      (response) =>
+        /\/api\/customer\/v2\/tickets\/[^/]+$/.test(new URL(response.url()).pathname) &&
+        response.status() === 200,
+    );
+    await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+    const created = (await (await createdResponse).json()) as {
+      schema: string;
+      ticketId: string;
+    };
+    const snapshot = (await (await snapshotResponse).json()) as {
+      view: string;
+      schema: string;
+      ticket: { id: string };
+    };
+    expect(created.schema).toBe("public-conversation-v2");
+    expect(snapshot).toMatchObject({
+      view: "PUBLIC_CONVERSATION",
+      schema: "public-conversation-v2",
+      ticket: { id: created.ticketId },
+    });
+    await expect(customer.getByText("Issue #151 窄屏真实 v2 公开沟通验收")).toBeVisible();
+    await expect(customer.getByRole("button", { name: "转人工处理" })).toBeVisible();
     expect(
       await customer.evaluate(
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,

@@ -311,24 +311,24 @@ describe("Issue #73 静态路由与两个界面壳", () => {
         sessionReads += 1;
         return sessionReads === 1 ? Response.json(customer) : new Response(null, { status: 401 });
       }
-      if (path === `/api/customer/tickets/${ticketId}`) {
+      if (path === `/api/customer/v2/tickets/${ticketId}`) {
         return Response.json({
-          view: "CUSTOMER_PUBLIC",
-          schema: "customer-public-v1",
-          cursor: "customer-public-v1:1",
+          view: "PUBLIC_CONVERSATION",
+          schema: "public-conversation-v2",
+          cursor: "public-conversation-v2:1",
           ticket: {
             id: ticketId,
             lifecycleState: "INVESTIGATING",
             handlingMode: "AGENT",
             agentGeneration: 1,
-            firstRespondedAt: "2026-08-22T00:00:00Z",
           },
           messages: [
             { author: "SUPPORT", body: "仅属于旧客户主体的缓存", sentAt: "2026-08-22T00:00:00Z" },
           ],
+          clarification: null,
         });
       }
-      if (path === `/api/customer/tickets/${ticketId}/events`) {
+      if (path === `/api/customer/v2/tickets/${ticketId}/events`) {
         init?.signal?.addEventListener("abort", () => {
           streamAborted = true;
         });
@@ -365,18 +365,17 @@ describe("Issue #73 静态路由与两个界面壳", () => {
         sessionReads += 1;
         return Response.json(sessionReads === 1 ? customer : support);
       }
-      if (path === `/api/customer/tickets/${ticketId}`) {
+      if (path === `/api/customer/v2/tickets/${ticketId}`) {
         customerSnapshotReads += 1;
         return Response.json({
-          view: "CUSTOMER_PUBLIC",
-          schema: "customer-public-v1",
-          cursor: "customer-public-v1:1",
+          view: "PUBLIC_CONVERSATION",
+          schema: "public-conversation-v2",
+          cursor: "public-conversation-v2:1",
           ticket: {
             id: ticketId,
             lifecycleState: "INVESTIGATING",
             handlingMode: "AGENT",
             agentGeneration: 1,
-            firstRespondedAt: "2026-08-22T00:00:00Z",
           },
           messages: [
             {
@@ -385,9 +384,10 @@ describe("Issue #73 静态路由与两个界面壳", () => {
               sentAt: "2026-08-22T00:00:00Z",
             },
           ],
+          clarification: null,
         });
       }
-      if (path === `/api/customer/tickets/${ticketId}/events`) {
+      if (path === `/api/customer/v2/tickets/${ticketId}/events`) {
         return new Response(null, { status: 403 });
       }
       if (path === "/api/auth/csrf") {

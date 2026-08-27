@@ -11,28 +11,35 @@ import { loadCsrfToken } from "./csrf";
 import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 
-const CUSTOMER_PUBLIC_SCHEMA = "customer-public-v1" as const;
+const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
+const PUBLIC_CONVERSATION_BASE = "/api/customer/v2/tickets";
 
 type Snapshot = {
-  view: "CUSTOMER_PUBLIC";
-  schema: typeof CUSTOMER_PUBLIC_SCHEMA;
+  view: "PUBLIC_CONVERSATION";
+  schema: typeof PUBLIC_CONVERSATION_SCHEMA;
   cursor: string;
   ticket: {
     id: string;
     lifecycleState: string;
     handlingMode: string;
     agentGeneration: number;
-    firstRespondedAt: string;
   };
   messages: Array<{ author: string; body: string; sentAt: string }>;
   clarification: { id: string; promptCode: string; question: string } | null;
 };
 
 type EventEnvelope = {
-  view: "CUSTOMER_PUBLIC";
-  schema: typeof CUSTOMER_PUBLIC_SCHEMA;
+  view: "PUBLIC_CONVERSATION";
+  schema: typeof PUBLIC_CONVERSATION_SCHEMA;
   generation: number;
   payload: unknown;
+};
+
+type CreateTicketResponse = {
+  schema: typeof PUBLIC_CONVERSATION_SCHEMA;
+  ticketId: string;
+  accepted: true;
+  replayed: boolean;
 };
 
 function clarificationRejectionMessage(status: number) {
@@ -95,7 +102,7 @@ export function App() {
     setError("");
     try {
       const csrf = await loadCsrfToken();
-      const created = await humanSessionFetch("/api/customer/tickets", {
+      const created = await humanSessionFetch(PUBLIC_CONVERSATION_BASE, {
         method: "POST",
         credentials: "same-origin",
         headers: {
@@ -103,10 +110,16 @@ export function App() {
           "Content-Type": "application/json",
           "Idempotency-Key": requestId.current,
         },
-        body: JSON.stringify({ orderReference, description }),
+        body: JSON.stringify({
+          schema: PUBLIC_CONVERSATION_SCHEMA,
+          orderReference,
+          description,
+        }),
       });
       if (!created.ok) throw new Error("ticket creation failed");
-      const { ticketId } = (await created.json()) as { ticketId: string };
+      const responseBody = (await created.json()) as unknown;
+      if (!isCreateTicketResponse(responseBody)) throw new Error("incompatible creation response");
+      const { ticketId } = responseBody;
       await loadTicket(ticketId);
     } catch {
       setError("提交未完成，请保留本页并重试。相同请求不会创建第二张工单。");
@@ -116,7 +129,7 @@ export function App() {
   }
 
   async function loadTicket(ticketId: string) {
-    const loaded = await humanSessionFetch(`/api/customer/tickets/${ticketId}`, {
+    const loaded = await humanSessionFetch(`${PUBLIC_CONVERSATION_BASE}/${ticketId}`, {
       credentials: "same-origin",
     });
     if (!loaded.ok) throw new Error("snapshot request failed");
@@ -356,7 +369,7 @@ export function App() {
       }, 1_000);
     };
     try {
-      const response = await humanSessionFetch(`/api/customer/tickets/${ticketId}/events`, {
+      const response = await humanSessionFetch(`${PUBLIC_CONVERSATION_BASE}/${ticketId}/events`, {
         headers: { "Last-Event-ID": cursor, Accept: "text/event-stream" },
         credentials: "same-origin",
         signal: controller.signal,
@@ -417,8 +430,8 @@ export function App() {
     if (
       !isRecord(envelope) ||
       !hasOnlyKeys(envelope, ["view", "schema", "generation", "payload"]) ||
-      envelope.view !== "CUSTOMER_PUBLIC" ||
-      envelope.schema !== CUSTOMER_PUBLIC_SCHEMA ||
+      envelope.view !== "PUBLIC_CONVERSATION" ||
+      envelope.schema !== PUBLIC_CONVERSATION_SCHEMA ||
       !Number.isSafeInteger(envelope.generation) ||
       envelope.generation < 0
     )
@@ -731,23 +744,51 @@ export function App() {
 function isSnapshot(value: unknown): value is Snapshot {
   if (
     !isRecord(value) ||
-    value.view !== "CUSTOMER_PUBLIC" ||
-    value.schema !== CUSTOMER_PUBLIC_SCHEMA
+    !hasOnlyKeys(value, ["view", "schema", "cursor", "ticket", "messages", "clarification"]) ||
+    value.view !== "PUBLIC_CONVERSATION" ||
+    value.schema !== PUBLIC_CONVERSATION_SCHEMA
   )
     return false;
   const cursor = typeof value.cursor === "string" ? parseCursor(value.cursor) : null;
   return (
     cursor?.epoch === value.schema &&
     isRecord(value.ticket) &&
+    hasOnlyKeys(value.ticket, ["id", "lifecycleState", "handlingMode", "agentGeneration"]) &&
+    typeof value.ticket.id === "string" &&
+    typeof value.ticket.lifecycleState === "string" &&
+    typeof value.ticket.handlingMode === "string" &&
     Array.isArray(value.messages) &&
     Number.isSafeInteger(value.ticket.agentGeneration) &&
     Number(value.ticket.agentGeneration) >= 0 &&
-    value.messages.every(isPublicMessage)
+    value.messages.every(isPublicMessage) &&
+    isClarification(value.clarification)
+  );
+}
+
+function isCreateTicketResponse(value: unknown): value is CreateTicketResponse {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["schema", "ticketId", "accepted", "replayed"]) &&
+    value.schema === PUBLIC_CONVERSATION_SCHEMA &&
+    typeof value.ticketId === "string" &&
+    value.accepted === true &&
+    typeof value.replayed === "boolean"
   );
 }
 
 function parseCursor(cursor: string) {
-  return parseViewCursor(cursor, CUSTOMER_PUBLIC_SCHEMA);
+  return parseViewCursor(cursor, PUBLIC_CONVERSATION_SCHEMA);
+}
+
+function isClarification(value: unknown): value is Snapshot["clarification"] {
+  return (
+    value === null ||
+    (isRecord(value) &&
+      hasOnlyKeys(value, ["id", "promptCode", "question"]) &&
+      typeof value.id === "string" &&
+      typeof value.promptCode === "string" &&
+      typeof value.question === "string")
+  );
 }
 
 function isPublicMessage(value: unknown): value is Snapshot["messages"][number] {

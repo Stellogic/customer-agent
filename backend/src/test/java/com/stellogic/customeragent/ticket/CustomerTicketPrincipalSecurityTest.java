@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.ticket;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +32,7 @@ import tools.jackson.databind.ObjectMapper;
 @WebMvcTest(
         controllers = {
             CustomerTicketController.class,
+            CustomerTicketV2Controller.class,
             AuthSessionController.class,
             DemoAccountController.class
         })
@@ -59,7 +61,35 @@ class CustomerTicketPrincipalSecurityTest {
                                 .header("X-Synthetic-Customer-Id", "customer-other-demo"))
                 .andExpect(status().isOk());
 
-        verify(service).snapshot("customer-demo", TICKET_ID);
+        verify(service, atLeastOnce()).snapshot("customer-demo", TICKET_ID);
+    }
+
+    @Test
+    void v2UsesTheSameCustomerPrincipalAndCsrfBoundaryAsV1() throws Exception {
+        when(service.snapshot("customer-demo", TICKET_ID)).thenReturn(snapshot());
+        MockHttpSession customer = login("customer-demo");
+
+        mvc.perform(
+                        get("/api/customer/v2/tickets/{ticketId}", TICKET_ID)
+                                .session(customer)
+                                .header("X-Synthetic-Customer-Id", "customer-other-demo"))
+                .andExpect(status().isOk());
+        mvc.perform(
+                        post("/api/customer/v2/tickets")
+                                .session(customer)
+                                .header("Idempotency-Key", "issue-151-create")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {
+                                          "schema":"public-conversation-v2",
+                                          "orderReference":"ORDER-DELAY-001",
+                                          "description":"物流延迟"
+                                        }
+                                        """))
+                .andExpect(status().isForbidden());
+
+        verify(service, atLeastOnce()).snapshot("customer-demo", TICKET_ID);
     }
 
     @Test
