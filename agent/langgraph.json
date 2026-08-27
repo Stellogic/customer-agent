@@ -2,7 +2,8 @@
   "$schema": "https://langgra.ph/schema.json",
   "dependencies": ["."],
   "graphs": {
-    "baseline_agent": "./src/baseline_agent/graph.py:graph"
+    "baseline_agent": "./src/baseline_agent/graph.py:graph",
+    "intake_agent": "./src/baseline_agent/intake_graph.py:graph"
   },
   "auth": {
     "path": "./src/baseline_agent/auth.py:auth"
@@ -12,4 +13,3 @@
     "path": "./src/baseline_agent/checkpointer.py:generate_checkpointer"
   }
 }
-

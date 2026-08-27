@@ -43,4 +43,28 @@ public final class CustomerTicketExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("code", "INCOMPATIBLE_SCHEMA", "message", "请求的公开沟通版本不兼容"));
     }
+
+    @ExceptionHandler(IntakeNotFoundException.class)
+    ResponseEntity<Map<String, String>> intakeNotFound() {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("code", "INTAKE_NOT_FOUND", "message", "受理对话不存在"));
+    }
+
+    @ExceptionHandler(IntakeNotReadyException.class)
+    ResponseEntity<Map<String, String>> intakeNotReady() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("code", "INTAKE_NOT_READY", "message", "请先确认订单与问题理解"));
+    }
+
+    @ExceptionHandler(IntakeCandidateStaleException.class)
+    ResponseEntity<Map<String, String>> intakeCandidateStale() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("code", "INTAKE_CANDIDATE_STALE", "message", "订单事实已变化，请重新确认"));
+    }
+
+    @ExceptionHandler(IntakeAgentUnavailableException.class)
+    ResponseEntity<Map<String, String>> intakeAgentUnavailable() {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("code", "INTAKE_AGENT_UNAVAILABLE", "message", "受理理解暂时不可用，请稍后重试"));
+    }
 }

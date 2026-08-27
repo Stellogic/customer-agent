@@ -15,9 +15,13 @@ test("Issue #129 客户人工偏好围栏真实 Flash 迟到自动回复", async
     .fill("这是合成客户数据：请调查物流延迟，但我随后会明确要求人工处理。");
   const createdResponse = page.waitForResponse(
     (response) =>
-      response.url().endsWith("/api/customer/v2/tickets") && response.status() === 201,
+      /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(
+        new URL(response.url()).pathname,
+      ) && response.status() === 201,
   );
   await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await page.getByRole("button", { name: "确认，就是这个问题" }).click();
   await createdResponse;
 
   const handoff = page.getByRole("button", { name: "转人工处理" });

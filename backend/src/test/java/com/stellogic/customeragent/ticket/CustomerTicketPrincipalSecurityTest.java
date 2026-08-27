@@ -33,6 +33,7 @@ import tools.jackson.databind.ObjectMapper;
         controllers = {
             CustomerTicketController.class,
             CustomerTicketV2Controller.class,
+            CustomerIntakeV2Controller.class,
             AuthSessionController.class,
             DemoAccountController.class
         })
@@ -90,6 +91,20 @@ class CustomerTicketPrincipalSecurityTest {
                 .andExpect(status().isForbidden());
 
         verify(service, atLeastOnce()).snapshot("customer-demo", TICKET_ID);
+    }
+
+    @Test
+    void naturalLanguageIntakeUsesTheAuthenticatedCustomerAndCsrfBoundary() throws Exception {
+        MockHttpSession customer = login("customer-demo");
+        String body = "{\"schema\":\"customer-intake-v1\",\"message\":\"我的包裹好几天没动了\"}";
+
+        mvc.perform(
+                        post("/api/customer/v2/intakes")
+                                .session(customer)
+                                .header("Idempotency-Key", "issue-152-intake")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -173,6 +188,11 @@ class CustomerTicketPrincipalSecurityTest {
         @Bean
         CustomerTicketService customerTicketService() {
             return mock(CustomerTicketService.class);
+        }
+
+        @Bean
+        CustomerIntakeService customerIntakeService() {
+            return mock(CustomerIntakeService.class);
         }
     }
 }

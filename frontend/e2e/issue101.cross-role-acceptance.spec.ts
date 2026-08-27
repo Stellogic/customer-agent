@@ -151,7 +151,7 @@ test("Issue #101 客户、客服与审批页面共享视觉语言并保持投影
   await expect(customer.getByLabel("订单编号")).toBeVisible();
   await expect(customer.getByLabel("问题描述")).toBeVisible();
   await expect(customer.getByRole("navigation", { name: "内部工作区" })).toHaveCount(0);
-  await customer.route("**/api/customer/v2/tickets", (route) =>
+  await customer.route("**/api/customer/v2/intakes", (route) =>
     route.request().method() === "POST"
       ? route.fulfill({ status: 503, body: "temporarily unavailable" })
       : route.continue(),

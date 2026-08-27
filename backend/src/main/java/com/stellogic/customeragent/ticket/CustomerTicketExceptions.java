@@ -15,3 +15,11 @@ final class CustomerAuthenticationException extends RuntimeException {}
 final class ProjectionCursorException extends RuntimeException {}
 
 final class IncompatibleCustomerSchemaException extends RuntimeException {}
+
+final class IntakeNotFoundException extends RuntimeException {}
+
+final class IntakeNotReadyException extends RuntimeException {}
+
+final class IntakeCandidateStaleException extends RuntimeException {}
+
+final class IntakeAgentUnavailableException extends RuntimeException {}

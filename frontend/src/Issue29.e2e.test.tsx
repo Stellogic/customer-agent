@@ -84,6 +84,11 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
       target: { value: `Issue #29 ${scenario} 合成物流延迟验收` },
     });
     fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+    expect(
+      await screen.findByRole("heading", { name: "请确认我的理解" }, { timeout: 10_000 }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/补偿建议正在等待人工审批/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认，就是这个问题" }));
 
     expect(
       await screen.findByText(/补偿建议正在等待人工审批/, {}, { timeout: asyncFlowTimeout }),

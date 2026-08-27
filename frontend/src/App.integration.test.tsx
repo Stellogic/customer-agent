@@ -36,6 +36,9 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
     fireEvent.change(screen.getByLabelText("订单编号"), { target: { value: "ORDER-DELAY-001" } });
     fireEvent.change(screen.getByLabelText("问题描述"), { target: { value: description } });
     fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+    expect(await screen.findByRole("heading", { name: "请确认我的理解" })).toBeInTheDocument();
+    expect(screen.queryByText("调查中")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认，就是这个问题" }));
 
     expect(await screen.findByText("调查中")).toBeInTheDocument();
     expect(screen.getByText(description)).toBeInTheDocument();

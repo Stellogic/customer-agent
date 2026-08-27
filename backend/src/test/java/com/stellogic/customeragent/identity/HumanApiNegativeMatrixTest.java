@@ -28,6 +28,8 @@ class HumanApiNegativeMatrixTest {
                     getApi("/api/customer/tickets"),
                     getApi("/api/customer/tickets/" + ID),
                     getApi("/api/customer/tickets/" + ID + "/events"),
+                    postApi("/api/customer/v2/intakes"),
+                    postApi("/api/customer/v2/intakes/" + ID + "/messages"),
                     postApi("/api/customer/tickets"),
                     postApi("/api/customer/tickets/" + ID + "/clarifications/" + ID + "/replies"),
                     getApi("/api/customer/tickets/" + ID + "/clarification-resumes/" + ID),

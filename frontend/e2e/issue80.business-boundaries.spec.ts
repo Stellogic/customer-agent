@@ -14,9 +14,13 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   await customer.getByLabel("问题描述").fill(description);
   const createdResponse = customer.waitForResponse(
     (response) =>
-      response.url().endsWith("/api/customer/v2/tickets") && response.status() === 201,
+      /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(
+        new URL(response.url()).pathname,
+      ) && response.status() === 201,
   );
   await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await expect(customer.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };
   expect(created.ticketId).toMatch(/^[0-9a-f-]{36}$/i);
   await expect(

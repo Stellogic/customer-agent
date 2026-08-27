@@ -13,6 +13,8 @@ import { humanSessionFetch } from "./humanSessionLifecycle";
 
 const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
 const PUBLIC_CONVERSATION_BASE = "/api/customer/v2/tickets";
+const CUSTOMER_INTAKE_SCHEMA = "customer-intake-v1" as const;
+const CUSTOMER_INTAKE_BASE = "/api/customer/v2/intakes";
 
 type Snapshot = {
   view: "PUBLIC_CONVERSATION";
@@ -35,10 +37,15 @@ type EventEnvelope = {
   payload: unknown;
 };
 
-type CreateTicketResponse = {
-  schema: typeof PUBLIC_CONVERSATION_SCHEMA;
-  ticketId: string;
-  accepted: true;
+type IntakeSnapshot = {
+  schema: typeof CUSTOMER_INTAKE_SCHEMA;
+  intakeId: string;
+  status: "READY_TO_CONFIRM" | "NEEDS_CLARIFICATION" | "CONFIRMED";
+  candidateOrder: { reference: string; summary: string } | null;
+  issue: { kind: "LOGISTICS_DELAY"; summary: string } | null;
+  assistantMessage: string;
+  ticketId: string | null;
+  confirmed: boolean;
   replayed: boolean;
 };
 
@@ -58,6 +65,8 @@ function clarificationRejectionMessage(status: number) {
 export function App() {
   const [orderReference, setOrderReference] = useState("");
   const [description, setDescription] = useState("");
+  const [intake, setIntake] = useState<IntakeSnapshot | null>(null);
+  const [intakeReply, setIntakeReply] = useState("");
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [clarificationAnswer, setClarificationAnswer] = useState("");
@@ -75,6 +84,7 @@ export function App() {
   );
   const [recoveringTicketId, setRecoveringTicketId] = useState<string | null>(initialTicketId);
   const requestId = useRef(globalThis.crypto.randomUUID());
+  const intakeReplyRequestId = useRef(globalThis.crypto.randomUUID());
   const replyMessageId = useRef(globalThis.crypto.randomUUID());
   const resumeRequestId = useRef(globalThis.crypto.randomUUID());
   const handoffRequestId = useRef(globalThis.crypto.randomUUID());
@@ -102,7 +112,7 @@ export function App() {
     setError("");
     try {
       const csrf = await loadCsrfToken();
-      const created = await humanSessionFetch(PUBLIC_CONVERSATION_BASE, {
+      const started = await humanSessionFetch(CUSTOMER_INTAKE_BASE, {
         method: "POST",
         credentials: "same-origin",
         headers: {
@@ -111,21 +121,76 @@ export function App() {
           "Idempotency-Key": requestId.current,
         },
         body: JSON.stringify({
-          schema: PUBLIC_CONVERSATION_SCHEMA,
-          orderReference,
-          description,
+          schema: CUSTOMER_INTAKE_SCHEMA,
+          message: orderReference
+            ? `订单 ${orderReference} 的物流延迟问题：${description}`
+            : description,
         }),
       });
-      if (!created.ok) throw new Error("ticket creation failed");
-      const responseBody = (await created.json()) as unknown;
-      if (!isCreateTicketResponse(responseBody)) throw new Error("incompatible creation response");
-      const { ticketId } = responseBody;
-      await loadTicket(ticketId);
+      if (!started.ok) throw new Error("intake creation failed");
+      const responseBody = (await started.json()) as unknown;
+      if (!isIntakeSnapshot(responseBody)) throw new Error("incompatible intake response");
+      setIntake(responseBody);
     } catch {
-      setError("提交未完成，请保留本页并重试。相同请求不会创建第二张工单。");
+      setError("受理未完成，请保留本页并重试。相同请求不会创建第二张工单。");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function submitIntakeReply(event: FormEvent) {
+    event.preventDefault();
+    if (!intake || !intakeReply.trim()) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await replyToIntake(intake, intakeReply);
+      setIntakeReply("");
+    } catch {
+      setError("这次回复尚未确认，请重试原操作；相同请求不会重复创建工单。");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function confirmIntake() {
+    if (!intake) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await replyToIntake(intake, "确认提交");
+    } catch {
+      setError("确认结果尚未取得，请重试原确认；不会创建第二张工单。");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function replyToIntake(current: IntakeSnapshot, message: string) {
+    const csrf = await loadCsrfToken();
+    const response = await humanSessionFetch(
+      `${CUSTOMER_INTAKE_BASE}/${current.intakeId}/messages`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          [csrf.headerName]: csrf.token,
+          "Content-Type": "application/json",
+          "Idempotency-Key": intakeReplyRequestId.current,
+        },
+        body: JSON.stringify({ schema: CUSTOMER_INTAKE_SCHEMA, message }),
+      },
+    );
+    if (!response.ok) throw new Error("intake reply failed");
+    const value = (await response.json()) as unknown;
+    if (!isIntakeSnapshot(value)) throw new Error("incompatible intake reply");
+    setIntake(value);
+    if (value.ticketId) {
+      await loadTicket(value.ticketId);
+      setIntake(null);
+      return;
+    }
+    intakeReplyRequestId.current = globalThis.crypto.randomUUID();
   }
 
   async function loadTicket(ticketId: string) {
@@ -515,7 +580,7 @@ export function App() {
           我们从这里开始处理。
         </h1>
         <p className="lede">
-          提交后，你会得到一张可查询的客服工单。调查异步继续；订单无法唯一确认时，我们会在同一工单中向你提问。
+          直接描述你的问题。我们会先确认订单与理解；只有你明确确认后，才创建可查询的客服工单并开始处理。
         </p>
       </header>
 
@@ -540,25 +605,90 @@ export function App() {
             </StatusNotice>
           )}
         </section>
+      ) : !snapshot && intake ? (
+        <section className="intake-card" aria-live="polite" aria-busy={submitting}>
+          <div className="intake-agent-heading">
+            <span className="intake-agent-mark" aria-hidden="true">
+              澄
+            </span>
+            <div>
+              <p className="eyebrow">智能受理</p>
+              <h2>{intake.status === "READY_TO_CONFIRM" ? "请确认我的理解" : "再帮我确认一点"}</h2>
+            </div>
+          </div>
+          <p className="intake-agent-message">{intake.assistantMessage}</p>
+          {intake.candidateOrder && (
+            <article className="intake-candidate" aria-label="订单候选">
+              <span className="intake-candidate-icon" aria-hidden="true">
+                订
+              </span>
+              <div>
+                <span>订单候选</span>
+                <strong>{intake.candidateOrder.reference}</strong>
+                <small>{intake.candidateOrder.summary}</small>
+              </div>
+              <span className="intake-candidate-boundary">仅摘要</span>
+            </article>
+          )}
+          {intake.issue && (
+            <article className="intake-issue" aria-label="问题理解">
+              <span>问题理解</span>
+              <strong>{intake.issue.summary}</strong>
+              <small>确认前不会创建正式工单，也不会启动服务时长目标。</small>
+            </article>
+          )}
+          {intake.status === "READY_TO_CONFIRM" && (
+            <button
+              className="primary-action"
+              type="button"
+              disabled={submitting}
+              onClick={confirmIntake}
+            >
+              {submitting ? "正在确认…" : "确认，就是这个问题"}
+            </button>
+          )}
+          <form className="intake-reply-form" onSubmit={submitIntakeReply}>
+            <label>
+              {intake.status === "READY_TO_CONFIRM" ? "需要纠正？直接告诉我" : "补充或纠正你的意思"}
+              <textarea
+                aria-label="补充受理信息"
+                value={intakeReply}
+                onChange={(event) => setIntakeReply(event.target.value)}
+                placeholder="例如：不是这笔订单，是另一笔；或者直接回复“可以”"
+                required
+                rows={3}
+              />
+            </label>
+            <button className="intake-secondary-action" disabled={submitting}>
+              {submitting ? "正在理解…" : "发送给智能受理"}
+            </button>
+          </form>
+          {error && (
+            <StatusNotice className="error" role="alert" tone="danger">
+              {error}
+            </StatusNotice>
+          )}
+        </section>
       ) : !snapshot ? (
         <form className="ticket-form" onSubmit={submit}>
           <div className="form-intro">
             <span className="form-step">01</span>
             <div>
-              <p className="eyebrow">创建客服工单</p>
-              <h2>告诉我们发生了什么</h2>
-              <p>只需订单引用和问题描述。提交后，所有公开进展都会保留在同一张工单中。</p>
+              <p className="eyebrow">自然语言受理</p>
+              <h2>直接说说发生了什么</h2>
+              <p>
+                无需先选择问题类型。Agent 会依据你可见的订单摘要提出理解，得到确认后才创建工单。
+              </p>
             </div>
           </div>
           <label>
-            订单引用
+            订单引用（可选）
             <input
               aria-label="订单编号"
               autoComplete="off"
               placeholder="例如 ORDER-DELAY-001"
               value={orderReference}
               onChange={(event) => setOrderReference(event.target.value)}
-              required
             />
           </label>
           <label>
@@ -573,9 +703,9 @@ export function App() {
             />
           </label>
           <button className="primary-action" disabled={submitting}>
-            {submitting ? "正在安全提交…" : "提交物流延迟问题"}
+            {submitting ? "正在理解你的问题…" : "提交物流延迟问题"}
           </button>
-          <p className="form-assurance">提交使用稳定请求身份；响应不确定时，不会创建第二张工单。</p>
+          <p className="form-assurance">此时只开始受理对话；确认前不会创建正式工单。</p>
           {error && (
             <StatusNotice className="error" role="alert" tone="danger">
               {error}
@@ -765,14 +895,42 @@ function isSnapshot(value: unknown): value is Snapshot {
   );
 }
 
-function isCreateTicketResponse(value: unknown): value is CreateTicketResponse {
+function isIntakeSnapshot(value: unknown): value is IntakeSnapshot {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, [
+      "schema",
+      "intakeId",
+      "status",
+      "candidateOrder",
+      "issue",
+      "assistantMessage",
+      "ticketId",
+      "confirmed",
+      "replayed",
+    ]) ||
+    value.schema !== CUSTOMER_INTAKE_SCHEMA ||
+    typeof value.intakeId !== "string" ||
+    !["READY_TO_CONFIRM", "NEEDS_CLARIFICATION", "CONFIRMED"].includes(String(value.status)) ||
+    typeof value.assistantMessage !== "string" ||
+    !(value.ticketId === null || typeof value.ticketId === "string") ||
+    typeof value.confirmed !== "boolean" ||
+    typeof value.replayed !== "boolean"
+  )
+    return false;
+  const candidate = value.candidateOrder;
+  const issue = value.issue;
   return (
-    isRecord(value) &&
-    hasOnlyKeys(value, ["schema", "ticketId", "accepted", "replayed"]) &&
-    value.schema === PUBLIC_CONVERSATION_SCHEMA &&
-    typeof value.ticketId === "string" &&
-    value.accepted === true &&
-    typeof value.replayed === "boolean"
+    (candidate === null ||
+      (isRecord(candidate) &&
+        hasOnlyKeys(candidate, ["reference", "summary"]) &&
+        typeof candidate.reference === "string" &&
+        typeof candidate.summary === "string")) &&
+    (issue === null ||
+      (isRecord(issue) &&
+        hasOnlyKeys(issue, ["kind", "summary"]) &&
+        issue.kind === "LOGISTICS_DELAY" &&
+        typeof issue.summary === "string"))
   );
 }
 
