@@ -12,11 +12,13 @@ record CustomerIntakeSnapshot(
         String status,
         String candidateOrderReference,
         String candidateOrderSummary,
-        String issueKind,
-        String issueSummary,
+        List<ProposedIntakeIssue> issues,
         String assistantMessage,
-        UUID ticketId,
+        List<UUID> ticketIds,
+        UUID sharedIntakeRecordId,
         boolean replayed) {}
+
+record ProposedIntakeIssue(String kind, String summary) {}
 
 record CustomerVisibleOrderSummary(String reference, String summary, String version) {}
 
@@ -24,12 +26,14 @@ record IntakeUnderstandingRequest(
         String customerMessage,
         List<CustomerVisibleOrderSummary> visibleOrders,
         String currentOrderReference,
-        String currentIssueSummary) {}
+        String currentIssueSummary,
+        List<ProposedIntakeIssue> currentIssues,
+        List<String> currentPendingIssueKinds) {}
 
 record IntakeUnderstanding(
         String intent,
         String status,
         String candidateOrderReference,
-        String issueKind,
-        String issueSummary,
+        List<ProposedIntakeIssue> issues,
+        List<String> pendingIssueKinds,
         String assistantMessage) {}

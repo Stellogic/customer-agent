@@ -222,6 +222,27 @@ h1 {
   background: rgb(247 244 236 / 72%);
   padding: 14px 16px;
 }
+.intake-issue-list,
+.intake-created-tickets {
+  display: grid;
+  gap: 10px;
+}
+.intake-atomic-note,
+.intake-empty {
+  margin: 0;
+  border-radius: 10px;
+  background: var(--forest-50);
+  padding: 10px 12px;
+  color: var(--forest-800);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+.intake-created-tickets button {
+  min-height: 42px;
+  border: 1px solid var(--forest-200);
+  background: white;
+  color: var(--forest-800);
+}
 .intake-reply-form {
   display: grid;
   gap: 12px;

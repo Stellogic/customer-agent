@@ -5,7 +5,7 @@ from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from baseline_agent.intake_model import IntakeModelInput, VisibleOrder
+from baseline_agent.intake_model import IntakeIssue, IntakeModelInput, VisibleOrder
 from baseline_agent.intake_model_runtime import configured_intake_model
 
 
@@ -15,6 +15,8 @@ class IntakeState(TypedDict, total=False):
     visible_orders: list[dict[str, str]]
     current_order_reference: str
     current_issue_summary: str
+    current_issues: list[dict[str, str]]
+    current_pending_issue_kinds: list[str]
     intake_understanding: dict[str, object]
     model_mode: str
 
@@ -35,6 +37,11 @@ async def understand_intake(state: IntakeState) -> IntakeState:
             visible_orders=orders,
             current_order_reference=state.get("current_order_reference") or None,
             current_issue_summary=state.get("current_issue_summary") or None,
+            current_issues=tuple(
+                IntakeIssue(issue["kind"], issue["summary"])
+                for issue in state.get("current_issues", [])
+            ),
+            current_pending_issue_kinds=tuple(state.get("current_pending_issue_kinds", [])),
         )
     )
     return {
@@ -43,8 +50,8 @@ async def understand_intake(state: IntakeState) -> IntakeState:
             "intent": result.intent,
             "status": result.status,
             "candidate_order_reference": result.candidate_order_reference,
-            "issue_kind": result.issue_kind,
-            "issue_summary": result.issue_summary,
+            "issues": [{"kind": issue.kind, "summary": issue.summary} for issue in result.issues],
+            "pending_issue_kinds": list(result.pending_issue_kinds),
             "assistant_message": result.assistant_message,
         },
     }

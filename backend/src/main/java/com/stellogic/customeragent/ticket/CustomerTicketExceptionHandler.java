@@ -8,6 +8,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public final class CustomerTicketExceptionHandler {
+    @ExceptionHandler(IntakeRequestIdentityConflictException.class)
+    ResponseEntity<CustomerIntakeV2Controller.IntakeResponse> intakeConflict(
+            IntakeRequestIdentityConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(
+                        CustomerIntakeV2Controller.IntakeResponse.from(
+                                exception.authoritativeSnapshot()));
+    }
+
     @ExceptionHandler(RequestIdentityConflictException.class)
     ResponseEntity<Map<String, String>> conflict() {
         return ResponseEntity.status(HttpStatus.CONFLICT)
