@@ -14,7 +14,8 @@ test("Issue #129 客户人工偏好围栏真实 Flash 迟到自动回复", async
     .getByLabel("问题描述")
     .fill("这是合成客户数据：请调查物流延迟，但我随后会明确要求人工处理。");
   const createdResponse = page.waitForResponse(
-    (response) => response.url().endsWith("/api/customer/tickets") && response.status() === 201,
+    (response) =>
+      response.url().endsWith("/api/customer/v2/tickets") && response.status() === 201,
   );
   await page.getByRole("button", { name: "提交物流延迟问题" }).click();
   await createdResponse;

@@ -14,7 +14,8 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
   await customer.getByLabel("订单编号").fill("ORDER-DELAY-UNDER-24");
   await customer.getByLabel("问题描述").fill(description);
   const createdResponse = customer.waitForResponse(
-    (response) => response.url().endsWith("/api/customer/tickets") && response.status() === 201,
+    (response) =>
+      response.url().endsWith("/api/customer/v2/tickets") && response.status() === 201,
   );
   await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };

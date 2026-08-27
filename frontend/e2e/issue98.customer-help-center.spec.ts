@@ -9,7 +9,7 @@ test("Issue #98 客户真实创建、交互状态与断线权威恢复视觉", a
   });
   const page = await context.newPage();
   let disconnectTicketStream = false;
-  await page.route("**/api/customer/tickets/*/events", (route) =>
+  await page.route("**/api/customer/v2/tickets/*/events", (route) =>
     disconnectTicketStream
       ? route.fulfill({ status: 503, body: "temporarily unavailable" })
       : route.continue(),
@@ -26,7 +26,8 @@ test("Issue #98 客户真实创建、交互状态与断线权威恢复视觉", a
   await page.getByLabel("订单编号").fill("ORDER-DELAY-UNDER-24");
   await page.getByLabel("问题描述").fill(description);
   const createdResponse = page.waitForResponse(
-    (response) => response.url().endsWith("/api/customer/tickets") && response.status() === 201,
+    (response) =>
+      response.url().endsWith("/api/customer/v2/tickets") && response.status() === 201,
   );
   await page.getByRole("button", { name: "提交物流延迟问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };

@@ -37,4 +37,10 @@ public final class CustomerTicketExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("code", "SNAPSHOT_REQUIRED", "message", "游标不兼容，请重新读取权威快照"));
     }
+
+    @ExceptionHandler(IncompatibleCustomerSchemaException.class)
+    ResponseEntity<Map<String, String>> incompatibleSchema() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("code", "INCOMPATIBLE_SCHEMA", "message", "请求的公开沟通版本不兼容"));
+    }
 }

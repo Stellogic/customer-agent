@@ -13,7 +13,8 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   await customer.getByLabel("订单编号").fill("ORDER-DELAY-UNDER-24");
   await customer.getByLabel("问题描述").fill(description);
   const createdResponse = customer.waitForResponse(
-    (response) => response.url().endsWith("/api/customer/tickets") && response.status() === 201,
+    (response) =>
+      response.url().endsWith("/api/customer/v2/tickets") && response.status() === 201,
   );
   await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };

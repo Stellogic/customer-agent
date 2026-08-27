@@ -100,7 +100,8 @@ async function createTicket(page: Page, orderReference: string, description: str
   await page.getByLabel("订单编号").fill(orderReference);
   await page.getByLabel("问题描述").fill(description);
   const createdResponse = page.waitForResponse(
-    (response) => response.url().endsWith("/api/customer/tickets") && response.status() === 201,
+    (response) =>
+      response.url().endsWith("/api/customer/v2/tickets") && response.status() === 201,
   );
   await page.getByRole("button", { name: "提交物流延迟问题" }).click();
   return (await (await createdResponse).json()) as { ticketId: string };
@@ -117,7 +118,7 @@ test("Issue #124 客户通过真实全栈完成安全自动回复并从 SSE 断�
   test.setTimeout(90_000);
   const { context, page, evidence } = await openCustomer(browser);
   let disconnectEvents = false;
-  await page.route("**/api/customer/tickets/*/events", (route) =>
+  await page.route("**/api/customer/v2/tickets/*/events", (route) =>
     disconnectEvents
       ? route.fulfill({ status: 503, body: "temporarily unavailable" })
       : route.continue(),
