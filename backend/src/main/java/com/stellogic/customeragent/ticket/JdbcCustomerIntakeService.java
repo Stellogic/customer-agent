@@ -18,16 +18,19 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
     private final JdbcTemplate jdbc;
     private final IntakeUnderstandingGateway agent;
     private final CustomerTicketService tickets;
+    private final IntakeAssistanceService assistance;
     private final Clock clock;
 
     JdbcCustomerIntakeService(
             JdbcTemplate jdbc,
             IntakeUnderstandingGateway agent,
             CustomerTicketService tickets,
+            IntakeAssistanceService assistance,
             Clock clock) {
         this.jdbc = jdbc;
         this.agent = agent;
         this.tickets = tickets;
+        this.assistance = assistance;
         this.clock = clock;
     }
 
@@ -56,18 +59,26 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
             return snapshot(enrich(row), true);
         }
 
+        if (CustomerIntakeSafetyPolicy.isHumanAssistanceRequest(command.message())) {
+            return createAssistedIntake(command, "CUSTOMER_REQUESTED");
+        }
         List<CustomerVisibleOrderSummary> orders = visibleOrders(command.customerId());
-        IntakeUnderstanding understanding =
-                agent.understand(
-                        new IntakeUnderstandingRequest(
-                                command.message(),
-                                orders,
-                                null,
-                                null,
-                                List.of(),
-                                List.of(),
-                                List.of()));
-        requireUnderstanding(understanding, orders);
+        IntakeUnderstanding understanding;
+        try {
+            understanding =
+                    agent.understand(
+                            new IntakeUnderstandingRequest(
+                                    command.message(),
+                                    orders,
+                                    null,
+                                    null,
+                                    List.of(),
+                                    List.of(),
+                                    List.of()));
+            requireUnderstanding(understanding, orders);
+        } catch (IntakeAgentUnavailableException exception) {
+            return createAssistedIntake(command, "AGENT_UNAVAILABLE");
+        }
         String assistantMessage = CustomerIntakeSafetyPolicy.assistantMessage(understanding);
         UUID intakeId = UUID.randomUUID();
         CustomerVisibleOrderSummary candidate = candidate(understanding, orders);
@@ -139,27 +150,56 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
         appendTranscript(command.intakeId(), "CUSTOMER", command.message(), now);
         if ("CONFIRMED".equals(current.status())) return snapshot(current, true);
 
-        List<CustomerVisibleOrderSummary> orders = visibleOrders(command.customerId());
-        IntakeUnderstanding understanding =
-                agent.understand(
-                        new IntakeUnderstandingRequest(
-                                command.message(),
-                                orders,
-                                current.orderReference(),
-                                firstSummary(current.issues()),
-                                current.issues(),
-                                current.pendingIssueKinds(),
-                                current.pendingOrders().stream()
-                                        .map(PendingOrder::reference)
-                                        .toList()));
-        if ("CONFIRM".equals(understanding.intent())) {
-            if (!CustomerIntakeSafetyPolicy.isExplicitConfirmation(command.message())) {
-                throw new IntakeAgentUnavailableException();
-            }
-            return confirm(
-                    command, current, "已确认，" + current.issues().size() + " 张客服工单已原子创建并开始独立处理。");
+        if (CustomerIntakeSafetyPolicy.isHumanAssistanceRequest(command.message())) {
+            assistance.createForIntake(command.intakeId(), "CUSTOMER_REQUESTED");
         }
-        requireUnderstanding(understanding, orders);
+        if (assistance.hasOpenRequest(command.intakeId())) {
+            if (CustomerIntakeSafetyPolicy.isExplicitConfirmation(command.message())
+                    && "READY_TO_CONFIRM".equals(current.status())
+                    && assistance.awaitingCustomerConfirmation(command.intakeId())) {
+                CustomerIntakeSnapshot confirmed =
+                        confirm(
+                                command,
+                                current,
+                                "已确认，" + current.issues().size() + " 张客服工单已原子创建并开始独立处理。");
+                assistance.completeForIntake(command.intakeId());
+                return confirmed;
+            }
+            return retainHumanAssistance(command.customerId(), command.intakeId(), now);
+        }
+
+        List<CustomerVisibleOrderSummary> orders = visibleOrders(command.customerId());
+        IntakeUnderstanding understanding;
+        try {
+            understanding =
+                    agent.understand(
+                            new IntakeUnderstandingRequest(
+                                    command.message(),
+                                    orders,
+                                    current.orderReference(),
+                                    firstSummary(current.issues()),
+                                    current.issues(),
+                                    current.pendingIssueKinds(),
+                                    current.pendingOrders().stream()
+                                            .map(PendingOrder::reference)
+                                            .toList()));
+        } catch (IntakeAgentUnavailableException exception) {
+            assistance.createForIntake(command.intakeId(), "AGENT_UNAVAILABLE");
+            return retainHumanAssistance(command.customerId(), command.intakeId(), now);
+        }
+        try {
+            if ("CONFIRM".equals(understanding.intent())) {
+                if (!CustomerIntakeSafetyPolicy.isExplicitConfirmation(command.message())) {
+                    throw new IntakeAgentUnavailableException();
+                }
+                return confirm(
+                        command, current, "已确认，" + current.issues().size() + " 张客服工单已原子创建并开始独立处理。");
+            }
+            requireUnderstanding(understanding, orders);
+        } catch (IntakeAgentUnavailableException exception) {
+            assistance.createForIntake(command.intakeId(), "AGENT_UNAVAILABLE");
+            return retainHumanAssistance(command.customerId(), command.intakeId(), now);
+        }
         String assistantMessage = CustomerIntakeSafetyPolicy.assistantMessage(understanding);
         CustomerVisibleOrderSummary candidate = candidate(understanding, orders);
         jdbc.update(
@@ -439,6 +479,45 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                 command.expectedVersion() + 1,
                 timestamp(now));
         return recoverable(load(command.customerId(), command.intakeId()), false);
+    }
+
+    private CustomerIntakeSnapshot createAssistedIntake(
+            StartCustomerIntake command, String reasonCode) {
+        UUID intakeId = UUID.randomUUID();
+        Instant now = clock.instant();
+        String assistantMessage = "已建立受理协助请求；客服只能协助确认订单与拟建问题，仍需由你确认后才会创建正式工单。";
+        jdbc.update(
+                "insert into customer_intake "
+                        + "(id, customer_id, start_request_key, start_digest, original_message, status, "
+                        + "assistant_message, created_at, updated_at, expires_at) "
+                        + "values (?, ?, ?, ?, ?, 'NEEDS_CLARIFICATION', ?, ?, ?, ?)",
+                intakeId,
+                command.customerId(),
+                command.requestId(),
+                StableParameterDigest.sha256(command.message()),
+                command.message(),
+                assistantMessage,
+                timestamp(now),
+                timestamp(now),
+                timestamp(now.plus(Duration.ofDays(7))));
+        appendTranscript(intakeId, "CUSTOMER", command.message(), now);
+        appendTranscript(intakeId, "AGENT", assistantMessage, now);
+        assistance.createForIntake(intakeId, reasonCode);
+        return snapshot(load(command.customerId(), intakeId), false);
+    }
+
+    private CustomerIntakeSnapshot retainHumanAssistance(
+            String customerId, UUID intakeId, Instant now) {
+        String assistantMessage = "受理协助仍由客服负责；客服可以修正订单候选与拟建问题，但不会代替你确认或提前创建工单。";
+        jdbc.update(
+                "update customer_intake set assistant_message = ?, updated_at = ?, expires_at = ?, "
+                        + "version = version + 1 where id = ?",
+                assistantMessage,
+                timestamp(now),
+                timestamp(now.plus(Duration.ofDays(7))),
+                intakeId);
+        appendTranscript(intakeId, "AGENT", assistantMessage, now);
+        return snapshot(load(customerId, intakeId), false);
     }
 
     private CustomerIntakeSnapshot completeCurrentOrder(
