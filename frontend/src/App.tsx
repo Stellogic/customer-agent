@@ -15,6 +15,7 @@ const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
 const PUBLIC_CONVERSATION_BASE = "/api/customer/v2/tickets";
 const CUSTOMER_INTAKE_SCHEMA = "customer-intake-v3" as const;
 const CUSTOMER_INTAKE_BASE = "/api/customer/v2/intakes";
+const CUSTOMER_INTAKE_RECOVERY_SCHEMA = "customer-intake-recovery-v1" as const;
 
 type Snapshot = {
   view: "PUBLIC_CONVERSATION";
@@ -69,6 +70,22 @@ type DuplicateIntakeMatch = {
   lifecycleState: string;
 };
 
+type RecoverableIntake = {
+  intake: IntakeSnapshot;
+  version: number;
+  retentionState: "ACTIVE" | "ARCHIVED";
+  expiresAt: string;
+  archivedAt: string | null;
+  factsChanged: boolean;
+  messages: Array<{ author: "CUSTOMER" | "AGENT"; body: string; sentAt: string }>;
+};
+
+type IntakeRecoveryIndex = {
+  schema: typeof CUSTOMER_INTAKE_RECOVERY_SCHEMA;
+  active: RecoverableIntake[];
+  archived: RecoverableIntake[];
+};
+
 function clarificationRejectionMessage(status: number) {
   switch (status) {
     case 401:
@@ -87,6 +104,11 @@ export function App() {
   const [description, setDescription] = useState("");
   const [intake, setIntake] = useState<IntakeSnapshot | null>(null);
   const [intakeReply, setIntakeReply] = useState("");
+  const [intakeRecoveryState, setIntakeRecoveryState] = useState<
+    "idle" | "loading" | "empty" | "ready" | "restoring" | "error"
+  >("idle");
+  const [archivedIntakes, setArchivedIntakes] = useState<RecoverableIntake[]>([]);
+  const [intakeFactsChanged, setIntakeFactsChanged] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [clarificationAnswer, setClarificationAnswer] = useState("");
@@ -106,6 +128,7 @@ export function App() {
   const requestId = useRef(globalThis.crypto.randomUUID());
   const intakeReplyRequestId = useRef(globalThis.crypto.randomUUID());
   const duplicateResolutionRequestId = useRef(globalThis.crypto.randomUUID());
+  const restoreIntakeRequestId = useRef(globalThis.crypto.randomUUID());
   const replyMessageId = useRef(globalThis.crypto.randomUUID());
   const resumeRequestId = useRef(globalThis.crypto.randomUUID());
   const handoffRequestId = useRef(globalThis.crypto.randomUUID());
@@ -234,6 +257,68 @@ export function App() {
     const parsed = parseIntakeSnapshot((await response.json()) as unknown);
     if (!parsed) throw new Error("incompatible intake snapshot");
     setIntake(parsed);
+  }
+
+  async function findRecoverableIntakes() {
+    setIntakeRecoveryState("loading");
+    setError("");
+    try {
+      const response = await humanSessionFetch(`${CUSTOMER_INTAKE_BASE}/recovery`, {
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error("intake recovery index failed");
+      const index = parseIntakeRecoveryIndex((await response.json()) as unknown);
+      if (!index) throw new Error("incompatible intake recovery index");
+      if (index.active.length > 0) {
+        const active = index.active[0];
+        setIntake(active.intake);
+        setIntakeFactsChanged(active.factsChanged);
+        globalThis.history.replaceState(null, "", `?intake=${active.intake.intakeId}`);
+        setIntakeRecoveryState("idle");
+        return;
+      }
+      setArchivedIntakes(index.archived);
+      setIntakeRecoveryState(index.archived.length === 0 ? "empty" : "ready");
+    } catch {
+      setIntakeRecoveryState("error");
+    }
+  }
+
+  async function restoreArchivedIntake(archived: RecoverableIntake) {
+    setIntakeRecoveryState("restoring");
+    setError("");
+    try {
+      const csrf = await loadCsrfToken();
+      const response = await humanSessionFetch(
+        `${CUSTOMER_INTAKE_BASE}/${archived.intake.intakeId}/restore`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            [csrf.headerName]: csrf.token,
+            "Content-Type": "application/json",
+            "Idempotency-Key": restoreIntakeRequestId.current,
+          },
+          body: JSON.stringify({
+            schema: CUSTOMER_INTAKE_RECOVERY_SCHEMA,
+            expectedVersion: archived.version,
+          }),
+        },
+      );
+      if (!response.ok) throw new Error("intake restore failed");
+      const restored = parseRecoverableIntake((await response.json()) as unknown);
+      if (!restored || restored.retentionState !== "ACTIVE") {
+        throw new Error("incompatible intake restore");
+      }
+      setIntake(restored.intake);
+      setIntakeFactsChanged(restored.factsChanged);
+      setArchivedIntakes([]);
+      setIntakeRecoveryState("idle");
+      globalThis.history.replaceState(null, "", `?intake=${restored.intake.intakeId}`);
+      restoreIntakeRequestId.current = globalThis.crypto.randomUUID();
+    } catch {
+      setIntakeRecoveryState("error");
+    }
   }
 
   async function resolveDuplicate(match: DuplicateIntakeMatch, action: string) {
@@ -683,6 +768,62 @@ export function App() {
             </StatusNotice>
           )}
         </section>
+      ) : !snapshot && intakeRecoveryState !== "idle" ? (
+        <section
+          className="ticket-recovery intake-recovery"
+          aria-live="polite"
+          aria-busy={intakeRecoveryState === "loading" || intakeRecoveryState === "restoring"}
+        >
+          <p className="eyebrow">受理记录</p>
+          {intakeRecoveryState === "loading" && (
+            <StatusNotice role="status" tone="busy">
+              正在查找活动与已归档受理
+            </StatusNotice>
+          )}
+          {intakeRecoveryState === "restoring" && (
+            <StatusNotice role="status" tone="warning">
+              正在恢复受理并核对当前订单事实
+            </StatusNotice>
+          )}
+          {intakeRecoveryState === "ready" && (
+            <>
+              <h2>已归档受理</h2>
+              <p>七日保留期已结束。恢复只会重新核对事实，不会直接确认或创建工单。</p>
+              <div className="archived-intake-list">
+                {archivedIntakes.map((archived) => (
+                  <article key={archived.intake.intakeId}>
+                    <strong>{archived.intake.candidateOrder?.reference ?? "待确认订单"}</strong>
+                    <span>
+                      {archived.messages.at(-1)?.body ?? archived.intake.assistantMessage}
+                    </span>
+                    <button type="button" onClick={() => void restoreArchivedIntake(archived)}>
+                      恢复并重新核对事实
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </>
+          )}
+          {intakeRecoveryState === "empty" && (
+            <>
+              <h2>没有可恢复的受理记录</h2>
+              <p>当前客户没有活动或已归档的未确认受理，你可以开始新的受理对话。</p>
+              <button type="button" onClick={() => void findRecoverableIntakes()}>
+                重新查询受理记录
+              </button>
+            </>
+          )}
+          {intakeRecoveryState === "error" && (
+            <>
+              <StatusNotice role="alert" tone="danger">
+                受理记录加载失败，请稍后重新读取 Spring 权威记录。
+              </StatusNotice>
+              <button type="button" onClick={() => void findRecoverableIntakes()}>
+                重新查询受理记录
+              </button>
+            </>
+          )}
+        </section>
       ) : !snapshot && intake ? (
         <section className="intake-card" aria-live="polite" aria-busy={submitting}>
           <div className="intake-agent-heading">
@@ -708,6 +849,11 @@ export function App() {
               </h2>
             </div>
           </div>
+          {intakeFactsChanged && (
+            <StatusNotice role="status" tone="warning">
+              订单事实已变化，请重新确认
+            </StatusNotice>
+          )}
           <p className="intake-agent-message">{intake.assistantMessage}</p>
           {(intake.completedOrderCount > 0 || intake.remainingOrderCount > 0) && (
             <p className="intake-atomic-note" role="status">
@@ -879,6 +1025,13 @@ export function App() {
           </label>
           <button className="primary-action" disabled={submitting}>
             {submitting ? "正在理解你的问题…" : "提交物流延迟问题"}
+          </button>
+          <button
+            type="button"
+            className="intake-secondary-action"
+            onClick={() => void findRecoverableIntakes()}
+          >
+            查找未完成受理
           </button>
           <p className="form-assurance">此时只开始受理对话；确认前不会创建正式工单。</p>
           {error && (
@@ -1067,6 +1220,77 @@ function isSnapshot(value: unknown): value is Snapshot {
     Number(value.ticket.agentGeneration) >= 0 &&
     value.messages.every(isPublicMessage) &&
     isClarification(value.clarification)
+  );
+}
+
+function parseIntakeRecoveryIndex(value: unknown): IntakeRecoveryIndex | null {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["schema", "active", "archived"]) ||
+    value.schema !== CUSTOMER_INTAKE_RECOVERY_SCHEMA ||
+    !Array.isArray(value.active) ||
+    !Array.isArray(value.archived)
+  )
+    return null;
+  const active = value.active.map(parseRecoverableIntake);
+  const archived = value.archived.map(parseRecoverableIntake);
+  if (active.some((item) => item === null) || archived.some((item) => item === null)) return null;
+  const parsedActive = active as RecoverableIntake[];
+  const parsedArchived = archived as RecoverableIntake[];
+  if (
+    parsedActive.some((item) => item.retentionState !== "ACTIVE") ||
+    parsedArchived.some((item) => item.retentionState !== "ARCHIVED")
+  )
+    return null;
+  return {
+    schema: CUSTOMER_INTAKE_RECOVERY_SCHEMA,
+    active: parsedActive,
+    archived: parsedArchived,
+  };
+}
+
+function parseRecoverableIntake(value: unknown): RecoverableIntake | null {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, [
+      "intake",
+      "version",
+      "retentionState",
+      "expiresAt",
+      "archivedAt",
+      "factsChanged",
+      "messages",
+    ]) ||
+    !Number.isSafeInteger(value.version) ||
+    Number(value.version) < 1 ||
+    !["ACTIVE", "ARCHIVED"].includes(String(value.retentionState)) ||
+    typeof value.expiresAt !== "string" ||
+    !(value.archivedAt === null || typeof value.archivedAt === "string") ||
+    typeof value.factsChanged !== "boolean" ||
+    !Array.isArray(value.messages) ||
+    !value.messages.every(isIntakeConversationMessage)
+  )
+    return null;
+  const intake = parseIntakeSnapshot(value.intake);
+  if (!intake) return null;
+  return {
+    intake,
+    version: Number(value.version),
+    retentionState: value.retentionState as RecoverableIntake["retentionState"],
+    expiresAt: value.expiresAt,
+    archivedAt: value.archivedAt,
+    factsChanged: value.factsChanged,
+    messages: value.messages as RecoverableIntake["messages"],
+  };
+}
+
+function isIntakeConversationMessage(value: unknown) {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["author", "body", "sentAt"]) &&
+    ["CUSTOMER", "AGENT"].includes(String(value.author)) &&
+    typeof value.body === "string" &&
+    typeof value.sentAt === "string"
   );
 }
 

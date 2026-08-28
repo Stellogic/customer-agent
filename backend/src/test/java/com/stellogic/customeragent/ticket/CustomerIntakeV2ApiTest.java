@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -253,6 +254,100 @@ class CustomerIntakeV2ApiTest {
                 .andExpect(jsonPath("$.ticketIds[0]").value(TICKET_ID.toString()))
                 .andExpect(jsonPath("$.completedOrderCount").value(1))
                 .andExpect(jsonPath("$.confirmed").value(false));
+    }
+
+    @Test
+    void listsOnlyTheAuthenticatedCustomersRecoverableIntakesWithHistory() throws Exception {
+        when(service.recoveryIndex("customer-demo"))
+                .thenReturn(
+                        new CustomerIntakeRecoveryIndex(
+                                java.util.List.of(),
+                                java.util.List.of(
+                                        new RecoverableCustomerIntake(
+                                                new CustomerIntakeSnapshot(
+                                                        INTAKE_ID,
+                                                        "READY_TO_CONFIRM",
+                                                        "ORDER-DELAY-001",
+                                                        "配送中的合成订单",
+                                                        java.util.List.of(
+                                                                new ProposedIntakeIssue(
+                                                                        "LOGISTICS_DELAY", "物流延迟")),
+                                                        "请重新确认变化后的订单事实。",
+                                                        java.util.List.of(),
+                                                        null,
+                                                        java.util.List.of(),
+                                                        java.util.List.of(),
+                                                        0,
+                                                        0,
+                                                        false),
+                                                3,
+                                                "ARCHIVED",
+                                                Instant.parse("2026-08-27T00:00:00Z"),
+                                                Instant.parse("2026-08-27T00:00:00Z"),
+                                                false,
+                                                java.util.List.of(
+                                                        new IntakeConversationMessage(
+                                                                "CUSTOMER",
+                                                                "物流延迟了",
+                                                                Instant.parse(
+                                                                        "2026-08-20T00:00:00Z")),
+                                                        new IntakeConversationMessage(
+                                                                "AGENT",
+                                                                "请确认我的理解。",
+                                                                Instant.parse(
+                                                                        "2026-08-20T00:00:01Z")))))));
+
+        mvc.perform(get("/api/customer/v2/intakes/recovery").principal(customer("customer-demo")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.schema").value("customer-intake-recovery-v1"))
+                .andExpect(jsonPath("$.active.length()").value(0))
+                .andExpect(jsonPath("$.archived[0].intake.intakeId").value(INTAKE_ID.toString()))
+                .andExpect(jsonPath("$.archived[0].version").value(3))
+                .andExpect(jsonPath("$.archived[0].retentionState").value("ARCHIVED"))
+                .andExpect(jsonPath("$.archived[0].messages.length()").value(2));
+    }
+
+    @Test
+    void restoresAnArchivedIntakeAgainstItsStableVersion() throws Exception {
+        when(service.restore(any()))
+                .thenReturn(
+                        new RecoverableCustomerIntake(
+                                new CustomerIntakeSnapshot(
+                                        INTAKE_ID,
+                                        "READY_TO_CONFIRM",
+                                        "ORDER-DELAY-001",
+                                        "配送中的合成订单",
+                                        java.util.List.of(
+                                                new ProposedIntakeIssue("LOGISTICS_DELAY", "物流延迟")),
+                                        "订单事实已变化，请重新确认。",
+                                        java.util.List.of(),
+                                        null,
+                                        java.util.List.of(),
+                                        java.util.List.of(),
+                                        0,
+                                        0,
+                                        false),
+                                4,
+                                "ACTIVE",
+                                Instant.parse("2026-09-04T00:00:00Z"),
+                                null,
+                                true,
+                                java.util.List.of()));
+
+        mvc.perform(
+                        post("/api/customer/v2/intakes/{intakeId}/restore", INTAKE_ID)
+                                .principal(customer("customer-demo"))
+                                .header("Idempotency-Key", "restore-155")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"customer-intake-recovery-v1","expectedVersion":3}
+                                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.version").value(4))
+                .andExpect(jsonPath("$.retentionState").value("ACTIVE"))
+                .andExpect(jsonPath("$.factsChanged").value(true))
+                .andExpect(jsonPath("$.intake.confirmed").value(false));
     }
 
     private static UsernamePasswordAuthenticationToken customer(String customerId) {

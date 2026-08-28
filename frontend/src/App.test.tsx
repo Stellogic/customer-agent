@@ -330,6 +330,71 @@ describe("客户帮助中心", () => {
     expect(screen.getByText(/原始描述已保留，但下一订单仍需单独确认/)).toBeInTheDocument();
   });
 
+  it("重新登录后列出归档受理并在恢复期间禁止直接确认", async () => {
+    let finishRestore: ((response: Response) => void) | undefined;
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            schema: "customer-intake-recovery-v1",
+            active: [],
+            archived: [recoverableIntake({ retentionState: "ARCHIVED", version: 3 })],
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishRestore = resolve;
+          }),
+      );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "查找未完成受理" }));
+
+    expect(await screen.findByRole("heading", { name: "已归档受理" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "恢复并重新核对事实" }));
+    expect(screen.getByRole("status")).toHaveTextContent("正在恢复受理并核对当前订单事实");
+    expect(screen.queryByRole("button", { name: /确认.*工单/ })).not.toBeInTheDocument();
+
+    await waitFor(() => expect(finishRestore).toBeTypeOf("function"));
+    finishRestore?.(
+      new Response(
+        JSON.stringify(
+          recoverableIntake({
+            retentionState: "ACTIVE",
+            version: 4,
+            factsChanged: true,
+            archivedAt: null,
+          }),
+        ),
+        { status: 201 },
+      ),
+    );
+    expect(await screen.findByText("订单事实已变化，请重新确认")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "请确认我的理解" })).toBeInTheDocument();
+  });
+
+  it("受理记录查询区分无记录与加载失败", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ schema: "customer-intake-recovery-v1", active: [], archived: [] }),
+          { status: 200 },
+        ),
+      )
+      .mockRejectedValueOnce(new TypeError("offline"));
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "查找未完成受理" }));
+    expect(await screen.findByText("没有可恢复的受理记录")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重新查询受理记录" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("受理记录加载失败");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("澄清恢复响应丢失时按稳定 resumeRequestId 查询而不创建第二次恢复", async () => {
     const ticketId = "16000000-0000-0000-0000-000000000001";
     globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
@@ -1320,6 +1385,25 @@ function intakeV3(overrides: Record<string, unknown> = {}) {
     expectedTicketCount: 1,
     confirmed: false,
     replayed: false,
+    ...overrides,
+  };
+}
+
+function recoverableIntake(overrides: Record<string, unknown> = {}) {
+  return {
+    intake: intakeV3({
+      intakeId: "15500000-0000-0000-0000-000000000001",
+      assistantMessage: "请重新确认我的理解。",
+    }),
+    version: 3,
+    retentionState: "ARCHIVED",
+    expiresAt: "2026-08-27T00:00:00Z",
+    archivedAt: "2026-08-27T00:00:00Z",
+    factsChanged: false,
+    messages: [
+      { author: "CUSTOMER", body: "物流延迟了", sentAt: "2026-08-20T00:00:00Z" },
+      { author: "AGENT", body: "请确认我的理解。", sentAt: "2026-08-20T00:00:01Z" },
+    ],
     ...overrides,
   };
 }

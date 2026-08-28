@@ -25,6 +25,8 @@ public final class CustomerIntakeV2Controller {
     private static final Set<String> MESSAGE_FIELDS = Set.of("schema", "message");
     private static final Set<String> DUPLICATE_FIELDS =
             Set.of("schema", "existingTicketId", "action");
+    private static final String RECOVERY_SCHEMA = "customer-intake-recovery-v1";
+    private static final Set<String> RESTORE_FIELDS = Set.of("schema", "expectedVersion");
     private final CustomerIntakeService service;
 
     public CustomerIntakeV2Controller(CustomerIntakeService service) {
@@ -66,6 +68,35 @@ public final class CustomerIntakeV2Controller {
     @GetMapping("/{intakeId}")
     IntakeResponse snapshot(Authentication authentication, @PathVariable UUID intakeId) {
         return IntakeResponse.from(service.snapshot(authentication.getName(), intakeId));
+    }
+
+    @GetMapping("/recovery")
+    RecoveryIndexResponse recoveryIndex(Authentication authentication) {
+        return RecoveryIndexResponse.from(service.recoveryIndex(authentication.getName()));
+    }
+
+    @PostMapping("/{intakeId}/restore")
+    ResponseEntity<RecoverableIntakeResponse> restore(
+            Authentication authentication,
+            @PathVariable UUID intakeId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
+            @RequestBody Map<String, Object> request) {
+        if (!request.keySet().equals(RESTORE_FIELDS)
+                || !RECOVERY_SCHEMA.equals(request.get("schema"))
+                || !(request.get("expectedVersion") instanceof Number expectedVersion)
+                || expectedVersion.longValue() < 1) {
+            throw new InvalidCustomerRequestException("归档受理恢复字段与版本无效");
+        }
+        RecoverableCustomerIntake restored =
+                service.restore(
+                        new RestoreCustomerIntake(
+                                authentication.getName(),
+                                intakeId,
+                                requireText(requestId, 200, "缺少稳定请求身份"),
+                                expectedVersion.longValue()));
+        return ResponseEntity.status(
+                        restored.intake().replayed() ? HttpStatus.OK : HttpStatus.CREATED)
+                .body(RecoverableIntakeResponse.from(restored));
     }
 
     @PostMapping("/{intakeId}/duplicate-resolution")
@@ -187,6 +218,44 @@ public final class CustomerIntakeV2Controller {
                     match.issueKind(),
                     match.issueSummary(),
                     match.lifecycleState());
+        }
+    }
+
+    record RecoveryIndexResponse(
+            String schema,
+            java.util.List<RecoverableIntakeResponse> active,
+            java.util.List<RecoverableIntakeResponse> archived) {
+        static RecoveryIndexResponse from(CustomerIntakeRecoveryIndex index) {
+            return new RecoveryIndexResponse(
+                    RECOVERY_SCHEMA,
+                    index.active().stream().map(RecoverableIntakeResponse::from).toList(),
+                    index.archived().stream().map(RecoverableIntakeResponse::from).toList());
+        }
+    }
+
+    record RecoverableIntakeResponse(
+            IntakeResponse intake,
+            long version,
+            String retentionState,
+            java.time.Instant expiresAt,
+            java.time.Instant archivedAt,
+            boolean factsChanged,
+            java.util.List<ConversationMessage> messages) {
+        static RecoverableIntakeResponse from(RecoverableCustomerIntake value) {
+            return new RecoverableIntakeResponse(
+                    IntakeResponse.from(value.intake()),
+                    value.version(),
+                    value.retentionState(),
+                    value.expiresAt(),
+                    value.archivedAt(),
+                    value.factsChanged(),
+                    value.messages().stream().map(ConversationMessage::from).toList());
+        }
+    }
+
+    record ConversationMessage(String author, String body, java.time.Instant sentAt) {
+        static ConversationMessage from(IntakeConversationMessage message) {
+            return new ConversationMessage(message.author(), message.body(), message.sentAt());
         }
     }
 }

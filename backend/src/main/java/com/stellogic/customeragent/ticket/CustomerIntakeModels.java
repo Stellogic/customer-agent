@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.ticket;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -9,6 +10,9 @@ record ReplyCustomerIntake(String customerId, UUID intakeId, String requestId, S
 
 record ResolveDuplicateIntake(
         String customerId, UUID intakeId, String requestId, UUID existingTicketId, String action) {}
+
+record RestoreCustomerIntake(
+        String customerId, UUID intakeId, String requestId, long expectedVersion) {}
 
 record CustomerIntakeSnapshot(
         UUID intakeId,
@@ -31,6 +35,20 @@ record CustomerVisibleOrderSummary(String reference, String summary, String vers
 
 record DuplicateIntakeMatch(
         UUID ticketId, String issueKind, String issueSummary, String lifecycleState) {}
+
+record IntakeConversationMessage(String author, String body, Instant sentAt) {}
+
+record RecoverableCustomerIntake(
+        CustomerIntakeSnapshot intake,
+        long version,
+        String retentionState,
+        Instant expiresAt,
+        Instant archivedAt,
+        boolean factsChanged,
+        List<IntakeConversationMessage> messages) {}
+
+record CustomerIntakeRecoveryIndex(
+        List<RecoverableCustomerIntake> active, List<RecoverableCustomerIntake> archived) {}
 
 record IntakeUnderstandingRequest(
         String customerMessage,

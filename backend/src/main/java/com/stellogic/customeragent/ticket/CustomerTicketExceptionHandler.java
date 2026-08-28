@@ -71,6 +71,18 @@ public final class CustomerTicketExceptionHandler {
                 .body(Map.of("code", "INTAKE_CANDIDATE_STALE", "message", "订单事实已变化，请重新确认"));
     }
 
+    @ExceptionHandler(IntakeArchivedException.class)
+    ResponseEntity<Map<String, String>> intakeArchived() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("code", "INTAKE_ARCHIVED", "message", "受理对话已归档，请先恢复并重新确认事实"));
+    }
+
+    @ExceptionHandler(IntakeVersionConflictException.class)
+    ResponseEntity<Map<String, String>> intakeVersionConflict() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("code", "INTAKE_VERSION_CONFLICT", "message", "受理版本已变化，请重新读取权威记录"));
+    }
+
     @ExceptionHandler(IntakeAgentUnavailableException.class)
     ResponseEntity<Map<String, String>> intakeAgentUnavailable() {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)

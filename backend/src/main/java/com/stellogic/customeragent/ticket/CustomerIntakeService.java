@@ -8,4 +8,8 @@ interface CustomerIntakeService {
     CustomerIntakeSnapshot resolveDuplicate(ResolveDuplicateIntake command);
 
     CustomerIntakeSnapshot snapshot(String customerId, java.util.UUID intakeId);
+
+    CustomerIntakeRecoveryIndex recoveryIndex(String customerId);
+
+    RecoverableCustomerIntake restore(RestoreCustomerIntake command);
 }

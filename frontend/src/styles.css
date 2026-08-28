@@ -269,6 +269,26 @@ h1 {
   background: white;
   color: var(--forest-800);
 }
+.intake-recovery {
+  display: grid;
+  gap: 16px;
+}
+.archived-intake-list {
+  display: grid;
+  gap: 12px;
+}
+.archived-intake-list article {
+  display: grid;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--forest-50);
+  padding: 15px;
+}
+.archived-intake-list article span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
 .ticket-form {
   display: grid;
   gap: 20px;

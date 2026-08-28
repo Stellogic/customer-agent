@@ -34,4 +34,8 @@ final class IntakeNotReadyException extends RuntimeException {}
 
 final class IntakeCandidateStaleException extends RuntimeException {}
 
+final class IntakeArchivedException extends RuntimeException {}
+
+final class IntakeVersionConflictException extends RuntimeException {}
+
 final class IntakeAgentUnavailableException extends RuntimeException {}
