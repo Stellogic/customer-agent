@@ -413,6 +413,7 @@ describe("客户帮助中心", () => {
             retentionState: "COMPLETED",
             expiresAt: null,
             archivedAt: null,
+            factsChanged: true,
             version: 5,
             intake: intakeV4({
               intakeId,
@@ -430,6 +431,7 @@ describe("客户帮助中心", () => {
 
     expect(await screen.findByRole("heading", { name: "1 张工单已创建" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "已创建工单" })).toBeInTheDocument();
+    expect(screen.queryByText("订单事实已变化，请重新确认")).not.toBeInTheDocument();
   });
 
   it("受理记录查询区分无记录与加载失败", async () => {

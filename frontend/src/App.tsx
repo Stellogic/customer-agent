@@ -873,7 +873,7 @@ export function App() {
               </h2>
             </div>
           </div>
-          {intakeFactsChanged && (
+          {intakeFactsChanged && intake.status !== "CONFIRMED" && (
             <StatusNotice role="status" tone="warning">
               订单事实已变化，请重新确认
             </StatusNotice>

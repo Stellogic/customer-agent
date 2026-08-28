@@ -114,7 +114,9 @@ test("Issue #155 窄屏在订单权属失效后安全恢复并隔离其他客户
   const context = await newIssue80Context(browser, { viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   const orderReference = "ORDER-INTAKE-155-NARROW";
+  const replacementOrderReference = "ORDER-INTAKE-155-REPLACEMENT";
   prepareOrder(orderReference);
+  prepareOrder(replacementOrderReference);
   await login(page, "customer", "customer-demo");
 
   const intakeId = await startIntake(page, orderReference);
@@ -123,6 +125,10 @@ test("Issue #155 窄屏在订单权属失效后安全恢复并隔离其他客户
     set updated_at = timestamptz '2026-08-09T14:00:01Z',
         expires_at = timestamptz '2026-08-09T14:00:00Z'
     where id = '${intakeId}'::uuid;
+    update synthetic_order
+    set customer_id = 'customer-issue155-hidden'
+    where customer_id = 'customer-demo'
+      and order_reference <> '${replacementOrderReference}';
     update synthetic_order
     set customer_id = 'customer-other'
     where order_reference = '${orderReference}';
@@ -149,28 +155,40 @@ test("Issue #155 窄屏在订单权属失效后安全恢复并隔离其他客户
     ) on conflict do nothing;
   `);
 
-  await page.getByRole("button", { name: "退出登录" }).click();
-  await expect(page).toHaveURL(/\/help\/login/);
-  await login(page, "customer", "customer-demo");
-  await page.goto(`/help?intake=${intakeId}`);
-  await expect(page.getByRole("heading", { name: "已归档受理" })).toBeVisible();
-  await page.getByRole("button", { name: "恢复并重新核对事实" }).click();
-  await expect(page.getByText("订单事实已变化，请重新确认")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "再帮我确认一点" })).toBeVisible();
-  await expect(page.locator(".intake-agent-message").getByText(/请补充订单线索/)).toBeVisible();
-  await expect(page.getByRole("article", { name: "订单候选" })).toHaveCount(0);
-  await expect(page.getByRole("list", { name: "已恢复的受理消息" })).toContainText(
-    "物流已经延迟，请帮我核对",
-  );
-  await expect(page.getByText("其他客户私有消息")).toHaveCount(0);
-  expect(ticketCount(orderReference)).toBe("0");
-  expect(new URL(page.url()).searchParams.get("intake")).toBe(intakeId);
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
-    ),
-  ).toBe(true);
-  await context.close();
+  try {
+    await page.getByRole("button", { name: "退出登录" }).click();
+    await expect(page).toHaveURL(/\/help\/login/);
+    await login(page, "customer", "customer-demo");
+    await page.goto(`/help?intake=${intakeId}`);
+    await expect(page.getByRole("heading", { name: "已归档受理" })).toBeVisible();
+    await page.getByRole("button", { name: "恢复并重新核对事实" }).click();
+    await expect(page.getByText("订单事实已变化，请重新确认")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "再帮我确认一点" })).toBeVisible();
+    await expect(
+      page.locator(".intake-agent-message").getByText(/请补充订单线索/),
+    ).toBeVisible();
+    await expect(page.getByRole("article", { name: "订单候选" })).toHaveCount(0);
+    await expect(page.getByRole("list", { name: "已恢复的受理消息" })).toContainText(
+      "物流已经延迟，请帮我核对",
+    );
+    await expect(page.getByText("其他客户私有消息")).toHaveCount(0);
+    expect(ticketCount(orderReference)).toBe("0");
+    expect(ticketCount(replacementOrderReference)).toBe("0");
+    expect(new URL(page.url()).searchParams.get("intake")).toBe(intakeId);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+  } finally {
+    executeFixtureSql(`
+      update synthetic_order
+      set customer_id = 'customer-demo'
+      where customer_id = 'customer-issue155-hidden'
+         or order_reference = '${orderReference}';
+    `);
+    await context.close();
+  }
 });
 
 async function startIntake(page: Page, orderReference: string) {

@@ -354,10 +354,10 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
         }
 
         List<CustomerVisibleOrderSummary> orders = visibleOrders(command.customerId());
-        boolean currentCandidateVisible =
-                current.orderReference() == null
-                        || orders.stream()
-                                .anyMatch(
+        boolean candidateOwnershipLost =
+                current.orderReference() != null
+                        && orders.stream()
+                                .noneMatch(
                                         order ->
                                                 order.reference().equals(current.orderReference()));
         List<String> visibleRemainingOrders =
@@ -372,15 +372,25 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                                                                         .equals(reference)))
                         .toList();
         IntakeUnderstanding understanding =
-                agent.understand(
-                        new IntakeUnderstandingRequest(
-                                latestCustomerMessage(current.id(), current.originalMessage()),
-                                orders,
-                                currentCandidateVisible ? current.orderReference() : null,
-                                firstSummary(current.issues()),
-                                current.issues(),
-                                current.pendingIssueKinds(),
-                                visibleRemainingOrders));
+                candidateOwnershipLost
+                        ? new IntakeUnderstanding(
+                                "UNDERSTANDING",
+                                "NEEDS_CLARIFICATION",
+                                null,
+                                List.of(),
+                                List.of(),
+                                List.of(),
+                                "原订单已不再可见，请补充订单线索。")
+                        : agent.understand(
+                                new IntakeUnderstandingRequest(
+                                        latestCustomerMessage(
+                                                current.id(), current.originalMessage()),
+                                        orders,
+                                        current.orderReference(),
+                                        firstSummary(current.issues()),
+                                        current.issues(),
+                                        current.pendingIssueKinds(),
+                                        visibleRemainingOrders));
         requireUnderstanding(understanding, orders);
         CustomerVisibleOrderSummary candidate = candidate(understanding, orders);
         boolean factsChanged = factsChanged(current, orders, candidate);
@@ -440,7 +450,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                     "update customer_intake set status = 'CONFIRMED', assistant_message = ?, "
                             + "confirmed_at = coalesce(confirmed_at, ?), updated_at = ?, "
                             + "retention_state = 'COMPLETED', expires_at = null, archived_at = null, "
-                            + "version = version + 1 "
+                            + "facts_changed = false, version = version + 1 "
                             + "where id = ?",
                     completionMessage,
                     timestamp(now),
