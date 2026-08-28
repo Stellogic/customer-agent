@@ -5,6 +5,7 @@ import { SupportWorkbench } from "./SupportWorkbench";
 
 const HANDOFF_TICKET = "26000000-0000-0000-0000-000000000001";
 const BREACHED_TICKET = "26000000-0000-0000-0000-000000000002";
+const SNAPSHOT_URL = "/api/support/workbench/snapshot?schema=support-workbench-v2";
 
 describe("客服共享队列工作台", () => {
   afterEach(() => {
@@ -32,7 +33,7 @@ describe("客服共享队列工作台", () => {
       )
       .mockResolvedValueOnce(
         snapshotResponse(
-          "support-workbench-v1:7",
+          "support-workbench-v2:7",
           [handoffItem(), breachedItem()],
           [breachedItem()],
         ),
@@ -48,7 +49,9 @@ describe("客服共享队列工作台", () => {
     expect(await screen.findAllByText("26000000…0002")).toHaveLength(2);
     expect(screen.queryByText(HANDOFF_TICKET)).not.toBeInTheDocument();
     expect(screen.queryByText(BREACHED_TICKET)).not.toBeInTheDocument();
-    expect(screen.queryByText(/customer-demo|ORDER-DELAY|物流延迟/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/customer-demo|问题描述|调查摘要/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("ORDER-DELAY-001").length).toBeGreaterThan(0);
+    expect(screen.getByText("包裹未收到")).toBeInTheDocument();
     expect(
       screen.queryByRole("textbox", { name: /搜索|筛选|回复|订单查询/ }),
     ).not.toBeInTheDocument();
@@ -61,7 +64,7 @@ describe("客服共享队列工作台", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/快照游标/)).not.toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe("/api/auth/session");
-    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe("/api/support/workbench/snapshot");
+    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe(SNAPSHOT_URL);
     expect(
       new Headers(vi.mocked(globalThis.fetch).mock.calls[1]?.[1]?.headers).get(
         "X-Synthetic-Support-Id",
@@ -87,17 +90,14 @@ describe("客服共享队列工作台", () => {
       await screen.findByRole("heading", { name: "当前身份无权访问此页面" }),
     ).toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalledWith(
-      "/api/support/workbench/snapshot",
-      expect.anything(),
-    );
+    expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalledWith(SNAPSHOT_URL, expect.anything());
   });
 
   it("确认领取后才写入分配并分区呈现真实授权详情", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const path = String(input);
-      if (path === "/api/support/workbench/snapshot") {
-        return snapshotResponse("support-workbench-v1:1", [handoffItem()], []);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [handoffItem()], []);
       }
       if (path === "/api/support/workbench/events") return openStream();
       if (path === "/api/auth/csrf") {
@@ -163,7 +163,7 @@ describe("客服共享队列工作台", () => {
 
     expect(await screen.findByRole("heading", { name: "授权工单详情" })).toBeInTheDocument();
     expect(screen.getByText("customer-demo")).toBeInTheDocument();
-    expect(screen.getByText("ORDER-DELAY-001")).toBeInTheDocument();
+    expect(screen.getAllByText("ORDER-DELAY-001").length).toBeGreaterThan(1);
     expect(screen.getByRole("heading", { name: "公开沟通" })).toBeInTheDocument();
     expect(screen.getByText("物流一直没有更新")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "调查事实" })).toBeInTheDocument();
@@ -180,8 +180,8 @@ describe("客服共享队列工作台", () => {
     let detailReads = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
-      if (path === "/api/support/workbench/snapshot") {
-        return snapshotResponse("support-workbench-v1:1", [handoffItem()], []);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [handoffItem()], []);
       }
       if (path === "/api/support/workbench/events") return openStream();
       if (path === "/api/auth/csrf") {
@@ -225,8 +225,8 @@ describe("客服共享队列工作台", () => {
   it("从旧详情切换领取失败时立即移除不再监控的旧详情", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
-      if (path === "/api/support/workbench/snapshot") {
-        return snapshotResponse("support-workbench-v1:1", [handoffItem(), breachedItem()], []);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [handoffItem(), breachedItem()], []);
       }
       if (path === "/api/support/workbench/events") return openStream();
       if (path === "/api/auth/csrf") {
@@ -262,20 +262,20 @@ describe("客服共享队列工作台", () => {
 
     render(<SupportWorkbench />);
     await confirmClaim(HANDOFF_TICKET);
-    expect(await screen.findByText("ORDER-DELAY-001")).toBeInTheDocument();
+    expect((await screen.findAllByText("ORDER-DELAY-001")).length).toBeGreaterThan(0);
 
     await confirmClaim(BREACHED_TICKET);
     expect(await screen.findByRole("alert")).toHaveTextContent("领取未完成");
-    expect(screen.queryByText("ORDER-DELAY-001")).not.toBeInTheDocument();
+    expect(screen.queryByText("customer-demo")).not.toBeInTheDocument();
   });
 
   it("序号缺口停止旧流并整体替换为新快照", async () => {
     let resolveRecovery: ((response: Response) => void) | undefined;
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:2", [handoffItem()], []))
+      .mockResolvedValueOnce(snapshotResponse("support-workbench-v2:2", [handoffItem()], []))
       .mockResolvedValueOnce(
         sseResponse(
-          eventBlock("support-workbench-v1:4", "QUEUE_TICKET_REMOVED", {
+          eventBlock("support-workbench-v2:4", "QUEUE_TICKET_REMOVED", {
             ticketId: HANDOFF_TICKET,
           }),
         ),
@@ -292,31 +292,27 @@ describe("客服共享队列工作台", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("当前队列可能过期");
     resolveRecovery?.(
-      snapshotResponse("support-workbench-v1:8", [breachedItem()], [breachedItem()]),
+      snapshotResponse("support-workbench-v2:8", [breachedItem()], [breachedItem()]),
     );
     expect(await screen.findAllByText("26000000…0002")).toHaveLength(2);
     expect(screen.queryByText("26000000…0001")).not.toBeInTheDocument();
     expect(
-      vi
-        .mocked(globalThis.fetch)
-        .mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"),
+      vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => input === SNAPSHOT_URL),
     ).toHaveLength(2);
   });
 
   it("服务端结束单次 SSE 后自动重读快照并建立新的授权连接", async () => {
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:1", [handoffItem()], []))
+      .mockResolvedValueOnce(snapshotResponse("support-workbench-v2:1", [handoffItem()], []))
       .mockResolvedValueOnce(sseResponse(""))
-      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:2", [breachedItem()], []))
+      .mockResolvedValueOnce(snapshotResponse("support-workbench-v2:2", [breachedItem()], []))
       .mockResolvedValueOnce(openStream());
 
     render(<SupportWorkbench />);
 
     await waitFor(() =>
       expect(
-        vi
-          .mocked(globalThis.fetch)
-          .mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"),
+        vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => input === SNAPSHOT_URL),
       ).toHaveLength(2),
     );
     expect(await screen.findByText("26000000…0002")).toBeInTheDocument();
@@ -325,11 +321,13 @@ describe("客服共享队列工作台", () => {
 
   it("非法 payload 与 reset_required 都不会继续应用旧状态", async () => {
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:2", [handoffItem()], []))
+      .mockResolvedValueOnce(snapshotResponse("support-workbench-v2:2", [handoffItem()], []))
       .mockResolvedValueOnce(
         sseResponse(
-          eventBlock("support-workbench-v1:3", "QUEUE_TICKET_UPSERTED", {
+          eventBlock("support-workbench-v2:3", "QUEUE_TICKET_UPSERTED", {
             ticketId: BREACHED_TICKET,
+            orderReference: "ORDER-DELAY-001",
+            issueKind: "LOGISTICS_DELAY",
             lifecycleState: "INVESTIGATING",
             handlingMode: "AGENT",
             sharedEnteredAt: "2026-08-11T01:05:00Z",
@@ -338,12 +336,12 @@ describe("客服共享队列工作台", () => {
           }),
         ),
       )
-      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:9", [], []))
+      .mockResolvedValueOnce(snapshotResponse("support-workbench-v2:9", [], []))
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ code: "SNAPSHOT_REQUIRED" }), { status: 409 }),
       )
       .mockResolvedValueOnce(
-        snapshotResponse("support-workbench-v1:10", [breachedItem()], [breachedItem()]),
+        snapshotResponse("support-workbench-v2:10", [breachedItem()], [breachedItem()]),
       )
       .mockResolvedValueOnce(openStream());
 
@@ -352,18 +350,16 @@ describe("客服共享队列工作台", () => {
     expect(await screen.findAllByText("26000000…0002")).toHaveLength(2);
     expect(screen.queryByText("不得进入浏览器事件")).not.toBeInTheDocument();
     expect(
-      vi
-        .mocked(globalThis.fetch)
-        .mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"),
+      vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => input === SNAPSHOT_URL),
     ).toHaveLength(3);
   });
 
   it("异常断线也自动清除旧投影并重新读取权威快照", async () => {
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:2", [handoffItem()], []))
+      .mockResolvedValueOnce(snapshotResponse("support-workbench-v2:2", [handoffItem()], []))
       .mockRejectedValueOnce(new TypeError("disconnected"))
       .mockResolvedValueOnce(
-        snapshotResponse("support-workbench-v1:3", [breachedItem()], [breachedItem()]),
+        snapshotResponse("support-workbench-v2:3", [breachedItem()], [breachedItem()]),
       )
       .mockResolvedValueOnce(openStream());
 
@@ -376,7 +372,7 @@ describe("客服共享队列工作台", () => {
 
   it("保留地标、标题层级和语义化队列表格", async () => {
     vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(snapshotResponse("support-workbench-v1:1", [handoffItem()], []))
+      .mockResolvedValueOnce(snapshotResponse("support-workbench-v2:1", [handoffItem()], []))
       .mockResolvedValueOnce(openStream());
 
     render(<SupportWorkbench />);
@@ -385,11 +381,37 @@ describe("客服共享队列工作台", () => {
     expect(screen.getByRole("table", { name: "待接手工单" })).toBeInTheDocument();
     expect(screen.getByText("队列可发现不等于工单详情授权")).toBeInTheDocument();
   });
+
+  it("订单分组保持队列最早进入顺序而不是按订单号重排", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        snapshotResponse(
+          "support-workbench-v2:2",
+          [
+            { ...handoffItem(), orderReference: "ORDER-Z", enteredAt: "2026-08-11T01:00:00Z" },
+            { ...breachedItem(), orderReference: "ORDER-A", enteredAt: "2026-08-11T01:05:00Z" },
+          ],
+          [],
+        ),
+      )
+      .mockResolvedValueOnce(openStream());
+
+    const { container } = render(<SupportWorkbench />);
+
+    await screen.findByText("ORDER-Z");
+    expect(
+      [...container.querySelectorAll(".support-order-group > header strong")].map(
+        (element) => element.textContent,
+      ),
+    ).toEqual(["ORDER-Z", "ORDER-A"]);
+  });
 });
 
 function handoffItem() {
   return {
     ticketId: HANDOFF_TICKET,
+    orderReference: "ORDER-DELAY-001",
+    issueKind: "PACKAGE_NOT_RECEIVED",
     lifecycleState: "WAITING_FOR_CUSTOMER",
     handlingMode: "HUMAN",
     enteredAt: "2026-08-11T01:00:00Z",
@@ -404,6 +426,8 @@ async function confirmClaim(ticketId: string) {
 function breachedItem() {
   return {
     ticketId: BREACHED_TICKET,
+    orderReference: "ORDER-DELAY-001",
+    issueKind: "LOGISTICS_DELAY",
     lifecycleState: "INVESTIGATING",
     handlingMode: "AGENT",
     enteredAt: "2026-08-11T01:05:00Z",
@@ -413,7 +437,7 @@ function breachedItem() {
 function snapshotResponse(cursor: string, sharedQueue: unknown[], escalationQueue: unknown[]) {
   return Response.json({
     view: "SUPPORT_WORKBENCH",
-    schema: "support-workbench-v1",
+    schema: "support-workbench-v2",
     cursor,
     sharedQueue,
     escalationQueue,
@@ -423,7 +447,7 @@ function snapshotResponse(cursor: string, sharedQueue: unknown[], escalationQueu
 function eventBlock(id: string, type: string, payload: unknown) {
   return `id:${id}\nevent:${type}\ndata:${JSON.stringify({
     view: "SUPPORT_WORKBENCH",
-    schema: "support-workbench-v1",
+    schema: "support-workbench-v2",
     payload,
   })}\n\n`;
 }

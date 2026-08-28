@@ -91,6 +91,154 @@ body {
 .help-center > :last-child {
   animation-delay: 0.09s;
 }
+.help-center-intro {
+  display: grid;
+  gap: 24px;
+}
+.order-overview-trigger {
+  justify-self: start;
+  border: 1px solid var(--forest-300);
+  background: rgb(255 254 250 / 78%);
+  color: var(--forest-800);
+  box-shadow: var(--shadow-xs);
+}
+.order-ticket-overview {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--forest-200);
+  border-radius: 4px var(--radius-lg) var(--radius-lg);
+  background:
+    linear-gradient(135deg, rgb(242 248 244 / 96%), rgb(255 254 250 / 92%)),
+    repeating-linear-gradient(90deg, transparent 0 23px, rgb(20 82 62 / 4%) 24px);
+  box-shadow: var(--shadow-sm);
+}
+.order-ticket-overview > header,
+.order-ticket-group > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.order-ticket-overview h2,
+.order-ticket-group h3,
+.order-ticket-grid h4 {
+  max-width: none;
+  margin: 3px 0;
+  font-family: var(--font-display);
+}
+.order-ticket-overview > header p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.order-ticket-overview > header button {
+  border: 0;
+  background: transparent;
+  color: var(--forest-700);
+}
+.order-ticket-group {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-strong);
+}
+.order-ticket-group > header span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+.order-ticket-group > header strong {
+  border-radius: 999px;
+  background: var(--forest-100);
+  padding: 5px 9px;
+  color: var(--forest-800);
+  font-size: 0.72rem;
+}
+.order-ticket-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.order-ticket-grid > article {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  border-left: 3px solid var(--forest-500);
+  background: rgb(255 255 255 / 86%);
+  padding: 13px;
+}
+.order-ticket-number {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.order-ticket-grid dl {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+.order-ticket-grid dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.74rem;
+}
+.order-ticket-grid dt {
+  color: var(--muted);
+}
+.order-ticket-grid dd {
+  margin: 0;
+  color: var(--ink-soft);
+  font-weight: 750;
+  text-align: right;
+}
+.order-ticket-grid button,
+.pending-customer-items button {
+  min-height: 34px;
+  border: 1px solid var(--forest-200);
+  background: white;
+  color: var(--forest-800);
+}
+.compensation-chip {
+  justify-self: start;
+  border-radius: 999px;
+  background: var(--orange-soft);
+  padding: 3px 7px;
+  color: #9a581b;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.pending-customer-items {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pending-customer-items li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border: 1px dashed var(--forest-300);
+  border-radius: var(--radius-sm);
+  padding: 9px;
+}
+.pending-customer-items span {
+  color: var(--forest-700);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.pending-customer-items p,
+.order-group-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
 .eyebrow {
   margin: 0;
   color: #37634a;
@@ -1188,6 +1336,34 @@ h2 {
   font-size: 2rem;
   font-weight: 500;
 }
+.order-grouped-queue {
+  display: grid;
+  min-width: 0;
+}
+.support-order-group {
+  min-width: 0;
+}
+.support-order-group + .support-order-group {
+  border-top: 1px solid var(--line-strong);
+}
+.support-order-group > header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 13px 24px;
+  background: linear-gradient(90deg, var(--forest-50), transparent);
+}
+.support-order-group > header span,
+.support-order-group > header small {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+.support-order-group > header strong {
+  overflow-wrap: anywhere;
+  color: var(--forest-900);
+  font-size: 0.82rem;
+}
 .queue-kicker {
   margin: 0;
   color: #4e775e;
@@ -1261,6 +1437,12 @@ select:focus-visible {
   outline-offset: 3px;
 }
 @media (max-width: 760px) {
+  .order-ticket-grid {
+    grid-template-columns: 1fr;
+  }
+  .pending-customer-items li {
+    grid-template-columns: 1fr;
+  }
   .support-workbench {
     padding: 34px 18px;
   }

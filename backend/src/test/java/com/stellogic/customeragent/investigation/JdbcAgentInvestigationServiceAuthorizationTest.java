@@ -27,6 +27,44 @@ import org.springframework.web.server.ResponseStatusException;
 class JdbcAgentInvestigationServiceAuthorizationTest {
     @Test
     @SuppressWarnings("unchecked")
+    void siblingSummaryRejectsAmbiguousAliasesAndCapsTheProjection() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenAnswer(
+                        invocation -> {
+                            String sql = invocation.getArgument(0, String.class);
+                            return sql.startsWith("select t.order_reference")
+                                    ? List.of("ORDER-DELAY-AMBIGUOUS")
+                                    : List.of();
+                        });
+        JdbcAgentInvestigationService service =
+                new JdbcAgentInvestigationService(
+                        jdbc,
+                        mock(AgentAccessAudit.class),
+                        Clock.fixed(Instant.parse("2026-08-25T00:00:00Z"), ZoneOffset.UTC),
+                        mock(JdbcCompensationProposalStore.class),
+                        mock(SlaService.class),
+                        mock(TicketAuthorityLock.class),
+                        mock(CustomerPublicProjectionAppender.class),
+                        mock(TicketResolutionTransition.class));
+
+        assertThat(service.siblingTicketSummary(UUID.randomUUID(), UUID.randomUUID()).tickets())
+                .isEmpty();
+
+        String summarySql =
+                mockingDetails(jdbc).getInvocations().stream()
+                        .map(invocation -> invocation.getArgument(0, String.class))
+                        .filter(sql -> sql.contains("from support_ticket current_ticket"))
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(summarySql)
+                .contains("count(distinct alias.order_reference)")
+                .contains("= 1")
+                .contains("limit 20");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void staleHumanPreferredOrNonInvestigatingResultsCannotPublishAMessage() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         when(jdbc.query(anyString(), any(ResultSetExtractor.class), any(Object[].class)))

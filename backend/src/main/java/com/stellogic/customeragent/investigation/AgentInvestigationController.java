@@ -68,6 +68,25 @@ public final class AgentInvestigationController {
         return service.customerCommunicationContext(ticketId, generationId);
     }
 
+    @GetMapping("/sibling-summary")
+    SiblingTicketSummary siblingTicketSummary(
+            @PathVariable UUID ticketId,
+            @PathVariable UUID generationId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
+                    String authorization,
+            @RequestHeader(value = "X-Agent-Generation-Id", required = false)
+                    UUID scopedGenerationId,
+            @RequestHeader(value = "X-Agent-Operation", required = false) String operation) {
+        requireScope(
+                ticketId,
+                generationId,
+                scopedGenerationId,
+                operation,
+                "READ_SIBLING_TICKET_SUMMARY",
+                authorization);
+        return service.siblingTicketSummary(ticketId, generationId);
+    }
+
     @PostMapping("/capabilities/{capabilityName}")
     InvestigationCapabilityResult invoke(
             @PathVariable UUID ticketId,

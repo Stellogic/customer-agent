@@ -13,6 +13,14 @@ record CustomerCommunicationContext(
 
 record CustomerCommunicationMessage(String author, String body) {}
 
+record SiblingTicketSummary(String schemaVersion, List<SiblingTicketSummaryItem> tickets) {}
+
+record SiblingTicketSummaryItem(
+        String issueKind,
+        String lifecycleState,
+        String pendingAction,
+        boolean compensationFlowExists) {}
+
 record InvestigationCapabilityDefinition(
         InvestigationCapability name,
         List<InvestigationCapabilityField> parameters,

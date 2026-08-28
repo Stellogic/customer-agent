@@ -87,6 +87,39 @@ class AgentInvestigationCapabilityControllerTest {
     }
 
     @Test
+    void exposesOnlyMinimumSiblingTicketSummaryForTheCurrentGeneration() throws Exception {
+        when(service.siblingTicketSummary(TICKET_ID, GENERATION_ID))
+                .thenReturn(
+                        new SiblingTicketSummary(
+                                "sibling-ticket-summary-v1",
+                                List.of(
+                                        new SiblingTicketSummaryItem(
+                                                "DUPLICATE_CHARGE",
+                                                "INVESTIGATING",
+                                                "NONE",
+                                                true))));
+
+        org.springframework.http.HttpHeaders headers = scopedHeaders();
+        headers.set("X-Agent-Operation", "READ_SIBLING_TICKET_SUMMARY");
+        mvc.perform(
+                        get(
+                                        "/internal/agent/tickets/{ticketId}/generations/{generationId}/sibling-summary",
+                                        TICKET_ID,
+                                        GENERATION_ID)
+                                .headers(headers))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.schemaVersion").value("sibling-ticket-summary-v1"))
+                .andExpect(jsonPath("$.tickets[0].issueKind").value("DUPLICATE_CHARGE"))
+                .andExpect(jsonPath("$.tickets[0].pendingAction").value("NONE"))
+                .andExpect(jsonPath("$.tickets[0].compensationFlowExists").value(true))
+                .andExpect(jsonPath("$.tickets[0].conversation").doesNotExist())
+                .andExpect(jsonPath("$.tickets[0].workingSummary").doesNotExist())
+                .andExpect(jsonPath("$.tickets[0].internalNotes").doesNotExist())
+                .andExpect(jsonPath("$.tickets[0].ticketId").doesNotExist())
+                .andExpect(jsonPath("$.tickets[0].writeUrl").doesNotExist());
+    }
+
+    @Test
     void invokesOnlyADeclaredCapabilityWithItsExactParameters() throws Exception {
         when(service.invoke(
                         eq(TICKET_ID),

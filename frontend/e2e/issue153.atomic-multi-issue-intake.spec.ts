@@ -23,9 +23,8 @@ test("Issue #153 低置信问题澄清后原子创建同订单多工单", async 
   const confirmationRequest = page.waitForRequest((request) =>
     /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(new URL(request.url()).pathname),
   );
-  const confirmed = page.waitForResponse(
-    (response) =>
-      /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(new URL(response.url()).pathname),
+  const confirmed = page.waitForResponse((response) =>
+    /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(new URL(response.url()).pathname),
   );
   await page.getByRole("button", { name: "确认并原子创建 2 张工单" }).click();
   const originalRequest = await confirmationRequest;
@@ -68,7 +67,7 @@ test("Issue #153 低置信问题澄清后原子创建同订单多工单", async 
     sharedIntakeRecordId: result.sharedIntakeRecordId,
   });
   await expect(page.getByRole("heading", { name: "2 张工单已创建" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "已创建工单" }).getByRole("button")).toHaveCount(2);
+  await expect(page.getByRole("heading", { name: "订单 ORDER-DELAY-UNDER-24" })).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,

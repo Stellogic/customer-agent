@@ -74,9 +74,11 @@ test("Issue #154 窄屏逐订单确认并保留原始描述续办", async ({ bro
   expect(finalResult.ticketIds).toHaveLength(2);
   expect(new Set(finalResult.ticketIds).size).toBe(2);
   await expect(page.getByRole("heading", { name: "2 张工单已创建" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "已创建工单" }).getByRole("button")).toHaveCount(
-    2,
-  );
+  const overview = page.getByRole("region", { name: "订单工单总览" });
+  await expect(overview.getByRole("heading", { name: "订单 ORDER-DELAY-UNDER-24" })).toBeVisible();
+  for (const ticketId of finalResult.ticketIds) {
+    await expect(overview.getByRole("button", { name: `打开工单 ${ticketId}` })).toBeVisible();
+  }
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,

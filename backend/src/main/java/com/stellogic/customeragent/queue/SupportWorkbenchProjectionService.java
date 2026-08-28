@@ -10,7 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 class SupportWorkbenchProjectionService {
-    static final String EPOCH = "support-workbench-v1";
+    static final String LEGACY_EPOCH = "support-workbench-v1";
+    static final String EPOCH = "support-workbench-v2";
     private final JdbcTemplate jdbc;
     private final TicketAuthorityLock ticketLock;
 
@@ -21,38 +22,45 @@ class SupportWorkbenchProjectionService {
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     SupportWorkbenchSnapshot snapshot(String supportId) {
+        return snapshot(supportId, EPOCH);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    SupportWorkbenchSnapshot snapshot(String supportId, String epoch) {
         requireSupportPrincipal(supportId);
+        requireSupportedEpoch(epoch);
         List<SupportQueueItem> shared = queueItems("");
         List<SupportQueueItem> escalations = queueItems("where q.reason_code = 'SLA_BREACH' ");
         Long sequence =
                 jdbc.queryForObject(
-                        "select coalesce(max(sequence), 0) from support_workbench_event where epoch = ?",
+                        "select coalesce(max(epoch_sequence), 0) from support_workbench_event where epoch = ?",
                         Long.class,
-                        EPOCH);
+                        epoch);
         return new SupportWorkbenchSnapshot(
-                EPOCH, sequence == null ? 0 : sequence, shared, escalations);
+                epoch, sequence == null ? 0 : sequence, shared, escalations);
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     List<SupportWorkbenchEvent> events(String supportId, String afterCursor) {
-        SupportWorkbenchSnapshot authority = snapshot(supportId);
-        long after = parseCursor(afterCursor);
+        WorkbenchCursor cursor = parseCursor(afterCursor);
+        SupportWorkbenchSnapshot authority = snapshot(supportId, cursor.epoch());
+        long after = cursor.sequence();
         if (after < 0 || after > authority.sequence()) throw new SupportWorkbenchCursorException();
         Long firstRetained =
                 jdbc.queryForObject(
-                        "select min(sequence) from support_workbench_event where epoch = ?",
+                        "select min(epoch_sequence) from support_workbench_event where epoch = ?",
                         Long.class,
-                        EPOCH);
+                        cursor.epoch());
         if (after < authority.sequence() && firstRetained != null && firstRetained > after + 1) {
             throw new SupportWorkbenchCursorException();
         }
         return jdbc.query(
-                "select epoch, sequence, event_type, payload::text from support_workbench_event "
-                        + "where epoch = ? and sequence > ? order by sequence",
+                "select epoch, epoch_sequence, event_type, payload::text from support_workbench_event "
+                        + "where epoch = ? and epoch_sequence > ? order by epoch_sequence",
                 (rs, row) ->
                         new SupportWorkbenchEvent(
                                 rs.getString(1), rs.getLong(2), rs.getString(3), rs.getString(4)),
-                EPOCH,
+                cursor.epoch(),
                 after);
     }
 
@@ -156,31 +164,43 @@ class SupportWorkbenchProjectionService {
 
     private List<SupportQueueItem> queueItems(String predicate) {
         return jdbc.query(
-                "select q.ticket_id, t.lifecycle_state, t.handling_mode, min(q.entered_at) "
+                "select q.ticket_id, t.order_reference, t.issue_kind, t.lifecycle_state, t.handling_mode, min(q.entered_at) "
                         + "from shared_support_queue_entry q join support_ticket t on t.id = q.ticket_id "
                         + predicate
-                        + "group by q.ticket_id, t.lifecycle_state, t.handling_mode "
+                        + "group by q.ticket_id, t.order_reference, t.issue_kind, t.lifecycle_state, t.handling_mode "
                         + "order by min(q.entered_at), q.ticket_id",
                 (rs, row) ->
                         new SupportQueueItem(
                                 rs.getObject(1, UUID.class),
-                                SupportTicketLifecycleState.valueOf(rs.getString(2)),
-                                SupportHandlingMode.valueOf(rs.getString(3)),
-                                rs.getTimestamp(4).toInstant()));
+                                rs.getString(2),
+                                rs.getString(3),
+                                SupportTicketLifecycleState.valueOf(rs.getString(4)),
+                                SupportHandlingMode.valueOf(rs.getString(5)),
+                                rs.getTimestamp(6).toInstant()));
     }
 
-    private static long parseCursor(String cursor) {
-        if (cursor == null || cursor.isBlank()) return 0;
+    private static WorkbenchCursor parseCursor(String cursor) {
+        if (cursor == null || cursor.isBlank()) return new WorkbenchCursor(EPOCH, 0);
         int separator = cursor.lastIndexOf(':');
-        if (separator < 1 || !EPOCH.equals(cursor.substring(0, separator))) {
+        if (separator < 1) {
             throw new SupportWorkbenchCursorException();
         }
+        String epoch = cursor.substring(0, separator);
+        requireSupportedEpoch(epoch);
         try {
-            return Long.parseLong(cursor.substring(separator + 1));
+            return new WorkbenchCursor(epoch, Long.parseLong(cursor.substring(separator + 1)));
         } catch (NumberFormatException exception) {
             throw new SupportWorkbenchCursorException();
         }
     }
+
+    private static void requireSupportedEpoch(String epoch) {
+        if (!EPOCH.equals(epoch) && !LEGACY_EPOCH.equals(epoch)) {
+            throw new SupportWorkbenchCursorException();
+        }
+    }
+
+    private record WorkbenchCursor(String epoch, long sequence) {}
 
     private static void requireSupportPrincipal(String supportId) {
         if (supportId == null || supportId.isBlank()) {

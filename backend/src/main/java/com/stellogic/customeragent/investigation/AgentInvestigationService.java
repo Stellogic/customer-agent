@@ -7,6 +7,8 @@ interface AgentInvestigationService {
 
     CustomerCommunicationContext customerCommunicationContext(UUID ticketId, UUID generationId);
 
+    SiblingTicketSummary siblingTicketSummary(UUID ticketId, UUID generationId);
+
     InvestigationCapabilityResult invoke(
             UUID ticketId,
             UUID generationId,

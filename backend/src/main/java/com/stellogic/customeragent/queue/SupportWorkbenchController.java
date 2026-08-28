@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -27,11 +28,16 @@ public final class SupportWorkbenchController {
     }
 
     @GetMapping("/snapshot")
-    ResponseEntity<SnapshotResponse> snapshot(Authentication authentication) {
+    ResponseEntity<SnapshotResponse> snapshot(
+            Authentication authentication,
+            @RequestParam(
+                            value = "schema",
+                            defaultValue = SupportWorkbenchProjectionService.LEGACY_EPOCH)
+                    String schema) {
         String supportId = authentication.getName();
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(SnapshotResponse.from(service.snapshot(supportId)));
+                .body(SnapshotResponse.from(service.snapshot(supportId, schema)));
     }
 
     @GetMapping("/tickets/{ticketId}")
@@ -135,15 +141,32 @@ public final class SupportWorkbenchController {
             String view,
             String schema,
             String cursor,
-            List<SupportQueueItem> sharedQueue,
-            List<SupportQueueItem> escalationQueue) {
+            List<?> sharedQueue,
+            List<?> escalationQueue) {
         static SnapshotResponse from(SupportWorkbenchSnapshot snapshot) {
+            boolean legacy =
+                    SupportWorkbenchProjectionService.LEGACY_EPOCH.equals(snapshot.epoch());
             return new SnapshotResponse(
                     "SUPPORT_WORKBENCH",
                     snapshot.epoch(),
                     snapshot.epoch() + ":" + snapshot.sequence(),
-                    snapshot.sharedQueue(),
-                    snapshot.escalationQueue());
+                    legacy ? legacyItems(snapshot.sharedQueue()) : snapshot.sharedQueue(),
+                    legacy ? legacyItems(snapshot.escalationQueue()) : snapshot.escalationQueue());
+        }
+
+        private static List<LegacyQueueItem> legacyItems(List<SupportQueueItem> items) {
+            return items.stream().map(LegacyQueueItem::from).toList();
+        }
+    }
+
+    record LegacyQueueItem(
+            UUID ticketId,
+            SupportTicketLifecycleState lifecycleState,
+            SupportHandlingMode handlingMode,
+            java.time.Instant enteredAt) {
+        static LegacyQueueItem from(SupportQueueItem item) {
+            return new LegacyQueueItem(
+                    item.ticketId(), item.lifecycleState(), item.handlingMode(), item.enteredAt());
         }
     }
 }

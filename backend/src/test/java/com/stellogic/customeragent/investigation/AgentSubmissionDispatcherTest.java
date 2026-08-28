@@ -24,7 +24,7 @@ class AgentSubmissionDispatcherTest {
         UUID threadId = UUID.fromString("14000000-0000-0000-0000-000000000004");
         var submission =
                 new AgentSubmissionStore.PendingSubmission(
-                        submissionId, generationId, ticketId, threadId);
+                        submissionId, generationId, ticketId, threadId, "LOGISTICS_DELAY");
         AgentSubmissionStore store = org.mockito.Mockito.mock(AgentSubmissionStore.class);
         when(store.claim()).thenReturn(Optional.of(submission));
         AtomicInteger runPosts = new AtomicInteger();
@@ -76,7 +76,7 @@ class AgentSubmissionDispatcherTest {
         UUID threadId = UUID.fromString("14000000-0000-0000-0000-000000000014");
         var submission =
                 new AgentSubmissionStore.PendingSubmission(
-                        submissionId, generationId, ticketId, threadId);
+                        submissionId, generationId, ticketId, threadId, "PACKAGE_NOT_RECEIVED");
         AgentSubmissionStore store = org.mockito.Mockito.mock(AgentSubmissionStore.class);
         when(store.claim()).thenReturn(Optional.of(submission));
         AtomicInteger runPosts = new AtomicInteger();

@@ -4276,12 +4276,12 @@ def main() -> None:
             )
         )
         workbench_before_handoff = client.get(
-            f"{spring_url}/api/support/workbench/snapshot",
+            f"{spring_url}/api/support/workbench/snapshot?schema=support-workbench-v2",
         )
         expect_status(workbench_before_handoff, 200)
         workbench_before_handoff = workbench_before_handoff.json()
         assert workbench_before_handoff["view"] == "SUPPORT_WORKBENCH"
-        assert workbench_before_handoff["schema"] == "support-workbench-v1"
+        assert workbench_before_handoff["schema"] == "support-workbench-v2"
         workbench_cursor = workbench_before_handoff["cursor"]
         sla_handoff_request_id = f"sla-handoff-{uuid.uuid4()}"
         sla_handoff = client.post(
@@ -4310,7 +4310,7 @@ def main() -> None:
         expect_status(escalations_after_handoff, 200)
         assert sum(item["ticketId"] == ticket_id for item in escalations_after_handoff.json()) == 1
         workbench_after_handoff = client.get(
-            f"{spring_url}/api/support/workbench/snapshot",
+            f"{spring_url}/api/support/workbench/snapshot?schema=support-workbench-v2",
         )
         expect_status(workbench_after_handoff, 200)
         assert workbench_after_handoff.headers["cache-control"] == "no-store"
@@ -4327,6 +4327,8 @@ def main() -> None:
         assert escalation_workbench_item["handlingMode"] == "HUMAN"
         assert set(shared_workbench_item) == {
             "ticketId",
+            "orderReference",
+            "issueKind",
             "lifecycleState",
             "handlingMode",
             "enteredAt",
@@ -4337,7 +4339,6 @@ def main() -> None:
                 "reasonCode",
                 "investigationSummary",
                 "customerId",
-                "orderReference",
                 "description",
                 "messages",
             )
@@ -4354,11 +4355,24 @@ def main() -> None:
             for line in stream.iter_lines():
                 replay_lines.append(line)
                 if line == "" and any(
-                    part.startswith("id:support-workbench-v1:") for part in replay_lines
+                    part.startswith("id:support-workbench-v2:") for part in replay_lines
                 ):
                     break
         assert any(part == "event:QUEUE_TICKET_UPSERTED" for part in replay_lines)
         assert any('"view":"SUPPORT_WORKBENCH"' in part for part in replay_lines)
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            epoch_sequences = connection.execute(
+                "select epoch, array_agg(epoch_sequence order by epoch_sequence) "
+                "from support_workbench_event group by epoch order by epoch"
+            ).fetchall()
+        assert {epoch for epoch, _ in epoch_sequences} == {
+            "support-workbench-v1",
+            "support-workbench-v2",
+        }
+        for epoch, sequences in epoch_sequences:
+            assert list(sequences) == list(range(1, len(sequences) + 1)), (
+                f"{epoch} cursor sequence is not contiguous: {sequences}"
+            )
         assigned_detail = client.get(
             f"{spring_url}/api/support/workbench/tickets/{ticket_id}",
         )
@@ -4374,7 +4388,7 @@ def main() -> None:
             )
             expect_status(denied_queue, 403)
         denied_workbench = httpx.get(
-            f"{spring_url}/api/support/workbench/snapshot",
+            f"{spring_url}/api/support/workbench/snapshot?schema=support-workbench-v2",
             timeout=20.0,
         )
         expect_status(denied_workbench, 401)
@@ -4456,7 +4470,7 @@ def main() -> None:
         )
     with customer_browser_client(spring_url) as client:
         workbench_after_removal = client.get(
-            f"{spring_url}/api/support/workbench/snapshot",
+            f"{spring_url}/api/support/workbench/snapshot?schema=support-workbench-v2",
         )
         expect_status(workbench_after_removal, 200)
         assert not any(
@@ -4757,7 +4771,7 @@ def main() -> None:
         )
     with customer_browser_client(spring_url) as client:
         queue_before_close = client.get(
-            f"{spring_url}/api/support/workbench/snapshot",
+            f"{spring_url}/api/support/workbench/snapshot?schema=support-workbench-v2",
         )
         expect_status(queue_before_close, 200)
         queue_before_close_payload = queue_before_close.json()
@@ -4894,7 +4908,7 @@ def main() -> None:
 
     with customer_browser_client(spring_url) as client:
         queue_after_close = client.get(
-            f"{spring_url}/api/support/workbench/snapshot",
+            f"{spring_url}/api/support/workbench/snapshot?schema=support-workbench-v2",
         )
         expect_status(queue_after_close, 200)
         assert str(exact_boundary_id) not in {

@@ -100,7 +100,8 @@ class AgentSubmissionDispatcher {
                                                 "requested_by", "spring",
                                                 "ticket_id", submission.ticketId().toString(),
                                                 "generation_id",
-                                                        submission.generationId().toString())))
+                                                        submission.generationId().toString(),
+                                                "issue_kind", submission.issueKind())))
                         .exchange((request, response) -> response.getStatusCode().value());
         requireSuccess(status, "run submission");
     }

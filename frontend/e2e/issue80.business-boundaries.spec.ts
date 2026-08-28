@@ -14,9 +14,8 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   await customer.getByLabel("问题描述").fill(description);
   const createdResponse = customer.waitForResponse(
     (response) =>
-      /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(
-        new URL(response.url()).pathname,
-      ) && response.status() === 201,
+      /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(new URL(response.url()).pathname) &&
+      response.status() === 201,
   );
   await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
   await continueAsNewIfDuplicate(customer);
@@ -96,7 +95,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
 
   const minimumQueueItem = await support.evaluate(async (ticketId) => {
     const snapshot = (await (
-      await fetch("/api/support/workbench/snapshot", {
+      await fetch("/api/support/workbench/snapshot?schema=support-workbench-v2", {
         credentials: "same-origin",
         cache: "no-store",
       })
@@ -104,10 +103,17 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
     return snapshot.sharedQueue.find((item) => item.ticketId === ticketId);
   }, created.ticketId);
   expect(Object.keys(minimumQueueItem ?? {}).sort()).toEqual(
-    ["enteredAt", "handlingMode", "lifecycleState", "ticketId"].sort(),
+    [
+      "enteredAt",
+      "handlingMode",
+      "issueKind",
+      "lifecycleState",
+      "orderReference",
+      "ticketId",
+    ].sort(),
   );
   expect(JSON.stringify(minimumQueueItem)).not.toMatch(
-    /customerId|orderReference|description|investigation|message|timeline/i,
+    /customerId|description|investigation|message|timeline/i,
   );
 
   const staleCursorStatus = await support.evaluate(async () => {
@@ -132,7 +138,11 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   await support.getByRole("button", { name: `领取工单 ${created.ticketId}` }).click();
   await support.getByRole("button", { name: "确认领取" }).click();
   await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
-  await expect(support.getByText("ORDER-DELAY-UNDER-24")).toBeVisible();
+  await expect(
+    support
+      .getByLabel("工单基本信息")
+      .getByText("ORDER-DELAY-UNDER-24", { exact: true }),
+  ).toBeVisible();
   await expect(
     support.getByRole("region", { name: "问题描述" }).getByText(description),
   ).toBeVisible();

@@ -19,15 +19,19 @@ class AgentSubmissionStore {
     Optional<PendingSubmission> claim() {
         List<PendingSubmission> pending =
                 jdbc.query(
-                        "select s.submission_request_id, s.generation_id, g.ticket_id, s.thread_id "
+                        "select s.submission_request_id, s.generation_id, g.ticket_id, s.thread_id, t.issue_kind "
                                 + "from agent_submission s join agent_processing_generation g on g.id = s.generation_id "
+                                + "join support_ticket t on t.id = g.ticket_id "
                                 + "where s.status in ('PENDING', 'RETRY', 'SUBMITTING', 'SUBMITTED') "
                                 + "and s.next_attempt_at <= current_timestamp "
                                 + "and g.status = 'ACTIVE' order by s.created_at for update skip locked limit 1",
                         (rs, row) ->
                                 new PendingSubmission(
-                                        rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
-                                        rs.getObject(3, UUID.class), rs.getObject(4, UUID.class)));
+                                        rs.getObject(1, UUID.class),
+                                        rs.getObject(2, UUID.class),
+                                        rs.getObject(3, UUID.class),
+                                        rs.getObject(4, UUID.class),
+                                        rs.getString(5)));
         if (pending.isEmpty()) return Optional.empty();
         PendingSubmission submission = pending.getFirst();
         jdbc.update(
@@ -60,5 +64,9 @@ class AgentSubmissionStore {
     }
 
     record PendingSubmission(
-            UUID submissionRequestId, UUID generationId, UUID ticketId, UUID threadId) {}
+            UUID submissionRequestId,
+            UUID generationId,
+            UUID ticketId,
+            UUID threadId,
+            String issueKind) {}
 }

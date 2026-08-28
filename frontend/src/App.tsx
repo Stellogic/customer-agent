@@ -10,6 +10,7 @@ import {
 import { loadCsrfToken } from "./csrf";
 import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
+import { OrderTicketGroups } from "./OrderTicketGroups";
 
 const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
 const PUBLIC_CONVERSATION_BASE = "/api/customer/v2/tickets";
@@ -759,17 +760,23 @@ export function App() {
 
   return (
     <main className="help-center">
-      <header>
-        <p className="eyebrow">STELLOGIC 帮助中心</p>
-        <h1>
-          物流遇到问题？
-          <br />
-          我们从这里开始处理。
-        </h1>
-        <p className="lede">
-          直接描述你的问题。我们会先确认订单与理解；只有你明确确认后，才创建可查询的客服工单并开始处理。
-        </p>
-      </header>
+      <div className="help-center-intro">
+        <header>
+          <p className="eyebrow">STELLOGIC 帮助中心</p>
+          <h1>
+            物流遇到问题？
+            <br />
+            我们从这里开始处理。
+          </h1>
+          <p className="lede">
+            直接描述你的问题。我们会先确认订单与理解；只有你明确确认后，才创建可查询的客服工单并开始处理。
+          </p>
+        </header>
+
+        {!snapshot && !intake && !recoveringTicketId && intakeRecoveryState === "idle" && (
+          <OrderTicketGroups autoLoad onOpenTicket={(ticketId) => void loadTicket(ticketId)} />
+        )}
+      </div>
 
       {!snapshot && recoveringTicketId ? (
         <section className="ticket-recovery" aria-live="polite" aria-busy="true">
@@ -980,7 +987,10 @@ export function App() {
                   : "确认，就是这个问题"}
             </button>
           )}
-          {intake.ticketIds.length > 0 && (
+          {intake.ticketIds.length > 1 && (
+            <OrderTicketGroups autoLoad onOpenTicket={(ticketId) => void loadTicket(ticketId)} />
+          )}
+          {intake.ticketIds.length === 1 && (
             <div className="intake-created-tickets" role="region" aria-label="已创建工单">
               {intake.ticketIds.map((ticketId, index) => (
                 <button type="button" key={ticketId} onClick={() => void loadTicket(ticketId)}>
