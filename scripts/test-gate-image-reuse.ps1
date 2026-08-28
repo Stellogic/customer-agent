@@ -27,6 +27,14 @@ Assert-GateImages `
     -SourceFingerprint $fingerprint `
     -InspectImage { param($image) $validMetadata[$image] }
 
+Assert-GateImagesAbsent -RunId $runId -InspectImage { param($image) $null }
+try {
+    Assert-GateImagesAbsent -RunId $runId -InspectImage { param($image) $validMetadata[$image] }
+    throw '残留门禁镜像未 fail closed。'
+} catch {
+    if ($_.Exception.Message -notmatch '清理回读非空') { throw }
+}
+
 foreach ($case in @(
     @{ Name = '镜像缺失'; Mutate = { param($metadata, $image) $metadata.Remove($image) | Out-Null }; Pattern = '缺失' },
     @{ Name = '运行标识不匹配'; Mutate = { param($metadata, $image) $metadata[$image].RunId = 'another-run' }; Pattern = '运行标识不匹配' },

@@ -12,6 +12,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 
 if ($runsFullAcceptance) {
     . "$PSScriptRoot/gate-images.ps1"
+    . "$PSScriptRoot/gate-resources.ps1"
     if ([string]::IsNullOrWhiteSpace($RunId)) {
         $RunId = "issue182-$([guid]::NewGuid().ToString('N').Substring(0, 12))"
     }
@@ -42,6 +43,7 @@ if ($runsFullAcceptance) {
 & "$PSScriptRoot/test-compose-reset-isolation.ps1"
 & "$PSScriptRoot/test-issue129-acceptance-contract.ps1"
 & "$PSScriptRoot/test-gate-image-reuse.ps1"
+& "$PSScriptRoot/test-gate-resources.ps1"
 & "$PSScriptRoot/test-browser-acceptance-plan.ps1"
 & "$PSScriptRoot/assert-deprecated-human-auth-contract.ps1"
 
@@ -67,14 +69,7 @@ if ($runsFullAcceptance) {
         & "$PSScriptRoot/smoke.ps1" -Reset -SkipBuild
         $smokeWatch.Stop()
         docker compose -p $projectName down --volumes --remove-orphans
-        $remainingSmokeResources = @(
-            @(docker ps --all --quiet --filter "label=com.docker.compose.project=$projectName") +
-            @(docker volume ls --quiet --filter "label=com.docker.compose.project=$projectName") +
-            @(docker network ls --quiet --filter "label=com.docker.compose.project=$projectName")
-        )
-        if ($remainingSmokeResources.Count -ne 0) {
-            throw "smoke 阶段清理回读非空: $($remainingSmokeResources -join ',')"
-        }
+        Assert-ComposeProjectResourcesEmpty -ProjectName $projectName -Phase '在 smoke 清理后'
 
         $browserWatch = [System.Diagnostics.Stopwatch]::StartNew()
         & "$PSScriptRoot/issue80-acceptance.ps1" -SkipBuild -RunId $RunId -SourceFingerprint $sourceFingerprint
@@ -84,6 +79,7 @@ if ($runsFullAcceptance) {
         docker compose -p $projectName down --volumes --remove-orphans 2>$null | Out-Null
         if ($completed) {
             Remove-GateImages -RunId $RunId
+            Assert-GateImagesAbsent -RunId $RunId
         }
     }
     $gateWatch.Stop()

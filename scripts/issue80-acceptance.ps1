@@ -9,6 +9,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 . "$PSScriptRoot/gate-images.ps1"
+. "$PSScriptRoot/gate-resources.ps1"
 . "$PSScriptRoot/browser-acceptance-plan.ps1"
 
 if ([string]::IsNullOrWhiteSpace($RunId)) {
@@ -32,22 +33,6 @@ $env:CUSTOMER_AGENT_FRONTEND_PORT = [string]$frontendPort
 $env:SESSION_COOKIE_SECURE = 'true'
 $ownsImages = -not $SkipBuild
 
-function Get-ProjectResources {
-    @(
-        @(docker ps --all --quiet --filter "label=com.docker.compose.project=$projectName") +
-        @(docker volume ls --quiet --filter "label=com.docker.compose.project=$projectName") +
-        @(docker network ls --quiet --filter "label=com.docker.compose.project=$projectName")
-    )
-}
-
-function Assert-ProjectResourcesEmpty {
-    param([Parameter(Mandatory)][string]$Phase)
-    $resources = @(Get-ProjectResources)
-    if ($resources.Count -ne 0) {
-        throw "Issue #80 隔离资源${Phase}非空: project=$projectName resources=$($resources -join ',')"
-    }
-}
-
 $plan = Import-PowerShellDataFile "$PSScriptRoot/browser-acceptance-plan.psd1"
 $discovered = @(
     Get-ChildItem -LiteralPath (Join-Path $repoRoot 'frontend/e2e') -File -Filter '*.spec.ts' |
@@ -59,12 +44,6 @@ Assert-BrowserAcceptancePlan `
     -Serial $plan.Serial `
     -Excluded $plan.Excluded.Keys
 Assert-ParallelSafeBrowserTests -RepoRoot $repoRoot -Files $plan.ParallelSafe
-
-if ($SkipBuild) {
-    Assert-GateImages -RunId $RunId -SourceFingerprint $SourceFingerprint
-} else {
-    Invoke-GateImageBuilds -RepoRoot $repoRoot -RunId $RunId -SourceFingerprint $SourceFingerprint | Out-Null
-}
 
 $effectiveConfigJson = docker compose --project-name $projectName --profile smoke config --format json
 $effectiveConfig = $effectiveConfigJson | ConvertFrom-Json
@@ -82,7 +61,14 @@ if (
 ) {
     throw "Issue #80 effective config 未应用唯一 project/端口/镜像标签: project=$projectName port=$frontendPort tag=$imageTag"
 }
-Assert-ProjectResourcesEmpty -Phase '在启动前'
+Assert-ComposeResourcesOwned -ProjectName $projectName -EffectiveConfig $effectiveConfig
+Assert-ComposeProjectResourcesEmpty -ProjectName $projectName -Phase '在启动前'
+
+if ($SkipBuild) {
+    Assert-GateImages -RunId $RunId -SourceFingerprint $SourceFingerprint
+} else {
+    Invoke-GateImageBuilds -RepoRoot $repoRoot -RunId $RunId -SourceFingerprint $SourceFingerprint | Out-Null
+}
 Write-Host "Issue #80 effective config: project=$projectName port=$frontendPort tag=$imageTag fingerprint=$SourceFingerprint preflight resources=0"
 
 $playwrightRunner = {
@@ -117,9 +103,10 @@ try {
     Invoke-PlaywrightGroup -Files $sessionFile -Workers 1 -Runner $playwrightRunner
 } finally {
     docker compose --project-name $projectName --profile smoke down --volumes --remove-orphans
-    Assert-ProjectResourcesEmpty -Phase '清理后'
+    Assert-ComposeProjectResourcesEmpty -ProjectName $projectName -Phase '在清理后'
     if ($ownsImages) {
         Remove-GateImages -RunId $RunId
+        Assert-GateImagesAbsent -RunId $RunId
     }
     Remove-Item Env:CUSTOMER_AGENT_IMAGE_TAG -ErrorAction SilentlyContinue
     Remove-Item Env:CUSTOMER_AGENT_FRONTEND_PORT -ErrorAction SilentlyContinue

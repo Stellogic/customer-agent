@@ -3,8 +3,8 @@
 ## 门禁组成
 
 - `pwsh ./scripts/check.ps1` 先执行既有组件检查与全栈 smoke，再执行 `scripts/issue80-acceptance.ps1`。
-- Issue #80 浏览器验收每次生成唯一 Compose project、端口、镜像标签和两个专用卷；失败路径也只清理本次 project、卷和精确镜像标签，并回读确认不存在残留。
-- Chromium 只访问同一隔离 Docker network 内自建的 HTTPS React/Nginx 与 Spring 服务。测试固定为单 worker、零重试；只有镜像仓库/构建阶段允许最多五次有界重试。
+- Issue #80 浏览器验收每次使用唯一 Compose project、端口和两个专用卷，并复用完整门禁本次 `RunId` 下已经过源码指纹校验的不可变镜像；独立运行时自行构建并清理精确镜像标签。失败路径只清理本阶段 project、卷和网络，完整门禁结束后统一清理镜像，并分别回读确认不存在残留。
+- Chromium 只访问同一隔离 Docker network 内自建的 HTTPS React/Nginx 与 Spring 服务。测试零重试；显式 `parallel-safe` 匿名静态 UI 组使用 `workers=2` 连续运行三次且首个失败立即停止，其他 Session、SSE、共享数据库、审批竞态与恢复文件固定 `workers=1`。
 
 ## 浏览器覆盖
 

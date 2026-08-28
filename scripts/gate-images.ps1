@@ -147,3 +147,16 @@ function Remove-GateImages {
         docker image rm $specification.Image 2>$null | Out-Null
     }
 }
+
+function Assert-GateImagesAbsent {
+    param(
+        [Parameter(Mandatory)][string]$RunId,
+        [scriptblock]$InspectImage = { param($image) Get-GateImageMetadata -Image $image }
+    )
+
+    foreach ($specification in Get-GateImageSpecifications -ImageTag "gate-$RunId") {
+        if ($null -ne (& $InspectImage $specification.Image)) {
+            throw "门禁镜像清理回读非空: $($specification.Image)"
+        }
+    }
+}
