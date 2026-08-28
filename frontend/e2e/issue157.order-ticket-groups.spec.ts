@@ -77,7 +77,8 @@ test("Issue #157 同订单工单独立启动、分组导航与领取隔离", asy
   ).toBe("2");
 
   await customer.goto("/help");
-  await customer.getByRole("button", { name: "查看订单工单总览" }).click();
+  const overview = customer.getByRole("region", { name: "订单工单总览" });
+  await expect(overview).toBeVisible();
   const orderGroup = customer
     .getByRole("heading", { name: `订单 ${orderReference}` })
     .locator("..")
