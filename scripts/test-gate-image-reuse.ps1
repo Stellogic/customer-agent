@@ -34,6 +34,12 @@ try {
 } catch {
     if ($_.Exception.Message -notmatch '清理回读非空') { throw }
 }
+try {
+    Assert-GateImagesAbsent -RunId $runId -InspectImage { param($image) throw 'docker daemon unavailable' }
+    throw '镜像查询失败未 fail closed。'
+} catch {
+    if ($_.Exception.Message -notmatch 'docker daemon unavailable') { throw }
+}
 
 foreach ($case in @(
     @{ Name = '镜像缺失'; Mutate = { param($metadata, $image) $metadata.Remove($image) | Out-Null }; Pattern = '缺失' },

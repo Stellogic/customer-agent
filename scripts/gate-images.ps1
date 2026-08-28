@@ -45,13 +45,16 @@ function Get-GateSourceFingerprint {
 function Get-GateImageMetadata {
     param([Parameter(Mandatory)][string]$Image)
 
-    try {
-        $json = docker image inspect $Image --format '{{json .Config.Labels}}' 2>$null
-    } catch {
+    $availableImages = @(docker image ls --format '{{.Repository}}:{{.Tag}}')
+    if ($LASTEXITCODE -ne 0) {
+        throw '无法查询本地 Docker 镜像，不能判定门禁镜像状态。'
+    }
+    if ($availableImages -notcontains $Image) {
         return $null
     }
+    $json = docker image inspect $Image --format '{{json .Config.Labels}}'
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($json)) {
-        return $null
+        throw "无法读取门禁镜像元数据: $Image"
     }
     $labels = $json | ConvertFrom-Json -AsHashtable
     @{

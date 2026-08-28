@@ -1,11 +1,26 @@
 function Get-ComposeProjectResources {
-    param([Parameter(Mandatory)][string]$ProjectName)
-
-    @(
-        @(docker ps --all --quiet --filter "label=com.docker.compose.project=$ProjectName") +
-        @(docker volume ls --quiet --filter "label=com.docker.compose.project=$ProjectName") +
-        @(docker network ls --quiet --filter "label=com.docker.compose.project=$ProjectName")
+    param(
+        [Parameter(Mandatory)][string]$ProjectName,
+        [scriptblock]$Query = {
+            param($kind, $project)
+            $values = switch ($kind) {
+                'containers' { @(docker ps --all --quiet --filter "label=com.docker.compose.project=$project") }
+                'volumes' { @(docker volume ls --quiet --filter "label=com.docker.compose.project=$project") }
+                'networks' { @(docker network ls --quiet --filter "label=com.docker.compose.project=$project") }
+            }
+            [pscustomobject]@{ ExitCode = $LASTEXITCODE; Values = @($values) }
+        }
     )
+
+    $resources = @()
+    foreach ($kind in @('containers', 'volumes', 'networks')) {
+        $result = & $Query $kind $ProjectName
+        if ($result.ExitCode -ne 0) {
+            throw "无法查询 Compose $kind，不能判定清理结果: project=$ProjectName"
+        }
+        $resources += @($result.Values)
+    }
+    @($resources)
 }
 
 function Assert-ComposeProjectResourcesEmpty {
