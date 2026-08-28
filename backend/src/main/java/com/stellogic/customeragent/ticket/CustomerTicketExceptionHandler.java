@@ -53,6 +53,12 @@ public final class CustomerTicketExceptionHandler {
                 .body(Map.of("code", "INCOMPATIBLE_SCHEMA", "message", "请求的公开沟通版本不兼容"));
     }
 
+    @ExceptionHandler(CustomerMessageNotAcceptedException.class)
+    ResponseEntity<Map<String, String>> messageNotAccepted() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("code", "MESSAGE_NOT_ACCEPTED", "message", "当前工单不接受 Agent 对话回复"));
+    }
+
     @ExceptionHandler(IntakeNotFoundException.class)
     ResponseEntity<Map<String, String>> intakeNotFound() {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

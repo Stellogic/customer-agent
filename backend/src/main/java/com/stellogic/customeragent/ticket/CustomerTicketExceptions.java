@@ -28,6 +28,8 @@ final class ProjectionCursorException extends RuntimeException {}
 
 final class IncompatibleCustomerSchemaException extends RuntimeException {}
 
+final class CustomerMessageNotAcceptedException extends RuntimeException {}
+
 final class IntakeNotFoundException extends RuntimeException {}
 
 final class IntakeNotReadyException extends RuntimeException {}

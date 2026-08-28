@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from decimal import Decimal
@@ -448,6 +448,400 @@ def main() -> None:
             ).fetchone()[0]
             >= 2
         )
+
+    message_fence_create_id = f"issue-158-create-{uuid.uuid4()}"
+    message_fence_id = f"issue-158-message-{uuid.uuid4()}"
+    with customer_browser_client(spring_url) as client:
+        created = client.post(
+            f"{spring_url}/api/customer/v2/tickets",
+            headers={"Idempotency-Key": message_fence_create_id},
+            json={
+                "schema": "public-conversation-v2",
+                "orderReference": "ORDER-ISSUE-158-FENCE",
+                "description": "请先调查这笔合成订单的物流状态",
+            },
+        )
+        expect_status(created, 201)
+        message_fence_ticket_id = uuid.UUID(created.json()["ticketId"])
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            old_message_fence_generation_id = connection.execute(
+                "select id from agent_processing_generation "
+                "where ticket_id = %s and status = 'ACTIVE'",
+                (message_fence_ticket_id,),
+            ).fetchone()[0]
+        accepted_message = client.post(
+            f"{spring_url}/api/customer/v2/tickets/{message_fence_ticket_id}/messages",
+            headers={"Idempotency-Key": message_fence_id},
+            json={
+                "schema": "public-conversation-v2",
+                "message": "补充：今天仍然没有新的物流轨迹",
+            },
+        )
+        expect_status(accepted_message, 202)
+        assert accepted_message.json() == {
+            "schema": "public-conversation-v2",
+            "ticketId": str(message_fence_ticket_id),
+            "accepted": True,
+            "replayed": False,
+        }
+        replayed_message = client.post(
+            f"{spring_url}/api/customer/v2/tickets/{message_fence_ticket_id}/messages",
+            headers={"Idempotency-Key": message_fence_id},
+            json={
+                "schema": "public-conversation-v2",
+                "message": "补充：今天仍然没有新的物流轨迹",
+            },
+        )
+        expect_status(replayed_message, 200)
+        assert replayed_message.json()["replayed"] is True
+        conflicting_message = client.post(
+            f"{spring_url}/api/customer/v2/tickets/{message_fence_ticket_id}/messages",
+            headers={"Idempotency-Key": message_fence_id},
+            json={
+                "schema": "public-conversation-v2",
+                "message": "复用消息身份但改变正文",
+            },
+        )
+        expect_status(conflicting_message, 409)
+        assert conflicting_message.json()["code"] == "REQUEST_ID_CONFLICT"
+        denied_other_customer_message = client.post(
+            f"{spring_url}/api/customer/v2/tickets/{other_customer_ticket_id}/messages",
+            headers={"Idempotency-Key": f"issue-158-other-{uuid.uuid4()}"},
+            json={
+                "schema": "public-conversation-v2",
+                "message": "不能写入其他客户的工单",
+            },
+        )
+        expect_status(denied_other_customer_message, 404)
+        fenced_snapshot = client.get(
+            f"{spring_url}/api/customer/v2/tickets/{message_fence_ticket_id}",
+        )
+        expect_status(fenced_snapshot, 200)
+        fenced_projection = fenced_snapshot.json()
+        assert fenced_projection["messages"][-1]["body"] == "补充：今天仍然没有新的物流轨迹"
+        assert fenced_projection["ticket"]["agentGeneration"] == 2
+
+        stale_capabilities = client.get(
+            f"{spring_url}/internal/agent/tickets/{message_fence_ticket_id}/generations/"
+            f"{old_message_fence_generation_id}/capabilities",
+            headers={
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": str(old_message_fence_generation_id),
+                "X-Agent-Operation": "USE_INVESTIGATION_CAPABILITY",
+            },
+        )
+        expect_status(stale_capabilities, 403)
+        stale_handoff = client.post(
+            f"{spring_url}/internal/agent/tickets/{message_fence_ticket_id}/generations/"
+            f"{old_message_fence_generation_id}/human-handoff",
+            headers={
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": str(old_message_fence_generation_id),
+                "X-Agent-Operation": "REQUEST_HUMAN_HANDOFF",
+                "Idempotency-Key": f"issue-158-stale-handoff-{uuid.uuid4()}",
+            },
+            json={
+                "reasonCode": "FACT_CONFLICT",
+                "summary": {
+                    "conclusionCode": "INVESTIGATION_COULD_NOT_CONTINUE",
+                    "facts": [],
+                },
+            },
+        )
+        expect_status(stale_handoff, 403)
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        generations = connection.execute(
+            "select generation_number, thread_id, status from agent_processing_generation "
+            "where ticket_id = %s order by generation_number",
+            (message_fence_ticket_id,),
+        ).fetchall()
+        assert len(generations) == 2
+        assert generations[0][2] == "SUPERSEDED"
+        assert generations[1][1] != generations[0][1]
+        assert connection.execute(
+            "select count(*) from customer_public_message_request "
+            "where customer_id = 'customer-demo' and message_id = %s and ticket_id = %s",
+            (message_fence_id, message_fence_ticket_id),
+        ).fetchone() == (1,)
+        assert connection.execute(
+            "select count(*) from public_message where ticket_id = %s and author = 'CUSTOMER'",
+            (message_fence_ticket_id,),
+        ).fetchone() == (2,)
+        assert connection.execute(
+            "select array_agg(event_type order by sequence) from customer_public_event "
+            "where ticket_id = %s and event_type in "
+            "('CUSTOMER_MESSAGE_ACCEPTED', 'AGENT_PROCESSING_TERMINATED', 'AGENT_PROCESSING_STARTED')",
+            (message_fence_ticket_id,),
+        ).fetchone()[0] == [
+            "CUSTOMER_MESSAGE_ACCEPTED",
+            "AGENT_PROCESSING_TERMINATED",
+            "AGENT_PROCESSING_STARTED",
+        ]
+        assert connection.execute(
+            "select count(*) from agent_resume_request "
+            "where generation_id = %s and status <> 'COMPLETED'",
+            (old_message_fence_generation_id,),
+        ).fetchone() == (0,)
+
+    concurrent_message_id = f"issue-158-cross-ticket-{uuid.uuid4()}"
+    concurrent_ticket_ids: list[str] = []
+    with customer_browser_client(spring_url) as client:
+        for index in range(2):
+            created = client.post(
+                f"{spring_url}/api/customer/v2/tickets",
+                headers={"Idempotency-Key": f"issue-158-concurrent-create-{uuid.uuid4()}"},
+                json={
+                    "schema": "public-conversation-v2",
+                    "orderReference": f"ORDER-ISSUE-158-CONCURRENT-{index}",
+                    "description": "并发消息身份隔离测试",
+                },
+            )
+            expect_status(created, 201)
+            concurrent_ticket_ids.append(created.json()["ticketId"])
+
+    def append_same_message_identity(ticket_id: str) -> httpx.Response:
+        with customer_browser_client(spring_url) as client:
+            return client.post(
+                f"{spring_url}/api/customer/v2/tickets/{ticket_id}/messages",
+                headers={"Idempotency-Key": concurrent_message_id},
+                json={
+                    "schema": "public-conversation-v2",
+                    "message": f"只允许一个工单消费该消息身份：{ticket_id}",
+                },
+            )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        concurrent_message_responses = list(
+            executor.map(append_same_message_identity, concurrent_ticket_ids)
+        )
+    assert sorted(response.status_code for response in concurrent_message_responses) == [202, 409]
+    assert (
+        next(
+            response for response in concurrent_message_responses if response.status_code == 409
+        ).json()["code"]
+        == "REQUEST_ID_CONFLICT"
+    )
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select count(*) from customer_public_message_request "
+            "where customer_id = 'customer-demo' and message_id = %s",
+            (concurrent_message_id,),
+        ).fetchone() == (1,)
+
+    def create_generation_race_ticket(order_reference: str) -> tuple[uuid.UUID, uuid.UUID]:
+        race_ticket_id = uuid.uuid4()
+        race_generation_id = uuid.uuid4()
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            connection.execute(
+                "insert into support_ticket "
+                "(id, customer_id, order_reference, description, issue_kind, lifecycle_state, "
+                "handling_mode, created_at, first_responded_at, resolution_running_since) "
+                "values (%s, 'customer-demo', %s, '生成竞态验收', 'LOGISTICS_DELAY', "
+                "'INVESTIGATING', 'AGENT', now(), now(), now())",
+                (race_ticket_id, order_reference),
+            )
+            connection.execute(
+                "insert into agent_processing_generation "
+                "(id, ticket_id, generation_number, thread_id, status, created_at) "
+                "values (%s, %s, 1, %s, 'ACTIVE', now())",
+                (race_generation_id, race_ticket_id, uuid.uuid4()),
+            )
+            connection.execute(
+                "insert into public_message "
+                "(id, ticket_id, message_sequence, author, body, sent_at) values "
+                "(%s, %s, 1, 'CUSTOMER', '生成竞态验收', now()), "
+                "(%s, %s, 2, 'SUPPORT', '我们正在调查', now())",
+                (uuid.uuid4(), race_ticket_id, uuid.uuid4(), race_ticket_id),
+            )
+        return race_ticket_id, race_generation_id
+
+    def race_new_message_with_old_action(
+        race_name: str,
+        order_reference: str,
+        old_action: Callable[[httpx.Client, uuid.UUID, uuid.UUID], httpx.Response],
+        allowed_outcomes: set[tuple[int, int]],
+        prepared: tuple[uuid.UUID, uuid.UUID] | None = None,
+    ) -> None:
+        race_ticket_id, race_generation_id = prepared or create_generation_race_ticket(
+            order_reference
+        )
+        barrier = threading.Barrier(2)
+        message_identity = f"issue-158-{race_name}-message-{uuid.uuid4()}"
+        message_body = f"{race_name} 期间补充的新消息"
+
+        def append_message() -> httpx.Response:
+            with customer_browser_client(spring_url) as client:
+                barrier.wait()
+                return client.post(
+                    f"{spring_url}/api/customer/v2/tickets/{race_ticket_id}/messages",
+                    headers={"Idempotency-Key": message_identity},
+                    json={"schema": "public-conversation-v2", "message": message_body},
+                )
+
+        def invoke_old_action() -> httpx.Response:
+            with customer_browser_client(spring_url) as client:
+                barrier.wait()
+                return old_action(client, race_ticket_id, race_generation_id)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            message_future = executor.submit(append_message)
+            action_future = executor.submit(invoke_old_action)
+            message_response = message_future.result(timeout=20)
+            action_response = action_future.result(timeout=20)
+        assert (
+            message_response.status_code,
+            action_response.status_code,
+        ) in allowed_outcomes, (message_response.text, action_response.text)
+
+        if message_response.status_code == 202:
+            with customer_browser_client(spring_url) as reconnected_client:
+                recovered = reconnected_client.get(
+                    f"{spring_url}/api/customer/v2/tickets/{race_ticket_id}"
+                )
+                expect_status(recovered, 200)
+                recovered_projection = recovered.json()
+                assert recovered_projection["messages"][-1]["body"] == message_body
+                assert recovered_projection["ticket"]["agentGeneration"] == 2
+                late_action = old_action(reconnected_client, race_ticket_id, race_generation_id)
+                expect_status(late_action, 403)
+
+    def agent_headers(generation_id: uuid.UUID, operation: str, request_id: str) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+            "X-Agent-Generation-Id": str(generation_id),
+            "X-Agent-Operation": operation,
+            "Idempotency-Key": request_id,
+        }
+
+    def old_tool_action(
+        client: httpx.Client, ticket_id: uuid.UUID, generation_id: uuid.UUID
+    ) -> httpx.Response:
+        return client.post(
+            f"{spring_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/"
+            "capabilities/CONFIRM_ORDER",
+            headers=agent_headers(
+                generation_id,
+                "USE_INVESTIGATION_CAPABILITY",
+                f"{generation_id}:race-capability:{uuid.uuid4()}",
+            ),
+            json={},
+        )
+
+    def old_clarification_action(
+        client: httpx.Client, ticket_id: uuid.UUID, generation_id: uuid.UUID
+    ) -> httpx.Response:
+        return client.post(
+            f"{spring_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/"
+            "clarifications",
+            headers=agent_headers(
+                generation_id,
+                "CREATE_CUSTOMER_CLARIFICATION",
+                f"{generation_id}:race-clarification:{uuid.uuid4()}",
+            ),
+            json={
+                "reasonCode": "ORDER_AMBIGUOUS",
+                "customerReply": {
+                    "schemaVersion": "customer-reply-v1",
+                    "body": "为确认需要调查的订单，请回复订单确认码（A 或 B）。",
+                    "intent": "CLARIFICATION_REQUIRED",
+                    "evidenceRefs": [],
+                    "escalationRequired": False,
+                    "referencedOrder": "ORDER-PENDING",
+                },
+            },
+        )
+
+    def old_handoff_action(
+        client: httpx.Client, ticket_id: uuid.UUID, generation_id: uuid.UUID
+    ) -> httpx.Response:
+        return client.post(
+            f"{spring_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/"
+            "human-handoff",
+            headers=agent_headers(
+                generation_id,
+                "REQUEST_HUMAN_HANDOFF",
+                f"{generation_id}:race-handoff:{uuid.uuid4()}",
+            ),
+            json={
+                "reasonCode": "FACT_CONFLICT",
+                "summary": {
+                    "conclusionCode": "INVESTIGATION_COULD_NOT_CONTINUE",
+                    "facts": [],
+                },
+            },
+        )
+
+    race_new_message_with_old_action(
+        "tool-call", "ORDER-DELAY-UNDER-24", old_tool_action, {(202, 403), (202, 200)}
+    )
+    race_new_message_with_old_action(
+        "clarification",
+        "ORDER-DELAY-AMBIGUOUS",
+        old_clarification_action,
+        {(202, 403), (202, 200)},
+    )
+    race_new_message_with_old_action(
+        "human-handoff",
+        "ORDER-DELAY-UNDER-24",
+        old_handoff_action,
+        {(202, 403), (409, 202)},
+    )
+
+    def race_conclusion(compensation_required: bool) -> None:
+        order_reference = (
+            "ORDER-ISSUE-158-COMPENSATION-RACE" if compensation_required else "ORDER-DELAY-UNDER-24"
+        )
+        ticket_id, generation_id = create_generation_race_ticket(order_reference)
+        with customer_browser_client(spring_url) as client:
+            facts = collect_investigation_facts(
+                client,
+                spring_url,
+                ticket_id,
+                generation_id,
+                {
+                    "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                    "X-Agent-Generation-Id": str(generation_id),
+                },
+            )
+        assert facts["matchStatus"] == "UNIQUE"
+
+        def old_conclusion_action(
+            client: httpx.Client,
+            scoped_ticket_id: uuid.UUID,
+            scoped_generation_id: uuid.UUID,
+        ) -> httpx.Response:
+            return client.post(
+                f"{spring_url}/internal/agent/tickets/{scoped_ticket_id}/generations/"
+                f"{scoped_generation_id}/conclusions",
+                headers=agent_headers(
+                    scoped_generation_id,
+                    "SUBMIT_INVESTIGATION_CONCLUSION",
+                    f"{scoped_generation_id}:race-conclusion:{uuid.uuid4()}",
+                ),
+                json={
+                    "compensationRequired": compensation_required,
+                    "reasonCode": (
+                        "LOGISTICS_DELAY" if compensation_required else "DELAY_UNDER_24_HOURS"
+                    ),
+                    "delayHours": facts["delayHours"],
+                    "delaySeconds": facts["delaySeconds"],
+                    "orderReference": order_reference,
+                    "evidenceRefs": facts["evidenceRefs"],
+                    **customer_reply(order_reference, facts["evidenceRefs"], compensation_required),
+                },
+            )
+
+        race_new_message_with_old_action(
+            "compensation-proposal" if compensation_required else "public-conclusion",
+            order_reference,
+            old_conclusion_action,
+            ({(202, 403), (202, 200)} if compensation_required else {(202, 403), (409, 200)}),
+            (ticket_id, generation_id),
+        )
+
+    race_conclusion(False)
+    race_conclusion(True)
 
     no_compensation_request = f"issue-14-{uuid.uuid4()}"
     no_compensation_payload = {

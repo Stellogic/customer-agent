@@ -6,6 +6,8 @@ import java.util.UUID;
 public interface CustomerTicketService {
     TicketCreationResult create(CreateCustomerTicket command);
 
+    CustomerMessageResult appendMessage(AppendCustomerMessage command);
+
     UUID createFollowUp(
             String customerId,
             String requestId,

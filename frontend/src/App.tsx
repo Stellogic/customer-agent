@@ -122,6 +122,10 @@ export function App() {
   const [ticketReplyOrderReference, setTicketReplyOrderReference] = useState("");
   const [ticketReplyIssueKind, setTicketReplyIssueKind] = useState("LOGISTICS_DELAY");
   const [ticketReplyBody, setTicketReplyBody] = useState("");
+  const [liveMessageBody, setLiveMessageBody] = useState("");
+  const [liveMessageState, setLiveMessageState] = useState<
+    "idle" | "sending" | "accepted" | "conflict" | "error"
+  >("idle");
   const [error, setError] = useState("");
   const [copiedTicketId, setCopiedTicketId] = useState(false);
   const [confirmingHumanHandoff, setConfirmingHumanHandoff] = useState(false);
@@ -140,6 +144,7 @@ export function App() {
   const resumeRequestId = useRef(globalThis.crypto.randomUUID());
   const handoffRequestId = useRef(globalThis.crypto.randomUUID());
   const ticketReplyRequestId = useRef(globalThis.crypto.randomUUID());
+  const liveMessageRequestId = useRef(globalThis.crypto.randomUUID());
   const streamController = useRef<AbortController | null>(null);
   const reconnectTimer = useRef<number | null>(null);
   const snapshotRef = useRef<Snapshot | null>(null);
@@ -591,6 +596,57 @@ export function App() {
     }
   }
 
+  async function submitLiveMessage(event: FormEvent) {
+    event.preventDefault();
+    if (
+      !snapshot ||
+      snapshot.ticket.handlingMode !== "AGENT" ||
+      ["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState) ||
+      !liveMessageBody.trim()
+    )
+      return;
+    const ticketId = snapshot.ticket.id;
+    setLiveMessageState("sending");
+    setError("");
+    try {
+      const csrf = await loadCsrfToken();
+      const response = await humanSessionFetch(`${PUBLIC_CONVERSATION_BASE}/${ticketId}/messages`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          [csrf.headerName]: csrf.token,
+          "Content-Type": "application/json",
+          "Idempotency-Key": liveMessageRequestId.current,
+        },
+        body: JSON.stringify({
+          schema: PUBLIC_CONVERSATION_SCHEMA,
+          message: liveMessageBody.trim(),
+        }),
+      });
+      if (response.status === 409) {
+        setLiveMessageState("conflict");
+        await loadTicket(ticketId);
+        return;
+      }
+      if (!response.ok) throw new Error("customer message failed");
+      const result = (await response.json()) as unknown;
+      if (
+        !isRecord(result) ||
+        result.schema !== PUBLIC_CONVERSATION_SCHEMA ||
+        result.ticketId !== ticketId ||
+        result.accepted !== true ||
+        typeof result.replayed !== "boolean"
+      )
+        throw new Error("incompatible customer message result");
+      await loadTicket(ticketId);
+      setLiveMessageBody("");
+      liveMessageRequestId.current = globalThis.crypto.randomUUID();
+      setLiveMessageState("accepted");
+    } catch {
+      setLiveMessageState("error");
+    }
+  }
+
   async function consumeEvents(ticketId: string, cursor: string) {
     streamController.current?.abort();
     const controller = new AbortController();
@@ -695,10 +751,25 @@ export function App() {
       setSnapshot(next);
       return true;
     }
-    if (envelope.generation > current.ticket.agentGeneration) return false;
     const payload = envelope.payload;
     let next: Snapshot;
-    if (event.type === "PUBLIC_MESSAGE_APPENDED") {
+    if (
+      event.type === "AGENT_PROCESSING_STARTED" &&
+      envelope.generation > current.ticket.agentGeneration
+    ) {
+      if (!isProcessingState(payload)) return false;
+      next = {
+        ...current,
+        cursor: event.id,
+        ticket: { ...current.ticket, agentGeneration: envelope.generation },
+      };
+      setLiveMessageState("accepted");
+    } else if (envelope.generation > current.ticket.agentGeneration) {
+      return false;
+    } else if (
+      event.type === "PUBLIC_MESSAGE_APPENDED" ||
+      event.type === "CUSTOMER_MESSAGE_ACCEPTED"
+    ) {
       if (!isPublicMessage(payload)) return false;
       const message = payload;
       if (current.ticket.handlingMode === "HUMAN" && message.author === "AGENT") {
@@ -716,6 +787,13 @@ export function App() {
           messages: duplicate ? current.messages : [...current.messages, message],
         };
       }
+    } else if (event.type === "AGENT_PROCESSING_TERMINATED") {
+      if (!isProcessingTermination(payload)) return false;
+      next = { ...current, cursor: event.id };
+      setLiveMessageState("accepted");
+    } else if (event.type === "AGENT_PROCESSING_STARTED") {
+      if (!isProcessingState(payload)) return false;
+      next = { ...current, cursor: event.id };
     } else if (event.type === "TICKET_ACCEPTED") {
       if (!isTicketTransition(payload)) return false;
       next = { ...current, cursor: event.id, ticket: { ...current.ticket, ...payload } };
@@ -1157,6 +1235,42 @@ export function App() {
               </button>
             </form>
           )}
+          {snapshot.ticket.handlingMode === "AGENT" &&
+            !["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState) && (
+              <form className="clarification-form live-message-form" onSubmit={submitLiveMessage}>
+                <label>
+                  继续补充消息
+                  <textarea
+                    aria-label="继续补充消息"
+                    value={liveMessageBody}
+                    onChange={(event) => {
+                      setLiveMessageBody(event.target.value);
+                      if (liveMessageState !== "sending") setLiveMessageState("idle");
+                    }}
+                    required
+                    rows={3}
+                  />
+                </label>
+                <button disabled={liveMessageState === "sending"}>
+                  {liveMessageState === "sending" ? "正在发送…" : "发送新消息"}
+                </button>
+                {liveMessageState === "accepted" && (
+                  <StatusNotice role="status" tone="success">
+                    已接受你的补充，旧回复已停止，正在结合最新对话重新处理。
+                  </StatusNotice>
+                )}
+                {liveMessageState === "conflict" && (
+                  <StatusNotice role="alert" tone="warning">
+                    工单状态已经变化，已重新同步；请确认当前状态后再发送。
+                  </StatusNotice>
+                )}
+                {liveMessageState === "error" && (
+                  <StatusNotice role="alert" tone="danger">
+                    消息结果暂时未知。请保留原文并重试；系统会复用稳定消息身份，不会重复追加。
+                  </StatusNotice>
+                )}
+              </form>
+            )}
           {["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState) && (
             <form className="clarification-form" onSubmit={submitTicketReply}>
               <label>
@@ -1265,6 +1379,16 @@ function isSnapshot(value: unknown): value is Snapshot {
     value.messages.every(isPublicMessage) &&
     isClarification(value.clarification)
   );
+}
+
+function isProcessingTermination(value: unknown) {
+  return (
+    isRecord(value) && hasOnlyKeys(value, ["reason"]) && value.reason === "NEW_CUSTOMER_MESSAGE"
+  );
+}
+
+function isProcessingState(value: unknown) {
+  return isRecord(value) && hasOnlyKeys(value, ["state"]) && value.state === "PROCESSING";
 }
 
 function parseIntakeRecoveryIndex(value: unknown): IntakeRecoveryIndex | null {

@@ -508,6 +508,79 @@ describe("客户帮助中心", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("Agent 处理中仍可用稳定消息身份追加信息并从新权威代次继续", async () => {
+    const ticketId = "15800000-0000-0000-0000-000000000001";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    let snapshotReads = 0;
+    let submittedMessageId = "";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith(`/api/customer/v2/tickets/${ticketId}`)) {
+        snapshotReads += 1;
+        return new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: `public-conversation-v2:${snapshotReads === 1 ? 4 : 7}`,
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "AGENT",
+              agentGeneration: snapshotReads,
+            },
+            messages:
+              snapshotReads === 1
+                ? [{ author: "CUSTOMER", body: "物流一直没更新", sentAt: "2026-08-28T00:00:00Z" }]
+                : [
+                    { author: "CUSTOMER", body: "物流一直没更新", sentAt: "2026-08-28T00:00:00Z" },
+                    {
+                      author: "CUSTOMER",
+                      body: "补充：今天仍然没有物流轨迹",
+                      sentAt: "2026-08-28T00:01:00Z",
+                    },
+                  ],
+            clarification: null,
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.endsWith(`/api/customer/v2/tickets/${ticketId}/messages`)) {
+        submittedMessageId = new Headers(init?.headers).get("Idempotency-Key") ?? "";
+        expect(JSON.parse(String(init?.body))).toEqual({
+          schema: "public-conversation-v2",
+          message: "补充：今天仍然没有物流轨迹",
+        });
+        return new Response(
+          JSON.stringify({
+            schema: "public-conversation-v2",
+            ticketId,
+            accepted: true,
+            replayed: false,
+          }),
+          { status: 202 },
+        );
+      }
+      if (url.endsWith("/events")) return openEventResponse();
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    render(<App />);
+
+    const input = await screen.findByLabelText("继续补充消息");
+    expect(input).toBeEnabled();
+    fireEvent.change(input, { target: { value: "补充：今天仍然没有物流轨迹" } });
+    fireEvent.click(screen.getByRole("button", { name: "发送新消息" }));
+
+    expect(
+      await screen.findByText("已接受你的补充，旧回复已停止，正在结合最新对话重新处理。"),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("补充：今天仍然没有物流轨迹")).toBeInTheDocument();
+    expect(input).toHaveValue("");
+    expect(submittedMessageId).not.toBe("");
+    expect(snapshotReads).toBe(2);
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
   it("澄清恢复响应丢失时按稳定 resumeRequestId 查询而不创建第二次恢复", async () => {
     const ticketId = "16000000-0000-0000-0000-000000000001";
     globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);

@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.ticket;
 
 import com.stellogic.customeragent.reliability.StableParameterDigest;
+import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -24,11 +25,14 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
     private static final String UNSUPPORTED_ISSUE_ACKNOWLEDGEMENT = "您的新问题已创建关联客服工单，并转由客服继续处理。";
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final TicketAuthorityLock authorityLock;
 
     @Autowired
-    public JdbcCustomerTicketService(JdbcTemplate jdbc, Clock clock) {
+    public JdbcCustomerTicketService(
+            JdbcTemplate jdbc, Clock clock, TicketAuthorityLock authorityLock) {
         this.jdbc = jdbc;
         this.clock = clock;
+        this.authorityLock = authorityLock;
     }
 
     @Override
@@ -181,6 +185,199 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
 
     @Override
     @Transactional
+    public CustomerMessageResult appendMessage(AppendCustomerMessage command) {
+        String digest =
+                StableParameterDigest.sha256(
+                        command.ticketId().toString(), command.message().trim());
+        authorityLock.acquire(command.ticketId());
+        jdbc.query(
+                "select pg_advisory_xact_lock(hashtextextended(?, 0))",
+                (ResultSetExtractor<Void>) resultSet -> null,
+                command.customerId() + "\n" + command.messageId());
+        List<CustomerMessageRequestRecord> existing =
+                jdbc.query(
+                        "select parameter_digest, outcome from customer_public_message_request "
+                                + "where customer_id = ? and message_id = ?",
+                        (rs, row) ->
+                                new CustomerMessageRequestRecord(rs.getString(1), rs.getString(2)),
+                        command.customerId(),
+                        command.messageId());
+        if (!existing.isEmpty()) {
+            CustomerMessageRequestRecord record = existing.getFirst();
+            if (!record.digest().equals(digest)) throw new RequestIdentityConflictException();
+            return new CustomerMessageResult(command.ticketId(), record.outcome(), true);
+        }
+
+        List<AppendableTicket> tickets =
+                jdbc.query(
+                        "select lifecycle_state, handling_mode, customer_human_preference "
+                                + "from support_ticket where id = ? and customer_id = ? for update",
+                        (rs, row) ->
+                                new AppendableTicket(
+                                        rs.getString(1), rs.getString(2), rs.getBoolean(3)),
+                        command.ticketId(),
+                        command.customerId());
+        if (tickets.isEmpty()) throw new TicketNotFoundException();
+        AppendableTicket ticket = tickets.getFirst();
+        if (!Set.of("NEW", "INVESTIGATING", "WAITING_FOR_CUSTOMER", "WAITING_FOR_EXTERNAL")
+                        .contains(ticket.lifecycleState())
+                || !"AGENT".equals(ticket.handlingMode())
+                || ticket.customerHumanPreference()) {
+            throw new CustomerMessageNotAcceptedException();
+        }
+
+        Instant now = clock.instant();
+        Timestamp at = Timestamp.from(now);
+        List<GenerationRecord> active =
+                jdbc.query(
+                        "select id, generation_number from agent_processing_generation "
+                                + "where ticket_id = ? and status = 'ACTIVE' for update",
+                        (rs, row) ->
+                                new GenerationRecord(rs.getObject(1, UUID.class), rs.getLong(2)),
+                        command.ticketId());
+        Long nextGeneration =
+                jdbc.queryForObject(
+                        "select coalesce(max(generation_number), 0) + 1 "
+                                + "from agent_processing_generation where ticket_id = ?",
+                        Long.class,
+                        command.ticketId());
+        long newGeneration = nextGeneration == null ? 1 : nextGeneration;
+        for (GenerationRecord generation : active) {
+            jdbc.update(
+                    "update agent_processing_generation set status = 'SUPERSEDED', completed_at = ? "
+                            + "where id = ? and status = 'ACTIVE'",
+                    at,
+                    generation.id());
+            jdbc.update(
+                    "update agent_submission set status = 'COMPLETED', last_error = null "
+                            + "where generation_id = ? and status <> 'COMPLETED'",
+                    generation.id());
+            jdbc.update(
+                    "update agent_resume_request set status = 'COMPLETED' "
+                            + "where generation_id = ? and status <> 'COMPLETED'",
+                    generation.id());
+        }
+
+        UUID generationId = UUID.randomUUID();
+        UUID threadId = UUID.randomUUID();
+        UUID submissionRequestId = UUID.randomUUID();
+        jdbc.update(
+                "insert into agent_processing_generation "
+                        + "(id, ticket_id, generation_number, thread_id, status, created_at) "
+                        + "values (?, ?, ?, ?, 'ACTIVE', ?)",
+                generationId,
+                command.ticketId(),
+                newGeneration,
+                threadId,
+                at);
+        jdbc.update(
+                "insert into agent_submission "
+                        + "(submission_request_id, generation_id, thread_id, parameter_digest, status, next_attempt_at, created_at) "
+                        + "values (?, ?, ?, ?, 'PENDING', ?, ?)",
+                submissionRequestId,
+                generationId,
+                threadId,
+                StableParameterDigest.sha256(
+                        command.ticketId().toString(),
+                        generationId.toString(),
+                        threadId.toString(),
+                        submissionRequestId.toString()),
+                at,
+                at);
+        if ("WAITING_FOR_CUSTOMER".equals(ticket.lifecycleState())) {
+            jdbc.update(
+                    "update support_ticket set lifecycle_state = 'INVESTIGATING', resolution_running_since = ? where id = ?",
+                    at,
+                    command.ticketId());
+        }
+
+        Long messageSequence =
+                jdbc.queryForObject(
+                        "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?",
+                        Long.class,
+                        command.ticketId());
+        Long eventSequence =
+                jdbc.queryForObject(
+                        "select coalesce(max(sequence), 0) + 1 from customer_public_event where ticket_id = ? and epoch = ?",
+                        Long.class,
+                        command.ticketId(),
+                        EPOCH);
+        jdbc.update(
+                "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) "
+                        + "values (?, ?, ?, 'CUSTOMER', ?, ?)",
+                UUID.randomUUID(),
+                command.ticketId(),
+                messageSequence,
+                command.message().trim(),
+                at);
+        long acceptedGeneration = active.isEmpty() ? newGeneration : active.getFirst().number();
+        jdbc.update(
+                "insert into customer_public_event "
+                        + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) values "
+                        + "(?, ?, ?, ?, 'CUSTOMER_MESSAGE_ACCEPTED', "
+                        + "jsonb_build_object('author', 'CUSTOMER', 'body', ?, 'sentAt', ?::text), ?)",
+                command.ticketId(),
+                EPOCH,
+                eventSequence,
+                acceptedGeneration,
+                command.message().trim(),
+                now.toString(),
+                at);
+        long nextEvent = eventSequence + 1;
+        if (!active.isEmpty()) {
+            jdbc.update(
+                    "insert into customer_public_event "
+                            + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
+                            + "values (?, ?, ?, ?, 'AGENT_PROCESSING_TERMINATED', "
+                            + "jsonb_build_object('reason', 'NEW_CUSTOMER_MESSAGE'), ?)",
+                    command.ticketId(),
+                    EPOCH,
+                    nextEvent++,
+                    active.getFirst().number(),
+                    at);
+        }
+        jdbc.update(
+                "insert into customer_public_event "
+                        + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
+                        + "values (?, ?, ?, ?, 'AGENT_PROCESSING_STARTED', "
+                        + "jsonb_build_object('state', 'PROCESSING'), ?)",
+                command.ticketId(),
+                EPOCH,
+                nextEvent,
+                newGeneration,
+                at);
+        jdbc.update(
+                "insert into customer_public_message_request "
+                        + "(customer_id, message_id, parameter_digest, ticket_id, outcome, received_at) "
+                        + "values (?, ?, ?, ?, 'ACCEPTED', ?)",
+                command.customerId(),
+                command.messageId(),
+                digest,
+                command.ticketId(),
+                at);
+        jdbc.update(
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                        + "values (?, 'CUSTOMER_MESSAGE_ACCEPTED', ?, ?)",
+                command.ticketId(),
+                command.customerId(),
+                at);
+        if (!active.isEmpty()) {
+            jdbc.update(
+                    "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                            + "values (?, 'AGENT_GENERATION_SUPERSEDED', 'spring-system', ?)",
+                    command.ticketId(),
+                    at);
+        }
+        jdbc.update(
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                        + "values (?, 'AGENT_GENERATION_CREATED', 'spring-system', ?)",
+                command.ticketId(),
+                at);
+        return new CustomerMessageResult(command.ticketId(), "ACCEPTED", false);
+    }
+
+    @Override
+    @Transactional
     public UUID createFollowUp(
             String customerId,
             String requestId,
@@ -298,4 +495,11 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
     }
 
     private record RequestRecord(String digest, UUID ticketId) {}
+
+    private record CustomerMessageRequestRecord(String digest, String outcome) {}
+
+    private record AppendableTicket(
+            String lifecycleState, String handlingMode, boolean customerHumanPreference) {}
+
+    private record GenerationRecord(UUID id, long number) {}
 }

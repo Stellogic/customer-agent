@@ -56,6 +56,37 @@ class CustomerTicketV2ApiTest {
     }
 
     @Test
+    void acceptsAnAdditionalCustomerMessageWithStableIdentityWhileAgentIsProcessing()
+            throws Exception {
+        when(service.appendMessage(any()))
+                .thenReturn(new CustomerMessageResult(TICKET_ID, "ACCEPTED", false));
+
+        mvc.perform(
+                        post("/api/customer/v2/tickets/{ticketId}/messages", TICKET_ID)
+                                .principal(customer("customer-demo"))
+                                .header("Idempotency-Key", "message-158-1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {
+                                          "schema":"public-conversation-v2",
+                                          "message":"补充一下，今天仍然没有更新物流轨迹"
+                                        }
+                                        """))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.schema").value("public-conversation-v2"))
+                .andExpect(jsonPath("$.ticketId").value(TICKET_ID.toString()))
+                .andExpect(jsonPath("$.accepted").value(true))
+                .andExpect(jsonPath("$.replayed").value(false))
+                .andExpect(jsonPath("$.generationId").doesNotExist());
+
+        verify(service)
+                .appendMessage(
+                        new AppendCustomerMessage(
+                                "customer-demo", TICKET_ID, "message-158-1", "补充一下，今天仍然没有更新物流轨迹"));
+    }
+
+    @Test
     void rejectsUnknownFieldsAndIncompatibleRequestVersions() throws Exception {
         mvc.perform(
                         post("/api/customer/v2/tickets")
