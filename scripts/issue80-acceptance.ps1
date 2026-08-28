@@ -1,165 +1,126 @@
 param(
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [string]$RunId,
+    [string]$SourceFingerprint
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
+. "$PSScriptRoot/gate-images.ps1"
+. "$PSScriptRoot/browser-acceptance-plan.ps1"
 
-$runId = [guid]::NewGuid().ToString('N').Substring(0, 12)
-$projectName = "customer-agent-issue80-$runId"
-$imageTag = "issue80-$runId"
+if ([string]::IsNullOrWhiteSpace($RunId)) {
+    $RunId = "issue80-$([guid]::NewGuid().ToString('N').Substring(0, 12))"
+}
+if ($RunId -notmatch '^[a-z0-9][a-z0-9-]{7,}$') {
+    throw 'Issue #80 RunId 只能包含小写字母、数字和连字符，且至少 8 位。'
+}
+if ([string]::IsNullOrWhiteSpace($SourceFingerprint)) {
+    $SourceFingerprint = Get-GateSourceFingerprint -RepoRoot $repoRoot
+}
+
+$imageTag = "gate-$RunId"
+$projectName = "customer-agent-issue80-$RunId"
 $portProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
 $portProbe.Start()
 $frontendPort = $portProbe.LocalEndpoint.Port
 $portProbe.Stop()
-
 $env:CUSTOMER_AGENT_IMAGE_TAG = $imageTag
 $env:CUSTOMER_AGENT_FRONTEND_PORT = [string]$frontendPort
 $env:SESSION_COOKIE_SECURE = 'true'
-$ownedImages = @(
-    "customer-agent/backend:$imageTag",
-    "customer-agent/agent:$imageTag",
-    "customer-agent/frontend:$imageTag",
-    "customer-agent/frontend-browser-test:$imageTag",
-    "customer-agent/frontend-browser-server:$imageTag"
-)
+$ownsImages = -not $SkipBuild
 
-function Get-ProjectContainers {
-    @(docker ps --all --quiet --filter "label=com.docker.compose.project=$projectName")
-}
-
-function Get-ProjectVolumes {
-    @(docker volume ls --quiet --filter "label=com.docker.compose.project=$projectName")
-}
-
-function Get-ProjectNetworks {
-    @(docker network ls --quiet --filter "label=com.docker.compose.project=$projectName")
-}
-
-function Get-OwnedImages {
-    $existingImages = @(docker image ls --format '{{.Repository}}:{{.Tag}}')
-    @($ownedImages | Where-Object { $existingImages -contains $_ })
-}
-
-function Get-IsolatedResourceSnapshot {
-    [pscustomobject]@{
-        Containers = @(Get-ProjectContainers)
-        Volumes    = @(Get-ProjectVolumes)
-        Networks   = @(Get-ProjectNetworks)
-        Images     = @(Get-OwnedImages)
-    }
-}
-
-function Assert-IsolatedResourcesEmpty {
-    param(
-        [Parameter(Mandatory)]$Snapshot,
-        [Parameter(Mandatory)][string]$Phase
+function Get-ProjectResources {
+    @(
+        @(docker ps --all --quiet --filter "label=com.docker.compose.project=$projectName") +
+        @(docker volume ls --quiet --filter "label=com.docker.compose.project=$projectName") +
+        @(docker network ls --quiet --filter "label=com.docker.compose.project=$projectName")
     )
+}
 
-    if (
-        $Snapshot.Containers.Count -ne 0 -or
-        $Snapshot.Volumes.Count -ne 0 -or
-        $Snapshot.Networks.Count -ne 0 -or
-        $Snapshot.Images.Count -ne 0
-    ) {
-        throw "Issue #80 隔离资源${Phase}非空: project=$projectName containers=$($Snapshot.Containers -join ',') volumes=$($Snapshot.Volumes -join ',') networks=$($Snapshot.Networks -join ',') images=$($Snapshot.Images -join ',')"
+function Assert-ProjectResourcesEmpty {
+    param([Parameter(Mandatory)][string]$Phase)
+    $resources = @(Get-ProjectResources)
+    if ($resources.Count -ne 0) {
+        throw "Issue #80 隔离资源${Phase}非空: project=$projectName resources=$($resources -join ',')"
     }
 }
 
-function Invoke-BoundedBuild {
-    for ($attempt = 1; $attempt -le 5; $attempt++) {
-        try {
-            $build = Start-Process -FilePath 'docker' -ArgumentList @(
-                'compose', '--project-name', $projectName, '--profile', 'smoke', 'build'
-            ) -NoNewWindow -PassThru
-            try {
-                $build | Wait-Process -Timeout 900 -ErrorAction Stop
-            } catch {
-                Stop-Process -Id $build.Id -Force -ErrorAction SilentlyContinue
-                throw 'Issue #80 镜像构建超过 900 秒有界超时'
-            }
-            if ($build.ExitCode -ne 0) {
-                throw "Issue #80 镜像构建退出码: $($build.ExitCode)"
-            }
-            return
-        } catch {
-            if ($attempt -eq 5) { throw }
-            Write-Warning "Issue #80 镜像构建第 $attempt 次失败，将重试；浏览器测试本身不重试。"
-            Start-Sleep -Seconds 2
-        }
-    }
+$plan = Import-PowerShellDataFile "$PSScriptRoot/browser-acceptance-plan.psd1"
+$discovered = @(
+    Get-ChildItem -LiteralPath (Join-Path $repoRoot 'frontend/e2e') -File -Filter '*.spec.ts' |
+        ForEach-Object { "e2e/$($_.Name)" }
+)
+Assert-BrowserAcceptancePlan `
+    -DiscoveredFiles $discovered `
+    -ParallelSafe $plan.ParallelSafe `
+    -Serial $plan.Serial `
+    -Excluded $plan.Excluded.Keys
+Assert-ParallelSafeBrowserTests -RepoRoot $repoRoot -Files $plan.ParallelSafe
+
+if ($SkipBuild) {
+    Assert-GateImages -RunId $RunId -SourceFingerprint $SourceFingerprint
+} else {
+    Invoke-GateImageBuilds -RepoRoot $repoRoot -RunId $RunId -SourceFingerprint $SourceFingerprint | Out-Null
 }
 
 $effectiveConfigJson = docker compose --project-name $projectName --profile smoke config --format json
-if ($LASTEXITCODE -ne 0) {
-    throw "Issue #80 effective config 读取失败: $projectName"
-}
 $effectiveConfig = $effectiveConfigJson | ConvertFrom-Json
 $configuredPort = [string]$effectiveConfig.services.frontend.ports[0].published
 $configuredImages = @($effectiveConfig.services.PSObject.Properties.Value.image)
-if ($effectiveConfig.name -ne $projectName -or $configuredPort -ne [string]$frontendPort) {
-    throw "Issue #80 effective config 未应用唯一 project/端口: project=$($effectiveConfig.name) port=$configuredPort"
+$expectedImages = @(
+    Get-GateImageSpecifications -ImageTag $imageTag |
+        Where-Object { $_.Image -notmatch 'customer-agent/(backend|agent)-test:' } |
+        ForEach-Object Image
+)
+if (
+    $effectiveConfig.name -ne $projectName -or
+    $configuredPort -ne [string]$frontendPort -or
+    @($expectedImages | Where-Object { $configuredImages -notcontains $_ }).Count -ne 0
+) {
+    throw "Issue #80 effective config 未应用唯一 project/端口/镜像标签: project=$projectName port=$frontendPort tag=$imageTag"
 }
-if ($ownedImages | Where-Object { $configuredImages -notcontains $_ }) {
-    throw "Issue #80 effective config 未应用唯一镜像标签: $imageTag"
+Assert-ProjectResourcesEmpty -Phase '在启动前'
+Write-Host "Issue #80 effective config: project=$projectName port=$frontendPort tag=$imageTag fingerprint=$SourceFingerprint preflight resources=0"
+
+$playwrightRunner = {
+    param($files, $workers, $attempt)
+    docker compose --project-name $projectName --profile smoke run --rm --no-deps browser-acceptance `
+        "--workers=$workers" @files
+    return $LASTEXITCODE
 }
 
-Assert-IsolatedResourcesEmpty -Snapshot (Get-IsolatedResourceSnapshot) -Phase '在启动前'
-
-Write-Host "Issue #80 effective config: project=$projectName port=$frontendPort tag=$imageTag volumes=$projectName`_postgres-data,$projectName`_browser-artifacts; preflight containers=0 volumes=0 networks=0 images=0"
 try {
-    if (-not $SkipBuild) {
-        Invoke-BoundedBuild
-    }
     docker compose --project-name $projectName up --detach --no-build --force-recreate --wait
     docker compose --project-name $projectName exec -T postgres `
         psql -U postgres -d customer_agent -f /acceptance/issue80-browser.sql
     docker compose --project-name $projectName --profile smoke up --detach --no-build --no-deps --wait browser-frontend
-    docker compose --project-name $projectName --profile smoke run --rm --no-deps browser-acceptance `
-        e2e/issue80.identity-shells.spec.ts `
-        e2e/issue80.session-lifecycle.spec.ts `
-        e2e/issue80.business-boundaries.spec.ts `
-        e2e/issue80.approval-separation.spec.ts `
-        e2e/issue98.customer-help-center.spec.ts `
-        e2e/issue99.support-workbench.spec.ts `
-        e2e/issue100.approval-workbench.spec.ts `
-        e2e/issue101.cross-role-acceptance.spec.ts `
-        e2e/issue124.offline-fullstack-readiness.spec.ts `
-        e2e/issue152.natural-language-intake.spec.ts `
-        e2e/issue153.atomic-multi-issue-intake.spec.ts `
-        e2e/issue154.duplicate-multi-order-intake.spec.ts `
-        e2e/issue155.intake-recovery.spec.ts `
-        e2e/issue156.intake-assistance.spec.ts `
-        e2e/issue80.sse-revocation.spec.ts
-    if ($LASTEXITCODE -ne 0) {
-        throw "Issue #80 真实浏览器验收失败，退出码: $LASTEXITCODE"
-    }
 
+    Invoke-PlaywrightGroup -Files $plan.ParallelSafe -Workers 2 -RepeatCount 3 -Runner $playwrightRunner
+
+    $regularSerial = @($plan.Serial | Where-Object { $_ -ne 'e2e/issue80.session-restart-expiry.spec.ts' })
+    Invoke-PlaywrightGroup -Files $regularSerial -Workers 1 -Runner $playwrightRunner
+
+    $sessionFile = @('e2e/issue80.session-restart-expiry.spec.ts')
     $env:ISSUE80_SESSION_PHASE = 'restart-prepare'
-    docker compose --project-name $projectName --profile smoke run --rm --no-deps browser-acceptance `
-        e2e/issue80.session-restart-expiry.spec.ts
+    Invoke-PlaywrightGroup -Files $sessionFile -Workers 1 -Runner $playwrightRunner
     docker compose --project-name $projectName restart backend
     docker compose --project-name $projectName up --detach --no-deps --wait backend
     $env:ISSUE80_SESSION_PHASE = 'restart-verify'
-    docker compose --project-name $projectName --profile smoke run --rm --no-deps browser-acceptance `
-        e2e/issue80.session-restart-expiry.spec.ts
+    Invoke-PlaywrightGroup -Files $sessionFile -Workers 1 -Runner $playwrightRunner
 
     $env:CUSTOMER_AGENT_SESSION_TIMEOUT = '1m'
     docker compose --project-name $projectName up --detach --no-deps --force-recreate --wait backend
     $env:ISSUE80_SESSION_PHASE = 'expiry'
-    docker compose --project-name $projectName --profile smoke run --rm --no-deps browser-acceptance `
-        e2e/issue80.session-restart-expiry.spec.ts
-    if ($LASTEXITCODE -ne 0) {
-        throw "Issue #80 Session 重启/超时验收失败，退出码: $LASTEXITCODE"
-    }
+    Invoke-PlaywrightGroup -Files $sessionFile -Workers 1 -Runner $playwrightRunner
 } finally {
     docker compose --project-name $projectName --profile smoke down --volumes --remove-orphans
-    Get-OwnedImages | ForEach-Object {
-        docker image rm $_ | Out-Null
+    Assert-ProjectResourcesEmpty -Phase '清理后'
+    if ($ownsImages) {
+        Remove-GateImages -RunId $RunId
     }
-    Assert-IsolatedResourcesEmpty -Snapshot (Get-IsolatedResourceSnapshot) -Phase '清理后'
     Remove-Item Env:CUSTOMER_AGENT_IMAGE_TAG -ErrorAction SilentlyContinue
     Remove-Item Env:CUSTOMER_AGENT_FRONTEND_PORT -ErrorAction SilentlyContinue
     Remove-Item Env:SESSION_COOKIE_SECURE -ErrorAction SilentlyContinue
@@ -167,4 +128,4 @@ try {
     Remove-Item Env:ISSUE80_SESSION_PHASE -ErrorAction SilentlyContinue
 }
 
-Write-Host 'Issue #80 真实浏览器验收通过，隔离容器、合成数据卷与本次镜像标签已回读为空。'
+Write-Host "Issue #80 真实浏览器验收通过：parallel-safe=$($plan.ParallelSafe.Count) files x3 workers=2，serial=$($plan.Serial.Count) files workers=1；隔离容器、网络与卷已回读为空。"

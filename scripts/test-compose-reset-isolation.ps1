@@ -140,7 +140,7 @@ if ($smokeGuardIndex -lt 0 -or $destructiveDownIndex -le $smokeGuardIndex) {
 
 $checkSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'check.ps1') -Raw
 $checkGuardIndex = $checkSource.IndexOf('confirm-compose-reset-isolation.ps1', [StringComparison]::Ordinal)
-$firstBuildIndex = $checkSource.IndexOf('docker build', [StringComparison]::Ordinal)
+$firstBuildIndex = $checkSource.IndexOf('Invoke-GateImageBuilds', [StringComparison]::Ordinal)
 if ($checkGuardIndex -lt 0 -or $firstBuildIndex -le $checkGuardIndex) {
     throw '完整规范门禁未在 Docker 构建与验收前执行隔离配置读回。'
 }

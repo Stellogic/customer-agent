@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
+. "$PSScriptRoot/gate-images.ps1"
 $imageTag = if ($env:CUSTOMER_AGENT_IMAGE_TAG) { $env:CUSTOMER_AGENT_IMAGE_TAG } else { 'local' }
 $env:CUSTOMER_AGENT_IMAGE_TAG = $imageTag
 $env:AGENT_INVESTIGATION_SHADOW_MODE = 'offline'
@@ -24,6 +25,16 @@ if ($Reset) {
         -ImageTag $imageTag `
         -FrontendPort $frontendPort
     docker compose -p $projectName down --volumes --remove-orphans
+}
+
+if ($SkipBuild) {
+    if (
+        [string]::IsNullOrWhiteSpace($env:CUSTOMER_AGENT_GATE_RUN_ID) -or
+        [string]::IsNullOrWhiteSpace($env:CUSTOMER_AGENT_GATE_SOURCE_FINGERPRINT)
+    ) {
+        throw 'smoke -SkipBuild 需要完整门禁运行标识与源码指纹。'
+    }
+    Assert-GateImages -RunId $env:CUSTOMER_AGENT_GATE_RUN_ID -SourceFingerprint $env:CUSTOMER_AGENT_GATE_SOURCE_FINGERPRINT
 }
 
 if (-not $SkipBuild) {
