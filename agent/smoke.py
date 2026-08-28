@@ -789,7 +789,9 @@ def main() -> None:
     )
 
     def race_conclusion(compensation_required: bool) -> None:
-        order_reference = "ORDER-DELAY-001" if compensation_required else "ORDER-DELAY-UNDER-24"
+        order_reference = (
+            "ORDER-ISSUE-158-COMPENSATION-RACE" if compensation_required else "ORDER-DELAY-UNDER-24"
+        )
         ticket_id, generation_id = create_generation_race_ticket(order_reference)
         with customer_browser_client(spring_url) as client:
             facts = collect_investigation_facts(
