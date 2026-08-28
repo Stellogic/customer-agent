@@ -654,7 +654,7 @@ def main() -> None:
         race_name: str,
         order_reference: str,
         old_action: Callable[[httpx.Client, uuid.UUID, uuid.UUID], httpx.Response],
-        accepted_old_status: int,
+        allowed_outcomes: set[tuple[int, int]],
         prepared: tuple[uuid.UUID, uuid.UUID] | None = None,
     ) -> None:
         race_ticket_id, race_generation_id = prepared or create_generation_race_ticket(
@@ -683,11 +683,10 @@ def main() -> None:
             action_future = executor.submit(invoke_old_action)
             message_response = message_future.result(timeout=20)
             action_response = action_future.result(timeout=20)
-        assert (message_response.status_code, action_response.status_code) in {
-            (202, 403),
-            (202, accepted_old_status),
-            (409, accepted_old_status),
-        }, (message_response.text, action_response.text)
+        assert (
+            message_response.status_code,
+            action_response.status_code,
+        ) in allowed_outcomes, (message_response.text, action_response.text)
 
         if message_response.status_code == 202:
             with customer_browser_client(spring_url) as reconnected_client:
@@ -767,12 +766,20 @@ def main() -> None:
             },
         )
 
-    race_new_message_with_old_action("tool-call", "ORDER-DELAY-UNDER-24", old_tool_action, 200)
     race_new_message_with_old_action(
-        "clarification", "ORDER-DELAY-AMBIGUOUS", old_clarification_action, 200
+        "tool-call", "ORDER-DELAY-UNDER-24", old_tool_action, {(202, 403), (202, 200)}
     )
     race_new_message_with_old_action(
-        "human-handoff", "ORDER-DELAY-UNDER-24", old_handoff_action, 202
+        "clarification",
+        "ORDER-DELAY-AMBIGUOUS",
+        old_clarification_action,
+        {(202, 403), (202, 200)},
+    )
+    race_new_message_with_old_action(
+        "human-handoff",
+        "ORDER-DELAY-UNDER-24",
+        old_handoff_action,
+        {(202, 403), (409, 202)},
     )
 
     def race_conclusion(compensation_required: bool) -> None:
@@ -821,7 +828,7 @@ def main() -> None:
             "compensation-proposal" if compensation_required else "public-conclusion",
             order_reference,
             old_conclusion_action,
-            200,
+            ({(202, 403), (202, 200)} if compensation_required else {(202, 403), (409, 200)}),
             (ticket_id, generation_id),
         )
 
