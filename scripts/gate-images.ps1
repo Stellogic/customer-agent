@@ -45,7 +45,11 @@ function Get-GateSourceFingerprint {
 function Get-GateImageMetadata {
     param([Parameter(Mandatory)][string]$Image)
 
-    $json = docker image inspect $Image --format '{{json .Config.Labels}}' 2>$null
+    try {
+        $json = docker image inspect $Image --format '{{json .Config.Labels}}' 2>$null
+    } catch {
+        return $null
+    }
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($json)) {
         return $null
     }
@@ -119,7 +123,7 @@ function Invoke-GateImageBuilds {
         }
         $arguments += (Join-Path $RepoRoot $specification.Context)
         $watch = [System.Diagnostics.Stopwatch]::StartNew()
-        & docker @arguments
+        & docker @arguments | Out-Host
         $exitCode = $LASTEXITCODE
         $watch.Stop()
         if ($exitCode -ne 0) {

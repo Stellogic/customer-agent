@@ -88,7 +88,7 @@ Write-Host "Issue #80 effective config: project=$projectName port=$frontendPort 
 $playwrightRunner = {
     param($files, $workers, $attempt)
     docker compose --project-name $projectName --profile smoke run --rm --no-deps browser-acceptance `
-        "--workers=$workers" @files
+        "--workers=$workers" @files | Out-Host
     return $LASTEXITCODE
 }
 

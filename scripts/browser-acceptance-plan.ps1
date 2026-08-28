@@ -33,7 +33,14 @@ function Invoke-PlaywrightGroup {
     )
 
     for ($attempt = 1; $attempt -le $RepeatCount; $attempt++) {
-        $exitCode = & $Runner $Files $Workers $attempt
+        $runnerOutput = @(& $Runner $Files $Workers $attempt)
+        if ($runnerOutput.Count -eq 0) {
+            throw "Playwright 组第 $attempt 次运行未返回退出码。"
+        }
+        if ($runnerOutput.Count -gt 1) {
+            $runnerOutput[0..($runnerOutput.Count - 2)] | Out-Host
+        }
+        $exitCode = $runnerOutput[-1]
         if ($exitCode -ne 0) {
             throw "Playwright 组第 $attempt 次运行失败，workers=$Workers，退出码: $exitCode"
         }

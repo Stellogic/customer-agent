@@ -51,6 +51,7 @@ try {
         -Runner {
             param($files, $workers, $attempt)
             $script:attempts += 1
+            Write-Output "attempt-$attempt-output"
             if ($attempt -eq 2) { return 17 }
             return 0
         }
