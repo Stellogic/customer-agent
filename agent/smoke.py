@@ -540,7 +540,13 @@ def main() -> None:
                 "X-Agent-Operation": "REQUEST_HUMAN_HANDOFF",
                 "Idempotency-Key": f"issue-158-stale-handoff-{uuid.uuid4()}",
             },
-            json={"reasonCode": "FACT_CONFLICT", "summary": None},
+            json={
+                "reasonCode": "FACT_CONFLICT",
+                "summary": {
+                    "conclusionCode": "INVESTIGATION_COULD_NOT_CONTINUE",
+                    "facts": [],
+                },
+            },
         )
         expect_status(stale_handoff, 403)
 
