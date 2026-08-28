@@ -23,9 +23,10 @@
 
 | 决策 | 状态 | 关联范围 |
 | --- | --- | --- |
-| [跨语言质量门禁](../decisions/0001-quality-guardrails.md) | 已接受 | 三端格式、Lint、类型检查、架构测试、统一检查和 CI |
+| [跨语言质量门禁](../decisions/0001-quality-guardrails.md) | 已接受；CI 部分被替代 | 三端格式、Lint、类型检查、架构测试及原 GitHub CI 决定 |
 | [静态 React Shell 与路由组件栈](../decisions/0002-static-react-shell-stack.md) | 已接受 | #71、#73；前端依赖版本、静态路由注册表和分包 |
 | [Playwright 真实浏览器验收](../decisions/0003-playwright-browser-acceptance.md) | 已接受 | #80；真实浏览器、隔离 Compose 和 bundle 验收 |
+| [以本地完整门禁替代 GitHub CI](../decisions/0004-local-canonical-gate.md) | 已接受 | #184；关闭远端 CI、本地完整门禁与正式交付证据 |
 
 ## 父规格中的架构汇总
 

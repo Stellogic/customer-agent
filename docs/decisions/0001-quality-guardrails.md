@@ -2,7 +2,7 @@
 
 ## 状态
 
-已接受。
+已接受；其中 GitHub CI 决定已被 [`0004-local-canonical-gate.md`](./0004-local-canonical-gate.md) 替代。
 
 ## 背景
 
