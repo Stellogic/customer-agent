@@ -1,5 +1,7 @@
 package com.stellogic.customeragent.ticket;
 
+import java.util.UUID;
+
 interface CustomerIntakeService {
     CustomerIntakeSnapshot start(StartCustomerIntake command);
 
@@ -10,6 +12,8 @@ interface CustomerIntakeService {
     CustomerIntakeSnapshot snapshot(String customerId, java.util.UUID intakeId);
 
     CustomerIntakeRecoveryIndex recoveryIndex(String customerId);
+
+    RecoverableCustomerIntake recoverableSnapshot(String customerId, UUID intakeId);
 
     RecoverableCustomerIntake restore(RestoreCustomerIntake command);
 }

@@ -39,8 +39,24 @@ SELECT gen_random_uuid(), id, 1, 'CUSTOMER', original_message, created_at
 FROM customer_intake;
 
 INSERT INTO customer_intake_transcript (id, intake_id, ordinal, author, body, created_at)
-SELECT gen_random_uuid(), id, 2, 'AGENT', assistant_message, created_at
-FROM customer_intake;
+SELECT gen_random_uuid(), intake_id, ordinal + 1, 'CUSTOMER', customer_message, created_at
+FROM (
+    SELECT intake_id, customer_message, created_at,
+        row_number() OVER (
+            PARTITION BY intake_id ORDER BY created_at, request_key
+        ) AS ordinal
+    FROM customer_intake_message
+) messages;
+
+INSERT INTO customer_intake_transcript (id, intake_id, ordinal, author, body, created_at)
+SELECT gen_random_uuid(), intake.id, coalesce(messages.message_count, 0) + 2,
+    'AGENT', intake.assistant_message, intake.updated_at
+FROM customer_intake intake
+LEFT JOIN (
+    SELECT intake_id, count(*) AS message_count
+    FROM customer_intake_message
+    GROUP BY intake_id
+) messages ON messages.intake_id = intake.id;
 
 CREATE TABLE customer_intake_restore_request (
     intake_id uuid NOT NULL REFERENCES customer_intake(id) ON DELETE CASCADE,

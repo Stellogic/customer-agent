@@ -107,7 +107,7 @@ describe("客户帮助中心", () => {
     expect(createHeaders.get("X-CSRF-TOKEN")).toBe("customer-csrf");
     expect(createHeaders.get("X-Synthetic-Customer-Id")).toBeNull();
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
-      schema: "customer-intake-v3",
+      schema: "customer-intake-v4",
       message: "订单 ORDER-DELAY-001 的物流延迟问题：物流已经延迟多日",
     });
     expect(fetchMock.mock.calls[1][0]).toBe("/api/customer/v2/intakes/intake-152/messages");
@@ -147,7 +147,7 @@ describe("客户帮助中心", () => {
     expect(screen.getByRole("button", { name: "确认，就是这个问题" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
-      schema: "customer-intake-v3",
+      schema: "customer-intake-v4",
       message: "包裹好几天没有动了",
     });
   });
@@ -226,7 +226,7 @@ describe("客户帮助中心", () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            schema: "customer-intake-v3",
+            schema: "customer-intake-v4",
             intakeId: "15400000-0000-0000-0000-000000000002",
             status: "READY_TO_CONFIRM",
             candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
@@ -249,6 +249,7 @@ describe("客户帮助中心", () => {
             completedOrderCount: 0,
             expectedTicketCount: 1,
             confirmed: false,
+            version: 1,
             replayed: false,
           }),
           { status: 201 },
@@ -257,7 +258,7 @@ describe("客户帮助中心", () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            schema: "customer-intake-v3",
+            schema: "customer-intake-v4",
             intakeId: "15400000-0000-0000-0000-000000000002",
             status: "CONFIRMED",
             candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
@@ -273,6 +274,7 @@ describe("客户帮助中心", () => {
             completedOrderCount: 1,
             expectedTicketCount: 0,
             confirmed: true,
+            version: 3,
             replayed: false,
           }),
           { status: 201 },
@@ -301,12 +303,12 @@ describe("客户帮助中心", () => {
   it("完成当前订单后保留原始描述并要求重新确认下一订单", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(intakeV3({ remainingOrderCount: 1 })), { status: 201 }),
+        new Response(JSON.stringify(intakeV4({ remainingOrderCount: 1 })), { status: 201 }),
       )
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify(
-            intakeV3({
+            intakeV4({
               candidateOrder: { reference: "ORDER-DELAY-002", summary: "配送中的合成订单" },
               ticketIds: ["15400000-0000-0000-0000-000000000003"],
               assistantMessage: "原始描述已保留，请重新确认下一订单与问题集合。",
@@ -374,6 +376,31 @@ describe("客户帮助中心", () => {
     );
     expect(await screen.findByText("订单事实已变化，请重新确认")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "请确认我的理解" })).toBeInTheDocument();
+  });
+
+  it("刷新受理链接后从恢复端点重建事实变化提示与完整消息", async () => {
+    const intakeId = "15500000-0000-0000-0000-000000000001";
+    globalThis.history.replaceState(null, "", `/?intake=${intakeId}`);
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify(
+          recoverableIntake({
+            retentionState: "ACTIVE",
+            version: 4,
+            factsChanged: true,
+            archivedAt: null,
+          }),
+        ),
+        { status: 200 },
+      ),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("订单事实已变化，请重新确认")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "请确认我的理解" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "已恢复的受理消息" })).toHaveTextContent("物流延迟了");
+    expect(fetchMock.mock.calls[0][0]).toContain(`/api/customer/v2/intakes/${intakeId}/recovery`);
   });
 
   it("受理记录查询区分无记录与加载失败", async () => {
@@ -1366,9 +1393,9 @@ describe("客户帮助中心", () => {
   });
 });
 
-function intakeV3(overrides: Record<string, unknown> = {}) {
+function intakeV4(overrides: Record<string, unknown> = {}) {
   return {
-    schema: "customer-intake-v3",
+    schema: "customer-intake-v4",
     intakeId: "15400000-0000-0000-0000-000000000010",
     status: "READY_TO_CONFIRM",
     candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
@@ -1384,6 +1411,7 @@ function intakeV3(overrides: Record<string, unknown> = {}) {
     completedOrderCount: 0,
     expectedTicketCount: 1,
     confirmed: false,
+    version: 3,
     replayed: false,
     ...overrides,
   };
@@ -1391,7 +1419,7 @@ function intakeV3(overrides: Record<string, unknown> = {}) {
 
 function recoverableIntake(overrides: Record<string, unknown> = {}) {
   return {
-    intake: intakeV3({
+    intake: intakeV4({
       intakeId: "15500000-0000-0000-0000-000000000001",
       assistantMessage: "请重新确认我的理解。",
     }),

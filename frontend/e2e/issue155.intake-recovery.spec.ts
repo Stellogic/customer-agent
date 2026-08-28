@@ -3,7 +3,7 @@ import { login } from "./support/auth";
 import { newIssue80Context } from "./support/browser-context";
 import { executeFixtureSql, queryFixtureSql } from "./support/database";
 
-test("Issue #155 桌面端在七日精确边界归档并重新核对变化事实", async ({ browser }) => {
+test("Issue #155 桌面端在七日边界仲裁恢复、旧确认与重复确认", async ({ browser }) => {
   const context = await newIssue80Context(browser, { viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   const orderReference = "ORDER-INTAKE-155-DESKTOP";
@@ -13,36 +13,97 @@ test("Issue #155 桌面端在七日精确边界归档并重新核对变化事实
   const intakeId = await startIntake(page, orderReference);
   executeFixtureSql(`
     update customer_intake
+    set expires_at = timestamptz '2026-08-09T14:00:00.001Z'
+    where id = '${intakeId}'::uuid;
+  `);
+  const beforeBoundary = await readRecoverable(page, intakeId);
+  expect(beforeBoundary.retentionState).toBe("ACTIVE");
+  expect(beforeBoundary.version).toBe(1);
+  expect(ticketCount(orderReference)).toBe("0");
+
+  executeFixtureSql(`
+    update customer_intake
     set expires_at = timestamptz '2026-08-09T14:00:00Z'
     where id = '${intakeId}'::uuid;
     update synthetic_order
     set delay_hours = 81, delay_seconds = 291600
     where order_reference = '${orderReference}';
   `);
-
-  await page.goto("/help");
-  await page.getByRole("button", { name: "查找未完成受理" }).click();
-  await expect(page.getByRole("heading", { name: "已归档受理" })).toBeVisible();
+  const archived = await readRecoverable(page, intakeId);
+  expect(archived.retentionState).toBe("ARCHIVED");
+  expect(archived.version).toBe(2);
   expect(
     queryFixtureSql(`select retention_state from customer_intake where id = '${intakeId}'`),
   ).toBe("ARCHIVED");
-  expect(
-    queryFixtureSql(
-      `select count(*) from support_ticket where order_reference = '${orderReference}'`,
-    ),
-  ).toBe("0");
+  expect(ticketCount(orderReference)).toBe("0");
 
-  await page.getByRole("button", { name: "恢复并重新核对事实" }).click();
+  const restoreKey = crypto.randomUUID();
+  const competingRestoreKey = crypto.randomUUID();
+  const arbitration = await postIntakeRequests(page, [
+    {
+      path: `/api/customer/v2/intakes/${intakeId}/restore`,
+      requestKey: restoreKey,
+      body: { schema: "customer-intake-recovery-v1", expectedVersion: archived.version },
+    },
+    {
+      path: `/api/customer/v2/intakes/${intakeId}/restore`,
+      requestKey: competingRestoreKey,
+      body: { schema: "customer-intake-recovery-v1", expectedVersion: archived.version },
+    },
+    {
+      path: `/api/customer/v2/intakes/${intakeId}/messages`,
+      requestKey: crypto.randomUUID(),
+      body: { schema: "customer-intake-v4", message: "确认提交", expectedVersion: 1 },
+    },
+  ]);
+  expect(arbitration.toSorted()).toEqual([201, 409, 409]);
+  expect(ticketCount(orderReference)).toBe("0");
+  const winningRestoreKey = arbitration[0] === 201 ? restoreKey : competingRestoreKey;
+
+  const replay = await postIntakeRequests(page, [
+    {
+      path: `/api/customer/v2/intakes/${intakeId}/restore`,
+      requestKey: winningRestoreKey,
+      body: { schema: "customer-intake-recovery-v1", expectedVersion: archived.version },
+    },
+  ]);
+  expect(replay).toEqual([200]);
+
+  await page.goto(`/help?intake=${intakeId}`);
   await expect(page.getByText("订单事实已变化，请重新确认")).toBeVisible();
   await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "已恢复的受理消息" })).toContainText(
+    "物流已经延迟，请帮我核对",
+  );
   expect(
     queryFixtureSql(`select retention_state from customer_intake where id = '${intakeId}'`),
   ).toBe("ACTIVE");
-  expect(
-    queryFixtureSql(
-      `select count(*) from support_ticket where order_reference = '${orderReference}'`,
-    ),
-  ).toBe("0");
+
+  const restored = await readRecoverable(page, intakeId);
+  expect(restored.version).toBe(3);
+  const confirmationKey = crypto.randomUUID();
+  const confirmations = await postIntakeRequests(page, [
+    {
+      path: `/api/customer/v2/intakes/${intakeId}/messages`,
+      requestKey: confirmationKey,
+      body: {
+        schema: "customer-intake-v4",
+        message: "确认提交",
+        expectedVersion: restored.version,
+      },
+    },
+    {
+      path: `/api/customer/v2/intakes/${intakeId}/messages`,
+      requestKey: confirmationKey,
+      body: {
+        schema: "customer-intake-v4",
+        message: "确认提交",
+        expectedVersion: restored.version,
+      },
+    },
+  ]);
+  expect(confirmations.toSorted()).toEqual([200, 201]);
+  expect(ticketCount(orderReference)).toBe("1");
   await context.close();
 });
 
@@ -82,9 +143,14 @@ test("Issue #155 窄屏恢复活动受理且隔离其他客户记录", async ({ 
     ) on conflict do nothing;
   `);
 
-  await page.goto("/help");
-  await page.getByRole("button", { name: "查找未完成受理" }).click();
+  await page.getByRole("button", { name: "退出登录" }).click();
+  await expect(page).toHaveURL(/\/help\/login/);
+  await login(page, "customer", "customer-demo");
+  await page.goto(`/help?intake=${intakeId}`);
   await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "已恢复的受理消息" })).toContainText(
+    "物流已经延迟，请帮我核对",
+  );
   await expect(page.getByText("其他客户私有消息")).toHaveCount(0);
   expect(new URL(page.url()).searchParams.get("intake")).toBe(intakeId);
   expect(
@@ -121,4 +187,49 @@ function prepareOrder(orderReference: string) {
     ) on conflict (order_reference) do update
     set delay_hours = excluded.delay_hours, delay_seconds = excluded.delay_seconds;
   `);
+}
+
+async function readRecoverable(page: Page, intakeId: string) {
+  return page.evaluate(async (id) => {
+    const response = await fetch(`/api/customer/v2/intakes/${id}/recovery`, {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`recovery read failed: ${response.status}`);
+    return (await response.json()) as { retentionState: string; version: number };
+  }, intakeId);
+}
+
+async function postIntakeRequests(
+  page: Page,
+  requests: Array<{ path: string; requestKey: string; body: Record<string, unknown> }>,
+) {
+  return page.evaluate(async (entries) => {
+    const csrfResponse = await fetch("/api/auth/csrf", {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    const csrf = (await csrfResponse.json()) as { token: string; headerName: string };
+    return Promise.all(
+      entries.map(async (entry) => {
+        const response = await fetch(entry.path, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            [csrf.headerName]: csrf.token,
+            "Content-Type": "application/json",
+            "Idempotency-Key": entry.requestKey,
+          },
+          body: JSON.stringify(entry.body),
+        });
+        return response.status;
+      }),
+    );
+  }, requests);
+}
+
+function ticketCount(orderReference: string) {
+  return queryFixtureSql(
+    `select count(*) from support_ticket where order_reference = '${orderReference}'`,
+  );
 }

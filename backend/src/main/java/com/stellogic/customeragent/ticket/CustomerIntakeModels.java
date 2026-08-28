@@ -6,10 +6,16 @@ import java.util.UUID;
 
 record StartCustomerIntake(String customerId, String requestId, String message) {}
 
-record ReplyCustomerIntake(String customerId, UUID intakeId, String requestId, String message) {}
+record ReplyCustomerIntake(
+        String customerId, UUID intakeId, String requestId, String message, long expectedVersion) {}
 
 record ResolveDuplicateIntake(
-        String customerId, UUID intakeId, String requestId, UUID existingTicketId, String action) {}
+        String customerId,
+        UUID intakeId,
+        String requestId,
+        UUID existingTicketId,
+        String action,
+        long expectedVersion) {}
 
 record RestoreCustomerIntake(
         String customerId, UUID intakeId, String requestId, long expectedVersion) {}
@@ -27,6 +33,7 @@ record CustomerIntakeSnapshot(
         List<UUID> routedTicketIds,
         int remainingOrderCount,
         int completedOrderCount,
+        long version,
         boolean replayed) {}
 
 record ProposedIntakeIssue(String kind, String summary) {}

@@ -163,6 +163,29 @@ h1 {
   font-size: 0.96rem;
   line-height: 1.75;
 }
+
+.intake-transcript {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.intake-transcript li {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+}
+
+.intake-transcript span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.intake-transcript p {
+  margin: 0.25rem 0 0;
+}
 .intake-candidate {
   display: grid;
   grid-template-columns: 50px minmax(0, 1fr) auto;

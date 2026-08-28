@@ -45,6 +45,7 @@ class CustomerIntakeV2ApiTest {
                                 java.util.List.of(),
                                 0,
                                 0,
+                                1,
                                 false));
 
         mvc.perform(
@@ -60,7 +61,7 @@ class CustomerIntakeV2ApiTest {
                                         }
                                         """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.schema").value("customer-intake-v3"))
+                .andExpect(jsonPath("$.schema").value("customer-intake-v4"))
                 .andExpect(jsonPath("$.intakeId").value(INTAKE_ID.toString()))
                 .andExpect(jsonPath("$.status").value("READY_TO_CONFIRM"))
                 .andExpect(jsonPath("$.candidateOrder.reference").value("ORDER-DELAY-001"))
@@ -90,6 +91,7 @@ class CustomerIntakeV2ApiTest {
                                 java.util.List.of(),
                                 0,
                                 1,
+                                4,
                                 false));
 
         mvc.perform(
@@ -99,7 +101,7 @@ class CustomerIntakeV2ApiTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
-                                        {"schema":"customer-intake-v1","message":"可以，就按这个处理"}
+                                        {"schema":"customer-intake-v4","message":"可以，就按这个处理","expectedVersion":3}
                                         """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
@@ -130,6 +132,7 @@ class CustomerIntakeV2ApiTest {
                                 java.util.List.of(),
                                 0,
                                 0,
+                                1,
                                 false));
 
         mvc.perform(
@@ -142,7 +145,7 @@ class CustomerIntakeV2ApiTest {
                                         {"schema":"customer-intake-v2","message":"包裹未收到且重复扣款"}
                                         """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.schema").value("customer-intake-v3"))
+                .andExpect(jsonPath("$.schema").value("customer-intake-v4"))
                 .andExpect(jsonPath("$.issues[0].kind").value("PACKAGE_NOT_RECEIVED"))
                 .andExpect(jsonPath("$.issues[1].kind").value("DUPLICATE_CHARGE"))
                 .andExpect(jsonPath("$.expectedTicketCount").value(2));
@@ -168,6 +171,7 @@ class CustomerIntakeV2ApiTest {
                         java.util.List.of(),
                         0,
                         1,
+                        4,
                         true);
         when(service.reply(any()))
                 .thenThrow(new IntakeRequestIdentityConflictException(authoritative));
@@ -179,7 +183,7 @@ class CustomerIntakeV2ApiTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
-                                        {"schema":"customer-intake-v2","message":"不同参数"}
+                                        {"schema":"customer-intake-v4","message":"不同参数","expectedVersion":3}
                                         """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replayed").value(true))
@@ -205,6 +209,7 @@ class CustomerIntakeV2ApiTest {
                                 java.util.List.of(existingTicketId),
                                 0,
                                 1,
+                                4,
                                 false));
 
         mvc.perform(
@@ -215,9 +220,10 @@ class CustomerIntakeV2ApiTest {
                                 .content(
                                         """
                                         {
-                                          "schema":"customer-intake-v3",
+                                          "schema":"customer-intake-v4",
                                           "existingTicketId":"15400000-0000-0000-0000-000000000001",
-                                          "action":"CONTINUE_EXISTING"
+                                          "action":"CONTINUE_EXISTING",
+                                          "expectedVersion":3
                                         }
                                         """))
                 .andExpect(status().isCreated())
@@ -244,6 +250,7 @@ class CustomerIntakeV2ApiTest {
                                 java.util.List.of(),
                                 0,
                                 1,
+                                3,
                                 false));
 
         mvc.perform(
@@ -279,6 +286,7 @@ class CustomerIntakeV2ApiTest {
                                                         java.util.List.of(),
                                                         0,
                                                         0,
+                                                        3,
                                                         false),
                                                 3,
                                                 "ARCHIVED",
@@ -326,6 +334,7 @@ class CustomerIntakeV2ApiTest {
                                         java.util.List.of(),
                                         0,
                                         0,
+                                        4,
                                         false),
                                 4,
                                 "ACTIVE",
@@ -348,6 +357,20 @@ class CustomerIntakeV2ApiTest {
                 .andExpect(jsonPath("$.retentionState").value("ACTIVE"))
                 .andExpect(jsonPath("$.factsChanged").value(true))
                 .andExpect(jsonPath("$.intake.confirmed").value(false));
+    }
+
+    @Test
+    void rejectsFractionalRestoreVersionsInsteadOfTruncatingThem() throws Exception {
+        mvc.perform(
+                        post("/api/customer/v2/intakes/{intakeId}/restore", INTAKE_ID)
+                                .principal(customer("customer-demo"))
+                                .header("Idempotency-Key", "restore-fractional")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"customer-intake-recovery-v1","expectedVersion":3.9}
+                                        """))
+                .andExpect(status().isBadRequest());
     }
 
     private static UsernamePasswordAuthenticationToken customer(String customerId) {

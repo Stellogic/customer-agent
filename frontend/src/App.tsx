@@ -13,7 +13,7 @@ import { humanSessionFetch } from "./humanSessionLifecycle";
 
 const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
 const PUBLIC_CONVERSATION_BASE = "/api/customer/v2/tickets";
-const CUSTOMER_INTAKE_SCHEMA = "customer-intake-v3" as const;
+const CUSTOMER_INTAKE_SCHEMA = "customer-intake-v4" as const;
 const CUSTOMER_INTAKE_BASE = "/api/customer/v2/intakes";
 const CUSTOMER_INTAKE_RECOVERY_SCHEMA = "customer-intake-recovery-v1" as const;
 
@@ -39,7 +39,11 @@ type EventEnvelope = {
 };
 
 type IntakeSnapshot = {
-  schema: "customer-intake-v1" | "customer-intake-v2" | typeof CUSTOMER_INTAKE_SCHEMA;
+  schema:
+    | "customer-intake-v1"
+    | "customer-intake-v2"
+    | "customer-intake-v3"
+    | typeof CUSTOMER_INTAKE_SCHEMA;
   intakeId: string;
   status: "READY_TO_CONFIRM" | "NEEDS_CLARIFICATION" | "CONFIRMED";
   candidateOrder: { reference: string; summary: string } | null;
@@ -55,6 +59,7 @@ type IntakeSnapshot = {
   completedOrderCount: number;
   expectedTicketCount: number;
   confirmed: boolean;
+  version: number;
   replayed: boolean;
 };
 
@@ -109,6 +114,7 @@ export function App() {
   >("idle");
   const [archivedIntakes, setArchivedIntakes] = useState<RecoverableIntake[]>([]);
   const [intakeFactsChanged, setIntakeFactsChanged] = useState(false);
+  const [intakeMessages, setIntakeMessages] = useState<RecoverableIntake["messages"]>([]);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [clarificationAnswer, setClarificationAnswer] = useState("");
@@ -181,6 +187,8 @@ export function App() {
       const parsed = parseIntakeSnapshot(responseBody);
       if (!parsed) throw new Error("incompatible intake response");
       setIntake(parsed);
+      setIntakeMessages([]);
+      setIntakeFactsChanged(false);
       globalThis.history.replaceState(null, "", `?intake=${parsed.intakeId}`);
     } catch {
       setError("受理未完成，请保留本页并重试。相同请求不会创建第二张工单。");
@@ -229,7 +237,11 @@ export function App() {
           "Content-Type": "application/json",
           "Idempotency-Key": intakeReplyRequestId.current,
         },
-        body: JSON.stringify({ schema: CUSTOMER_INTAKE_SCHEMA, message }),
+        body: JSON.stringify({
+          schema: CUSTOMER_INTAKE_SCHEMA,
+          message,
+          expectedVersion: current.version,
+        }),
       },
     );
     if (!response.ok && response.status !== 409) throw new Error("intake reply failed");
@@ -250,13 +262,22 @@ export function App() {
   }
 
   async function loadIntake(intakeId: string) {
-    const response = await humanSessionFetch(`${CUSTOMER_INTAKE_BASE}/${intakeId}`, {
+    const response = await humanSessionFetch(`${CUSTOMER_INTAKE_BASE}/${intakeId}/recovery`, {
       credentials: "same-origin",
     });
     if (!response.ok) throw new Error("intake snapshot failed");
-    const parsed = parseIntakeSnapshot((await response.json()) as unknown);
-    if (!parsed) throw new Error("incompatible intake snapshot");
-    setIntake(parsed);
+    const recovered = parseRecoverableIntake((await response.json()) as unknown);
+    if (!recovered) throw new Error("incompatible intake snapshot");
+    setIntakeMessages(recovered.messages);
+    setIntakeFactsChanged(recovered.factsChanged);
+    if (recovered.retentionState === "ARCHIVED") {
+      setIntake(null);
+      setArchivedIntakes([recovered]);
+      setIntakeRecoveryState("ready");
+      return;
+    }
+    setIntake(recovered.intake);
+    setIntakeRecoveryState("idle");
   }
 
   async function findRecoverableIntakes() {
@@ -273,6 +294,7 @@ export function App() {
         const active = index.active[0];
         setIntake(active.intake);
         setIntakeFactsChanged(active.factsChanged);
+        setIntakeMessages(active.messages);
         globalThis.history.replaceState(null, "", `?intake=${active.intake.intakeId}`);
         setIntakeRecoveryState("idle");
         return;
@@ -312,6 +334,7 @@ export function App() {
       }
       setIntake(restored.intake);
       setIntakeFactsChanged(restored.factsChanged);
+      setIntakeMessages(restored.messages);
       setArchivedIntakes([]);
       setIntakeRecoveryState("idle");
       globalThis.history.replaceState(null, "", `?intake=${restored.intake.intakeId}`);
@@ -341,6 +364,7 @@ export function App() {
             schema: CUSTOMER_INTAKE_SCHEMA,
             existingTicketId: match.ticketId,
             action,
+            expectedVersion: intake.version,
           }),
         },
       );
@@ -854,6 +878,16 @@ export function App() {
               订单事实已变化，请重新确认
             </StatusNotice>
           )}
+          {intakeMessages.length > 0 && (
+            <ol className="intake-transcript" aria-label="已恢复的受理消息">
+              {intakeMessages.map((message, index) => (
+                <li key={`${message.sentAt}-${index}`}>
+                  <span>{message.author === "CUSTOMER" ? "我" : "智能受理"}</span>
+                  <p>{message.body}</p>
+                </li>
+              ))}
+            </ol>
+          )}
           <p className="intake-agent-message">{intake.assistantMessage}</p>
           {(intake.completedOrderCount > 0 || intake.remainingOrderCount > 0) && (
             <p className="intake-atomic-note" role="status">
@@ -1298,6 +1332,7 @@ function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
   if (!isRecord(value)) return null;
   const legacy = value.schema === "customer-intake-v1";
   const v2 = value.schema === "customer-intake-v2";
+  const v3 = value.schema === "customer-intake-v3";
   const expectedKeys = legacy
     ? [
         "schema",
@@ -1326,33 +1361,58 @@ function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
           "confirmed",
           "replayed",
         ]
-      : [
-          "schema",
-          "intakeId",
-          "status",
-          "candidateOrder",
-          "issue",
-          "issues",
-          "assistantMessage",
-          "ticketId",
-          "ticketIds",
-          "sharedIntakeRecordId",
-          "duplicateMatches",
-          "routedTicketIds",
-          "remainingOrderCount",
-          "completedOrderCount",
-          "expectedTicketCount",
-          "confirmed",
-          "replayed",
-        ];
+      : v3
+        ? [
+            "schema",
+            "intakeId",
+            "status",
+            "candidateOrder",
+            "issue",
+            "issues",
+            "assistantMessage",
+            "ticketId",
+            "ticketIds",
+            "sharedIntakeRecordId",
+            "duplicateMatches",
+            "routedTicketIds",
+            "remainingOrderCount",
+            "completedOrderCount",
+            "expectedTicketCount",
+            "confirmed",
+            "replayed",
+          ]
+        : [
+            "schema",
+            "intakeId",
+            "status",
+            "candidateOrder",
+            "issue",
+            "issues",
+            "assistantMessage",
+            "ticketId",
+            "ticketIds",
+            "sharedIntakeRecordId",
+            "duplicateMatches",
+            "routedTicketIds",
+            "remainingOrderCount",
+            "completedOrderCount",
+            "expectedTicketCount",
+            "confirmed",
+            "version",
+            "replayed",
+          ];
   if (
     !hasOnlyKeys(value, expectedKeys) ||
-    (!legacy && !v2 && value.schema !== CUSTOMER_INTAKE_SCHEMA) ||
+    (!legacy && !v2 && !v3 && value.schema !== CUSTOMER_INTAKE_SCHEMA) ||
     typeof value.intakeId !== "string" ||
     !["READY_TO_CONFIRM", "NEEDS_CLARIFICATION", "CONFIRMED"].includes(String(value.status)) ||
     typeof value.assistantMessage !== "string" ||
     !(value.ticketId === null || typeof value.ticketId === "string") ||
     typeof value.confirmed !== "boolean" ||
+    (!legacy &&
+      !v2 &&
+      !v3 &&
+      (!Number.isSafeInteger(value.version) || Number(value.version) < 1)) ||
     typeof value.replayed !== "boolean"
   )
     return null;
@@ -1399,7 +1459,13 @@ function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
   )
     return null;
   return {
-    schema: legacy ? "customer-intake-v1" : v2 ? "customer-intake-v2" : CUSTOMER_INTAKE_SCHEMA,
+    schema: legacy
+      ? "customer-intake-v1"
+      : v2
+        ? "customer-intake-v2"
+        : v3
+          ? "customer-intake-v3"
+          : CUSTOMER_INTAKE_SCHEMA,
     intakeId: value.intakeId,
     status: value.status as IntakeSnapshot["status"],
     candidateOrder: candidate as IntakeSnapshot["candidateOrder"],
@@ -1415,6 +1481,7 @@ function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
     completedOrderCount: legacy || v2 ? 0 : Number(value.completedOrderCount),
     expectedTicketCount: legacy ? issues.length : Number(value.expectedTicketCount),
     confirmed: value.confirmed,
+    version: legacy || v2 || v3 ? 0 : Number(value.version),
     replayed: value.replayed,
   };
 }

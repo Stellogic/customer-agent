@@ -109,7 +109,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
     @Override
     @Transactional(noRollbackFor = IntakeArchivedException.class)
     public CustomerIntakeSnapshot reply(ReplyCustomerIntake command) {
-        IntakeRow current = requireActive(loadForUpdate(command.customerId(), command.intakeId()));
+        IntakeRow current = loadForUpdate(command.customerId(), command.intakeId());
         String digest = StableParameterDigest.sha256(command.message());
         List<MessageIdentity> prior =
                 jdbc.query(
@@ -124,6 +124,8 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
             }
             return snapshot(current, true);
         }
+        current = requireActive(current);
+        requireVersion(current, command.expectedVersion());
         Instant now = clock.instant();
         jdbc.update(
                 "insert into customer_intake_message "
@@ -196,7 +198,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
     @Override
     @Transactional(noRollbackFor = IntakeArchivedException.class)
     public CustomerIntakeSnapshot resolveDuplicate(ResolveDuplicateIntake command) {
-        IntakeRow current = requireActive(loadForUpdate(command.customerId(), command.intakeId()));
+        IntakeRow current = loadForUpdate(command.customerId(), command.intakeId());
         String digest =
                 StableParameterDigest.sha256(
                         command.existingTicketId().toString(), command.action());
@@ -213,6 +215,8 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
             }
             return snapshot(current, true);
         }
+        current = requireActive(current);
+        requireVersion(current, command.expectedVersion());
         DuplicateIntakeMatch selected =
                 current.duplicateMatches().stream()
                         .filter(match -> match.ticketId().equals(command.existingTicketId()))
@@ -319,6 +323,13 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
     }
 
     @Override
+    @Transactional(noRollbackFor = IntakeArchivedException.class)
+    public RecoverableCustomerIntake recoverableSnapshot(String customerId, UUID intakeId) {
+        IntakeRow current = archiveIfExpired(loadForUpdate(customerId, intakeId));
+        return recoverable(current, false);
+    }
+
+    @Override
     @Transactional(noRollbackFor = IntakeVersionConflictException.class)
     public RecoverableCustomerIntake restore(RestoreCustomerIntake command) {
         IntakeRow current =
@@ -346,13 +357,15 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
         IntakeUnderstanding understanding =
                 agent.understand(
                         new IntakeUnderstandingRequest(
-                                current.originalMessage(),
+                                latestCustomerMessage(current.id(), current.originalMessage()),
                                 orders,
-                                null,
-                                null,
-                                List.of(),
-                                List.of(),
-                                List.of()));
+                                current.orderReference(),
+                                firstSummary(current.issues()),
+                                current.issues(),
+                                current.pendingIssueKinds(),
+                                current.pendingOrders().stream()
+                                        .map(PendingOrder::reference)
+                                        .toList()));
         requireUnderstanding(understanding, orders);
         CustomerVisibleOrderSummary candidate = candidate(understanding, orders);
         boolean factsChanged = factsChanged(current, orders, candidate);
@@ -833,6 +846,12 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
         return authoritative;
     }
 
+    private static void requireVersion(IntakeRow current, long expectedVersion) {
+        if (current.version() != expectedVersion) {
+            throw new IntakeVersionConflictException();
+        }
+    }
+
     private IntakeRow archiveIfExpired(IntakeRow current) {
         Instant now = clock.instant();
         if ("ACTIVE".equals(current.retentionState())
@@ -918,6 +937,18 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                 messages);
     }
 
+    private String latestCustomerMessage(UUID intakeId, String fallback) {
+        return jdbc
+                .query(
+                        "select body from customer_intake_transcript "
+                                + "where intake_id = ? and author = 'CUSTOMER' order by ordinal desc limit 1",
+                        (rs, row) -> rs.getString(1),
+                        intakeId)
+                .stream()
+                .findFirst()
+                .orElse(fallback);
+    }
+
     private void appendTranscript(UUID intakeId, String author, String body, Instant sentAt) {
         Long nextOrdinal =
                 jdbc.queryForObject(
@@ -998,6 +1029,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                 row.routedTicketIds(),
                 row.pendingOrders().size(),
                 row.completedOrderCount(),
+                row.version(),
                 replayed);
     }
 
