@@ -82,10 +82,11 @@ test("Issue #157 同订单工单独立启动、分组导航与领取隔离", asy
   const orderGroup = customer
     .getByRole("heading", { name: `订单 ${orderReference}` })
     .locator("..")
+    .locator("..")
     .locator("..");
   await expect(customer.getByRole("heading", { name: `订单 ${orderReference}` })).toBeVisible();
-  await expect(customer.getByText("包裹未收到", { exact: true })).toBeVisible();
-  await expect(customer.getByText("重复扣款", { exact: true })).toBeVisible();
+  await expect(orderGroup.getByText("包裹未收到", { exact: true })).toBeVisible();
+  await expect(orderGroup.getByText("重复扣款", { exact: true })).toBeVisible();
   await expect(orderGroup).toContainText("2 张独立工单");
   await customer.setViewportSize({ width: 390, height: 844 });
   expect(
