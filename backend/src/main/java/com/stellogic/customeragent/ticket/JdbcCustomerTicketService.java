@@ -7,6 +7,7 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,7 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class JdbcCustomerTicketService implements CustomerTicketService {
     private static final String EPOCH = "customer-public-v1";
-    private static final String ACKNOWLEDGEMENT = "您的物流延迟问题已受理，我们会在此公开沟通中更新进展。";
+    private static final Set<String> AGENT_ISSUE_KINDS =
+            Set.of("LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE");
+    private static final String ACKNOWLEDGEMENT = "您的问题已受理，我们会在此公开沟通中更新进展。";
     private static final String UNSUPPORTED_ISSUE_ACKNOWLEDGEMENT = "您的新问题已创建关联客服工单，并转由客服继续处理。";
     private final JdbcTemplate jdbc;
     private final Clock clock;
@@ -54,7 +57,7 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         UUID ticketId = UUID.randomUUID();
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
-        boolean agentHandling = "LOGISTICS_DELAY".equals(command.issueKind());
+        boolean agentHandling = AGENT_ISSUE_KINDS.contains(command.issueKind());
         String acknowledgement =
                 agentHandling ? ACKNOWLEDGEMENT : UNSUPPORTED_ISSUE_ACKNOWLEDGEMENT;
         boolean startsAgentInvestigation =

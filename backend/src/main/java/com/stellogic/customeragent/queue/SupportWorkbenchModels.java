@@ -20,6 +20,8 @@ enum SupportHandlingMode {
 
 record SupportQueueItem(
         UUID ticketId,
+        String orderReference,
+        String issueKind,
         SupportTicketLifecycleState lifecycleState,
         SupportHandlingMode handlingMode,
         Instant enteredAt) {}

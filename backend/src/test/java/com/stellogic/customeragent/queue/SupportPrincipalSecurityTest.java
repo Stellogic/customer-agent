@@ -54,7 +54,7 @@ class SupportPrincipalSecurityTest {
         when(service.snapshot("support-demo"))
                 .thenReturn(
                         new SupportWorkbenchSnapshot(
-                                "support-workbench-v1", 0, List.of(), List.of()));
+                                "support-workbench-v2", 0, List.of(), List.of()));
 
         mvc.perform(
                         get("/api/support/workbench/snapshot")

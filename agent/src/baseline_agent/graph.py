@@ -68,6 +68,8 @@ class BaselineState(TypedDict, total=False):
     spring_probe: dict[str, str]
     ticket_id: str
     generation_id: str
+    issue_kind: str
+    sibling_ticket_summary: dict[str, object]
     facts: dict
     conclusion: dict
     customer_reply: dict[str, object]
@@ -208,6 +210,47 @@ async def probe_spring(state: BaselineState) -> BaselineState:
         return {"spring_probe": response.json()}
 
 
+async def read_sibling_ticket_summary(state: BaselineState) -> BaselineState:
+    if state.get("requested_by") != "spring":
+        raise ValueError("sibling summary accepts only Spring-owned runs")
+    ticket_id = state["ticket_id"]
+    generation_id = state["generation_id"]
+    async with httpx.AsyncClient(timeout=3.0) as client:
+        response = await client.get(
+            f"{os.environ['SPRING_INTERNAL_URL']}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/sibling-summary",
+            headers={
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": generation_id,
+                "X-Agent-Operation": "READ_SIBLING_TICKET_SUMMARY",
+            },
+        )
+        response.raise_for_status()
+        summary = response.json()
+    if not _valid_sibling_ticket_summary(summary):
+        raise ValueError("invalid sibling ticket summary")
+    return {"sibling_ticket_summary": summary}
+
+
+def _valid_sibling_ticket_summary(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != {"schemaVersion", "tickets"}:
+        return False
+    tickets = value.get("tickets")
+    if value.get("schemaVersion") != "sibling-ticket-summary-v1" or not isinstance(tickets, list):
+        return False
+    expected = {
+        "issueKind": str,
+        "lifecycleState": str,
+        "pendingAction": str,
+        "compensationFlowExists": bool,
+    }
+    return all(
+        isinstance(ticket, dict)
+        and set(ticket) == set(expected)
+        and all(isinstance(ticket.get(name), value_type) for name, value_type in expected.items())
+        for ticket in tickets
+    )
+
+
 async def investigate_ticket_step(state: BaselineState) -> BaselineState:
     if state.get("requested_by") != "spring":
         raise ValueError("ticket investigation accepts only Spring-owned runs")
@@ -219,11 +262,28 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
         "Authorization": authorization,
         "X-Agent-Generation-Id": generation_id,
     }
+    issue_kind = state.get("issue_kind", "LOGISTICS_DELAY")
+    if issue_kind not in {
+        "LOGISTICS_DELAY",
+        "PACKAGE_NOT_RECEIVED",
+        "DUPLICATE_CHARGE",
+    }:
+        raise ValueError("ticket investigation requires a supported issue kind")
     clarification_answer = state.get("clarification_answer", {})
     capability_request_scope = clarification_answer.get("clarificationRequestId", "initial")
     if not isinstance(capability_request_scope, str):
         capability_request_scope = "invalid-resume"
     async with httpx.AsyncClient(timeout=5.0) as client:
+        if issue_kind != "LOGISTICS_DELAY":
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "UNSUPPORTED_SCENARIO",
+                [],
+            )
         try:
             loop_result = await _advance_investigation_action_loop(
                 client,
@@ -233,6 +293,7 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 scope_headers,
                 capability_request_scope,
                 state.get("investigation_progress"),
+                state.get("sibling_ticket_summary", {}).get("tickets", []),
             )
         except ActionLoopFailure as error:
             failed_action_records = _checkpoint_action_records(error.records)
@@ -567,6 +628,7 @@ async def _advance_investigation_action_loop(
     scope_headers: dict[str, str],
     request_scope: str,
     checkpoint: dict[str, object] | None,
+    sibling_tickets: object,
 ):
     capability_headers = {
         **scope_headers,
@@ -610,7 +672,9 @@ async def _advance_investigation_action_loop(
         return result
 
     async def choose(facts: dict) -> ActionDecision:
-        return await investigation_action_model.choose(facts)
+        model_context = dict(facts)
+        model_context["siblingTickets"] = sibling_tickets
+        return await investigation_action_model.choose(model_context)
 
     return await ActionLoop(choose, ActionBudget.configured()).advance(checkpoint, execute)
 
@@ -1308,7 +1372,7 @@ def _build_conclusion(facts: dict, judgment: InvestigationJudgment) -> dict:
 
 
 def select_work(state: BaselineState) -> str:
-    return "investigate_ticket" if state.get("ticket_id") else "probe_spring"
+    return "read_sibling_ticket_summary" if state.get("ticket_id") else "probe_spring"
 
 
 def after_investigation(state: BaselineState) -> str:
@@ -1323,12 +1387,14 @@ def after_investigation(state: BaselineState) -> str:
 
 builder = StateGraph(BaselineState)
 builder.add_node("probe_spring", probe_spring)
+builder.add_node("read_sibling_ticket_summary", read_sibling_ticket_summary)
 builder.add_node("investigate_ticket", investigate_ticket_step)
 builder.add_node("shadow_investigation", shadow_investigation)
 builder.add_node("request_clarification", request_clarification)
 builder.add_node("await_clarification", await_clarification)
 builder.add_conditional_edges(START, select_work)
 builder.add_edge("probe_spring", END)
+builder.add_edge("read_sibling_ticket_summary", "investigate_ticket")
 builder.add_conditional_edges("investigate_ticket", after_investigation)
 builder.add_edge("shadow_investigation", END)
 builder.add_edge("request_clarification", "await_clarification")

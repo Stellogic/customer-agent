@@ -4281,7 +4281,7 @@ def main() -> None:
         expect_status(workbench_before_handoff, 200)
         workbench_before_handoff = workbench_before_handoff.json()
         assert workbench_before_handoff["view"] == "SUPPORT_WORKBENCH"
-        assert workbench_before_handoff["schema"] == "support-workbench-v1"
+        assert workbench_before_handoff["schema"] == "support-workbench-v2"
         workbench_cursor = workbench_before_handoff["cursor"]
         sla_handoff_request_id = f"sla-handoff-{uuid.uuid4()}"
         sla_handoff = client.post(
@@ -4327,6 +4327,8 @@ def main() -> None:
         assert escalation_workbench_item["handlingMode"] == "HUMAN"
         assert set(shared_workbench_item) == {
             "ticketId",
+            "orderReference",
+            "issueKind",
             "lifecycleState",
             "handlingMode",
             "enteredAt",
@@ -4337,7 +4339,6 @@ def main() -> None:
                 "reasonCode",
                 "investigationSummary",
                 "customerId",
-                "orderReference",
                 "description",
                 "messages",
             )
@@ -4354,7 +4355,7 @@ def main() -> None:
             for line in stream.iter_lines():
                 replay_lines.append(line)
                 if line == "" and any(
-                    part.startswith("id:support-workbench-v1:") for part in replay_lines
+                    part.startswith("id:support-workbench-v2:") for part in replay_lines
                 ):
                     break
         assert any(part == "event:QUEUE_TICKET_UPSERTED" for part in replay_lines)

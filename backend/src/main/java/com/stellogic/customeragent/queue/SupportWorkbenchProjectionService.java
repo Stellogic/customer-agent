@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 class SupportWorkbenchProjectionService {
-    static final String EPOCH = "support-workbench-v1";
+    static final String EPOCH = "support-workbench-v2";
     private final JdbcTemplate jdbc;
     private final TicketAuthorityLock ticketLock;
 
@@ -156,17 +156,19 @@ class SupportWorkbenchProjectionService {
 
     private List<SupportQueueItem> queueItems(String predicate) {
         return jdbc.query(
-                "select q.ticket_id, t.lifecycle_state, t.handling_mode, min(q.entered_at) "
+                "select q.ticket_id, t.order_reference, t.issue_kind, t.lifecycle_state, t.handling_mode, min(q.entered_at) "
                         + "from shared_support_queue_entry q join support_ticket t on t.id = q.ticket_id "
                         + predicate
-                        + "group by q.ticket_id, t.lifecycle_state, t.handling_mode "
+                        + "group by q.ticket_id, t.order_reference, t.issue_kind, t.lifecycle_state, t.handling_mode "
                         + "order by min(q.entered_at), q.ticket_id",
                 (rs, row) ->
                         new SupportQueueItem(
                                 rs.getObject(1, UUID.class),
-                                SupportTicketLifecycleState.valueOf(rs.getString(2)),
-                                SupportHandlingMode.valueOf(rs.getString(3)),
-                                rs.getTimestamp(4).toInstant()));
+                                rs.getString(2),
+                                rs.getString(3),
+                                SupportTicketLifecycleState.valueOf(rs.getString(4)),
+                                SupportHandlingMode.valueOf(rs.getString(5)),
+                                rs.getTimestamp(6).toInstant()));
     }
 
     private static long parseCursor(String cursor) {

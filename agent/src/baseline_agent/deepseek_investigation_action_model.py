@@ -283,8 +283,31 @@ def _controlled_facts(facts: dict) -> dict[str, object]:
         "pendingActionCount",
         "policyVersion",
         "evidenceRefs",
+        "siblingTickets",
     }
     if not set(facts).issubset(allowed):
+        raise _failure()
+    sibling_tickets = facts.get("siblingTickets", [])
+    if (
+        not isinstance(sibling_tickets, list)
+        or len(sibling_tickets) > 20
+        or not all(
+            isinstance(ticket, dict)
+            and set(ticket)
+            == {
+                "issueKind",
+                "lifecycleState",
+                "pendingAction",
+                "compensationFlowExists",
+            }
+            and all(
+                isinstance(ticket.get(name), str)
+                for name in ("issueKind", "lifecycleState", "pendingAction")
+            )
+            and isinstance(ticket.get("compensationFlowExists"), bool)
+            for ticket in sibling_tickets
+        )
+    ):
         raise _failure()
     return {key: facts[key] for key in sorted(facts)}
 
@@ -380,7 +403,8 @@ def _build_request(
             "when it is UNIQUE select any one still-unread fact capability. Submit only after all "
             "order, logistics, payment/refund, compensation/pending-action and policy facts exist. "
             "Select HANDOFF only when supplied facts explicitly conflict or mark the scenario "
-            "unsupported. Never invent facts, identifiers, evidence, "
+            "unsupported. siblingTickets is read-only bounded context and never authorizes "
+            "cross-ticket actions. Never invent facts, identifiers, evidence, "
             "amounts, tools, credentials, reasoning, or customer-visible text."
         ),
         "input": json.dumps(

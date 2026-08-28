@@ -39,19 +39,23 @@ class SupportWorkbenchControllerTest {
         var handoff =
                 new SupportQueueItem(
                         HANDOFF_TICKET,
+                        "ORDER-157",
+                        "PACKAGE_NOT_RECEIVED",
                         SupportTicketLifecycleState.WAITING_FOR_CUSTOMER,
                         SupportHandlingMode.HUMAN,
                         Instant.parse("2026-08-11T01:00:00Z"));
         var breach =
                 new SupportQueueItem(
                         BREACHED_TICKET,
+                        "ORDER-157",
+                        "LOGISTICS_DELAY",
                         SupportTicketLifecycleState.INVESTIGATING,
                         SupportHandlingMode.AGENT,
                         Instant.parse("2026-08-11T01:05:00Z"));
         when(service.snapshot("support-demo"))
                 .thenReturn(
                         new SupportWorkbenchSnapshot(
-                                "support-workbench-v1",
+                                "support-workbench-v2",
                                 7,
                                 List.of(handoff, breach),
                                 List.of(breach)));
@@ -60,11 +64,13 @@ class SupportWorkbenchControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.view").value("SUPPORT_WORKBENCH"))
-                .andExpect(jsonPath("$.schema").value("support-workbench-v1"))
-                .andExpect(jsonPath("$.cursor").value("support-workbench-v1:7"))
+                .andExpect(jsonPath("$.schema").value("support-workbench-v2"))
+                .andExpect(jsonPath("$.cursor").value("support-workbench-v2:7"))
                 .andExpect(jsonPath("$.sharedQueue.length()").value(2))
                 .andExpect(jsonPath("$.escalationQueue.length()").value(1))
                 .andExpect(jsonPath("$.sharedQueue[0].ticketId").value(HANDOFF_TICKET.toString()))
+                .andExpect(jsonPath("$.sharedQueue[0].orderReference").value("ORDER-157"))
+                .andExpect(jsonPath("$.sharedQueue[0].issueKind").value("PACKAGE_NOT_RECEIVED"))
                 .andExpect(
                         jsonPath("$.sharedQueue[0].lifecycleState").value("WAITING_FOR_CUSTOMER"))
                 .andExpect(jsonPath("$.sharedQueue[0].handlingMode").value("HUMAN"))
@@ -77,38 +83,40 @@ class SupportWorkbenchControllerTest {
 
     @Test
     void replaySwitchesToLivePollingWithoutMissingTheConcurrentQueueChange() throws Exception {
-        when(service.events("support-demo", "support-workbench-v1:0"))
+        when(service.events("support-demo", "support-workbench-v2:0"))
                 .thenReturn(
                         List.of(
                                 new SupportWorkbenchEvent(
-                                        "support-workbench-v1",
+                                        "support-workbench-v2",
                                         1,
                                         "QUEUE_TICKET_UPSERTED",
                                         "{\"ticketId\":\""
                                                 + HANDOFF_TICKET
-                                                + "\",\"lifecycleState\":\"INVESTIGATING\","
+                                                + "\",\"orderReference\":\"ORDER-157\","
+                                                + "\"issueKind\":\"PACKAGE_NOT_RECEIVED\","
+                                                + "\"lifecycleState\":\"INVESTIGATING\","
                                                 + "\"handlingMode\":\"HUMAN\",\"sharedEnteredAt\":\"2026-08-11T01:00:00Z\","
                                                 + "\"escalationEnteredAt\":null}")));
-        when(service.events("support-demo", "support-workbench-v1:1"))
+        when(service.events("support-demo", "support-workbench-v2:1"))
                 .thenReturn(
                         List.of(
                                 new SupportWorkbenchEvent(
-                                        "support-workbench-v1",
+                                        "support-workbench-v2",
                                         2,
                                         "QUEUE_TICKET_REMOVED",
                                         "{\"ticketId\":\"" + HANDOFF_TICKET + "\"}")));
-        when(service.events("support-demo", "support-workbench-v1:2")).thenReturn(List.of());
+        when(service.events("support-demo", "support-workbench-v2:2")).thenReturn(List.of());
 
         mvc.perform(
                         get("/api/support/workbench/events")
                                 .principal(support())
-                                .header("Last-Event-ID", "support-workbench-v1:0"))
+                                .header("Last-Event-ID", "support-workbench-v2:0"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(request().asyncStarted());
 
-        verify(service, timeout(2_000)).events("support-demo", "support-workbench-v1:1");
-        verify(service, timeout(2_000)).events("support-demo", "support-workbench-v1:2");
+        verify(service, timeout(2_000)).events("support-demo", "support-workbench-v2:1");
+        verify(service, timeout(2_000)).events("support-demo", "support-workbench-v2:2");
     }
 
     @Test
@@ -157,14 +165,14 @@ class SupportWorkbenchControllerTest {
     void supportEventUsesItsOwnWhitelistedEnvelope() {
         var event =
                 new SupportWorkbenchEvent(
-                        "support-workbench-v1",
+                        "support-workbench-v2",
                         3,
                         "QUEUE_TICKET_REMOVED",
                         "{\"ticketId\":\"" + HANDOFF_TICKET + "\"}");
 
         org.assertj.core.api.Assertions.assertThat(event.publicData())
                 .isEqualTo(
-                        "{\"view\":\"SUPPORT_WORKBENCH\",\"schema\":\"support-workbench-v1\",\"payload\":"
+                        "{\"view\":\"SUPPORT_WORKBENCH\",\"schema\":\"support-workbench-v2\",\"payload\":"
                                 + "{\"ticketId\":\""
                                 + HANDOFF_TICKET
                                 + "\"}}");

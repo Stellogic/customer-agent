@@ -12,7 +12,7 @@ import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import { IntakeAssistancePanel } from "./IntakeAssistancePanel";
 
-const SUPPORT_SCHEMA = "support-workbench-v1" as const;
+const SUPPORT_SCHEMA = "support-workbench-v2" as const;
 const lifecycleStates = [
   "NEW",
   "INVESTIGATING",
@@ -27,6 +27,8 @@ type HandlingMode = (typeof handlingModes)[number];
 
 type QueueItem = {
   ticketId: string;
+  orderReference: string;
+  issueKind: string;
   lifecycleState: LifecycleState;
   handlingMode: HandlingMode;
   enteredAt: string;
@@ -192,6 +194,8 @@ export function SupportWorkbench() {
       if (!isUpsert(envelope.payload)) return false;
       const item: QueueItem = {
         ticketId: envelope.payload.ticketId,
+        orderReference: envelope.payload.orderReference,
+        issueKind: envelope.payload.issueKind,
         lifecycleState: envelope.payload.lifecycleState,
         handlingMode: envelope.payload.handlingMode,
         enteredAt: envelope.payload.sharedEnteredAt,
@@ -444,49 +448,66 @@ function QueueSection({
         <strong aria-label={`${title}数量`}>{items.length.toString().padStart(2, "0")}</strong>
       </header>
       {items.length ? (
-        <div className="queue-table-wrap">
-          <table className="queue-table" aria-label={title}>
-            <thead>
-              <tr>
-                <th scope="col">工单</th>
-                <th scope="col">生命周期</th>
-                <th scope="col">处理模式</th>
-                <th scope="col">进入时间</th>
-                <th scope="col">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.ticketId}>
-                  <td>
-                    <TicketIdentifier ticketId={item.ticketId} compact />
-                  </td>
-                  <td>
-                    <span
-                      className={`status support-status status-${item.lifecycleState.toLowerCase()}`}
-                    >
-                      {stateLabel(item.lifecycleState)}
-                    </span>
-                  </td>
-                  <td>{item.handlingMode === "HUMAN" ? "人工处理" : "Agent 处理"}</td>
-                  <td>
-                    <time dateTime={item.enteredAt}>{formatTime(item.enteredAt)}</time>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="queue-claim-action"
-                      aria-label={`领取工单 ${item.ticketId}`}
-                      disabled={claimingTicketId !== null}
-                      onClick={() => onClaim(item.ticketId)}
-                    >
-                      {claimingTicketId === item.ticketId ? "正在领取…" : "领取"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="order-grouped-queue">
+          {groupQueueItems(items).map(([orderReference, orderItems]) => (
+            <section
+              className="support-order-group"
+              aria-label={`订单 ${orderReference}`}
+              key={orderReference}
+            >
+              <header>
+                <span>订单工单组</span>
+                <strong>{orderReference}</strong>
+                <small>{orderItems.length} 张独立工单</small>
+              </header>
+              <div className="queue-table-wrap">
+                <table className="queue-table" aria-label={title}>
+                  <thead>
+                    <tr>
+                      <th scope="col">工单</th>
+                      <th scope="col">问题</th>
+                      <th scope="col">生命周期</th>
+                      <th scope="col">处理模式</th>
+                      <th scope="col">进入时间</th>
+                      <th scope="col">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderItems.map((item) => (
+                      <tr key={item.ticketId}>
+                        <td>
+                          <TicketIdentifier ticketId={item.ticketId} compact />
+                        </td>
+                        <td>{issueKindLabel(item.issueKind)}</td>
+                        <td>
+                          <span
+                            className={`status support-status status-${item.lifecycleState.toLowerCase()}`}
+                          >
+                            {stateLabel(item.lifecycleState)}
+                          </span>
+                        </td>
+                        <td>{item.handlingMode === "HUMAN" ? "人工处理" : "Agent 处理"}</td>
+                        <td>
+                          <time dateTime={item.enteredAt}>{formatTime(item.enteredAt)}</time>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="queue-claim-action"
+                            aria-label={`领取工单 ${item.ticketId}`}
+                            disabled={claimingTicketId !== null}
+                            onClick={() => onClaim(item.ticketId)}
+                          >
+                            {claimingTicketId === item.ticketId ? "正在领取…" : "领取"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ))}
         </div>
       ) : (
         <p className="empty-queue">当前没有队列条目</p>
@@ -661,8 +682,17 @@ function isSnapshot(value: unknown): value is WorkbenchSnapshot {
 function isQueueItem(value: unknown): value is QueueItem {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ["ticketId", "lifecycleState", "handlingMode", "enteredAt"]) &&
+    hasOnlyKeys(value, [
+      "ticketId",
+      "orderReference",
+      "issueKind",
+      "lifecycleState",
+      "handlingMode",
+      "enteredAt",
+    ]) &&
     isTicketId(value.ticketId) &&
+    typeof value.orderReference === "string" &&
+    typeof value.issueKind === "string" &&
     isLifecycleState(value.lifecycleState) &&
     isHandlingMode(value.handlingMode) &&
     typeof value.enteredAt === "string"
@@ -740,12 +770,16 @@ function isUpsert(value: unknown): value is QueueUpsert {
     isRecord(value) &&
     hasOnlyKeys(value, [
       "ticketId",
+      "orderReference",
+      "issueKind",
       "lifecycleState",
       "handlingMode",
       "sharedEnteredAt",
       "escalationEnteredAt",
     ]) &&
     isTicketId(value.ticketId) &&
+    typeof value.orderReference === "string" &&
+    typeof value.issueKind === "string" &&
     isLifecycleState(value.lifecycleState) &&
     isHandlingMode(value.handlingMode) &&
     typeof value.sharedEnteredAt === "string" &&
@@ -773,6 +807,27 @@ function upsertAndSort(items: QueueItem[], item: QueueItem) {
   return [...items.filter((existing) => existing.ticketId !== item.ticketId), item].sort(
     (left, right) =>
       left.enteredAt.localeCompare(right.enteredAt) || left.ticketId.localeCompare(right.ticketId),
+  );
+}
+
+function groupQueueItems(items: QueueItem[]) {
+  const groups = new Map<string, QueueItem[]>();
+  for (const item of items) {
+    const group = groups.get(item.orderReference) ?? [];
+    group.push(item);
+    groups.set(item.orderReference, group);
+  }
+  return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right));
+}
+
+function issueKindLabel(issueKind: string) {
+  return (
+    {
+      LOGISTICS_DELAY: "物流延迟",
+      PACKAGE_NOT_RECEIVED: "包裹未收到",
+      DUPLICATE_CHARGE: "重复扣款",
+      OTHER: "其他问题",
+    }[issueKind] ?? "其他问题"
   );
 }
 

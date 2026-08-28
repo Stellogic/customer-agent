@@ -15,6 +15,7 @@ from baseline_agent.graph import (
     investigate_ticket,
     investigate_ticket_step,
     probe_spring,
+    read_sibling_ticket_summary,
     request_clarification,
 )
 from baseline_agent.investigation_action_loop import (
@@ -31,6 +32,61 @@ from baseline_agent.investigation_model import (
     InvestigationReasonCode,
 )
 from baseline_agent.shadow_investigation import ShadowCandidate
+
+
+@pytest.mark.asyncio
+async def test_agent_reads_only_the_bounded_sibling_ticket_summary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_headers: dict[str, str] = {}
+
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "schemaVersion": "sibling-ticket-summary-v1",
+                "tickets": [
+                    {
+                        "issueKind": "DUPLICATE_CHARGE",
+                        "lifecycleState": "INVESTIGATING",
+                        "pendingAction": "NONE",
+                        "compensationFlowExists": False,
+                    }
+                ],
+            }
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, _: str, *, headers: dict[str, str]) -> Response:
+            captured_headers.update(headers)
+            return Response()
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+
+    result = await read_sibling_ticket_summary(
+        {
+            "requested_by": "spring",
+            "ticket_id": "current-ticket",
+            "generation_id": "current-generation",
+        }
+    )
+
+    assert result["sibling_ticket_summary"]["tickets"][0] == {
+        "issueKind": "DUPLICATE_CHARGE",
+        "lifecycleState": "INVESTIGATING",
+        "pendingAction": "NONE",
+        "compensationFlowExists": False,
+    }
+    assert captured_headers["X-Agent-Operation"] == "READ_SIBLING_TICKET_SUMMARY"
 
 
 @pytest.mark.asyncio
@@ -110,6 +166,49 @@ class _OfflineShadowModel:
         return self.result
 
 
+@pytest.mark.asyncio
+async def test_confirmed_non_logistics_issue_starts_independently_then_hands_off_safely(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    posts: list[tuple[str, dict[str, object]]] = []
+
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, str]:
+            return {"handlingMode": "HUMAN", "reasonCode": "UNSUPPORTED_SCENARIO"}
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def post(self, url: str, *, json: dict[str, object], **_: object) -> Response:
+            posts.append((url, json))
+            return Response()
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+
+    result = await investigate_ticket_step(
+        {
+            "requested_by": "spring",
+            "ticket_id": "package-ticket",
+            "generation_id": "package-generation",
+            "issue_kind": "PACKAGE_NOT_RECEIVED",
+        }
+    )
+
+    assert result["handoff"]["reasonCode"] == "UNSUPPORTED_SCENARIO"
+    assert len(posts) == 1
+    assert posts[0][0].endswith("/human-handoff")
+    assert posts[0][1]["reasonCode"] == "UNSUPPORTED_SCENARIO"
+
+
 class _HandoffAfterFactsModel(DeterministicActionModel):
     async def choose(self, facts: dict) -> ActionDecision:
         if "policyVersion" in facts:
@@ -131,6 +230,18 @@ def _customer_communication_context() -> dict[str, object]:
 def _catalog_or_customer_context(url: str) -> dict[str, object]:
     if url.endswith("/customer-communication-context"):
         return _customer_communication_context()
+    if url.endswith("/sibling-summary"):
+        return {
+            "schemaVersion": "sibling-ticket-summary-v1",
+            "tickets": [
+                {
+                    "issueKind": "DUPLICATE_CHARGE",
+                    "lifecycleState": "INVESTIGATING",
+                    "pendingAction": "NONE",
+                    "compensationFlowExists": False,
+                }
+            ],
+        }
     return _capability_catalog()
 
 
@@ -241,6 +352,12 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[tuple[str, str]] = []
+    model_contexts: list[dict] = []
+
+    class CapturingActionModel(DeterministicActionModel):
+        async def choose(self, facts: dict) -> ActionDecision:
+            model_contexts.append(facts)
+            return await super().choose(facts)
 
     class Response:
         def __init__(self, payload: dict) -> None:
@@ -273,6 +390,7 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
         raise AssertionError("disabled shadow must not construct a provider")
 
     monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setattr("baseline_agent.graph.investigation_action_model", CapturingActionModel())
     monkeypatch.setattr("baseline_agent.graph.shadow_candidate_factory", forbidden_factory)
     monkeypatch.delenv("AGENT_INVESTIGATION_SHADOW_MODE", raising=False)
     monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
@@ -287,7 +405,21 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
     )
 
     assert "shadow_comparison" not in result
+    assert model_contexts
+    assert all(
+        context["siblingTickets"]
+        == [
+            {
+                "issueKind": "DUPLICATE_CHARGE",
+                "lifecycleState": "INVESTIGATING",
+                "pendingAction": "NONE",
+                "compensationFlowExists": False,
+            }
+        ]
+        for context in model_contexts
+    )
     assert [method for method, _ in calls] == [
+        "GET",
         "GET",
         "POST",
         "POST",

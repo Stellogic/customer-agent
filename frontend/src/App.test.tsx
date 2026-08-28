@@ -191,7 +191,10 @@ describe("客户帮助中心", () => {
             ],
             assistantMessage: "已确认，2 张客服工单已原子创建并开始独立处理。",
             ticketId: null,
-            ticketIds: ["ticket-153-a", "ticket-153-b"],
+            ticketIds: [
+              "15300000-0000-0000-0000-000000000001",
+              "15300000-0000-0000-0000-000000000002",
+            ],
             sharedIntakeRecordId: "shared-153",
             expectedTicketCount: 2,
             confirmed: true,
@@ -199,6 +202,38 @@ describe("客户帮助中心", () => {
           }),
           { status: 201 },
         ),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          view: "CUSTOMER_ORDER_TICKET_GROUPS",
+          schema: "customer-order-ticket-groups-v1",
+          groups: [
+            {
+              orderReference: "ORDER-MULTI-001",
+              tickets: [
+                {
+                  ticketId: "15300000-0000-0000-0000-000000000001",
+                  issueKind: "PACKAGE_NOT_RECEIVED",
+                  lifecycleState: "INVESTIGATING",
+                  handlingMode: "AGENT",
+                  controlledProgress: "AGENT_PROCESSING",
+                  pendingCustomerAction: false,
+                  compensationFlowExists: false,
+                },
+                {
+                  ticketId: "15300000-0000-0000-0000-000000000002",
+                  issueKind: "DUPLICATE_CHARGE",
+                  lifecycleState: "INVESTIGATING",
+                  handlingMode: "AGENT",
+                  controlledProgress: "AGENT_PROCESSING",
+                  pendingCustomerAction: false,
+                  compensationFlowExists: false,
+                },
+              ],
+              pendingCustomerItems: [],
+            },
+          ],
+        }),
       );
 
     render(<App />);
@@ -215,8 +250,9 @@ describe("客户帮助中心", () => {
     fireEvent.click(screen.getByRole("button", { name: "确认并原子创建 2 张工单" }));
     expect(await screen.findByRole("heading", { name: "2 张工单已创建" })).toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: "已创建工单" }).querySelectorAll("button"),
-    ).toHaveLength(2);
+      await screen.findByRole("heading", { name: "订单 ORDER-MULTI-001" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("article", { name: /独立工单/ })).toHaveLength(2);
   });
 
   it("疑似重复问题由客户选择继续既有工单且不展示新建结果", async () => {

@@ -91,6 +91,33 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     }
 
     @Override
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public SiblingTicketSummary siblingTicketSummary(UUID ticketId, UUID generationId) {
+        String orderReference = requireActiveGeneration(ticketId, generationId);
+        List<SiblingTicketSummaryItem> siblings =
+                jdbc.query(
+                        "select sibling.issue_kind, sibling.lifecycle_state, "
+                                + "case when exists (select 1 from customer_clarification_request c "
+                                + "where c.ticket_id = sibling.id and c.status = 'OPEN') then 'CUSTOMER_CLARIFICATION' "
+                                + "when sibling.lifecycle_state = 'WAITING_FOR_EXTERNAL' then 'WAITING_FOR_EXTERNAL' else 'NONE' end, "
+                                + "exists (select 1 from compensation_proposal_revision p where p.ticket_id = sibling.id) "
+                                + "from support_ticket current_ticket join support_ticket sibling "
+                                + "on sibling.customer_id = current_ticket.customer_id "
+                                + "and sibling.order_reference = current_ticket.order_reference "
+                                + "where current_ticket.id = ? and current_ticket.order_reference = ? "
+                                + "and sibling.id <> current_ticket.id order by sibling.created_at, sibling.id",
+                        (rs, row) ->
+                                new SiblingTicketSummaryItem(
+                                        rs.getString(1),
+                                        rs.getString(2),
+                                        rs.getString(3),
+                                        rs.getBoolean(4)),
+                        ticketId,
+                        orderReference);
+        return new SiblingTicketSummary("sibling-ticket-summary-v1", siblings);
+    }
+
+    @Override
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public InvestigationCapabilityResult invoke(
             UUID ticketId,
