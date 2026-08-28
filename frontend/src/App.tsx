@@ -13,7 +13,7 @@ import { humanSessionFetch } from "./humanSessionLifecycle";
 
 const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
 const PUBLIC_CONVERSATION_BASE = "/api/customer/v2/tickets";
-const CUSTOMER_INTAKE_SCHEMA = "customer-intake-v2" as const;
+const CUSTOMER_INTAKE_SCHEMA = "customer-intake-v3" as const;
 const CUSTOMER_INTAKE_BASE = "/api/customer/v2/intakes";
 
 type Snapshot = {
@@ -38,7 +38,7 @@ type EventEnvelope = {
 };
 
 type IntakeSnapshot = {
-  schema: "customer-intake-v1" | typeof CUSTOMER_INTAKE_SCHEMA;
+  schema: "customer-intake-v1" | "customer-intake-v2" | typeof CUSTOMER_INTAKE_SCHEMA;
   intakeId: string;
   status: "READY_TO_CONFIRM" | "NEEDS_CLARIFICATION" | "CONFIRMED";
   candidateOrder: { reference: string; summary: string } | null;
@@ -48,6 +48,10 @@ type IntakeSnapshot = {
   ticketId: string | null;
   ticketIds: string[];
   sharedIntakeRecordId: string | null;
+  duplicateMatches: DuplicateIntakeMatch[];
+  routedTicketIds: string[];
+  remainingOrderCount: number;
+  completedOrderCount: number;
   expectedTicketCount: number;
   confirmed: boolean;
   replayed: boolean;
@@ -56,6 +60,13 @@ type IntakeSnapshot = {
 type IntakeIssue = {
   kind: "LOGISTICS_DELAY" | "PACKAGE_NOT_RECEIVED" | "DUPLICATE_CHARGE";
   summary: string;
+};
+
+type DuplicateIntakeMatch = {
+  ticketId: string;
+  issueKind: IntakeIssue["kind"];
+  issueSummary: string;
+  lifecycleState: string;
 };
 
 function clarificationRejectionMessage(status: number) {
@@ -94,6 +105,7 @@ export function App() {
   const [recoveringTicketId, setRecoveringTicketId] = useState<string | null>(initialTicketId);
   const requestId = useRef(globalThis.crypto.randomUUID());
   const intakeReplyRequestId = useRef(globalThis.crypto.randomUUID());
+  const duplicateResolutionRequestId = useRef(globalThis.crypto.randomUUID());
   const replyMessageId = useRef(globalThis.crypto.randomUUID());
   const resumeRequestId = useRef(globalThis.crypto.randomUUID());
   const handoffRequestId = useRef(globalThis.crypto.randomUUID());
@@ -101,12 +113,17 @@ export function App() {
   const streamController = useRef<AbortController | null>(null);
   const reconnectTimer = useRef<number | null>(null);
   const snapshotRef = useRef<Snapshot | null>(null);
+  const initialIntakeId = readRequestedIntakeId();
 
   useEffect(() => {
     const ticketId = initialTicketId;
     if (ticketId) {
       void loadTicket(ticketId).catch(() => {
         setError("暂时无法读取最新工单状态，我们会继续尝试从权威记录恢复。");
+      });
+    } else if (initialIntakeId) {
+      void loadIntake(initialIntakeId).catch(() => {
+        setError("暂时无法恢复受理进度，请稍后重试权威记录。");
       });
     }
     return () => {
@@ -141,6 +158,7 @@ export function App() {
       const parsed = parseIntakeSnapshot(responseBody);
       if (!parsed) throw new Error("incompatible intake response");
       setIntake(parsed);
+      globalThis.history.replaceState(null, "", `?intake=${parsed.intakeId}`);
     } catch {
       setError("受理未完成，请保留本页并重试。相同请求不会创建第二张工单。");
     } finally {
@@ -196,12 +214,61 @@ export function App() {
     const parsed = parseIntakeSnapshot(value);
     if (!parsed) throw new Error("incompatible intake reply");
     setIntake(parsed);
-    if (parsed.ticketIds.length === 1) {
+    if (
+      parsed.status === "CONFIRMED" &&
+      parsed.ticketIds.length === 1 &&
+      parsed.routedTicketIds.length === 0
+    ) {
       await loadTicket(parsed.ticketIds[0]);
       setIntake(null);
       return;
     }
     intakeReplyRequestId.current = globalThis.crypto.randomUUID();
+  }
+
+  async function loadIntake(intakeId: string) {
+    const response = await humanSessionFetch(`${CUSTOMER_INTAKE_BASE}/${intakeId}`, {
+      credentials: "same-origin",
+    });
+    if (!response.ok) throw new Error("intake snapshot failed");
+    const parsed = parseIntakeSnapshot((await response.json()) as unknown);
+    if (!parsed) throw new Error("incompatible intake snapshot");
+    setIntake(parsed);
+  }
+
+  async function resolveDuplicate(match: DuplicateIntakeMatch, action: string) {
+    if (!intake) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const csrf = await loadCsrfToken();
+      const response = await humanSessionFetch(
+        `${CUSTOMER_INTAKE_BASE}/${intake.intakeId}/duplicate-resolution`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            [csrf.headerName]: csrf.token,
+            "Content-Type": "application/json",
+            "Idempotency-Key": duplicateResolutionRequestId.current,
+          },
+          body: JSON.stringify({
+            schema: CUSTOMER_INTAKE_SCHEMA,
+            existingTicketId: match.ticketId,
+            action,
+          }),
+        },
+      );
+      if (!response.ok && response.status !== 409) throw new Error("duplicate resolution failed");
+      const parsed = parseIntakeSnapshot((await response.json()) as unknown);
+      if (!parsed) throw new Error("incompatible duplicate resolution");
+      setIntake(parsed);
+      duplicateResolutionRequestId.current = globalThis.crypto.randomUUID();
+    } catch {
+      setError("重复问题确认结果尚未取得；请重试同一操作，系统不会静默合并或重复建单。");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function loadTicket(ticketId: string) {
@@ -625,17 +692,29 @@ export function App() {
             <div>
               <p className="eyebrow">智能受理</p>
               <h2>
-                {intake.status === "CONFIRMED"
-                  ? `${intake.ticketIds.length} 张工单已创建`
-                  : intake.status === "READY_TO_CONFIRM"
-                    ? intake.issues.length > 1
-                      ? `请确认 ${intake.issues.length} 个问题`
-                      : "请确认我的理解"
-                    : "再帮我确认一点"}
+                {intake.duplicateMatches.length > 0
+                  ? "请确认是否继续既有工单"
+                  : intake.status === "CONFIRMED"
+                    ? intake.ticketIds.length > 0
+                      ? `${intake.ticketIds.length} 张工单已创建`
+                      : "已继续既有工单"
+                    : intake.completedOrderCount > 0
+                      ? "继续下一订单"
+                      : intake.status === "READY_TO_CONFIRM"
+                        ? intake.issues.length > 1
+                          ? `请确认 ${intake.issues.length} 个问题`
+                          : "请确认我的理解"
+                        : "再帮我确认一点"}
               </h2>
             </div>
           </div>
           <p className="intake-agent-message">{intake.assistantMessage}</p>
+          {(intake.completedOrderCount > 0 || intake.remainingOrderCount > 0) && (
+            <p className="intake-atomic-note" role="status">
+              已逐订单完成 {intake.completedOrderCount} 个，仍有 {intake.remainingOrderCount}{" "}
+              个待续办； 原始描述已保留，但下一订单仍需单独确认。
+            </p>
+          )}
           {intake.candidateOrder && (
             <article className="intake-candidate" aria-label="订单候选">
               <span className="intake-candidate-icon" aria-hidden="true">
@@ -669,12 +748,45 @@ export function App() {
               <p className="intake-empty">尚无已确认理解的问题，请补充或纠正后继续。</p>
             )}
           </div>
+          {intake.duplicateMatches.length > 0 && (
+            <div className="intake-duplicate-list" role="region" aria-label="疑似重复问题">
+              {intake.duplicateMatches.map((match) => (
+                <article className="intake-issue" key={`${match.issueKind}-${match.ticketId}`}>
+                  <span>疑似重复 · {intakeIssueLabel(match.issueKind)}</span>
+                  <strong>{match.issueSummary}</strong>
+                  <small>
+                    仅使用同一订单下未关闭工单的编号、问题类型与状态匹配；不会读取或合并既有对话。
+                  </small>
+                  <div className="intake-duplicate-actions">
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => void resolveDuplicate(match, "CONTINUE_EXISTING")}
+                    >
+                      继续旧工单 {shortTicketId(match.ticketId)}
+                    </button>
+                  </div>
+                </article>
+              ))}
+              <button
+                className="intake-secondary-action"
+                type="button"
+                disabled={submitting}
+                onClick={() => {
+                  const firstMatch = intake.duplicateMatches[0];
+                  if (firstMatch) void resolveDuplicate(firstMatch, "CREATE_NEW");
+                }}
+              >
+                这是新问题，继续创建
+              </button>
+            </div>
+          )}
           {intake.status !== "CONFIRMED" && (
             <p className="intake-atomic-note">
               确认前不会创建正式工单，也不会启动服务时长目标；确认时全部创建或一张也不创建。
             </p>
           )}
-          {intake.status === "READY_TO_CONFIRM" && (
+          {intake.status === "READY_TO_CONFIRM" && intake.duplicateMatches.length === 0 && (
             <button
               className="primary-action"
               type="button"
@@ -688,11 +800,20 @@ export function App() {
                   : "确认，就是这个问题"}
             </button>
           )}
-          {intake.status === "CONFIRMED" && (
+          {intake.ticketIds.length > 0 && (
             <div className="intake-created-tickets" role="region" aria-label="已创建工单">
               {intake.ticketIds.map((ticketId, index) => (
                 <button type="button" key={ticketId} onClick={() => void loadTicket(ticketId)}>
                   查看工单 {index + 1} · {shortTicketId(ticketId)}
+                </button>
+              ))}
+            </div>
+          )}
+          {intake.routedTicketIds.length > 0 && (
+            <div className="intake-created-tickets" role="region" aria-label="继续处理的既有工单">
+              {intake.routedTicketIds.map((ticketId) => (
+                <button type="button" key={ticketId} onClick={() => void loadTicket(ticketId)}>
+                  继续旧工单 · {shortTicketId(ticketId)}
                 </button>
               ))}
             </div>
@@ -952,6 +1073,7 @@ function isSnapshot(value: unknown): value is Snapshot {
 function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
   if (!isRecord(value)) return null;
   const legacy = value.schema === "customer-intake-v1";
+  const v2 = value.schema === "customer-intake-v2";
   const expectedKeys = legacy
     ? [
         "schema",
@@ -964,24 +1086,44 @@ function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
         "confirmed",
         "replayed",
       ]
-    : [
-        "schema",
-        "intakeId",
-        "status",
-        "candidateOrder",
-        "issue",
-        "issues",
-        "assistantMessage",
-        "ticketId",
-        "ticketIds",
-        "sharedIntakeRecordId",
-        "expectedTicketCount",
-        "confirmed",
-        "replayed",
-      ];
+    : v2
+      ? [
+          "schema",
+          "intakeId",
+          "status",
+          "candidateOrder",
+          "issue",
+          "issues",
+          "assistantMessage",
+          "ticketId",
+          "ticketIds",
+          "sharedIntakeRecordId",
+          "expectedTicketCount",
+          "confirmed",
+          "replayed",
+        ]
+      : [
+          "schema",
+          "intakeId",
+          "status",
+          "candidateOrder",
+          "issue",
+          "issues",
+          "assistantMessage",
+          "ticketId",
+          "ticketIds",
+          "sharedIntakeRecordId",
+          "duplicateMatches",
+          "routedTicketIds",
+          "remainingOrderCount",
+          "completedOrderCount",
+          "expectedTicketCount",
+          "confirmed",
+          "replayed",
+        ];
   if (
     !hasOnlyKeys(value, expectedKeys) ||
-    (!legacy && value.schema !== CUSTOMER_INTAKE_SCHEMA) ||
+    (!legacy && !v2 && value.schema !== CUSTOMER_INTAKE_SCHEMA) ||
     typeof value.intakeId !== "string" ||
     !["READY_TO_CONFIRM", "NEEDS_CLARIFICATION", "CONFIRMED"].includes(String(value.status)) ||
     typeof value.assistantMessage !== "string" ||
@@ -1009,11 +1151,23 @@ function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
       ? [value.ticketId]
       : []
     : value.ticketIds;
+  const duplicateMatches = legacy || v2 ? [] : value.duplicateMatches;
+  const routedTicketIds = legacy || v2 ? [] : value.routedTicketIds;
   if (
     !Array.isArray(issues) ||
     !issues.every(isIntakeIssue) ||
     !Array.isArray(ticketIds) ||
     !ticketIds.every((ticketId) => typeof ticketId === "string") ||
+    !Array.isArray(duplicateMatches) ||
+    !duplicateMatches.every(isDuplicateIntakeMatch) ||
+    !Array.isArray(routedTicketIds) ||
+    !routedTicketIds.every((ticketId) => typeof ticketId === "string") ||
+    (!legacy &&
+      !v2 &&
+      (!Number.isSafeInteger(value.remainingOrderCount) ||
+        Number(value.remainingOrderCount) < 0 ||
+        !Number.isSafeInteger(value.completedOrderCount) ||
+        Number(value.completedOrderCount) < 0)) ||
     (!legacy &&
       (!(value.sharedIntakeRecordId === null || typeof value.sharedIntakeRecordId === "string") ||
         !Number.isSafeInteger(value.expectedTicketCount) ||
@@ -1021,7 +1175,7 @@ function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
   )
     return null;
   return {
-    schema: legacy ? "customer-intake-v1" : CUSTOMER_INTAKE_SCHEMA,
+    schema: legacy ? "customer-intake-v1" : v2 ? "customer-intake-v2" : CUSTOMER_INTAKE_SCHEMA,
     intakeId: value.intakeId,
     status: value.status as IntakeSnapshot["status"],
     candidateOrder: candidate as IntakeSnapshot["candidateOrder"],
@@ -1031,10 +1185,24 @@ function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
     ticketId: value.ticketId,
     ticketIds,
     sharedIntakeRecordId: legacy ? null : (value.sharedIntakeRecordId as string | null),
+    duplicateMatches,
+    routedTicketIds,
+    remainingOrderCount: legacy || v2 ? 0 : Number(value.remainingOrderCount),
+    completedOrderCount: legacy || v2 ? 0 : Number(value.completedOrderCount),
     expectedTicketCount: legacy ? issues.length : Number(value.expectedTicketCount),
     confirmed: value.confirmed,
     replayed: value.replayed,
   };
+}
+
+function isDuplicateIntakeMatch(value: unknown): value is DuplicateIntakeMatch {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["ticketId", "issueKind", "issueSummary", "lifecycleState"]) &&
+    typeof value.ticketId === "string" &&
+    isIntakeIssue({ kind: value.issueKind, summary: value.issueSummary }) &&
+    typeof value.lifecycleState === "string"
+  );
 }
 
 function isIntakeIssue(value: unknown): value is IntakeIssue {
@@ -1142,6 +1310,11 @@ function isLifecycleTransition(
 function readRequestedTicketId() {
   const ticketId = new URLSearchParams(globalThis.location.search).get("ticket");
   return ticketId && /^[0-9a-f-]{36}$/i.test(ticketId) ? ticketId : null;
+}
+
+function readRequestedIntakeId() {
+  const intakeId = new URLSearchParams(globalThis.location.search).get("intake");
+  return intakeId && /^[0-9a-f-]{36}$/i.test(intakeId) ? intakeId : null;
 }
 
 function shortTicketId(ticketId: string) {

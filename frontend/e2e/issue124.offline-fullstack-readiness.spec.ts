@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import sensitivePatterns from "../src/sensitive-content-patterns.json" with { type: "json" };
-import { login } from "./support/auth";
+import { continueAsNewIfDuplicate, login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
 
 const forbiddenBrowserEvidence = sensitivePatterns.modelBoundaryLiterals;
@@ -105,7 +105,7 @@ async function createTicket(page: Page, orderReference: string, description: str
   );
   await page.getByRole("button", { name: "提交物流延迟问题" }).click();
   await intakeResponse;
-  await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await continueAsNewIfDuplicate(page);
   const createdResponse = page.waitForResponse(
     (response) =>
       /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(

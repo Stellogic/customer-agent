@@ -17,6 +17,7 @@ class IntakeState(TypedDict, total=False):
     current_issue_summary: str
     current_issues: list[dict[str, str]]
     current_pending_issue_kinds: list[str]
+    current_remaining_order_references: list[str]
     intake_understanding: dict[str, object]
     model_mode: str
 
@@ -42,6 +43,9 @@ async def understand_intake(state: IntakeState) -> IntakeState:
                 for issue in state.get("current_issues", [])
             ),
             current_pending_issue_kinds=tuple(state.get("current_pending_issue_kinds", [])),
+            current_remaining_order_references=tuple(
+                state.get("current_remaining_order_references", [])
+            ),
         )
     )
     return {
@@ -52,6 +56,7 @@ async def understand_intake(state: IntakeState) -> IntakeState:
             "candidate_order_reference": result.candidate_order_reference,
             "issues": [{"kind": issue.kind, "summary": issue.summary} for issue in result.issues],
             "pending_issue_kinds": list(result.pending_issue_kinds),
+            "remaining_order_references": list(result.remaining_order_references),
             "assistant_message": result.assistant_message,
         },
     }

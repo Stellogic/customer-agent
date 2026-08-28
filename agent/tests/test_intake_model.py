@@ -26,6 +26,35 @@ async def test_fixed_fake_proposes_only_a_spring_visible_order() -> None:
 
 
 @pytest.mark.asyncio
+async def test_multiple_mentioned_orders_are_processed_one_at_a_time() -> None:
+    model = FixedFakeIntakeModel()
+    orders = (
+        VisibleOrder("ORDER-DELAY-001", "配送中的合成订单"),
+        VisibleOrder("ORDER-DELAY-002", "配送中的合成订单"),
+    )
+
+    first = await model.understand(
+        IntakeModelInput(
+            customer_message="ORDER-DELAY-001 没收到，ORDER-DELAY-002 物流延迟",
+            visible_orders=orders,
+        )
+    )
+
+    assert first.candidate_order_reference == "ORDER-DELAY-001"
+    assert first.remaining_order_references == ("ORDER-DELAY-002",)
+
+    continued = await model.understand(
+        IntakeModelInput(
+            customer_message="ORDER-DELAY-001 没收到，ORDER-DELAY-002 物流延迟",
+            visible_orders=(orders[1],),
+        )
+    )
+
+    assert continued.candidate_order_reference == "ORDER-DELAY-002"
+    assert continued.remaining_order_references == ()
+
+
+@pytest.mark.asyncio
 async def test_fixed_fake_prefers_the_full_reference_over_its_fixture_prefix() -> None:
     model = FixedFakeIntakeModel()
 

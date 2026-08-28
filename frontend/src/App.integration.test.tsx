@@ -36,6 +36,12 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
     fireEvent.change(screen.getByLabelText("订单编号"), { target: { value: "ORDER-DELAY-001" } });
     fireEvent.change(screen.getByLabelText("问题描述"), { target: { value: description } });
     fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+    const intakeHeading = await screen.findByRole("heading", {
+      name: /请确认我的理解|请确认是否继续既有工单/,
+    });
+    if (intakeHeading.textContent === "请确认是否继续既有工单") {
+      fireEvent.click(screen.getByRole("button", { name: "这是新问题，继续创建" }));
+    }
     expect(await screen.findByRole("heading", { name: "请确认我的理解" })).toBeInTheDocument();
     expect(screen.queryByText("调查中")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "确认，就是这个问题" }));

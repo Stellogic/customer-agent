@@ -10,4 +10,15 @@ export async function login(page: Page, audience: "customer" | "internal", usern
   await expect(page).not.toHaveURL(/\/login(?:\?.*)?$/);
 }
 
+export async function continueAsNewIfDuplicate(page: Page) {
+  const duplicateHeading = page.getByRole("heading", { name: "请确认是否继续既有工单" });
+  await expect(
+    page.getByRole("heading", { name: /请确认我的理解|请确认是否继续既有工单/ }),
+  ).toBeVisible();
+  if (await duplicateHeading.isVisible()) {
+    await page.getByRole("button", { name: "这是新问题，继续创建" }).click();
+  }
+  await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+}
+
 export { password };

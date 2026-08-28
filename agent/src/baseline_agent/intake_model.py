@@ -18,6 +18,7 @@ class IntakeModelInput:
     current_issue_summary: str | None = None
     current_issues: tuple[IntakeIssue, ...] = ()
     current_pending_issue_kinds: tuple[str, ...] = ()
+    current_remaining_order_references: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,7 @@ class IntakeUnderstanding:
     issues: tuple[IntakeIssue, ...]
     pending_issue_kinds: tuple[str, ...]
     assistant_message: str
+    remaining_order_references: tuple[str, ...] = ()
 
     @property
     def issue_kind(self) -> str | None:
@@ -68,6 +70,7 @@ class FixedFakeIntakeModel:
                 issues=current_issues,
                 pending_issue_kinds=(),
                 assistant_message="已确认，客服工单正在独立处理。",
+                remaining_order_references=model_input.current_remaining_order_references,
             )
 
         candidate = _candidate_order(message, model_input.visible_orders)
@@ -80,7 +83,17 @@ class FixedFakeIntakeModel:
                 ),
                 None,
             )
-        issues = _merge_issues(current_issues, _recognized_issues(message))
+        remaining_order_references = (
+            model_input.current_remaining_order_references
+            if model_input.current_order_reference
+            else tuple(
+                order.reference
+                for order in _mentioned_orders(message, model_input.visible_orders)
+                if candidate is None or order.reference != candidate.reference
+            )
+        )
+        scoped_message = _message_for_candidate(message, candidate, model_input.visible_orders)
+        issues = _merge_issues(current_issues, _recognized_issues(scoped_message))
         if pending_issue_kinds:
             pending_kind = pending_issue_kinds[0]
             if _confirms_pending_issue(pending_kind, message):
@@ -99,8 +112,9 @@ class FixedFakeIntakeModel:
                     issues=issues,
                     pending_issue_kinds=tuple(pending_issue_kinds),
                     assistant_message="请先确认是否确实发生了两次扣款。",
+                    remaining_order_references=remaining_order_references,
                 )
-        uncertain_issue_kinds = _uncertain_issue_kinds(message)
+        uncertain_issue_kinds = _uncertain_issue_kinds(scoped_message)
         if candidate is None:
             return IntakeUnderstanding(
                 intent="UNDERSTANDING",
@@ -109,6 +123,7 @@ class FixedFakeIntakeModel:
                 issues=issues,
                 pending_issue_kinds=tuple(pending_issue_kinds),
                 assistant_message="你说的是不是某一笔订单的物流问题？请补充订单线索。",
+                remaining_order_references=remaining_order_references,
             )
         if uncertain_issue_kinds:
             for kind in uncertain_issue_kinds:
@@ -121,6 +136,7 @@ class FixedFakeIntakeModel:
                 issues=tuple(issue for issue in issues if issue.kind not in pending_issue_kinds),
                 pending_issue_kinds=tuple(pending_issue_kinds),
                 assistant_message="你提到疑似重复扣款，请确认是否确实发生了两次扣款。",
+                remaining_order_references=remaining_order_references,
             )
         if pending_issue_kinds:
             return IntakeUnderstanding(
@@ -130,6 +146,7 @@ class FixedFakeIntakeModel:
                 issues=issues,
                 pending_issue_kinds=tuple(pending_issue_kinds),
                 assistant_message="还有一个不确定的问题需要逐项确认。",
+                remaining_order_references=remaining_order_references,
             )
         if not issues:
             return IntakeUnderstanding(
@@ -139,12 +156,13 @@ class FixedFakeIntakeModel:
                 issues=(),
                 pending_issue_kinds=(),
                 assistant_message=f"你说的是不是订单 {candidate.reference} 的物流或支付问题？也可以直接纠正我的理解。",
+                remaining_order_references=remaining_order_references,
             )
         if len(issues) == 1 and issues[0].kind == "LOGISTICS_DELAY":
             issues = (
                 IntakeIssue(
                     "LOGISTICS_DELAY",
-                    _customer_issue_summary(message, candidate.reference),
+                    _customer_issue_summary(scoped_message, candidate.reference),
                 ),
             )
         return IntakeUnderstanding(
@@ -157,6 +175,7 @@ class FixedFakeIntakeModel:
                 f"我理解为订单 {candidate.reference} 有 {len(issues)} 个独立问题。"
                 f"请确认；确认后将创建 {len(issues)} 张工单，也可以直接纠正我的理解。"
             ),
+            remaining_order_references=remaining_order_references,
         )
 
 
@@ -186,15 +205,48 @@ def _merge_issues(
 
 
 def _candidate_order(message: str, orders: tuple[VisibleOrder, ...]) -> VisibleOrder | None:
-    mentioned = [order for order in orders if order.reference.lower() in message.lower()]
+    mentioned = _mentioned_orders(message, orders)
     if mentioned:
-        longest_reference_length = max(len(order.reference) for order in mentioned)
-        longest = [order for order in mentioned if len(order.reference) == longest_reference_length]
-        if len(longest) == 1:
-            return longest[0]
+        return mentioned[0]
     if len(orders) == 1:
         return orders[0]
     return None
+
+
+def _mentioned_orders(message: str, orders: tuple[VisibleOrder, ...]) -> tuple[VisibleOrder, ...]:
+    lowered = message.lower()
+    mentioned = [
+        (lowered.index(order.reference.lower()), -len(order.reference), order)
+        for order in orders
+        if order.reference.lower() in lowered
+    ]
+    ordered = sorted(mentioned, key=lambda value: (value[0], value[1]))
+    selected: list[VisibleOrder] = []
+    positions: set[int] = set()
+    for position, _, order in ordered:
+        if position not in positions:
+            selected.append(order)
+            positions.add(position)
+    return tuple(selected)
+
+
+def _message_for_candidate(
+    message: str, candidate: VisibleOrder | None, orders: tuple[VisibleOrder, ...]
+) -> str:
+    if candidate is None:
+        return message
+    mentioned = _mentioned_orders(message, orders)
+    if len(mentioned) <= 1:
+        return message
+    lowered = message.lower()
+    start = lowered.index(candidate.reference.lower())
+    later_positions = [
+        lowered.index(order.reference.lower())
+        for order in mentioned
+        if lowered.index(order.reference.lower()) > start
+    ]
+    end = min(later_positions) if later_positions else len(message)
+    return message[start:end].strip(" ，,；;。")
 
 
 def _is_confirmation(message: str) -> bool:
