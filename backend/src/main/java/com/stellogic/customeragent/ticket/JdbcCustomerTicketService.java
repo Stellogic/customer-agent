@@ -189,11 +189,11 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         String digest =
                 StableParameterDigest.sha256(
                         command.ticketId().toString(), command.message().trim());
+        authorityLock.acquire(command.ticketId());
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 (ResultSetExtractor<Void>) resultSet -> null,
                 command.customerId() + "\n" + command.messageId());
-        authorityLock.acquire(command.ticketId());
         List<CustomerMessageRequestRecord> existing =
                 jdbc.query(
                         "select parameter_digest, outcome from customer_public_message_request "
