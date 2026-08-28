@@ -449,6 +449,101 @@ def main() -> None:
             >= 2
         )
 
+    message_fence_create_id = f"issue-158-create-{uuid.uuid4()}"
+    message_fence_id = f"issue-158-message-{uuid.uuid4()}"
+    with customer_browser_client(spring_url) as client:
+        created = client.post(
+            f"{spring_url}/api/customer/v2/tickets",
+            headers={"Idempotency-Key": message_fence_create_id},
+            json={
+                "schema": "public-conversation-v2",
+                "orderReference": "ORDER-ISSUE-158-FENCE",
+                "description": "请先调查这笔合成订单的物流状态",
+            },
+        )
+        expect_status(created, 201)
+        message_fence_ticket_id = uuid.UUID(created.json()["ticketId"])
+        accepted_message = client.post(
+            f"{spring_url}/api/customer/v2/tickets/{message_fence_ticket_id}/messages",
+            headers={"Idempotency-Key": message_fence_id},
+            json={
+                "schema": "public-conversation-v2",
+                "message": "补充：今天仍然没有新的物流轨迹",
+            },
+        )
+        expect_status(accepted_message, 202)
+        assert accepted_message.json() == {
+            "schema": "public-conversation-v2",
+            "ticketId": str(message_fence_ticket_id),
+            "accepted": True,
+            "replayed": False,
+        }
+        replayed_message = client.post(
+            f"{spring_url}/api/customer/v2/tickets/{message_fence_ticket_id}/messages",
+            headers={"Idempotency-Key": message_fence_id},
+            json={
+                "schema": "public-conversation-v2",
+                "message": "补充：今天仍然没有新的物流轨迹",
+            },
+        )
+        expect_status(replayed_message, 200)
+        assert replayed_message.json()["replayed"] is True
+        conflicting_message = client.post(
+            f"{spring_url}/api/customer/v2/tickets/{message_fence_ticket_id}/messages",
+            headers={"Idempotency-Key": message_fence_id},
+            json={
+                "schema": "public-conversation-v2",
+                "message": "复用消息身份但改变正文",
+            },
+        )
+        expect_status(conflicting_message, 409)
+        assert conflicting_message.json()["code"] == "REQUEST_ID_CONFLICT"
+        denied_other_customer_message = client.post(
+            f"{spring_url}/api/customer/v2/tickets/{other_customer_ticket_id}/messages",
+            headers={"Idempotency-Key": f"issue-158-other-{uuid.uuid4()}"},
+            json={
+                "schema": "public-conversation-v2",
+                "message": "不能写入其他客户的工单",
+            },
+        )
+        expect_status(denied_other_customer_message, 404)
+        fenced_snapshot = client.get(
+            f"{spring_url}/api/customer/v2/tickets/{message_fence_ticket_id}",
+        )
+        expect_status(fenced_snapshot, 200)
+        fenced_projection = fenced_snapshot.json()
+        assert fenced_projection["messages"][-1]["body"] == "补充：今天仍然没有新的物流轨迹"
+        assert fenced_projection["ticket"]["agentGeneration"] == 2
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        generations = connection.execute(
+            "select generation_number, thread_id, status from agent_processing_generation "
+            "where ticket_id = %s order by generation_number",
+            (message_fence_ticket_id,),
+        ).fetchall()
+        assert len(generations) == 2
+        assert generations[0][2] == "SUPERSEDED"
+        assert generations[1][1] != generations[0][1]
+        assert connection.execute(
+            "select count(*) from customer_public_message_request "
+            "where customer_id = 'customer-demo' and message_id = %s and ticket_id = %s",
+            (message_fence_id, message_fence_ticket_id),
+        ).fetchone() == (1,)
+        assert connection.execute(
+            "select count(*) from public_message where ticket_id = %s and author = 'CUSTOMER'",
+            (message_fence_ticket_id,),
+        ).fetchone() == (2,)
+        assert connection.execute(
+            "select array_agg(event_type order by sequence) from customer_public_event "
+            "where ticket_id = %s and event_type in "
+            "('CUSTOMER_MESSAGE_ACCEPTED', 'AGENT_PROCESSING_TERMINATED', 'AGENT_PROCESSING_STARTED')",
+            (message_fence_ticket_id,),
+        ).fetchone()[0] == [
+            "CUSTOMER_MESSAGE_ACCEPTED",
+            "AGENT_PROCESSING_TERMINATED",
+            "AGENT_PROCESSING_STARTED",
+        ]
+
     no_compensation_request = f"issue-14-{uuid.uuid4()}"
     no_compensation_payload = {
         "orderReference": "ORDER-DELAY-UNDER-24",

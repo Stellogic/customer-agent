@@ -26,6 +26,7 @@ public final class CustomerTicketV2Controller {
     private static final String V1_SCHEMA = "customer-public-v1";
     private static final Set<String> CREATE_FIELDS =
             Set.of("schema", "orderReference", "description");
+    private static final Set<String> MESSAGE_FIELDS = Set.of("schema", "message");
     private static final Set<String> EVENT_TYPES =
             Set.of(
                     "TICKET_ACCEPTED",
@@ -35,7 +36,10 @@ public final class CustomerTicketV2Controller {
                     "TICKET_INVESTIGATION_RESUMED",
                     "TICKET_HANDED_OFF",
                     "TICKET_REOPENED",
-                    "TICKET_CLOSED");
+                    "TICKET_CLOSED",
+                    "CUSTOMER_MESSAGE_ACCEPTED",
+                    "AGENT_PROCESSING_TERMINATED",
+                    "AGENT_PROCESSING_STARTED");
 
     private final CustomerTicketService service;
 
@@ -64,6 +68,30 @@ public final class CustomerTicketV2Controller {
                                 "LOGISTICS_DELAY"));
         return ResponseEntity.status(result.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .body(new CreateResponse(SCHEMA, result.ticketId(), true, result.replayed()));
+    }
+
+    @PostMapping("/{ticketId}/messages")
+    ResponseEntity<MessageResponse> appendMessage(
+            Authentication authentication,
+            @RequestHeader(value = "Idempotency-Key", required = false) String messageId,
+            @PathVariable UUID ticketId,
+            @RequestBody Map<String, Object> request) {
+        if (!request.keySet().equals(MESSAGE_FIELDS)) {
+            throw new InvalidCustomerRequestException("请求字段与 v2 消息契约不一致");
+        }
+        if (!SCHEMA.equals(text(request, "schema"))) {
+            throw new IncompatibleCustomerSchemaException();
+        }
+        requireText(messageId, "缺少稳定消息身份");
+        CustomerMessageResult result =
+                service.appendMessage(
+                        new AppendCustomerMessage(
+                                authentication.getName().trim(),
+                                ticketId,
+                                messageId.trim(),
+                                text(request, "message")));
+        return ResponseEntity.status(result.replayed() ? HttpStatus.OK : HttpStatus.ACCEPTED)
+                .body(new MessageResponse(SCHEMA, result.ticketId(), true, result.replayed()));
     }
 
     @GetMapping("/{ticketId}")
@@ -159,6 +187,8 @@ public final class CustomerTicketV2Controller {
     }
 
     record CreateResponse(String schema, UUID ticketId, boolean accepted, boolean replayed) {}
+
+    record MessageResponse(String schema, UUID ticketId, boolean accepted, boolean replayed) {}
 
     record SnapshotResponse(
             String view,

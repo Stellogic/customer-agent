@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -26,8 +27,8 @@ class JdbcCustomerTicketServiceTest {
                 spy(
                         new JdbcCustomerTicketService(
                                 jdbc,
-                                Clock.fixed(
-                                        Instant.parse("2026-08-11T00:00:00Z"), ZoneOffset.UTC)));
+                                Clock.fixed(Instant.parse("2026-08-11T00:00:00Z"), ZoneOffset.UTC),
+                                mock(TicketAuthorityLock.class)));
         var snapshot =
                 new CustomerPublicSnapshot(
                         TICKET_ID,

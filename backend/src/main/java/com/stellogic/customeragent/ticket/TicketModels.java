@@ -13,6 +13,10 @@ record CreateCustomerTicket(
 
 record TicketCreationResult(UUID ticketId, boolean replayed) {}
 
+record AppendCustomerMessage(String customerId, UUID ticketId, String messageId, String message) {}
+
+record CustomerMessageResult(UUID ticketId, String outcome, boolean replayed) {}
+
 record PublicMessage(String author, String body, Instant sentAt) {}
 
 record CurrentClarification(UUID id, String promptCode, String question) {}
