@@ -78,8 +78,8 @@ type DuplicateIntakeMatch = {
 type RecoverableIntake = {
   intake: IntakeSnapshot;
   version: number;
-  retentionState: "ACTIVE" | "ARCHIVED";
-  expiresAt: string;
+  retentionState: "ACTIVE" | "ARCHIVED" | "COMPLETED";
+  expiresAt: string | null;
   archivedAt: string | null;
   factsChanged: boolean;
   messages: Array<{ author: "CUSTOMER" | "AGENT"; body: string; sentAt: string }>;
@@ -1297,12 +1297,16 @@ function parseRecoverableIntake(value: unknown): RecoverableIntake | null {
     ]) ||
     !Number.isSafeInteger(value.version) ||
     Number(value.version) < 1 ||
-    !["ACTIVE", "ARCHIVED"].includes(String(value.retentionState)) ||
-    typeof value.expiresAt !== "string" ||
+    !["ACTIVE", "ARCHIVED", "COMPLETED"].includes(String(value.retentionState)) ||
     !(value.archivedAt === null || typeof value.archivedAt === "string") ||
     typeof value.factsChanged !== "boolean" ||
     !Array.isArray(value.messages) ||
     !value.messages.every(isIntakeConversationMessage)
+  )
+    return null;
+  if (
+    (value.retentionState === "COMPLETED" && value.expiresAt !== null) ||
+    (value.retentionState !== "COMPLETED" && typeof value.expiresAt !== "string")
   )
     return null;
   const intake = parseIntakeSnapshot(value.intake);
@@ -1311,7 +1315,7 @@ function parseRecoverableIntake(value: unknown): RecoverableIntake | null {
     intake,
     version: Number(value.version),
     retentionState: value.retentionState as RecoverableIntake["retentionState"],
-    expiresAt: value.expiresAt,
+    expiresAt: value.expiresAt as string | null,
     archivedAt: value.archivedAt,
     factsChanged: value.factsChanged,
     messages: value.messages as RecoverableIntake["messages"],

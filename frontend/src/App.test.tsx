@@ -403,6 +403,35 @@ describe("客户帮助中心", () => {
     expect(fetchMock.mock.calls[0][0]).toContain(`/api/customer/v2/intakes/${intakeId}/recovery`);
   });
 
+  it("完成态受理刷新后恢复已创建工单入口", async () => {
+    const intakeId = "15500000-0000-0000-0000-000000000001";
+    globalThis.history.replaceState(null, "", `/?intake=${intakeId}`);
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify(
+          recoverableIntake({
+            retentionState: "COMPLETED",
+            expiresAt: null,
+            archivedAt: null,
+            version: 5,
+            intake: intakeV4({
+              intakeId,
+              status: "CONFIRMED",
+              ticketIds: ["15500000-0000-0000-0000-000000000777"],
+              version: 5,
+            }),
+          }),
+        ),
+        { status: 200 },
+      ),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "1 张工单已创建" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "已创建工单" })).toBeInTheDocument();
+  });
+
   it("受理记录查询区分无记录与加载失败", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")

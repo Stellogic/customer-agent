@@ -104,10 +104,13 @@ test("Issue #155 桌面端在七日边界仲裁恢复、旧确认与重复确认
   ]);
   expect(confirmations.toSorted()).toEqual([200, 201]);
   expect(ticketCount(orderReference)).toBe("1");
+  await page.goto(`/help?intake=${intakeId}`);
+  await expect(page.getByRole("heading", { name: "1 张工单已创建" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "已创建工单" })).toBeVisible();
   await context.close();
 });
 
-test("Issue #155 窄屏恢复活动受理且隔离其他客户记录", async ({ browser }) => {
+test("Issue #155 窄屏在订单权属失效后安全恢复并隔离其他客户记录", async ({ browser }) => {
   const context = await newIssue80Context(browser, { viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   const orderReference = "ORDER-INTAKE-155-NARROW";
@@ -118,8 +121,11 @@ test("Issue #155 窄屏恢复活动受理且隔离其他客户记录", async ({ 
   executeFixtureSql(`
     update customer_intake
     set updated_at = timestamptz '2026-08-09T14:00:01Z',
-        expires_at = timestamptz '2026-08-16T14:00:01Z'
+        expires_at = timestamptz '2026-08-09T14:00:00Z'
     where id = '${intakeId}'::uuid;
+    update synthetic_order
+    set customer_id = 'customer-other'
+    where order_reference = '${orderReference}';
     insert into customer_intake (
       id, customer_id, start_request_key, start_digest, original_message, status,
       candidate_order_reference, candidate_order_version, candidate_order_summary,
@@ -147,11 +153,17 @@ test("Issue #155 窄屏恢复活动受理且隔离其他客户记录", async ({ 
   await expect(page).toHaveURL(/\/help\/login/);
   await login(page, "customer", "customer-demo");
   await page.goto(`/help?intake=${intakeId}`);
-  await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "已归档受理" })).toBeVisible();
+  await page.getByRole("button", { name: "恢复并重新核对事实" }).click();
+  await expect(page.getByText("订单事实已变化，请重新确认")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "再帮我确认一点" })).toBeVisible();
+  await expect(page.locator(".intake-agent-message").getByText(/请补充订单线索/)).toBeVisible();
+  await expect(page.getByRole("article", { name: "订单候选" })).toHaveCount(0);
   await expect(page.getByRole("list", { name: "已恢复的受理消息" })).toContainText(
     "物流已经延迟，请帮我核对",
   );
   await expect(page.getByText("其他客户私有消息")).toHaveCount(0);
+  expect(ticketCount(orderReference)).toBe("0");
   expect(new URL(page.url()).searchParams.get("intake")).toBe(intakeId);
   expect(
     await page.evaluate(

@@ -354,23 +354,42 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
         }
 
         List<CustomerVisibleOrderSummary> orders = visibleOrders(command.customerId());
+        boolean currentCandidateVisible =
+                current.orderReference() == null
+                        || orders.stream()
+                                .anyMatch(
+                                        order ->
+                                                order.reference().equals(current.orderReference()));
+        List<String> visibleRemainingOrders =
+                current.pendingOrders().stream()
+                        .map(PendingOrder::reference)
+                        .filter(
+                                reference ->
+                                        orders.stream()
+                                                .anyMatch(
+                                                        order ->
+                                                                order.reference()
+                                                                        .equals(reference)))
+                        .toList();
         IntakeUnderstanding understanding =
                 agent.understand(
                         new IntakeUnderstandingRequest(
                                 latestCustomerMessage(current.id(), current.originalMessage()),
                                 orders,
-                                current.orderReference(),
+                                currentCandidateVisible ? current.orderReference() : null,
                                 firstSummary(current.issues()),
                                 current.issues(),
                                 current.pendingIssueKinds(),
-                                current.pendingOrders().stream()
-                                        .map(PendingOrder::reference)
-                                        .toList()));
+                                visibleRemainingOrders));
         requireUnderstanding(understanding, orders);
         CustomerVisibleOrderSummary candidate = candidate(understanding, orders);
         boolean factsChanged = factsChanged(current, orders, candidate);
         String assistantMessage =
-                factsChanged ? "订单事实已变化；已重新核对候选，请重新确认后再创建工单。" : "已重新核对当前订单事实，请再次确认后再创建工单。";
+                candidate == null
+                        ? "订单事实已变化；原订单已不再可见，请补充订单线索后重新确认。"
+                        : factsChanged
+                                ? "订单事实已变化；已重新核对候选，请重新确认后再创建工单。"
+                                : "已重新核对当前订单事实，请再次确认后再创建工单。";
         Instant now = clock.instant();
         jdbc.update(
                 "update customer_intake set retention_state = 'ACTIVE', archived_at = null, "
