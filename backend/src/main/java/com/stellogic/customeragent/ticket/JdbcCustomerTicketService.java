@@ -189,6 +189,10 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         String digest =
                 StableParameterDigest.sha256(
                         command.ticketId().toString(), command.message().trim());
+        jdbc.query(
+                "select pg_advisory_xact_lock(hashtextextended(?, 0))",
+                (ResultSetExtractor<Void>) resultSet -> null,
+                command.customerId() + "\n" + command.messageId());
         authorityLock.acquire(command.ticketId());
         List<CustomerMessageRequestRecord> existing =
                 jdbc.query(
@@ -246,6 +250,10 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                     generation.id());
             jdbc.update(
                     "update agent_submission set status = 'COMPLETED', last_error = null "
+                            + "where generation_id = ? and status <> 'COMPLETED'",
+                    generation.id());
+            jdbc.update(
+                    "update agent_resume_request set status = 'COMPLETED' "
                             + "where generation_id = ? and status <> 'COMPLETED'",
                     generation.id());
         }
@@ -348,15 +356,21 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 command.ticketId(),
                 at);
         jdbc.update(
-                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values "
-                        + "(?, 'CUSTOMER_MESSAGE_ACCEPTED', ?, ?), "
-                        + "(?, 'AGENT_GENERATION_SUPERSEDED', 'spring-system', ?), "
-                        + "(?, 'AGENT_GENERATION_CREATED', 'spring-system', ?)",
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                        + "values (?, 'CUSTOMER_MESSAGE_ACCEPTED', ?, ?)",
                 command.ticketId(),
                 command.customerId(),
-                at,
-                command.ticketId(),
-                at,
+                at);
+        if (!active.isEmpty()) {
+            jdbc.update(
+                    "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                            + "values (?, 'AGENT_GENERATION_SUPERSEDED', 'spring-system', ?)",
+                    command.ticketId(),
+                    at);
+        }
+        jdbc.update(
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                        + "values (?, 'AGENT_GENERATION_CREATED', 'spring-system', ?)",
                 command.ticketId(),
                 at);
         return new CustomerMessageResult(command.ticketId(), "ACCEPTED", false);

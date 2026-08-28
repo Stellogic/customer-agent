@@ -27,6 +27,41 @@ import org.springframework.web.server.ResponseStatusException;
 class JdbcAgentInvestigationServiceAuthorizationTest {
     @Test
     @SuppressWarnings("unchecked")
+    void customerCommunicationContextKeepsTheCompleteOrderedConversation() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenAnswer(
+                        invocation -> {
+                            String sql = invocation.getArgument(0, String.class);
+                            if (sql.startsWith("select t.order_reference"))
+                                return List.of("ORDER-122");
+                            if (sql.startsWith("select description")) return List.of("原始问题");
+                            return List.of();
+                        });
+        JdbcAgentInvestigationService service =
+                new JdbcAgentInvestigationService(
+                        jdbc,
+                        mock(AgentAccessAudit.class),
+                        Clock.fixed(Instant.parse("2026-08-25T00:00:00Z"), ZoneOffset.UTC),
+                        mock(JdbcCompensationProposalStore.class),
+                        mock(SlaService.class),
+                        mock(TicketAuthorityLock.class),
+                        mock(CustomerPublicProjectionAppender.class),
+                        mock(TicketResolutionTransition.class));
+
+        service.customerCommunicationContext(UUID.randomUUID(), UUID.randomUUID());
+
+        String conversationSql =
+                mockingDetails(jdbc).getInvocations().stream()
+                        .map(invocation -> invocation.getArgument(0, String.class))
+                        .filter(sql -> sql.contains("from public_message"))
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(conversationSql).contains("order by message_sequence").doesNotContain("limit");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void siblingSummaryRejectsAmbiguousAliasesAndCapsTheProjection() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))

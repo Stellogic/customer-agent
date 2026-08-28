@@ -143,7 +143,7 @@ def validate_customer_communication_input(model_input: CustomerCommunicationInpu
         f"order:{model_input.order_reference}",
         f"logistics:{model_input.order_reference}",
     )
-    conversation_valid = len(model_input.public_conversation) <= 20 and all(
+    conversation_valid = all(
         isinstance(message, CustomerConversationMessage)
         and message.author in {"CUSTOMER", "SUPPORT", "AGENT"}
         and bool(message.body.strip())

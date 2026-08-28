@@ -80,8 +80,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         }
         List<CustomerCommunicationMessage> conversation =
                 jdbc.query(
-                        "select author, body from (select author, body, message_sequence "
-                                + "from public_message where ticket_id = ? order by message_sequence desc limit 20) recent "
+                        "select author, body from public_message where ticket_id = ? "
                                 + "order by message_sequence",
                         (rs, row) ->
                                 new CustomerCommunicationMessage(rs.getString(1), rs.getString(2)),

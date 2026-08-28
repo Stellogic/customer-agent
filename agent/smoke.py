@@ -463,6 +463,12 @@ def main() -> None:
         )
         expect_status(created, 201)
         message_fence_ticket_id = uuid.UUID(created.json()["ticketId"])
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            old_message_fence_generation_id = connection.execute(
+                "select id from agent_processing_generation "
+                "where ticket_id = %s and status = 'ACTIVE'",
+                (message_fence_ticket_id,),
+            ).fetchone()[0]
         accepted_message = client.post(
             f"{spring_url}/api/customer/v2/tickets/{message_fence_ticket_id}/messages",
             headers={"Idempotency-Key": message_fence_id},
@@ -515,6 +521,29 @@ def main() -> None:
         assert fenced_projection["messages"][-1]["body"] == "补充：今天仍然没有新的物流轨迹"
         assert fenced_projection["ticket"]["agentGeneration"] == 2
 
+        stale_capabilities = client.get(
+            f"{spring_url}/internal/agent/tickets/{message_fence_ticket_id}/generations/"
+            f"{old_message_fence_generation_id}/capabilities",
+            headers={
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": str(old_message_fence_generation_id),
+                "X-Agent-Operation": "USE_INVESTIGATION_CAPABILITY",
+            },
+        )
+        expect_status(stale_capabilities, 403)
+        stale_handoff = client.post(
+            f"{spring_url}/internal/agent/tickets/{message_fence_ticket_id}/generations/"
+            f"{old_message_fence_generation_id}/human-handoff",
+            headers={
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": str(old_message_fence_generation_id),
+                "X-Agent-Operation": "REQUEST_HUMAN_HANDOFF",
+                "Idempotency-Key": f"issue-158-stale-handoff-{uuid.uuid4()}",
+            },
+            json={"reasonCode": "FACT_CONFLICT", "summary": None},
+        )
+        expect_status(stale_handoff, 403)
+
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         generations = connection.execute(
             "select generation_number, thread_id, status from agent_processing_generation "
@@ -543,6 +572,56 @@ def main() -> None:
             "AGENT_PROCESSING_TERMINATED",
             "AGENT_PROCESSING_STARTED",
         ]
+        assert connection.execute(
+            "select count(*) from agent_resume_request "
+            "where generation_id = %s and status <> 'COMPLETED'",
+            (old_message_fence_generation_id,),
+        ).fetchone() == (0,)
+
+    concurrent_message_id = f"issue-158-cross-ticket-{uuid.uuid4()}"
+    concurrent_ticket_ids: list[str] = []
+    with customer_browser_client(spring_url) as client:
+        for index in range(2):
+            created = client.post(
+                f"{spring_url}/api/customer/v2/tickets",
+                headers={"Idempotency-Key": f"issue-158-concurrent-create-{uuid.uuid4()}"},
+                json={
+                    "schema": "public-conversation-v2",
+                    "orderReference": f"ORDER-ISSUE-158-CONCURRENT-{index}",
+                    "description": "并发消息身份隔离测试",
+                },
+            )
+            expect_status(created, 201)
+            concurrent_ticket_ids.append(created.json()["ticketId"])
+
+    def append_same_message_identity(ticket_id: str) -> httpx.Response:
+        with customer_browser_client(spring_url) as client:
+            return client.post(
+                f"{spring_url}/api/customer/v2/tickets/{ticket_id}/messages",
+                headers={"Idempotency-Key": concurrent_message_id},
+                json={
+                    "schema": "public-conversation-v2",
+                    "message": f"只允许一个工单消费该消息身份：{ticket_id}",
+                },
+            )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        concurrent_message_responses = list(
+            executor.map(append_same_message_identity, concurrent_ticket_ids)
+        )
+    assert sorted(response.status_code for response in concurrent_message_responses) == [202, 409]
+    assert (
+        next(
+            response for response in concurrent_message_responses if response.status_code == 409
+        ).json()["code"]
+        == "REQUEST_ID_CONFLICT"
+    )
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select count(*) from customer_public_message_request "
+            "where customer_id = 'customer-demo' and message_id = %s",
+            (concurrent_message_id,),
+        ).fetchone() == (1,)
 
     no_compensation_request = f"issue-14-{uuid.uuid4()}"
     no_compensation_payload = {

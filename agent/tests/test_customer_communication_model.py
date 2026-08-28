@@ -117,6 +117,43 @@ async def test_programmable_provider_receives_only_scoped_untrusted_customer_con
 
 
 @pytest.mark.asyncio
+async def test_programmable_provider_receives_the_complete_public_conversation() -> None:
+    captured: list[dict[str, object]] = []
+
+    class ProviderStub:
+        async def generate(self, request: dict[str, object]) -> dict[str, object]:
+            captured.append(request)
+            return {
+                "schemaVersion": "customer-reply-v1",
+                "body": default_customer_reply_body(
+                    "ORDER-123", CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
+                ),
+                "intent": "NO_COMPENSATION_RESOLUTION",
+                "evidenceRefs": ["order:ORDER-123", "logistics:ORDER-123"],
+                "escalationRequired": False,
+                "referencedOrder": "ORDER-123",
+            }
+
+    conversation = tuple(
+        CustomerConversationMessage("CUSTOMER", f"补充消息 {index}") for index in range(21)
+    )
+    await StructuredCustomerCommunicationModel(ProviderStub()).compose(
+        CustomerCommunicationInput(
+            order_reference="ORDER-123",
+            delay_seconds=1,
+            compensation_review_required=False,
+            evidence_refs=("order:ORDER-123", "logistics:ORDER-123"),
+            public_conversation=conversation,
+        )
+    )
+
+    untrusted = captured[0]["untrustedCustomerData"]
+    assert isinstance(untrusted, dict)
+    assert len(untrusted["publicConversation"]) == 21
+    assert untrusted["publicConversation"][-1]["body"] == "补充消息 20"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("intent", "evidence", "escalation"),
     [

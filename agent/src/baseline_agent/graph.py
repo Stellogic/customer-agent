@@ -625,7 +625,6 @@ async def _read_customer_communication_context(
         or not isinstance(context["syntheticCustomerText"], str)
         or len(context["syntheticCustomerText"]) > 4_000
         or not isinstance(conversation, list)
-        or len(conversation) > 20
         or not all(
             isinstance(message, dict)
             and set(message) == {"author", "body"}
