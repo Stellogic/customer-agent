@@ -173,13 +173,25 @@ foreach ($script in Get-ChildItem -LiteralPath $PSScriptRoot -File -Filter '*.ps
     }
 }
 
-$ciSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\.github\workflows\ci.yml') -Raw
-if (
-    $ciSource -notmatch 'COMPOSE_PROJECT_NAME: customer-agent-gate-' -or
-    $ciSource -notmatch 'CUSTOMER_AGENT_IMAGE_TAG: gate-' -or
-    $ciSource -notmatch 'CUSTOMER_AGENT_FRONTEND_PORT:'
-) {
-    throw 'CI full-stack acceptance 未显式提供合法隔离 namespace、镜像 tag 与端口。'
+$workflowRoot = Join-Path $PSScriptRoot '..\.github\workflows'
+$remoteGatePattern = 'scripts[\\/](check|smoke)\.ps1'
+foreach ($forbiddenInvocation in @('./scripts/check.ps1', '.\scripts\smoke.ps1')) {
+    if ($forbiddenInvocation -notmatch $remoteGatePattern) {
+        throw "远端门禁 workflow 检测未覆盖路径写法: $forbiddenInvocation"
+    }
+}
+foreach ($allowedInvocation in @('./scripts/check-doc-links.ps1', 'pwsh ./scripts/local-smoke-helper.ps1')) {
+    if ($allowedInvocation -match $remoteGatePattern) {
+        throw "远端门禁 workflow 检测误伤非规范化入口: $allowedInvocation"
+    }
+}
+if (Test-Path -LiteralPath $workflowRoot) {
+    foreach ($workflow in Get-ChildItem -LiteralPath $workflowRoot -File) {
+        $workflowSource = Get-Content -LiteralPath $workflow.FullName -Raw
+        if ($workflowSource -match $remoteGatePattern) {
+            throw "GitHub Actions 自动测试已关闭，但仍发现远端门禁 workflow: $($workflow.Name)"
+        }
+    }
 }
 
 Write-Host 'Compose reset 隔离契约检查通过。'

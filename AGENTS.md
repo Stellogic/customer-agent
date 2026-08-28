@@ -32,7 +32,8 @@
 - 完成任何实现任务前，必须从仓库根目录运行 `pwsh ./scripts/check.ps1`。
 - 仅在快速、聚焦的迭代中使用 `-Component backend|agent|frontend -SkipAcceptance`。
 - 规范化检查属于硬性要求：检查未通过时不得提交变更。
-- CI 会调用相同的组件检查，并单独运行全栈验收。
+- GitHub Actions CI 已按项目决定关闭；不得触发、等待或要求 CI，也不得把缺少 CI 结果视为交付阻塞。
+- 本地完整 `pwsh ./scripts/check.ps1` 是唯一自动化测试门槛；正式完成还需通过既定审查、合入 PR、关闭 Issue，并从 `origin/main` 回读结果。
 
 ## Agent 技能
 
