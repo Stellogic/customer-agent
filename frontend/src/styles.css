@@ -729,6 +729,148 @@ h2 {
   min-width: 0;
   gap: 18px;
 }
+
+.support-surface-tabs {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0 0 1.2rem;
+}
+
+.support-surface-tabs button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.support-surface-tabs button[aria-pressed="true"] {
+  border-color: var(--forest-700);
+  background: var(--forest-100);
+  color: var(--forest-900);
+}
+
+.intake-assistance-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.intake-assistance-panel > header,
+.intake-assistance-detail > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.intake-assistance-panel h2,
+.intake-assistance-panel h3,
+.intake-assistance-panel h4 {
+  margin: 0;
+}
+
+.intake-assistance-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.8fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.intake-assistance-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.intake-assistance-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.intake-assistance-list li > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.intake-assistance-list span,
+.intake-assistance-list time {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.intake-assistance-detail {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.intake-assistance-detail label,
+.intake-assistance-detail fieldset {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.intake-assistance-detail select,
+.intake-assistance-detail input[type="text"],
+.intake-assistance-detail input:not([type]) {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0.7rem;
+  font: inherit;
+}
+
+.assistance-issue-editor {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.45rem 0;
+}
+
+.assistance-issue-editor label {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.intake-assistance-actions {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .support-surface-tabs,
+  .intake-assistance-panel > header,
+  .intake-assistance-detail > header,
+  .intake-assistance-list li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .intake-assistance-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .support-surface-tabs button,
+  .intake-assistance-actions button,
+  .intake-assistance-list button {
+    width: 100%;
+  }
+}
 .support-workbench .queue-panel {
   border-radius: 4px 18px 18px;
 }

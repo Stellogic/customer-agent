@@ -10,6 +10,7 @@ import {
 import { loadCsrfToken } from "./csrf";
 import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
+import { IntakeAssistancePanel } from "./IntakeAssistancePanel";
 
 const SUPPORT_SCHEMA = "support-workbench-v1" as const;
 const lifecycleStates = [
@@ -64,6 +65,7 @@ type TicketDetails = {
 };
 
 export function SupportWorkbench() {
+  const [workspaceMode, setWorkspaceMode] = useState<"tickets" | "intake">("tickets");
   const [snapshot, setSnapshot] = useState<WorkbenchSnapshot | null>(null);
   const [connection, setConnection] = useState<
     "loading" | "syncing" | "resetting" | "live" | "stale"
@@ -306,86 +308,109 @@ export function SupportWorkbench() {
         </StatusNotice>
       </header>
 
-      <p className="authorization-note">队列可发现不等于工单详情授权</p>
-
-      <div
-        className={`support-workspace-layout${details ? " has-detail" : ""}`}
-        aria-busy={
-          connection === "loading" || connection === "syncing" || connection === "resetting"
-        }
-      >
-        <div className="support-queues">
-          <QueueSection
-            title="待接手工单"
-            description="转人工与其他共享队列条目"
-            items={snapshot?.sharedQueue ?? []}
-            claimingTicketId={claimingTicketId}
-            onClaim={setPendingClaimTicketId}
-          />
-          <QueueSection
-            title="SLA 违约升级"
-            description="已发生 SLA 违约、需要提高关注的工单"
-            items={snapshot?.escalationQueue ?? []}
-            claimingTicketId={claimingTicketId}
-            onClaim={setPendingClaimTicketId}
-            accent
-          />
-        </div>
-
-        {details ? (
-          <TicketDetail details={details} onCopyError={setActionError} />
-        ) : (
-          <aside className="detail-placeholder" aria-label="授权详情等待区">
-            <span aria-hidden="true">↳</span>
-            <p className="eyebrow">AUTHORIZED DETAIL</p>
-            <h2>领取后查看授权详情</h2>
-            <p>
-              领取前仅提供队列最小摘要。确认领取并取得当前有效客服工单分配后，这里才会显示客户、订单与调查信息。
-            </p>
-          </aside>
-        )}
-      </div>
-
-      {actionError && (
-        <p className="error" role="alert">
-          {actionError}
-        </p>
-      )}
-
-      <footer className="workbench-footer">
-        <p>队列会从权威状态重新同步；刷新不会沿用旧本地数据。</p>
+      <nav className="support-surface-tabs" aria-label="客服队列类型">
         <button
           type="button"
-          onClick={() => void loadSnapshot()}
-          disabled={
-            connection === "loading" || connection === "syncing" || connection === "resetting"
-          }
+          aria-pressed={workspaceMode === "tickets"}
+          onClick={() => setWorkspaceMode("tickets")}
         >
-          重新同步队列
+          客服工单队列
         </button>
-      </footer>
+        <button
+          type="button"
+          aria-pressed={workspaceMode === "intake"}
+          onClick={() => setWorkspaceMode("intake")}
+        >
+          受理协助队列
+        </button>
+      </nav>
 
-      <Modal
-        open={pendingClaimTicketId !== null}
-        title="确认领取工单"
-        okText="确认领取"
-        cancelText="取消"
-        confirmLoading={claimingTicketId !== null}
-        closable={claimingTicketId === null}
-        mask={{ closable: claimingTicketId === null }}
-        onCancel={() => setPendingClaimTicketId(null)}
-        onOk={() => {
-          if (!pendingClaimTicketId) return;
-          const ticketId = pendingClaimTicketId;
-          setPendingClaimTicketId(null);
-          void claimTicket(ticketId);
-        }}
-      >
-        <p>领取会建立你对该工单的当前客服分配责任，并在成功后请求受保护详情。</p>
-        {pendingClaimTicketId && (
-          <p className="claim-confirm-ticket">工单 {shortTicketId(pendingClaimTicketId)}</p>
-        )}
-      </Modal>
+      {workspaceMode === "intake" ? (
+        <IntakeAssistancePanel />
+      ) : (
+        <>
+          <p className="authorization-note">队列可发现不等于工单详情授权</p>
+
+          <div
+            className={`support-workspace-layout${details ? " has-detail" : ""}`}
+            aria-busy={
+              connection === "loading" || connection === "syncing" || connection === "resetting"
+            }
+          >
+            <div className="support-queues">
+              <QueueSection
+                title="待接手工单"
+                description="转人工与其他共享队列条目"
+                items={snapshot?.sharedQueue ?? []}
+                claimingTicketId={claimingTicketId}
+                onClaim={setPendingClaimTicketId}
+              />
+              <QueueSection
+                title="SLA 违约升级"
+                description="已发生 SLA 违约、需要提高关注的工单"
+                items={snapshot?.escalationQueue ?? []}
+                claimingTicketId={claimingTicketId}
+                onClaim={setPendingClaimTicketId}
+                accent
+              />
+            </div>
+
+            {details ? (
+              <TicketDetail details={details} onCopyError={setActionError} />
+            ) : (
+              <aside className="detail-placeholder" aria-label="授权详情等待区">
+                <span aria-hidden="true">↳</span>
+                <p className="eyebrow">AUTHORIZED DETAIL</p>
+                <h2>领取后查看授权详情</h2>
+                <p>
+                  领取前仅提供队列最小摘要。确认领取并取得当前有效客服工单分配后，这里才会显示客户、订单与调查信息。
+                </p>
+              </aside>
+            )}
+          </div>
+
+          {actionError && (
+            <p className="error" role="alert">
+              {actionError}
+            </p>
+          )}
+
+          <footer className="workbench-footer">
+            <p>队列会从权威状态重新同步；刷新不会沿用旧本地数据。</p>
+            <button
+              type="button"
+              onClick={() => void loadSnapshot()}
+              disabled={
+                connection === "loading" || connection === "syncing" || connection === "resetting"
+              }
+            >
+              重新同步队列
+            </button>
+          </footer>
+
+          <Modal
+            open={pendingClaimTicketId !== null}
+            title="确认领取工单"
+            okText="确认领取"
+            cancelText="取消"
+            confirmLoading={claimingTicketId !== null}
+            closable={claimingTicketId === null}
+            mask={{ closable: claimingTicketId === null }}
+            onCancel={() => setPendingClaimTicketId(null)}
+            onOk={() => {
+              if (!pendingClaimTicketId) return;
+              const ticketId = pendingClaimTicketId;
+              setPendingClaimTicketId(null);
+              void claimTicket(ticketId);
+            }}
+          >
+            <p>领取会建立你对该工单的当前客服分配责任，并在成功后请求受保护详情。</p>
+            {pendingClaimTicketId && (
+              <p className="claim-confirm-ticket">工单 {shortTicketId(pendingClaimTicketId)}</p>
+            )}
+          </Modal>
+        </>
+      )}
     </main>
   );
 }
