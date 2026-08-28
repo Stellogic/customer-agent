@@ -150,7 +150,7 @@ test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
       schema: string;
       ticket: { id: string };
     };
-    expect(created.schema).toBe("customer-intake-v3");
+    expect(created.schema).toBe("customer-intake-v4");
     expect(snapshot).toMatchObject({
       view: "PUBLIC_CONVERSATION",
       schema: "public-conversation-v2",

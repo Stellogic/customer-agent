@@ -163,6 +163,29 @@ h1 {
   font-size: 0.96rem;
   line-height: 1.75;
 }
+
+.intake-transcript {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.intake-transcript li {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+}
+
+.intake-transcript span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.intake-transcript p {
+  margin: 0.25rem 0 0;
+}
 .intake-candidate {
   display: grid;
   grid-template-columns: 50px minmax(0, 1fr) auto;
@@ -268,6 +291,26 @@ h1 {
   border: 1px solid var(--forest-300);
   background: white;
   color: var(--forest-800);
+}
+.intake-recovery {
+  display: grid;
+  gap: 16px;
+}
+.archived-intake-list {
+  display: grid;
+  gap: 12px;
+}
+.archived-intake-list article {
+  display: grid;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--forest-50);
+  padding: 15px;
+}
+.archived-intake-list article span {
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 .ticket-form {
   display: grid;

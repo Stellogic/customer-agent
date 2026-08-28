@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.ticket;
 
+import java.math.BigInteger;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -19,12 +20,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/customer/v2/intakes")
 @ConditionalOnProperty(name = "baseline.migrate-only", havingValue = "false", matchIfMissing = true)
 public final class CustomerIntakeV2Controller {
-    static final String SCHEMA = "customer-intake-v3";
+    static final String SCHEMA = "customer-intake-v4";
     private static final Set<String> ACCEPTED_SCHEMAS =
-            Set.of(SCHEMA, "customer-intake-v2", "customer-intake-v1");
-    private static final Set<String> MESSAGE_FIELDS = Set.of("schema", "message");
+            Set.of(SCHEMA, "customer-intake-v3", "customer-intake-v2", "customer-intake-v1");
+    private static final Set<String> START_FIELDS = Set.of("schema", "message");
+    private static final Set<String> REPLY_FIELDS = Set.of("schema", "message", "expectedVersion");
     private static final Set<String> DUPLICATE_FIELDS =
-            Set.of("schema", "existingTicketId", "action");
+            Set.of("schema", "existingTicketId", "action", "expectedVersion");
+    private static final String RECOVERY_SCHEMA = "customer-intake-recovery-v1";
+    private static final Set<String> RESTORE_FIELDS = Set.of("schema", "expectedVersion");
     private final CustomerIntakeService service;
 
     public CustomerIntakeV2Controller(CustomerIntakeService service) {
@@ -36,7 +40,7 @@ public final class CustomerIntakeV2Controller {
             Authentication authentication,
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @RequestBody Map<String, Object> request) {
-        MessageRequest message = parse(requestId, request);
+        MessageRequest message = parseStart(requestId, request);
         CustomerIntakeSnapshot snapshot =
                 service.start(
                         new StartCustomerIntake(
@@ -51,14 +55,15 @@ public final class CustomerIntakeV2Controller {
             @PathVariable UUID intakeId,
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @RequestBody Map<String, Object> request) {
-        MessageRequest message = parse(requestId, request);
+        VersionedMessageRequest message = parseReply(requestId, request);
         CustomerIntakeSnapshot snapshot =
                 service.reply(
                         new ReplyCustomerIntake(
                                 authentication.getName(),
                                 intakeId,
                                 message.requestId(),
-                                message.message()));
+                                message.message(),
+                                message.expectedVersion()));
         return ResponseEntity.status(snapshot.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .body(IntakeResponse.from(snapshot));
     }
@@ -68,14 +73,48 @@ public final class CustomerIntakeV2Controller {
         return IntakeResponse.from(service.snapshot(authentication.getName(), intakeId));
     }
 
+    @GetMapping("/recovery")
+    RecoveryIndexResponse recoveryIndex(Authentication authentication) {
+        return RecoveryIndexResponse.from(service.recoveryIndex(authentication.getName()));
+    }
+
+    @GetMapping("/{intakeId}/recovery")
+    RecoverableIntakeResponse recoverableSnapshot(
+            Authentication authentication, @PathVariable UUID intakeId) {
+        return RecoverableIntakeResponse.from(
+                service.recoverableSnapshot(authentication.getName(), intakeId));
+    }
+
+    @PostMapping("/{intakeId}/restore")
+    ResponseEntity<RecoverableIntakeResponse> restore(
+            Authentication authentication,
+            @PathVariable UUID intakeId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
+            @RequestBody Map<String, Object> request) {
+        if (!request.keySet().equals(RESTORE_FIELDS)
+                || !RECOVERY_SCHEMA.equals(request.get("schema"))) {
+            throw new InvalidCustomerRequestException("归档受理恢复字段与版本无效");
+        }
+        long expectedVersion = requirePositiveLong(request.get("expectedVersion"));
+        RecoverableCustomerIntake restored =
+                service.restore(
+                        new RestoreCustomerIntake(
+                                authentication.getName(),
+                                intakeId,
+                                requireText(requestId, 200, "缺少稳定请求身份"),
+                                expectedVersion));
+        return ResponseEntity.status(
+                        restored.intake().replayed() ? HttpStatus.OK : HttpStatus.CREATED)
+                .body(RecoverableIntakeResponse.from(restored));
+    }
+
     @PostMapping("/{intakeId}/duplicate-resolution")
     ResponseEntity<IntakeResponse> resolveDuplicate(
             Authentication authentication,
             @PathVariable UUID intakeId,
             @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
             @RequestBody Map<String, Object> request) {
-        if (!request.keySet().equals(DUPLICATE_FIELDS)
-                || !ACCEPTED_SCHEMAS.contains(request.get("schema"))) {
+        if (!request.keySet().equals(DUPLICATE_FIELDS) || !SCHEMA.equals(request.get("schema"))) {
             throw new InvalidCustomerRequestException("重复问题确认字段与受理契约不一致");
         }
         String action = requireText(request.get("action"), 40, "请选择如何处理疑似重复问题");
@@ -96,13 +135,14 @@ public final class CustomerIntakeV2Controller {
                                 intakeId,
                                 requireText(requestId, 200, "缺少稳定请求身份"),
                                 existingTicketId,
-                                action));
+                                action,
+                                requirePositiveLong(request.get("expectedVersion"))));
         return ResponseEntity.status(snapshot.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .body(IntakeResponse.from(snapshot));
     }
 
-    private static MessageRequest parse(String requestId, Map<String, Object> request) {
-        if (!request.keySet().equals(MESSAGE_FIELDS)) {
+    private static MessageRequest parseStart(String requestId, Map<String, Object> request) {
+        if (!request.keySet().equals(START_FIELDS)) {
             throw new InvalidCustomerRequestException("请求字段与受理契约不一致");
         }
         if (!ACCEPTED_SCHEMAS.contains(request.get("schema"))) {
@@ -113,6 +153,36 @@ public final class CustomerIntakeV2Controller {
                 requireText(request.get("message"), 2000, "请输入需要帮助的内容"));
     }
 
+    private static VersionedMessageRequest parseReply(
+            String requestId, Map<String, Object> request) {
+        if (!request.keySet().equals(REPLY_FIELDS)) {
+            throw new InvalidCustomerRequestException("请求字段与受理契约不一致");
+        }
+        if (!SCHEMA.equals(request.get("schema"))) {
+            throw new IncompatibleCustomerSchemaException();
+        }
+        return new VersionedMessageRequest(
+                requireText(requestId, 200, "缺少稳定请求身份"),
+                requireText(request.get("message"), 2000, "请输入需要帮助的内容"),
+                requirePositiveLong(request.get("expectedVersion")));
+    }
+
+    private static long requirePositiveLong(Object value) {
+        BigInteger integer =
+                switch (value) {
+                    case Byte number -> BigInteger.valueOf(number.longValue());
+                    case Short number -> BigInteger.valueOf(number.longValue());
+                    case Integer number -> BigInteger.valueOf(number.longValue());
+                    case Long number -> BigInteger.valueOf(number);
+                    case BigInteger number -> number;
+                    default -> throw new InvalidCustomerRequestException("受理版本无效");
+                };
+        if (integer.signum() <= 0 || integer.bitLength() > 63) {
+            throw new InvalidCustomerRequestException("受理版本无效");
+        }
+        return integer.longValueExact();
+    }
+
     private static String requireText(Object value, int maximum, String message) {
         if (!(value instanceof String text) || text.isBlank() || text.length() > maximum) {
             throw new InvalidCustomerRequestException(message);
@@ -121,6 +191,9 @@ public final class CustomerIntakeV2Controller {
     }
 
     private record MessageRequest(String requestId, String message) {}
+
+    private record VersionedMessageRequest(
+            String requestId, String message, long expectedVersion) {}
 
     record IntakeResponse(
             String schema,
@@ -139,6 +212,7 @@ public final class CustomerIntakeV2Controller {
             int completedOrderCount,
             int expectedTicketCount,
             boolean confirmed,
+            long version,
             boolean replayed) {
         static IntakeResponse from(CustomerIntakeSnapshot snapshot) {
             CandidateOrder candidate =
@@ -171,6 +245,7 @@ public final class CustomerIntakeV2Controller {
                     snapshot.completedOrderCount(),
                     snapshot.issues().size(),
                     "CONFIRMED".equals(snapshot.status()),
+                    snapshot.version(),
                     snapshot.replayed());
         }
     }
@@ -187,6 +262,44 @@ public final class CustomerIntakeV2Controller {
                     match.issueKind(),
                     match.issueSummary(),
                     match.lifecycleState());
+        }
+    }
+
+    record RecoveryIndexResponse(
+            String schema,
+            java.util.List<RecoverableIntakeResponse> active,
+            java.util.List<RecoverableIntakeResponse> archived) {
+        static RecoveryIndexResponse from(CustomerIntakeRecoveryIndex index) {
+            return new RecoveryIndexResponse(
+                    RECOVERY_SCHEMA,
+                    index.active().stream().map(RecoverableIntakeResponse::from).toList(),
+                    index.archived().stream().map(RecoverableIntakeResponse::from).toList());
+        }
+    }
+
+    record RecoverableIntakeResponse(
+            IntakeResponse intake,
+            long version,
+            String retentionState,
+            java.time.Instant expiresAt,
+            java.time.Instant archivedAt,
+            boolean factsChanged,
+            java.util.List<ConversationMessage> messages) {
+        static RecoverableIntakeResponse from(RecoverableCustomerIntake value) {
+            return new RecoverableIntakeResponse(
+                    IntakeResponse.from(value.intake()),
+                    value.version(),
+                    value.retentionState(),
+                    value.expiresAt(),
+                    value.archivedAt(),
+                    value.factsChanged(),
+                    value.messages().stream().map(ConversationMessage::from).toList());
+        }
+    }
+
+    record ConversationMessage(String author, String body, java.time.Instant sentAt) {
+        static ConversationMessage from(IntakeConversationMessage message) {
+            return new ConversationMessage(message.author(), message.body(), message.sentAt());
         }
     }
 }

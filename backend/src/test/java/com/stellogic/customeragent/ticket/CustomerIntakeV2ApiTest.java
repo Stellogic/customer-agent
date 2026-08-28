@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -44,6 +45,7 @@ class CustomerIntakeV2ApiTest {
                                 java.util.List.of(),
                                 0,
                                 0,
+                                1,
                                 false));
 
         mvc.perform(
@@ -59,7 +61,7 @@ class CustomerIntakeV2ApiTest {
                                         }
                                         """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.schema").value("customer-intake-v3"))
+                .andExpect(jsonPath("$.schema").value("customer-intake-v4"))
                 .andExpect(jsonPath("$.intakeId").value(INTAKE_ID.toString()))
                 .andExpect(jsonPath("$.status").value("READY_TO_CONFIRM"))
                 .andExpect(jsonPath("$.candidateOrder.reference").value("ORDER-DELAY-001"))
@@ -89,6 +91,7 @@ class CustomerIntakeV2ApiTest {
                                 java.util.List.of(),
                                 0,
                                 1,
+                                4,
                                 false));
 
         mvc.perform(
@@ -98,7 +101,7 @@ class CustomerIntakeV2ApiTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
-                                        {"schema":"customer-intake-v1","message":"可以，就按这个处理"}
+                                        {"schema":"customer-intake-v4","message":"可以，就按这个处理","expectedVersion":3}
                                         """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
@@ -129,6 +132,7 @@ class CustomerIntakeV2ApiTest {
                                 java.util.List.of(),
                                 0,
                                 0,
+                                1,
                                 false));
 
         mvc.perform(
@@ -141,7 +145,7 @@ class CustomerIntakeV2ApiTest {
                                         {"schema":"customer-intake-v2","message":"包裹未收到且重复扣款"}
                                         """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.schema").value("customer-intake-v3"))
+                .andExpect(jsonPath("$.schema").value("customer-intake-v4"))
                 .andExpect(jsonPath("$.issues[0].kind").value("PACKAGE_NOT_RECEIVED"))
                 .andExpect(jsonPath("$.issues[1].kind").value("DUPLICATE_CHARGE"))
                 .andExpect(jsonPath("$.expectedTicketCount").value(2));
@@ -167,6 +171,7 @@ class CustomerIntakeV2ApiTest {
                         java.util.List.of(),
                         0,
                         1,
+                        4,
                         true);
         when(service.reply(any()))
                 .thenThrow(new IntakeRequestIdentityConflictException(authoritative));
@@ -178,7 +183,7 @@ class CustomerIntakeV2ApiTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
-                                        {"schema":"customer-intake-v2","message":"不同参数"}
+                                        {"schema":"customer-intake-v4","message":"不同参数","expectedVersion":3}
                                         """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.replayed").value(true))
@@ -204,6 +209,7 @@ class CustomerIntakeV2ApiTest {
                                 java.util.List.of(existingTicketId),
                                 0,
                                 1,
+                                4,
                                 false));
 
         mvc.perform(
@@ -214,9 +220,10 @@ class CustomerIntakeV2ApiTest {
                                 .content(
                                         """
                                         {
-                                          "schema":"customer-intake-v3",
+                                          "schema":"customer-intake-v4",
                                           "existingTicketId":"15400000-0000-0000-0000-000000000001",
-                                          "action":"CONTINUE_EXISTING"
+                                          "action":"CONTINUE_EXISTING",
+                                          "expectedVersion":3
                                         }
                                         """))
                 .andExpect(status().isCreated())
@@ -243,6 +250,7 @@ class CustomerIntakeV2ApiTest {
                                 java.util.List.of(),
                                 0,
                                 1,
+                                3,
                                 false));
 
         mvc.perform(
@@ -253,6 +261,116 @@ class CustomerIntakeV2ApiTest {
                 .andExpect(jsonPath("$.ticketIds[0]").value(TICKET_ID.toString()))
                 .andExpect(jsonPath("$.completedOrderCount").value(1))
                 .andExpect(jsonPath("$.confirmed").value(false));
+    }
+
+    @Test
+    void listsOnlyTheAuthenticatedCustomersRecoverableIntakesWithHistory() throws Exception {
+        when(service.recoveryIndex("customer-demo"))
+                .thenReturn(
+                        new CustomerIntakeRecoveryIndex(
+                                java.util.List.of(),
+                                java.util.List.of(
+                                        new RecoverableCustomerIntake(
+                                                new CustomerIntakeSnapshot(
+                                                        INTAKE_ID,
+                                                        "READY_TO_CONFIRM",
+                                                        "ORDER-DELAY-001",
+                                                        "配送中的合成订单",
+                                                        java.util.List.of(
+                                                                new ProposedIntakeIssue(
+                                                                        "LOGISTICS_DELAY", "物流延迟")),
+                                                        "请重新确认变化后的订单事实。",
+                                                        java.util.List.of(),
+                                                        null,
+                                                        java.util.List.of(),
+                                                        java.util.List.of(),
+                                                        0,
+                                                        0,
+                                                        3,
+                                                        false),
+                                                3,
+                                                "ARCHIVED",
+                                                Instant.parse("2026-08-27T00:00:00Z"),
+                                                Instant.parse("2026-08-27T00:00:00Z"),
+                                                false,
+                                                java.util.List.of(
+                                                        new IntakeConversationMessage(
+                                                                "CUSTOMER",
+                                                                "物流延迟了",
+                                                                Instant.parse(
+                                                                        "2026-08-20T00:00:00Z")),
+                                                        new IntakeConversationMessage(
+                                                                "AGENT",
+                                                                "请确认我的理解。",
+                                                                Instant.parse(
+                                                                        "2026-08-20T00:00:01Z")))))));
+
+        mvc.perform(get("/api/customer/v2/intakes/recovery").principal(customer("customer-demo")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.schema").value("customer-intake-recovery-v1"))
+                .andExpect(jsonPath("$.active.length()").value(0))
+                .andExpect(jsonPath("$.archived[0].intake.intakeId").value(INTAKE_ID.toString()))
+                .andExpect(jsonPath("$.archived[0].version").value(3))
+                .andExpect(jsonPath("$.archived[0].retentionState").value("ARCHIVED"))
+                .andExpect(jsonPath("$.archived[0].messages.length()").value(2));
+    }
+
+    @Test
+    void restoresAnArchivedIntakeAgainstItsStableVersion() throws Exception {
+        when(service.restore(any()))
+                .thenReturn(
+                        new RecoverableCustomerIntake(
+                                new CustomerIntakeSnapshot(
+                                        INTAKE_ID,
+                                        "READY_TO_CONFIRM",
+                                        "ORDER-DELAY-001",
+                                        "配送中的合成订单",
+                                        java.util.List.of(
+                                                new ProposedIntakeIssue("LOGISTICS_DELAY", "物流延迟")),
+                                        "订单事实已变化，请重新确认。",
+                                        java.util.List.of(),
+                                        null,
+                                        java.util.List.of(),
+                                        java.util.List.of(),
+                                        0,
+                                        0,
+                                        4,
+                                        false),
+                                4,
+                                "ACTIVE",
+                                Instant.parse("2026-09-04T00:00:00Z"),
+                                null,
+                                true,
+                                java.util.List.of()));
+
+        mvc.perform(
+                        post("/api/customer/v2/intakes/{intakeId}/restore", INTAKE_ID)
+                                .principal(customer("customer-demo"))
+                                .header("Idempotency-Key", "restore-155")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"customer-intake-recovery-v1","expectedVersion":3}
+                                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.version").value(4))
+                .andExpect(jsonPath("$.retentionState").value("ACTIVE"))
+                .andExpect(jsonPath("$.factsChanged").value(true))
+                .andExpect(jsonPath("$.intake.confirmed").value(false));
+    }
+
+    @Test
+    void rejectsFractionalRestoreVersionsInsteadOfTruncatingThem() throws Exception {
+        mvc.perform(
+                        post("/api/customer/v2/intakes/{intakeId}/restore", INTAKE_ID)
+                                .principal(customer("customer-demo"))
+                                .header("Idempotency-Key", "restore-fractional")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"customer-intake-recovery-v1","expectedVersion":3.9}
+                                        """))
+                .andExpect(status().isBadRequest());
     }
 
     private static UsernamePasswordAuthenticationToken customer(String customerId) {
