@@ -180,6 +180,7 @@ class CustomerTicketPrincipalSecurityTest {
                 1,
                 1,
                 List.of(),
+                null,
                 null);
     }
 

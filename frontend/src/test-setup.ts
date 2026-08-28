@@ -16,3 +16,24 @@ Object.defineProperty(globalThis, "matchMedia", {
     dispatchEvent: () => false,
   }),
 });
+
+class TestResizeObserver implements ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  writable: true,
+  value: TestResizeObserver,
+});
+
+Object.defineProperty(globalThis.HTMLElement.prototype, "scrollTo", {
+  configurable: true,
+  value: () => undefined,
+});
+
+Object.defineProperty(globalThis.HTMLElement.prototype, "scrollIntoView", {
+  configurable: true,
+  value: () => undefined,
+});

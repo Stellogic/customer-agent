@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-final class CustomerReplySafetyPolicy {
+public final class CustomerReplySafetyPolicy {
     private static final String NUMBER = "(?:\\d+(?:\\.\\d+)?|[零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬]+)";
     private static final Pattern MONEY_PATTERN =
             Pattern.compile(
@@ -19,6 +19,32 @@ final class CustomerReplySafetyPolicy {
             Pattern.compile("ORDER-[A-Z0-9-]+", Pattern.CASE_INSENSITIVE);
 
     private CustomerReplySafetyPolicy() {}
+
+    public static boolean isAuthorizedBodyPrefix(
+            String body, String scopedOrderReference, boolean complete) {
+        if (body == null || body.isEmpty() || scopedOrderReference == null) return false;
+        return authorizedBodies(scopedOrderReference).stream()
+                .anyMatch(
+                        candidate ->
+                                complete ? candidate.equals(body) : candidate.startsWith(body));
+    }
+
+    private static List<String> authorizedBodies(String orderReference) {
+        String pending = "补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。";
+        String ineligible = "，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。";
+        return List.of(
+                "订单 " + orderReference + " 的调查已完成，" + pending,
+                "我们已核对订单 " + orderReference + " 的物流记录。" + pending,
+                "经核验，订单 " + orderReference + " 的物流存在延迟。" + pending,
+                "经核验，订单 " + orderReference + " 的物流出现延迟。" + pending,
+                "调查结果显示，订单 " + orderReference + " 的物流存在延迟。" + pending,
+                "调查结果显示，订单 " + orderReference + " 的物流出现延迟。" + pending,
+                "经核验，订单 " + orderReference + " 的本次物流延迟不足 24 小时" + ineligible,
+                "经核验，订单 " + orderReference + " 的物流延迟不足 24 小时" + ineligible,
+                "经核验，订单 " + orderReference + " 的物流延迟未达到 24 小时" + ineligible,
+                "调查结果显示，订单 " + orderReference + " 的物流延迟不足 24 小时" + ineligible,
+                "调查结果显示，订单 " + orderReference + " 的物流延迟未达到 24 小时" + ineligible);
+    }
 
     static String rejectionReason(
             InvestigationConclusion conclusion,
@@ -56,34 +82,14 @@ final class CustomerReplySafetyPolicy {
         if (!hasOnlyAllowedCompensationLanguage(reply.body(), reply.intent())) {
             return "CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE";
         }
-        if (!hasAuthorizedNarrative(reply.body(), scopedOrderReference, reply.intent())) {
+        if (!hasAuthorizedNarrative(reply.body(), scopedOrderReference)) {
             return "CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT";
         }
         return null;
     }
 
-    private static boolean hasAuthorizedNarrative(
-            String body, String orderReference, CustomerReplyIntent intent) {
-        String quotedOrder = Pattern.quote(orderReference);
-        String pattern;
-        if (intent == CustomerReplyIntent.COMPENSATION_REVIEW_PENDING) {
-            pattern =
-                    "^(?:订单 "
-                            + quotedOrder
-                            + " 的调查已完成，|我们已核对订单 "
-                            + quotedOrder
-                            + " 的物流记录。|(?:经核验|调查结果显示)，订单 "
-                            + quotedOrder
-                            + " 的物流(?:存在|出现)延迟。)补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。$";
-        } else {
-            pattern =
-                    "^(?:经核验，订单 "
-                            + quotedOrder
-                            + " 的本次物流延迟不足 24 小时|(?:经核验|调查结果显示)，订单 "
-                            + quotedOrder
-                            + " 的物流延迟(?:不足 24 小时|未达到 24 小时))，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。$";
-        }
-        return Pattern.matches(pattern, body);
+    private static boolean hasAuthorizedNarrative(String body, String orderReference) {
+        return authorizedBodies(orderReference).contains(body);
     }
 
     private static boolean hasOnlyAllowedCompensationLanguage(

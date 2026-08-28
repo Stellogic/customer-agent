@@ -86,6 +86,7 @@ class CustomerTicketApiTest {
                                         Instant.parse("2026-08-09T00:00:00Z")),
                                 new PublicMessage(
                                         "SUPPORT", "已受理", Instant.parse("2026-08-09T00:00:00Z"))),
+                        null,
                         null);
         when(service.snapshot("customer-demo", TICKET_ID)).thenReturn(snapshot);
         when(service.snapshot("customer-other-demo", TICKET_ID))

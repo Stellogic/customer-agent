@@ -219,6 +219,7 @@ class CustomerTicketV2ApiTest {
                         new PublicMessage(
                                 "CUSTOMER", "物流已经延迟多日", Instant.parse("2026-08-28T00:00:00Z")),
                         new PublicMessage("SUPPORT", "已受理", Instant.parse("2026-08-28T00:00:00Z"))),
+                null,
                 null);
     }
 

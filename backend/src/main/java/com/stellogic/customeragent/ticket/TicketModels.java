@@ -31,7 +31,8 @@ record CustomerPublicSnapshot(
         long sequence,
         long agentGeneration,
         List<PublicMessage> messages,
-        CurrentClarification clarification) {}
+        CurrentClarification clarification,
+        CurrentReplyStream replyStream) {}
 
 record CustomerPublicEvent(
         String epoch, long sequence, long agentGeneration, String type, String jsonPayload) {

@@ -475,7 +475,7 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
         ]
         for context in model_contexts
     )
-    assert [method for method, _ in calls] == [
+    assert [method for method, url in calls if not url.endswith("/public-reply-events")] == [
         "GET",
         "GET",
         "POST",
@@ -589,7 +589,7 @@ async def test_enabled_offline_shadow_only_adds_a_minimal_checkpoint_comparison(
             evidence_refs=("order:ORDER-116", "logistics:ORDER-116"),
         ),
     ]
-    assert posts == [
+    assert [post for post in posts if post[0].endswith("/conclusions")] == [
         (
             "http://spring/internal/agent/tickets/ticket-116/generations/generation-116/conclusions",
             "generation-116:submit-conclusion",
@@ -799,8 +799,9 @@ async def test_unsafe_investigation_uses_controlled_handoff_without_leaking_raw_
     )
 
     assert result["handoff"]["reasonCode"] == expected_reason
-    assert len(posts) == 1
-    url, body, headers = posts[0]
+    handoffs = [post for post in posts if post[0].endswith("/human-handoff")]
+    assert len(handoffs) == 1
+    url, body, headers = handoffs[0]
     assert url.endswith("/human-handoff")
     assert headers["X-Agent-Operation"] == "REQUEST_HUMAN_HANDOFF"
     assert headers["Idempotency-Key"] == f"generation-19:human-handoff:{expected_reason}"
@@ -839,7 +840,8 @@ async def test_transient_fact_tool_errors_retry_to_budget_then_handoff_without_w
             raise httpx.ConnectError("secret upstream stack and payload")
 
         async def post(self, _url: str, *, headers: dict[str, str], json: dict) -> Response:
-            posts.append(json)
+            if not _url.endswith("/public-reply-events"):
+                posts.append(json)
             return Response()
 
     monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
@@ -917,6 +919,8 @@ async def test_conclusion_tool_retry_exhaustion_uses_the_same_stable_handoff_ide
                     response = httpx.Response(422, request=request)
                     raise httpx.HTTPStatusError("fact conflict", request=request, response=response)
                 raise httpx.ConnectError("temporary conclusion failure")
+            if url.endswith("/public-reply-events"):
+                return Response({"accepted": True})
             handoff_keys.append(headers["Idempotency-Key"])
             reason = "FACT_CONFLICT" if failure_mode == "fact_conflict" else "TOOL_RETRY_EXHAUSTED"
             return Response({"handlingMode": "HUMAN", "reasonCode": reason})
@@ -996,7 +1000,8 @@ async def test_concurrent_unsafe_tool_results_share_one_handoff_identity(
         async def post(self, url: str, *, headers: dict[str, str], json: dict) -> Response:
             if "/capabilities/" in url:
                 return Response(_capability_result(url, facts))
-            handoff_keys.append(headers["Idempotency-Key"])
+            if url.endswith("/human-handoff"):
+                handoff_keys.append(headers["Idempotency-Key"])
             return Response({"handlingMode": "HUMAN", "reasonCode": json["reasonCode"]})
 
     monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
@@ -1141,7 +1146,29 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
             {"author": "SUPPORT", "body": "我们正在调查"},
         ],
     }
-    assert [call[0] for call in calls] == [
+    stream_calls = [call for call in calls if call[1].endswith("/public-reply-events")]
+    assert [call[2]["type"] for call in stream_calls] == [
+        "LOADING",
+        "PROGRESS",
+        "PROGRESS",
+        "PROGRESS",
+        "PROGRESS",
+        "STREAM_STARTED",
+        "CONTENT_DELTA",
+        "CONTENT_DELTA",
+        "COMPLETED",
+    ]
+    assert [call[2]["stage"] for call in stream_calls if call[2]["type"] == "PROGRESS"] == [
+        "UNDERSTANDING",
+        "VERIFYING_FACTS",
+        "QUERYING_RULES",
+        "COMPOSING_REPLY",
+    ]
+    assert (
+        "".join(call[2]["delta"] for call in stream_calls if call[2]["type"] == "CONTENT_DELTA")
+        == result["customer_reply"]["body"]
+    )
+    assert [call[0] for call in calls if not call[1].endswith("/public-reply-events")] == [
         "GET",
         "POST",
         "POST",
