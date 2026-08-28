@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./support/auth";
+import { continueAsNewIfDuplicate, login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
 
 test("Issue #98 客户真实创建、交互状态与断线权威恢复视觉", async ({ browser }) => {
@@ -32,7 +32,7 @@ test("Issue #98 客户真实创建、交互状态与断线权威恢复视觉", a
       ) && response.status() === 201,
   );
   await page.getByRole("button", { name: "提交物流延迟问题" }).click();
-  await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await continueAsNewIfDuplicate(page);
   await page.getByRole("button", { name: "确认，就是这个问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };
   const shortTicketId = `${created.ticketId.slice(0, 8)}…${created.ticketId.slice(-4)}`;

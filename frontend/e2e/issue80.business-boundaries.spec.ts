@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./support/auth";
+import { continueAsNewIfDuplicate, login } from "./support/auth";
 import { newIssue80Context } from "./support/browser-context";
 
 const otherCustomerTicketId = "80000000-0000-0000-0000-000000000009";
@@ -19,7 +19,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
       ) && response.status() === 201,
   );
   await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
-  await expect(customer.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await continueAsNewIfDuplicate(customer);
   await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };
   expect(created.ticketId).toMatch(/^[0-9a-f-]{36}$/i);

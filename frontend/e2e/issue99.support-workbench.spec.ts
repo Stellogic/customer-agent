@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./support/auth";
+import { continueAsNewIfDuplicate, login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
 import { executeFixtureSql } from "./support/database";
 
@@ -20,7 +20,7 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
       ) && response.status() === 201,
   );
   await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
-  await expect(customer.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await continueAsNewIfDuplicate(customer);
   await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };
   await customer.getByRole("button", { name: "转人工处理" }).click();

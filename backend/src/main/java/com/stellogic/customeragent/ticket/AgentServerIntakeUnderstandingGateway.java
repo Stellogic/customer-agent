@@ -79,7 +79,9 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
                                                                                             .summary()))
                                                             .toList(),
                                                     "current_pending_issue_kinds",
-                                                    request.currentPendingIssueKinds())))
+                                                    request.currentPendingIssueKinds(),
+                                                    "current_remaining_order_references",
+                                                    request.currentRemainingOrderReferences())))
                             .retrieve()
                             .body(String.class);
             return parse(response, request);
@@ -99,6 +101,8 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
             List<ProposedIntakeIssue> issues = parseIssues(value.path("issues"));
             List<String> pendingIssueKinds =
                     parsePendingIssueKinds(value.path("pending_issue_kinds"));
+            List<String> remainingOrderReferences =
+                    parseOrderReferences(value.path("remaining_order_references"), request);
             String assistantMessage = requiredText(value, "assistant_message");
             if (!List.of("UNDERSTANDING", "CONFIRM").contains(intent)
                     || !List.of("READY_TO_CONFIRM", "NEEDS_CLARIFICATION", "CONFIRMED")
@@ -114,11 +118,19 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
                             pendingIssueKinds,
                             request.currentOrderReference(),
                             request.currentIssues(),
-                            request.currentPendingIssueKinds())) {
+                            request.currentPendingIssueKinds(),
+                            remainingOrderReferences,
+                            request.currentRemainingOrderReferences())) {
                 throw new IntakeAgentUnavailableException();
             }
             return new IntakeUnderstanding(
-                    intent, status, orderReference, issues, pendingIssueKinds, assistantMessage);
+                    intent,
+                    status,
+                    orderReference,
+                    issues,
+                    pendingIssueKinds,
+                    remainingOrderReferences,
+                    assistantMessage);
         } catch (RuntimeException exception) {
             throw new IntakeAgentUnavailableException();
         }
@@ -133,6 +145,30 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
             String currentOrderReference,
             List<ProposedIntakeIssue> currentIssues,
             List<String> currentPendingIssueKinds) {
+        return hasConsistentShape(
+                intent,
+                status,
+                orderReference,
+                issues,
+                pendingIssueKinds,
+                currentOrderReference,
+                currentIssues,
+                currentPendingIssueKinds,
+                List.of(),
+                List.of());
+    }
+
+    static boolean hasConsistentShape(
+            String intent,
+            String status,
+            String orderReference,
+            List<ProposedIntakeIssue> issues,
+            List<String> pendingIssueKinds,
+            String currentOrderReference,
+            List<ProposedIntakeIssue> currentIssues,
+            List<String> currentPendingIssueKinds,
+            List<String> remainingOrderReferences,
+            List<String> currentRemainingOrderReferences) {
         if ("CONFIRM".equals(intent)) {
             return "CONFIRMED".equals(status)
                     && currentOrderReference != null
@@ -140,7 +176,8 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
                     && !currentIssues.isEmpty()
                     && currentIssues.equals(issues)
                     && currentPendingIssueKinds.isEmpty()
-                    && pendingIssueKinds.isEmpty();
+                    && pendingIssueKinds.isEmpty()
+                    && remainingOrderReferences.equals(currentRemainingOrderReferences);
         }
         boolean validShape =
                 !"CONFIRMED".equals(status)
@@ -155,6 +192,8 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
                                                                         issue.kind().equals(kind)));
         if (!validShape
                 || (currentOrderReference != null && !currentOrderReference.equals(orderReference))
+                || (currentOrderReference != null
+                        && !remainingOrderReferences.equals(currentRemainingOrderReferences))
                 || issues.size() < currentIssues.size()
                 || !issues.subList(0, currentIssues.size()).equals(currentIssues)) {
             return false;
@@ -203,6 +242,24 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
             kinds.add(kind);
         }
         return List.copyOf(kinds);
+    }
+
+    private static List<String> parseOrderReferences(
+            JsonNode value, IntakeUnderstandingRequest request) {
+        if (!value.isArray() || value.size() > request.visibleOrders().size()) {
+            throw new IntakeAgentUnavailableException();
+        }
+        java.util.ArrayList<String> references = new java.util.ArrayList<>();
+        for (JsonNode item : value) {
+            String reference = item.asText().trim();
+            if (references.contains(reference)
+                    || request.visibleOrders().stream()
+                            .noneMatch(order -> order.reference().equals(reference))) {
+                throw new IntakeAgentUnavailableException();
+            }
+            references.add(reference);
+        }
+        return List.copyOf(references);
     }
 
     private static String requiredText(JsonNode value, String field) {

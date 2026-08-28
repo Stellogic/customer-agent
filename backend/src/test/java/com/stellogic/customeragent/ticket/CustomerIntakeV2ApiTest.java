@@ -3,6 +3,7 @@ package com.stellogic.customeragent.ticket;
 import static com.stellogic.customeragent.identity.HumanTestPrincipals.session;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -39,6 +40,10 @@ class CustomerIntakeV2ApiTest {
                                 "我理解为 ORDER-DELAY-001 的物流延迟问题，请确认是否正确。",
                                 java.util.List.of(),
                                 null,
+                                java.util.List.of(),
+                                java.util.List.of(),
+                                0,
+                                0,
                                 false));
 
         mvc.perform(
@@ -54,7 +59,7 @@ class CustomerIntakeV2ApiTest {
                                         }
                                         """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.schema").value("customer-intake-v2"))
+                .andExpect(jsonPath("$.schema").value("customer-intake-v3"))
                 .andExpect(jsonPath("$.intakeId").value(INTAKE_ID.toString()))
                 .andExpect(jsonPath("$.status").value("READY_TO_CONFIRM"))
                 .andExpect(jsonPath("$.candidateOrder.reference").value("ORDER-DELAY-001"))
@@ -80,6 +85,10 @@ class CustomerIntakeV2ApiTest {
                                 "已确认，客服工单正在独立处理。",
                                 java.util.List.of(TICKET_ID),
                                 UUID.fromString("15300000-0000-0000-0000-000000000003"),
+                                java.util.List.of(),
+                                java.util.List.of(),
+                                0,
+                                1,
                                 false));
 
         mvc.perform(
@@ -116,6 +125,10 @@ class CustomerIntakeV2ApiTest {
                                 "请确认，确认后将创建 2 张工单。",
                                 java.util.List.of(),
                                 null,
+                                java.util.List.of(),
+                                java.util.List.of(),
+                                0,
+                                0,
                                 false));
 
         mvc.perform(
@@ -128,7 +141,7 @@ class CustomerIntakeV2ApiTest {
                                         {"schema":"customer-intake-v2","message":"包裹未收到且重复扣款"}
                                         """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.schema").value("customer-intake-v2"))
+                .andExpect(jsonPath("$.schema").value("customer-intake-v3"))
                 .andExpect(jsonPath("$.issues[0].kind").value("PACKAGE_NOT_RECEIVED"))
                 .andExpect(jsonPath("$.issues[1].kind").value("DUPLICATE_CHARGE"))
                 .andExpect(jsonPath("$.expectedTicketCount").value(2));
@@ -150,6 +163,10 @@ class CustomerIntakeV2ApiTest {
                         java.util.List.of(
                                 TICKET_ID, UUID.fromString("15300000-0000-0000-0000-000000000004")),
                         sharedRecordId,
+                        java.util.List.of(),
+                        java.util.List.of(),
+                        0,
+                        1,
                         true);
         when(service.reply(any()))
                 .thenThrow(new IntakeRequestIdentityConflictException(authoritative));
@@ -167,6 +184,75 @@ class CustomerIntakeV2ApiTest {
                 .andExpect(jsonPath("$.replayed").value(true))
                 .andExpect(jsonPath("$.ticketIds.length()").value(2))
                 .andExpect(jsonPath("$.sharedIntakeRecordId").value(sharedRecordId.toString()));
+    }
+
+    @Test
+    void resolvesDuplicateOnlyAfterAnExplicitCustomerChoice() throws Exception {
+        UUID existingTicketId = UUID.fromString("15400000-0000-0000-0000-000000000001");
+        when(service.resolveDuplicate(any()))
+                .thenReturn(
+                        new CustomerIntakeSnapshot(
+                                INTAKE_ID,
+                                "CONFIRMED",
+                                "ORDER-DELAY-001",
+                                "配送中的合成订单",
+                                java.util.List.of(),
+                                "已继续既有工单，没有创建重复工单。",
+                                java.util.List.of(),
+                                null,
+                                java.util.List.of(),
+                                java.util.List.of(existingTicketId),
+                                0,
+                                1,
+                                false));
+
+        mvc.perform(
+                        post("/api/customer/v2/intakes/{intakeId}/duplicate-resolution", INTAKE_ID)
+                                .principal(customer("customer-demo"))
+                                .header("Idempotency-Key", "issue-154-duplicate")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {
+                                          "schema":"customer-intake-v3",
+                                          "existingTicketId":"15400000-0000-0000-0000-000000000001",
+                                          "action":"CONTINUE_EXISTING"
+                                        }
+                                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ticketIds.length()").value(0))
+                .andExpect(jsonPath("$.routedTicketIds[0]").value(existingTicketId.toString()))
+                .andExpect(jsonPath("$.confirmed").value(true));
+    }
+
+    @Test
+    void restoresAnInProgressMultiOrderIntake() throws Exception {
+        when(service.snapshot("customer-demo", INTAKE_ID))
+                .thenReturn(
+                        new CustomerIntakeSnapshot(
+                                INTAKE_ID,
+                                "READY_TO_CONFIRM",
+                                "ORDER-DELAY-002",
+                                "配送中的合成订单",
+                                java.util.List.of(
+                                        new ProposedIntakeIssue("LOGISTICS_DELAY", "物流延迟")),
+                                "原始描述已保留，请重新确认下一订单与问题集合。",
+                                java.util.List.of(TICKET_ID),
+                                UUID.fromString("15400000-0000-0000-0000-000000000002"),
+                                java.util.List.of(),
+                                java.util.List.of(),
+                                0,
+                                1,
+                                false));
+
+        mvc.perform(
+                        get("/api/customer/v2/intakes/{intakeId}", INTAKE_ID)
+                                .principal(customer("customer-demo")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidateOrder.reference").value("ORDER-DELAY-002"))
+                .andExpect(jsonPath("$.ticketIds[0]").value(TICKET_ID.toString()))
+                .andExpect(jsonPath("$.completedOrderCount").value(1))
+                .andExpect(jsonPath("$.confirmed").value(false));
     }
 
     private static UsernamePasswordAuthenticationToken customer(String customerId) {

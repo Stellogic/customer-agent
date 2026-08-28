@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext } from "@playwright/test";
-import { login } from "./support/auth";
+import { continueAsNewIfDuplicate, login } from "./support/auth";
 import { newIssue80Context } from "./support/browser-context";
 
 async function freshPage(context: BrowserContext, path: string) {
@@ -139,7 +139,7 @@ test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
         response.status() === 200,
     );
     await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
-    await expect(customer.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+    await continueAsNewIfDuplicate(customer);
     await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
     const created = (await (await createdResponse).json()) as {
       schema: string;
@@ -150,7 +150,7 @@ test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
       schema: string;
       ticket: { id: string };
     };
-    expect(created.schema).toBe("customer-intake-v2");
+    expect(created.schema).toBe("customer-intake-v3");
     expect(snapshot).toMatchObject({
       view: "PUBLIC_CONVERSATION",
       schema: "public-conversation-v2",

@@ -107,7 +107,7 @@ describe("客户帮助中心", () => {
     expect(createHeaders.get("X-CSRF-TOKEN")).toBe("customer-csrf");
     expect(createHeaders.get("X-Synthetic-Customer-Id")).toBeNull();
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
-      schema: "customer-intake-v2",
+      schema: "customer-intake-v3",
       message: "订单 ORDER-DELAY-001 的物流延迟问题：物流已经延迟多日",
     });
     expect(fetchMock.mock.calls[1][0]).toBe("/api/customer/v2/intakes/intake-152/messages");
@@ -147,7 +147,7 @@ describe("客户帮助中心", () => {
     expect(screen.getByRole("button", { name: "确认，就是这个问题" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
-      schema: "customer-intake-v2",
+      schema: "customer-intake-v3",
       message: "包裹好几天没有动了",
     });
   });
@@ -217,6 +217,117 @@ describe("客户帮助中心", () => {
     expect(
       screen.getByRole("region", { name: "已创建工单" }).querySelectorAll("button"),
     ).toHaveLength(2);
+  });
+
+  it("疑似重复问题由客户选择继续既有工单且不展示新建结果", async () => {
+    const existingTicketId = "15400000-0000-0000-0000-000000000001";
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            schema: "customer-intake-v3",
+            intakeId: "15400000-0000-0000-0000-000000000002",
+            status: "READY_TO_CONFIRM",
+            candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
+            issue: { kind: "LOGISTICS_DELAY", summary: "物流延迟" },
+            issues: [{ kind: "LOGISTICS_DELAY", summary: "物流延迟" }],
+            assistantMessage: "发现同一订单下可能相同的未关闭问题，请确认如何继续。",
+            ticketId: null,
+            ticketIds: [],
+            sharedIntakeRecordId: null,
+            duplicateMatches: [
+              {
+                ticketId: existingTicketId,
+                issueKind: "LOGISTICS_DELAY",
+                issueSummary: "物流延迟",
+                lifecycleState: "INVESTIGATING",
+              },
+            ],
+            routedTicketIds: [],
+            remainingOrderCount: 0,
+            completedOrderCount: 0,
+            expectedTicketCount: 1,
+            confirmed: false,
+            replayed: false,
+          }),
+          { status: 201 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            schema: "customer-intake-v3",
+            intakeId: "15400000-0000-0000-0000-000000000002",
+            status: "CONFIRMED",
+            candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
+            issue: null,
+            issues: [],
+            assistantMessage: "已按你的确认继续既有工单，没有创建重复工单。",
+            ticketId: null,
+            ticketIds: [],
+            sharedIntakeRecordId: null,
+            duplicateMatches: [],
+            routedTicketIds: [existingTicketId],
+            remainingOrderCount: 0,
+            completedOrderCount: 1,
+            expectedTicketCount: 0,
+            confirmed: true,
+            replayed: false,
+          }),
+          { status: 201 },
+        ),
+      );
+
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("问题描述"), {
+      target: { value: "ORDER-DELAY-001 的物流还是没动" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+
+    const continueButton = await screen.findByRole("button", { name: /继续旧工单/ });
+    expect(screen.getByText(/不会读取或合并既有对话/)).toBeInTheDocument();
+    fireEvent.click(continueButton);
+
+    expect(await screen.findByRole("heading", { name: "已继续既有工单" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "已创建工单" })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls[1][0]).toMatch(/duplicate-resolution$/);
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toMatchObject({
+      existingTicketId,
+      action: "CONTINUE_EXISTING",
+    });
+  });
+
+  it("完成当前订单后保留原始描述并要求重新确认下一订单", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(intakeV3({ remainingOrderCount: 1 })), { status: 201 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify(
+            intakeV3({
+              candidateOrder: { reference: "ORDER-DELAY-002", summary: "配送中的合成订单" },
+              ticketIds: ["15400000-0000-0000-0000-000000000003"],
+              assistantMessage: "原始描述已保留，请重新确认下一订单与问题集合。",
+              remainingOrderCount: 0,
+              completedOrderCount: 1,
+            }),
+          ),
+          { status: 201 },
+        ),
+      );
+
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("问题描述"), {
+      target: { value: "ORDER-DELAY-001 延迟，ORDER-DELAY-002 也延迟" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+    fireEvent.click(await screen.findByRole("button", { name: "确认，就是这个问题" }));
+
+    expect(await screen.findByRole("heading", { name: "继续下一订单" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "订单候选" })).toHaveTextContent("ORDER-DELAY-002");
+    expect(screen.getByText(/原始描述已保留，但下一订单仍需单独确认/)).toBeInTheDocument();
   });
 
   it("澄清恢复响应丢失时按稳定 resumeRequestId 查询而不创建第二次恢复", async () => {
@@ -1189,6 +1300,29 @@ describe("客户帮助中心", () => {
     expect(handoffPosts).toBe(1);
   });
 });
+
+function intakeV3(overrides: Record<string, unknown> = {}) {
+  return {
+    schema: "customer-intake-v3",
+    intakeId: "15400000-0000-0000-0000-000000000010",
+    status: "READY_TO_CONFIRM",
+    candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
+    issue: { kind: "LOGISTICS_DELAY", summary: "物流延迟" },
+    issues: [{ kind: "LOGISTICS_DELAY", summary: "物流延迟" }],
+    assistantMessage: "请确认当前订单的问题。",
+    ticketId: null,
+    ticketIds: [],
+    sharedIntakeRecordId: null,
+    duplicateMatches: [],
+    routedTicketIds: [],
+    remainingOrderCount: 0,
+    completedOrderCount: 0,
+    expectedTicketCount: 1,
+    confirmed: false,
+    replayed: false,
+    ...overrides,
+  };
+}
 
 function message(body: string) {
   return { author: "SUPPORT", body, sentAt: "2026-08-09T00:01:00Z" };

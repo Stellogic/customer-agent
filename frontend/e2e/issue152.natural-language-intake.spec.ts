@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./support/auth";
+import { continueAsNewIfDuplicate, login } from "./support/auth";
 import { newIssue80Context } from "./support/browser-context";
 
 test("Issue #152 自然语言受理先确认后建单并保持窄屏可用", async ({ browser }) => {
@@ -17,7 +17,7 @@ test("Issue #152 自然语言受理先确认后建单并保持窄屏可用", asy
   const initial = (await (await started).json()) as { ticketId: string | null };
 
   expect(initial.ticketId).toBeNull();
-  await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await continueAsNewIfDuplicate(page);
   await expect(page.getByRole("article", { name: "订单候选" })).toContainText(
     "ORDER-DELAY-UNDER-24",
   );
