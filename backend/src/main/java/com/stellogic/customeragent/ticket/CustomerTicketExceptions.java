@@ -2,6 +2,18 @@ package com.stellogic.customeragent.ticket;
 
 final class RequestIdentityConflictException extends RuntimeException {}
 
+final class IntakeRequestIdentityConflictException extends RuntimeException {
+    private final CustomerIntakeSnapshot authoritativeSnapshot;
+
+    IntakeRequestIdentityConflictException(CustomerIntakeSnapshot authoritativeSnapshot) {
+        this.authoritativeSnapshot = authoritativeSnapshot;
+    }
+
+    CustomerIntakeSnapshot authoritativeSnapshot() {
+        return authoritativeSnapshot;
+    }
+}
+
 final class TicketNotFoundException extends RuntimeException {}
 
 final class InvalidCustomerRequestException extends RuntimeException {

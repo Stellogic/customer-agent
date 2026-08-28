@@ -41,14 +41,17 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                         command.requestId());
         if (!existing.isEmpty()) {
             IntakeRow row = existing.getFirst();
-            if (!row.startDigest().equals(digest)) throw new RequestIdentityConflictException();
-            return snapshot(row, true);
+            if (!row.startDigest().equals(digest)) {
+                throw new IntakeRequestIdentityConflictException(snapshot(enrich(row), true));
+            }
+            return snapshot(enrich(row), true);
         }
 
         List<CustomerVisibleOrderSummary> orders = visibleOrders(command.customerId());
         IntakeUnderstanding understanding =
                 agent.understand(
-                        new IntakeUnderstandingRequest(command.message(), orders, null, null));
+                        new IntakeUnderstandingRequest(
+                                command.message(), orders, null, null, List.of(), List.of()));
         requireUnderstanding(understanding, orders);
         String assistantMessage = CustomerIntakeSafetyPolicy.assistantMessage(understanding);
         UUID intakeId = UUID.randomUUID();
@@ -68,9 +71,11 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                 understanding.candidateOrderReference(),
                 candidate == null ? null : candidate.version(),
                 candidate == null ? null : candidate.summary(),
-                understanding.issueKind(),
-                understanding.issueSummary(),
+                firstKind(understanding.issues()),
+                firstSummary(understanding.issues()),
                 assistantMessage);
+        replaceIssues(intakeId, understanding.issues());
+        replacePendingIssueKinds(intakeId, understanding.pendingIssueKinds());
         return snapshot(load(command.customerId(), intakeId), false);
     }
 
@@ -88,7 +93,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                         command.requestId());
         if (!prior.isEmpty()) {
             if (!prior.getFirst().digest().equals(digest)) {
-                throw new RequestIdentityConflictException();
+                throw new IntakeRequestIdentityConflictException(snapshot(current, true));
             }
             return snapshot(current, true);
         }
@@ -100,7 +105,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                 command.requestId(),
                 digest,
                 command.message());
-        if (current.ticketId() != null) return snapshot(current, true);
+        if (current.sharedIntakeRecordId() != null) return snapshot(current, true);
 
         List<CustomerVisibleOrderSummary> orders = visibleOrders(command.customerId());
         IntakeUnderstanding understanding =
@@ -109,12 +114,15 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                                 command.message(),
                                 orders,
                                 current.orderReference(),
-                                current.issueSummary()));
+                                firstSummary(current.issues()),
+                                current.issues(),
+                                current.pendingIssueKinds()));
         if ("CONFIRM".equals(understanding.intent())) {
             if (!CustomerIntakeSafetyPolicy.isExplicitConfirmation(command.message())) {
                 throw new IntakeAgentUnavailableException();
             }
-            return confirm(command, current, "已确认，客服工单正在独立处理。");
+            return confirm(
+                    command, current, "已确认，" + current.issues().size() + " 张客服工单已原子创建并开始独立处理。");
         }
         requireUnderstanding(understanding, orders);
         String assistantMessage = CustomerIntakeSafetyPolicy.assistantMessage(understanding);
@@ -127,10 +135,12 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                 understanding.candidateOrderReference(),
                 candidate == null ? null : candidate.version(),
                 candidate == null ? null : candidate.summary(),
-                understanding.issueKind(),
-                understanding.issueSummary(),
+                firstKind(understanding.issues()),
+                firstSummary(understanding.issues()),
                 assistantMessage,
                 command.intakeId());
+        replaceIssues(command.intakeId(), understanding.issues());
+        replacePendingIssueKinds(command.intakeId(), understanding.pendingIssueKinds());
         return snapshot(load(command.customerId(), command.intakeId()), false);
     }
 
@@ -138,7 +148,8 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
             ReplyCustomerIntake command, IntakeRow current, String assistantMessage) {
         if (!"READY_TO_CONFIRM".equals(current.status())
                 || current.orderReference() == null
-                || current.issueKind() == null) {
+                || current.issues().isEmpty()
+                || !current.pendingIssueKinds().isEmpty()) {
             throw new IntakeNotReadyException();
         }
         CustomerVisibleOrderSummary authoritative =
@@ -146,19 +157,44 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
         if (!authoritative.version().equals(current.orderVersion())) {
             throw new IntakeCandidateStaleException();
         }
-        TicketCreationResult created =
-                tickets.create(
-                        new CreateCustomerTicket(
-                                command.customerId(),
-                                "intake-confirm:" + command.intakeId(),
-                                current.orderReference(),
-                                current.issueSummary(),
-                                current.issueKind()));
+        UUID sharedRecordId = UUID.randomUUID();
         jdbc.update(
-                "update customer_intake set status = 'CONFIRMED', assistant_message = ?, ticket_id = ?, "
+                "insert into shared_intake_record "
+                        + "(id, intake_id, customer_id, order_reference, original_message, customer_confirmation, confirmed_at) "
+                        + "select ?, id, customer_id, candidate_order_reference, original_message, ?, current_timestamp "
+                        + "from customer_intake where id = ?",
+                sharedRecordId,
+                command.message(),
+                command.intakeId());
+        java.util.ArrayList<UUID> ticketIds = new java.util.ArrayList<>();
+        int ordinal = 0;
+        for (ProposedIntakeIssue issue : current.issues()) {
+            ordinal++;
+            TicketCreationResult created =
+                    tickets.create(
+                            new CreateCustomerTicket(
+                                    command.customerId(),
+                                    "intake-confirm:" + command.intakeId() + ":" + issue.kind(),
+                                    current.orderReference(),
+                                    issue.summary(),
+                                    issue.kind()));
+            ticketIds.add(created.ticketId());
+            jdbc.update(
+                    "insert into shared_intake_issue "
+                            + "(id, shared_intake_record_id, ordinal, issue_kind, ticket_id) "
+                            + "values (?, ?, ?, ?, ?)",
+                    UUID.randomUUID(),
+                    sharedRecordId,
+                    ordinal,
+                    issue.kind(),
+                    created.ticketId());
+        }
+        jdbc.update(
+                "update customer_intake set status = 'CONFIRMED', assistant_message = ?, ticket_id = ?, shared_intake_record_id = ?, "
                         + "confirmed_at = current_timestamp, updated_at = current_timestamp where id = ?",
                 assistantMessage,
-                created.ticketId(),
+                ticketIds.getFirst(),
+                sharedRecordId,
                 command.intakeId());
         return snapshot(load(command.customerId(), command.intakeId()), false);
     }
@@ -212,8 +248,19 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                         .contains(understanding.status())
                 || ("READY_TO_CONFIRM".equals(understanding.status())
                         && (understanding.candidateOrderReference() == null
-                                || understanding.issueKind() == null
-                                || understanding.issueSummary() == null))
+                                || understanding.issues().isEmpty()
+                                || !understanding.pendingIssueKinds().isEmpty()))
+                || understanding.pendingIssueKinds().stream()
+                        .anyMatch(
+                                kind ->
+                                        !List.of(
+                                                                "LOGISTICS_DELAY",
+                                                                "PACKAGE_NOT_RECEIVED",
+                                                                "DUPLICATE_CHARGE")
+                                                        .contains(kind)
+                                                || understanding.issues().stream()
+                                                        .anyMatch(
+                                                                issue -> issue.kind().equals(kind)))
                 || (understanding.candidateOrderReference() != null
                         && orders.stream()
                                 .noneMatch(
@@ -246,7 +293,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                         intakeId,
                         customerId);
         if (rows.isEmpty()) throw new IntakeNotFoundException();
-        return rows.getFirst();
+        return enrich(rows.getFirst());
     }
 
     private IntakeRow load(String customerId, UUID intakeId) {
@@ -259,17 +306,93 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                         intakeId,
                         customerId);
         if (rows.isEmpty()) throw new IntakeNotFoundException();
-        return rows.getFirst();
+        return enrich(rows.getFirst());
+    }
+
+    private IntakeRow enrich(IntakeRow row) {
+        List<ProposedIntakeIssue> issues =
+                jdbc.query(
+                        "select issue_kind, issue_summary from customer_intake_issue "
+                                + "where intake_id = ? order by ordinal",
+                        (rs, number) -> new ProposedIntakeIssue(rs.getString(1), rs.getString(2)),
+                        row.id());
+        List<UUID> ticketIds =
+                row.sharedIntakeRecordId() == null
+                        ? (row.ticketId() == null ? List.of() : List.of(row.ticketId()))
+                        : jdbc.query(
+                                "select ticket_id from shared_intake_issue "
+                                        + "where shared_intake_record_id = ? order by ordinal",
+                                (rs, number) -> rs.getObject(1, UUID.class),
+                                row.sharedIntakeRecordId());
+        List<String> pendingIssueKinds =
+                jdbc.query(
+                        "select issue_kind from customer_intake_pending_issue "
+                                + "where intake_id = ? order by ordinal",
+                        (rs, number) -> rs.getString(1),
+                        row.id());
+        return new IntakeRow(
+                row.id(),
+                row.startDigest(),
+                row.status(),
+                row.orderReference(),
+                row.orderVersion(),
+                row.orderSummary(),
+                row.issueKind(),
+                row.issueSummary(),
+                row.assistantMessage(),
+                row.ticketId(),
+                row.sharedIntakeRecordId(),
+                issues,
+                pendingIssueKinds,
+                ticketIds);
+    }
+
+    private void replaceIssues(UUID intakeId, List<ProposedIntakeIssue> issues) {
+        jdbc.update("delete from customer_intake_issue where intake_id = ?", intakeId);
+        int ordinal = 0;
+        for (ProposedIntakeIssue issue : issues) {
+            ordinal++;
+            jdbc.update(
+                    "insert into customer_intake_issue (intake_id, ordinal, issue_kind, issue_summary) "
+                            + "values (?, ?, ?, ?)",
+                    intakeId,
+                    ordinal,
+                    issue.kind(),
+                    issue.summary());
+        }
+    }
+
+    private void replacePendingIssueKinds(UUID intakeId, List<String> pendingIssueKinds) {
+        jdbc.update("delete from customer_intake_pending_issue where intake_id = ?", intakeId);
+        int ordinal = 0;
+        for (String kind : pendingIssueKinds) {
+            ordinal++;
+            jdbc.update(
+                    "insert into customer_intake_pending_issue (intake_id, ordinal, issue_kind) "
+                            + "values (?, ?, ?)",
+                    intakeId,
+                    ordinal,
+                    kind);
+        }
+    }
+
+    private static String firstKind(List<ProposedIntakeIssue> issues) {
+        return issues.isEmpty() ? null : issues.getFirst().kind();
+    }
+
+    private static String firstSummary(List<ProposedIntakeIssue> issues) {
+        return issues.isEmpty() ? null : issues.getFirst().summary();
     }
 
     private static String intakeColumns() {
         return "id, start_digest, status, candidate_order_reference, candidate_order_version, "
-                + "candidate_order_summary, issue_kind, issue_summary, assistant_message, ticket_id";
+                + "candidate_order_summary, issue_kind, issue_summary, assistant_message, ticket_id, shared_intake_record_id";
     }
 
     private static IntakeRow map(java.sql.ResultSet rs) throws java.sql.SQLException {
+        UUID intakeId = rs.getObject(1, UUID.class);
         return new IntakeRow(
-                rs.getObject(1, UUID.class),
+                intakeId,
                 rs.getString(2),
                 rs.getString(3),
                 rs.getString(4),
@@ -278,19 +401,25 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                 rs.getString(7),
                 rs.getString(8),
                 rs.getString(9),
-                rs.getObject(10, UUID.class));
+                rs.getObject(10, UUID.class),
+                rs.getObject(11, UUID.class),
+                List.of(),
+                List.of(),
+                List.of());
     }
 
     private static CustomerIntakeSnapshot snapshot(IntakeRow row, boolean replayed) {
+        List<ProposedIntakeIssue> issues = row.issues();
+        List<UUID> ticketIds = row.ticketIds();
         return new CustomerIntakeSnapshot(
                 row.id(),
                 row.status(),
                 row.orderReference(),
                 row.orderSummary(),
-                row.issueKind(),
-                row.issueSummary(),
+                issues,
                 row.assistantMessage(),
-                row.ticketId(),
+                ticketIds,
+                row.sharedIntakeRecordId(),
                 replayed);
     }
 
@@ -306,5 +435,13 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
             String issueKind,
             String issueSummary,
             String assistantMessage,
-            UUID ticketId) {}
+            UUID ticketId,
+            UUID sharedIntakeRecordId,
+            List<ProposedIntakeIssue> issues,
+            List<String> pendingIssueKinds,
+            List<UUID> createdTicketIds) {
+        List<UUID> ticketIds() {
+            return createdTicketIds;
+        }
+    }
 }

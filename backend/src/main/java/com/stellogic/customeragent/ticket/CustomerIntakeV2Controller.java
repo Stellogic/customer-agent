@@ -18,7 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/customer/v2/intakes")
 @ConditionalOnProperty(name = "baseline.migrate-only", havingValue = "false", matchIfMissing = true)
 public final class CustomerIntakeV2Controller {
-    static final String SCHEMA = "customer-intake-v1";
+    static final String SCHEMA = "customer-intake-v2";
+    private static final Set<String> ACCEPTED_SCHEMAS = Set.of(SCHEMA, "customer-intake-v1");
     private static final Set<String> MESSAGE_FIELDS = Set.of("schema", "message");
     private final CustomerIntakeService service;
 
@@ -62,7 +63,9 @@ public final class CustomerIntakeV2Controller {
         if (!request.keySet().equals(MESSAGE_FIELDS)) {
             throw new InvalidCustomerRequestException("请求字段与受理契约不一致");
         }
-        if (!SCHEMA.equals(request.get("schema"))) throw new IncompatibleCustomerSchemaException();
+        if (!ACCEPTED_SCHEMAS.contains(request.get("schema"))) {
+            throw new IncompatibleCustomerSchemaException();
+        }
         return new MessageRequest(
                 requireText(requestId, 200, "缺少稳定请求身份"),
                 requireText(request.get("message"), 2000, "请输入需要帮助的内容"));
@@ -83,8 +86,12 @@ public final class CustomerIntakeV2Controller {
             String status,
             CandidateOrder candidateOrder,
             ProposedIssue issue,
+            java.util.List<ProposedIssue> issues,
             String assistantMessage,
             UUID ticketId,
+            java.util.List<UUID> ticketIds,
+            UUID sharedIntakeRecordId,
+            int expectedTicketCount,
             boolean confirmed,
             boolean replayed) {
         static IntakeResponse from(CustomerIntakeSnapshot snapshot) {
@@ -94,19 +101,26 @@ public final class CustomerIntakeV2Controller {
                             : new CandidateOrder(
                                     snapshot.candidateOrderReference(),
                                     snapshot.candidateOrderSummary());
-            ProposedIssue issue =
-                    snapshot.issueKind() == null
-                            ? null
-                            : new ProposedIssue(snapshot.issueKind(), snapshot.issueSummary());
+            java.util.List<ProposedIssue> issues =
+                    snapshot.issues().stream()
+                            .map(value -> new ProposedIssue(value.kind(), value.summary()))
+                            .toList();
+            ProposedIssue issue = issues.size() == 1 ? issues.getFirst() : null;
+            UUID ticketId =
+                    snapshot.ticketIds().size() == 1 ? snapshot.ticketIds().getFirst() : null;
             return new IntakeResponse(
                     SCHEMA,
                     snapshot.intakeId(),
                     snapshot.status(),
                     candidate,
                     issue,
+                    issues,
                     snapshot.assistantMessage(),
-                    snapshot.ticketId(),
-                    snapshot.ticketId() != null,
+                    ticketId,
+                    snapshot.ticketIds(),
+                    snapshot.sharedIntakeRecordId(),
+                    snapshot.issues().size(),
+                    !snapshot.ticketIds().isEmpty(),
                     snapshot.replayed());
         }
     }

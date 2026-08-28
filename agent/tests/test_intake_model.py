@@ -90,3 +90,163 @@ async def test_confirmation_keeps_the_existing_candidate() -> None:
     assert result.intent == "CONFIRM"
     assert result.status == "CONFIRMED"
     assert result.candidate_order_reference == "ORDER-DELAY-001"
+
+
+@pytest.mark.asyncio
+async def test_multiple_issues_are_proposed_only_after_uncertain_issue_is_clarified() -> None:
+    model = FixedFakeIntakeModel()
+    orders = (VisibleOrder("ORDER-MULTI-001", "配送中的合成订单"),)
+
+    first = await model.understand(
+        IntakeModelInput(
+            customer_message="ORDER-MULTI-001 的包裹没收到，而且疑似重复扣款",
+            visible_orders=orders,
+        )
+    )
+
+    assert first.status == "NEEDS_CLARIFICATION"
+    assert [issue.kind for issue in first.issues] == ["PACKAGE_NOT_RECEIVED"]
+    assert first.pending_issue_kinds == ("DUPLICATE_CHARGE",)
+    assert "重复扣款" in first.assistant_message
+
+    clarified = await model.understand(
+        IntakeModelInput(
+            customer_message="是的，确实重复扣款",
+            visible_orders=orders,
+            current_order_reference="ORDER-MULTI-001",
+            current_issues=first.issues,
+            current_pending_issue_kinds=first.pending_issue_kinds,
+        )
+    )
+
+    assert clarified.status == "READY_TO_CONFIRM"
+    assert [issue.kind for issue in clarified.issues] == [
+        "PACKAGE_NOT_RECEIVED",
+        "DUPLICATE_CHARGE",
+    ]
+    assert clarified.pending_issue_kinds == ()
+
+
+@pytest.mark.asyncio
+async def test_uncertain_duplicate_charge_denial_never_enters_proposed_issues() -> None:
+    model = FixedFakeIntakeModel()
+    orders = (VisibleOrder("ORDER-MULTI-001", "配送中的合成订单"),)
+    first = await model.understand(
+        IntakeModelInput(
+            customer_message="ORDER-MULTI-001 的包裹没收到，而且疑似重复扣款",
+            visible_orders=orders,
+        )
+    )
+
+    denied = await model.understand(
+        IntakeModelInput(
+            customer_message="没有重复扣款，只扣了一次",
+            visible_orders=orders,
+            current_order_reference="ORDER-MULTI-001",
+            current_issues=first.issues,
+            current_pending_issue_kinds=first.pending_issue_kinds,
+        )
+    )
+
+    assert denied.status == "READY_TO_CONFIRM"
+    assert [issue.kind for issue in denied.issues] == ["PACKAGE_NOT_RECEIVED"]
+    assert denied.pending_issue_kinds == ()
+
+
+@pytest.mark.asyncio
+async def test_multiple_uncertain_issues_are_retained_and_clarified_one_at_a_time() -> None:
+    model = FixedFakeIntakeModel()
+    orders = (VisibleOrder("ORDER-MULTI-001", "配送中的合成订单"),)
+    first = await model.understand(
+        IntakeModelInput(
+            customer_message="ORDER-MULTI-001 的包裹可能没收到，而且疑似重复扣款",
+            visible_orders=orders,
+        )
+    )
+    assert first.issues == ()
+    assert first.pending_issue_kinds == ("PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE")
+
+    package_confirmed = await model.understand(
+        IntakeModelInput(
+            customer_message="确认，至今没收到",
+            visible_orders=orders,
+            current_order_reference="ORDER-MULTI-001",
+            current_issues=first.issues,
+            current_pending_issue_kinds=first.pending_issue_kinds,
+        )
+    )
+    assert package_confirmed.status == "NEEDS_CLARIFICATION"
+    assert [issue.kind for issue in package_confirmed.issues] == ["PACKAGE_NOT_RECEIVED"]
+    assert package_confirmed.pending_issue_kinds == ("DUPLICATE_CHARGE",)
+
+
+@pytest.mark.asyncio
+async def test_clarified_pending_head_is_appended_after_existing_issues() -> None:
+    model = FixedFakeIntakeModel()
+    orders = (VisibleOrder("ORDER-MULTI-001", "配送中的合成订单"),)
+    first = await model.understand(
+        IntakeModelInput(
+            customer_message="ORDER-MULTI-001 的包裹可能没收到，而且确实重复扣款",
+            visible_orders=orders,
+        )
+    )
+    assert [issue.kind for issue in first.issues] == ["DUPLICATE_CHARGE"]
+    assert first.pending_issue_kinds == ("PACKAGE_NOT_RECEIVED",)
+
+    clarified = await model.understand(
+        IntakeModelInput(
+            customer_message="确认，至今没收到",
+            visible_orders=orders,
+            current_order_reference="ORDER-MULTI-001",
+            current_issues=first.issues,
+            current_pending_issue_kinds=first.pending_issue_kinds,
+        )
+    )
+
+    assert clarified.status == "READY_TO_CONFIRM"
+    assert [issue.kind for issue in clarified.issues] == [
+        "DUPLICATE_CHARGE",
+        "PACKAGE_NOT_RECEIVED",
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("uncertain_message", "denial_message", "pending_kind"),
+    [
+        (
+            "ORDER-MULTI-001 的包裹可能没收到，而且确实重复扣款",
+            "已经收到，不是没收到",
+            "PACKAGE_NOT_RECEIVED",
+        ),
+        (
+            "ORDER-MULTI-001 的物流可能延迟，而且确实重复扣款",
+            "没有延迟，物流正常",
+            "LOGISTICS_DELAY",
+        ),
+    ],
+)
+async def test_denied_pending_issue_never_enters_proposed_issues(
+    uncertain_message: str, denial_message: str, pending_kind: str
+) -> None:
+    model = FixedFakeIntakeModel()
+    orders = (VisibleOrder("ORDER-MULTI-001", "配送中的合成订单"),)
+    first = await model.understand(
+        IntakeModelInput(customer_message=uncertain_message, visible_orders=orders)
+    )
+    assert [issue.kind for issue in first.issues] == ["DUPLICATE_CHARGE"]
+    assert first.pending_issue_kinds == (pending_kind,)
+
+    denied = await model.understand(
+        IntakeModelInput(
+            customer_message=denial_message,
+            visible_orders=orders,
+            current_order_reference="ORDER-MULTI-001",
+            current_issues=first.issues,
+            current_pending_issue_kinds=first.pending_issue_kinds,
+        )
+    )
+
+    assert denied.status == "READY_TO_CONFIRM"
+    assert [issue.kind for issue in denied.issues] == ["DUPLICATE_CHARGE"]
+    assert denied.pending_issue_kinds == ()

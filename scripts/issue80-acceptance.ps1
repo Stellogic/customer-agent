@@ -128,6 +128,7 @@ try {
         e2e/issue101.cross-role-acceptance.spec.ts `
         e2e/issue124.offline-fullstack-readiness.spec.ts `
         e2e/issue152.natural-language-intake.spec.ts `
+        e2e/issue153.atomic-multi-issue-intake.spec.ts `
         e2e/issue80.sse-revocation.spec.ts
     if ($LASTEXITCODE -ne 0) {
         throw "Issue #80 真实浏览器验收失败，退出码: $LASTEXITCODE"

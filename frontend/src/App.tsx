@@ -13,7 +13,7 @@ import { humanSessionFetch } from "./humanSessionLifecycle";
 
 const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
 const PUBLIC_CONVERSATION_BASE = "/api/customer/v2/tickets";
-const CUSTOMER_INTAKE_SCHEMA = "customer-intake-v1" as const;
+const CUSTOMER_INTAKE_SCHEMA = "customer-intake-v2" as const;
 const CUSTOMER_INTAKE_BASE = "/api/customer/v2/intakes";
 
 type Snapshot = {
@@ -38,15 +38,24 @@ type EventEnvelope = {
 };
 
 type IntakeSnapshot = {
-  schema: typeof CUSTOMER_INTAKE_SCHEMA;
+  schema: "customer-intake-v1" | typeof CUSTOMER_INTAKE_SCHEMA;
   intakeId: string;
   status: "READY_TO_CONFIRM" | "NEEDS_CLARIFICATION" | "CONFIRMED";
   candidateOrder: { reference: string; summary: string } | null;
-  issue: { kind: "LOGISTICS_DELAY"; summary: string } | null;
+  issue: IntakeIssue | null;
+  issues: IntakeIssue[];
   assistantMessage: string;
   ticketId: string | null;
+  ticketIds: string[];
+  sharedIntakeRecordId: string | null;
+  expectedTicketCount: number;
   confirmed: boolean;
   replayed: boolean;
+};
+
+type IntakeIssue = {
+  kind: "LOGISTICS_DELAY" | "PACKAGE_NOT_RECEIVED" | "DUPLICATE_CHARGE";
+  summary: string;
 };
 
 function clarificationRejectionMessage(status: number) {
@@ -127,10 +136,11 @@ export function App() {
             : description,
         }),
       });
-      if (!started.ok) throw new Error("intake creation failed");
+      if (!started.ok && started.status !== 409) throw new Error("intake creation failed");
       const responseBody = (await started.json()) as unknown;
-      if (!isIntakeSnapshot(responseBody)) throw new Error("incompatible intake response");
-      setIntake(responseBody);
+      const parsed = parseIntakeSnapshot(responseBody);
+      if (!parsed) throw new Error("incompatible intake response");
+      setIntake(parsed);
     } catch {
       setError("受理未完成，请保留本页并重试。相同请求不会创建第二张工单。");
     } finally {
@@ -160,7 +170,7 @@ export function App() {
     try {
       await replyToIntake(intake, "确认提交");
     } catch {
-      setError("确认结果尚未取得，请重试原确认；不会创建第二张工单。");
+      setError("确认结果尚未取得，请重试原确认；不会创建部分工单或重复工单。");
     } finally {
       setSubmitting(false);
     }
@@ -181,12 +191,13 @@ export function App() {
         body: JSON.stringify({ schema: CUSTOMER_INTAKE_SCHEMA, message }),
       },
     );
-    if (!response.ok) throw new Error("intake reply failed");
+    if (!response.ok && response.status !== 409) throw new Error("intake reply failed");
     const value = (await response.json()) as unknown;
-    if (!isIntakeSnapshot(value)) throw new Error("incompatible intake reply");
-    setIntake(value);
-    if (value.ticketId) {
-      await loadTicket(value.ticketId);
+    const parsed = parseIntakeSnapshot(value);
+    if (!parsed) throw new Error("incompatible intake reply");
+    setIntake(parsed);
+    if (parsed.ticketIds.length === 1) {
+      await loadTicket(parsed.ticketIds[0]);
       setIntake(null);
       return;
     }
@@ -613,7 +624,15 @@ export function App() {
             </span>
             <div>
               <p className="eyebrow">智能受理</p>
-              <h2>{intake.status === "READY_TO_CONFIRM" ? "请确认我的理解" : "再帮我确认一点"}</h2>
+              <h2>
+                {intake.status === "CONFIRMED"
+                  ? `${intake.ticketIds.length} 张工单已创建`
+                  : intake.status === "READY_TO_CONFIRM"
+                    ? intake.issues.length > 1
+                      ? `请确认 ${intake.issues.length} 个问题`
+                      : "请确认我的理解"
+                    : "再帮我确认一点"}
+              </h2>
             </div>
           </div>
           <p className="intake-agent-message">{intake.assistantMessage}</p>
@@ -630,12 +649,30 @@ export function App() {
               <span className="intake-candidate-boundary">仅摘要</span>
             </article>
           )}
-          {intake.issue && (
-            <article className="intake-issue" aria-label="问题理解">
-              <span>问题理解</span>
-              <strong>{intake.issue.summary}</strong>
-              <small>确认前不会创建正式工单，也不会启动服务时长目标。</small>
-            </article>
+          <div className="intake-issue-list" aria-label="拟建工单集">
+            {intake.issues.map((issue, index) => (
+              <article
+                className="intake-issue"
+                aria-label={intake.issues.length === 1 ? "问题理解" : `拟建工单 ${index + 1}`}
+                key={issue.kind}
+              >
+                <span>
+                  问题 {index + 1} · {intakeIssueLabel(issue.kind)}
+                </span>
+                <strong>{issue.summary}</strong>
+                <small>
+                  确认前不会创建正式工单。每张工单只有这个订单和一个问题，并保持独立状态与公开沟通。
+                </small>
+              </article>
+            ))}
+            {intake.issues.length === 0 && (
+              <p className="intake-empty">尚无已确认理解的问题，请补充或纠正后继续。</p>
+            )}
+          </div>
+          {intake.status !== "CONFIRMED" && (
+            <p className="intake-atomic-note">
+              确认前不会创建正式工单，也不会启动服务时长目标；确认时全部创建或一张也不创建。
+            </p>
           )}
           {intake.status === "READY_TO_CONFIRM" && (
             <button
@@ -644,25 +681,42 @@ export function App() {
               disabled={submitting}
               onClick={confirmIntake}
             >
-              {submitting ? "正在确认…" : "确认，就是这个问题"}
+              {submitting
+                ? "正在原子创建…"
+                : intake.issues.length > 1
+                  ? `确认并原子创建 ${intake.issues.length} 张工单`
+                  : "确认，就是这个问题"}
             </button>
           )}
-          <form className="intake-reply-form" onSubmit={submitIntakeReply}>
-            <label>
-              {intake.status === "READY_TO_CONFIRM" ? "需要纠正？直接告诉我" : "补充或纠正你的意思"}
-              <textarea
-                aria-label="补充受理信息"
-                value={intakeReply}
-                onChange={(event) => setIntakeReply(event.target.value)}
-                placeholder="例如：不是这笔订单，是另一笔；或者直接回复“可以”"
-                required
-                rows={3}
-              />
-            </label>
-            <button className="intake-secondary-action" disabled={submitting}>
-              {submitting ? "正在理解…" : "发送给智能受理"}
-            </button>
-          </form>
+          {intake.status === "CONFIRMED" && (
+            <div className="intake-created-tickets" role="region" aria-label="已创建工单">
+              {intake.ticketIds.map((ticketId, index) => (
+                <button type="button" key={ticketId} onClick={() => void loadTicket(ticketId)}>
+                  查看工单 {index + 1} · {shortTicketId(ticketId)}
+                </button>
+              ))}
+            </div>
+          )}
+          {intake.status !== "CONFIRMED" && (
+            <form className="intake-reply-form" onSubmit={submitIntakeReply}>
+              <label>
+                {intake.status === "READY_TO_CONFIRM"
+                  ? "需要纠正？直接告诉我"
+                  : "补充或纠正你的意思"}
+                <textarea
+                  aria-label="补充受理信息"
+                  value={intakeReply}
+                  onChange={(event) => setIntakeReply(event.target.value)}
+                  placeholder="例如：不是这笔订单，是另一笔；或者直接回复“可以”"
+                  required
+                  rows={3}
+                />
+              </label>
+              <button className="intake-secondary-action" disabled={submitting}>
+                {submitting ? "正在理解…" : "发送给智能受理"}
+              </button>
+            </form>
+          )}
           {error && (
             <StatusNotice className="error" role="alert" tone="danger">
               {error}
@@ -895,21 +949,39 @@ function isSnapshot(value: unknown): value is Snapshot {
   );
 }
 
-function isIntakeSnapshot(value: unknown): value is IntakeSnapshot {
+function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
+  if (!isRecord(value)) return null;
+  const legacy = value.schema === "customer-intake-v1";
+  const expectedKeys = legacy
+    ? [
+        "schema",
+        "intakeId",
+        "status",
+        "candidateOrder",
+        "issue",
+        "assistantMessage",
+        "ticketId",
+        "confirmed",
+        "replayed",
+      ]
+    : [
+        "schema",
+        "intakeId",
+        "status",
+        "candidateOrder",
+        "issue",
+        "issues",
+        "assistantMessage",
+        "ticketId",
+        "ticketIds",
+        "sharedIntakeRecordId",
+        "expectedTicketCount",
+        "confirmed",
+        "replayed",
+      ];
   if (
-    !isRecord(value) ||
-    !hasOnlyKeys(value, [
-      "schema",
-      "intakeId",
-      "status",
-      "candidateOrder",
-      "issue",
-      "assistantMessage",
-      "ticketId",
-      "confirmed",
-      "replayed",
-    ]) ||
-    value.schema !== CUSTOMER_INTAKE_SCHEMA ||
+    !hasOnlyKeys(value, expectedKeys) ||
+    (!legacy && value.schema !== CUSTOMER_INTAKE_SCHEMA) ||
     typeof value.intakeId !== "string" ||
     !["READY_TO_CONFIRM", "NEEDS_CLARIFICATION", "CONFIRMED"].includes(String(value.status)) ||
     typeof value.assistantMessage !== "string" ||
@@ -917,21 +989,72 @@ function isIntakeSnapshot(value: unknown): value is IntakeSnapshot {
     typeof value.confirmed !== "boolean" ||
     typeof value.replayed !== "boolean"
   )
-    return false;
+    return null;
   const candidate = value.candidateOrder;
   const issue = value.issue;
-  return (
-    (candidate === null ||
+  if (
+    !(
+      candidate === null ||
       (isRecord(candidate) &&
         hasOnlyKeys(candidate, ["reference", "summary"]) &&
         typeof candidate.reference === "string" &&
-        typeof candidate.summary === "string")) &&
-    (issue === null ||
-      (isRecord(issue) &&
-        hasOnlyKeys(issue, ["kind", "summary"]) &&
-        issue.kind === "LOGISTICS_DELAY" &&
-        typeof issue.summary === "string"))
+        typeof candidate.summary === "string")
+    ) ||
+    !(issue === null || isIntakeIssue(issue))
+  )
+    return null;
+  const issues = legacy ? (issue ? [issue] : []) : value.issues;
+  const ticketIds = legacy
+    ? typeof value.ticketId === "string"
+      ? [value.ticketId]
+      : []
+    : value.ticketIds;
+  if (
+    !Array.isArray(issues) ||
+    !issues.every(isIntakeIssue) ||
+    !Array.isArray(ticketIds) ||
+    !ticketIds.every((ticketId) => typeof ticketId === "string") ||
+    (!legacy &&
+      (!(value.sharedIntakeRecordId === null || typeof value.sharedIntakeRecordId === "string") ||
+        !Number.isSafeInteger(value.expectedTicketCount) ||
+        Number(value.expectedTicketCount) !== issues.length))
+  )
+    return null;
+  return {
+    schema: legacy ? "customer-intake-v1" : CUSTOMER_INTAKE_SCHEMA,
+    intakeId: value.intakeId,
+    status: value.status as IntakeSnapshot["status"],
+    candidateOrder: candidate as IntakeSnapshot["candidateOrder"],
+    issue,
+    issues,
+    assistantMessage: value.assistantMessage,
+    ticketId: value.ticketId,
+    ticketIds,
+    sharedIntakeRecordId: legacy ? null : (value.sharedIntakeRecordId as string | null),
+    expectedTicketCount: legacy ? issues.length : Number(value.expectedTicketCount),
+    confirmed: value.confirmed,
+    replayed: value.replayed,
+  };
+}
+
+function isIntakeIssue(value: unknown): value is IntakeIssue {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["kind", "summary"]) &&
+    ["LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE"].includes(String(value.kind)) &&
+    typeof value.summary === "string"
   );
+}
+
+function intakeIssueLabel(kind: IntakeIssue["kind"]) {
+  switch (kind) {
+    case "PACKAGE_NOT_RECEIVED":
+      return "包裹未收到";
+    case "DUPLICATE_CHARGE":
+      return "重复扣款";
+    default:
+      return "物流延迟";
+  }
 }
 
 function parseCursor(cursor: string) {

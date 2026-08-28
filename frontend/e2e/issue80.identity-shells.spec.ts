@@ -130,9 +130,7 @@ test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
     await customer.getByLabel("问题描述").fill("Issue #151 窄屏真实 v2 公开沟通验收");
     const createdResponse = customer.waitForResponse(
       (response) =>
-        /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(
-          new URL(response.url()).pathname,
-        ) &&
+        /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(new URL(response.url()).pathname) &&
         [200, 201].includes(response.status()),
     );
     const snapshotResponse = customer.waitForResponse(
@@ -152,7 +150,7 @@ test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
       schema: string;
       ticket: { id: string };
     };
-    expect(created.schema).toBe("customer-intake-v1");
+    expect(created.schema).toBe("customer-intake-v2");
     expect(snapshot).toMatchObject({
       view: "PUBLIC_CONVERSATION",
       schema: "public-conversation-v2",

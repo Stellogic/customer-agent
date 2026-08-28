@@ -107,7 +107,7 @@ describe("客户帮助中心", () => {
     expect(createHeaders.get("X-CSRF-TOKEN")).toBe("customer-csrf");
     expect(createHeaders.get("X-Synthetic-Customer-Id")).toBeNull();
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
-      schema: "customer-intake-v1",
+      schema: "customer-intake-v2",
       message: "订单 ORDER-DELAY-001 的物流延迟问题：物流已经延迟多日",
     });
     expect(fetchMock.mock.calls[1][0]).toBe("/api/customer/v2/intakes/intake-152/messages");
@@ -147,9 +147,76 @@ describe("客户帮助中心", () => {
     expect(screen.getByRole("button", { name: "确认，就是这个问题" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
-      schema: "customer-intake-v1",
+      schema: "customer-intake-v2",
       message: "包裹好几天没有动了",
     });
+  });
+
+  it("一次展示同订单的多个拟建问题与原子创建数量", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            schema: "customer-intake-v2",
+            intakeId: "intake-multi-153",
+            status: "READY_TO_CONFIRM",
+            candidateOrder: { reference: "ORDER-MULTI-001", summary: "配送中的合成订单" },
+            issue: null,
+            issues: [
+              { kind: "PACKAGE_NOT_RECEIVED", summary: "包裹未收到" },
+              { kind: "DUPLICATE_CHARGE", summary: "疑似重复扣款" },
+            ],
+            assistantMessage: "请确认；确认后将创建 2 张工单。",
+            ticketId: null,
+            ticketIds: [],
+            sharedIntakeRecordId: null,
+            expectedTicketCount: 2,
+            confirmed: false,
+            replayed: false,
+          }),
+          { status: 201 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            schema: "customer-intake-v2",
+            intakeId: "intake-multi-153",
+            status: "CONFIRMED",
+            candidateOrder: { reference: "ORDER-MULTI-001", summary: "配送中的合成订单" },
+            issue: null,
+            issues: [
+              { kind: "PACKAGE_NOT_RECEIVED", summary: "包裹未收到" },
+              { kind: "DUPLICATE_CHARGE", summary: "疑似重复扣款" },
+            ],
+            assistantMessage: "已确认，2 张客服工单已原子创建并开始独立处理。",
+            ticketId: null,
+            ticketIds: ["ticket-153-a", "ticket-153-b"],
+            sharedIntakeRecordId: "shared-153",
+            expectedTicketCount: 2,
+            confirmed: true,
+            replayed: false,
+          }),
+          { status: 201 },
+        ),
+      );
+
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("问题描述"), {
+      target: { value: "包裹未收到而且重复扣款" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+
+    expect(await screen.findByRole("heading", { name: "请确认 2 个问题" })).toBeInTheDocument();
+    expect(screen.getAllByRole("article", { name: /拟建工单/ })).toHaveLength(2);
+    expect(screen.getByText("包裹未收到")).toBeInTheDocument();
+    expect(screen.getByText("疑似重复扣款")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认并原子创建 2 张工单" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认并原子创建 2 张工单" }));
+    expect(await screen.findByRole("heading", { name: "2 张工单已创建" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "已创建工单" }).querySelectorAll("button"),
+    ).toHaveLength(2);
   });
 
   it("澄清恢复响应丢失时按稳定 resumeRequestId 查询而不创建第二次恢复", async () => {
