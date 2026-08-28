@@ -17,6 +17,30 @@ function completedSsePayload(payload: string): string {
   return last?.index === undefined ? "" : payload.slice(0, last.index + last[0].length);
 }
 
+function normalizeExpectedCsrfTokens(payload: string): string {
+  return payload.replace(/("token"\s*:\s*)"[^"]*"/g, '$1"<csrf-token>"');
+}
+
+describe("Issue #29 网络敏感内容审计", () => {
+  it("保留字段审计并归一化预期的随机 CSRF token 值", () => {
+    const collidingToken = ["UBS", "K-", "A".repeat(24)].join("");
+    const payload = JSON.stringify({ token: collidingToken, headerName: "X-CSRF-TOKEN" });
+    const forbidden = new RegExp(
+      [...sensitiveContent.contentPatterns, ...sensitiveContent.internalAddressPatterns].join("|"),
+      "i",
+    );
+
+    expect(payload).toMatch(forbidden);
+    expect(normalizeExpectedCsrfTokens(payload)).toBe(
+      '{"token":"<csrf-token>","headerName":"X-CSRF-TOKEN"}',
+    );
+    expect(normalizeExpectedCsrfTokens(payload)).not.toMatch(forbidden);
+    expect(normalizeExpectedCsrfTokens(JSON.stringify({ message: collidingToken }))).toMatch(
+      forbidden,
+    );
+  });
+});
+
 describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
   const nativeFetch = globalThis.fetch;
 
@@ -169,7 +193,9 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
     const auditedNetworkContent = [
       ...browserNetworkPayloads,
       ...streamAudits.map((audit) => completedSsePayload(audit.payload)),
-    ].join("\n");
+    ]
+      .map(normalizeExpectedCsrfTokens)
+      .join("\n");
     expect(auditedNetworkContent).not.toMatch(forbiddenNetworkContent);
   }, 150_000);
 });
