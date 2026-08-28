@@ -51,10 +51,10 @@ class SupportPrincipalSecurityTest {
 
     @Test
     void forgedSupportHeaderCannotReplaceTheAuthenticatedSupportPrincipal() throws Exception {
-        when(service.snapshot("support-demo"))
+        when(service.snapshot("support-demo", "support-workbench-v1"))
                 .thenReturn(
                         new SupportWorkbenchSnapshot(
-                                "support-workbench-v2", 0, List.of(), List.of()));
+                                "support-workbench-v1", 0, List.of(), List.of()));
 
         mvc.perform(
                         get("/api/support/workbench/snapshot")
@@ -62,7 +62,7 @@ class SupportPrincipalSecurityTest {
                                 .header("X-Synthetic-Support-Id", "internal-demo"))
                 .andExpect(status().isOk());
 
-        verify(service).snapshot("support-demo");
+        verify(service).snapshot("support-demo", "support-workbench-v1");
     }
 
     @Test

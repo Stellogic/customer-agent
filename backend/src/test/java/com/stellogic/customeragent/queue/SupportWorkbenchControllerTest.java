@@ -52,7 +52,7 @@ class SupportWorkbenchControllerTest {
                         SupportTicketLifecycleState.INVESTIGATING,
                         SupportHandlingMode.AGENT,
                         Instant.parse("2026-08-11T01:05:00Z"));
-        when(service.snapshot("support-demo"))
+        when(service.snapshot("support-demo", "support-workbench-v2"))
                 .thenReturn(
                         new SupportWorkbenchSnapshot(
                                 "support-workbench-v2",
@@ -60,7 +60,10 @@ class SupportWorkbenchControllerTest {
                                 List.of(handoff, breach),
                                 List.of(breach)));
 
-        mvc.perform(get("/api/support/workbench/snapshot").principal(support()))
+        mvc.perform(
+                        get("/api/support/workbench/snapshot")
+                                .queryParam("schema", "support-workbench-v2")
+                                .principal(support()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.view").value("SUPPORT_WORKBENCH"))
@@ -79,6 +82,34 @@ class SupportWorkbenchControllerTest {
                 .andExpect(jsonPath("$.sharedQueue[0].customerId").doesNotExist())
                 .andExpect(jsonPath("$.sharedQueue[0].investigationSummary").doesNotExist())
                 .andExpect(jsonPath("$.sharedQueue[0].messages").doesNotExist());
+    }
+
+    @Test
+    void legacySnapshotRemainsStrictlyCompatibleDuringTheEpochCutover() throws Exception {
+        var item =
+                new SupportQueueItem(
+                        HANDOFF_TICKET,
+                        "ORDER-157",
+                        "PACKAGE_NOT_RECEIVED",
+                        SupportTicketLifecycleState.WAITING_FOR_CUSTOMER,
+                        SupportHandlingMode.HUMAN,
+                        Instant.parse("2026-08-11T01:00:00Z"));
+        when(service.snapshot("support-demo", "support-workbench-v1"))
+                .thenReturn(
+                        new SupportWorkbenchSnapshot(
+                                "support-workbench-v1", 9, List.of(item), List.of()));
+
+        mvc.perform(get("/api/support/workbench/snapshot").principal(support()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.schema").value("support-workbench-v1"))
+                .andExpect(jsonPath("$.cursor").value("support-workbench-v1:9"))
+                .andExpect(jsonPath("$.sharedQueue[0].ticketId").value(HANDOFF_TICKET.toString()))
+                .andExpect(
+                        jsonPath("$.sharedQueue[0].lifecycleState").value("WAITING_FOR_CUSTOMER"))
+                .andExpect(jsonPath("$.sharedQueue[0].handlingMode").value("HUMAN"))
+                .andExpect(jsonPath("$.sharedQueue[0].enteredAt").exists())
+                .andExpect(jsonPath("$.sharedQueue[0].orderReference").doesNotExist())
+                .andExpect(jsonPath("$.sharedQueue[0].issueKind").doesNotExist());
     }
 
     @Test

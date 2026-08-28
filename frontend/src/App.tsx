@@ -774,7 +774,7 @@ export function App() {
         </header>
 
         {!snapshot && !intake && !recoveringTicketId && intakeRecoveryState === "idle" && (
-          <OrderTicketGroups onOpenTicket={(ticketId) => void loadTicket(ticketId)} />
+          <OrderTicketGroups autoLoad onOpenTicket={(ticketId) => void loadTicket(ticketId)} />
         )}
       </div>
 

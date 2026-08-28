@@ -10,6 +10,8 @@ from baseline_agent.customer_communication_model import (
     StructuredCustomerCommunicationModel,
 )
 from baseline_agent.graph import (
+    after_clarification,
+    after_sibling_summary,
     await_clarification,
     graph,
     investigate_ticket,
@@ -87,6 +89,61 @@ async def test_agent_reads_only_the_bounded_sibling_ticket_summary(
         "compensationFlowExists": False,
     }
     assert captured_headers["X-Agent-Operation"] == "READ_SIBLING_TICKET_SUMMARY"
+
+
+@pytest.mark.asyncio
+async def test_sibling_summary_retry_exhaustion_hands_off_instead_of_escaping(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gets = 0
+    posts: list[dict[str, object]] = []
+
+    class HandoffResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {"handlingMode": "HUMAN", "reasonCode": "TOOL_RETRY_EXHAUSTED"}
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, *_: object, **__: object) -> object:
+            nonlocal gets
+            gets += 1
+            raise httpx.ReadTimeout("summary timeout")
+
+        async def post(self, _: str, *, json: dict[str, object], **__: object) -> HandoffResponse:
+            posts.append(json)
+            return HandoffResponse()
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    monkeypatch.setenv("AGENT_TOOL_MAX_ATTEMPTS", "2")
+
+    result = await read_sibling_ticket_summary(
+        {
+            "requested_by": "spring",
+            "ticket_id": "current-ticket",
+            "generation_id": "current-generation",
+        }
+    )
+
+    assert gets == 2
+    assert posts[0]["reasonCode"] == "TOOL_RETRY_EXHAUSTED"
+    assert result["handoff"]["handlingMode"] == "HUMAN"
+    assert after_sibling_summary(result) == "__end__"
+
+
+def test_clarification_resume_refreshes_sibling_summary_before_investigation() -> None:
+    assert after_clarification({"clarification_answer": {"answerDigest": "digest"}}) == (
+        "read_sibling_ticket_summary"
+    )
 
 
 @pytest.mark.asyncio

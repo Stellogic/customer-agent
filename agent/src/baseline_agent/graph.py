@@ -215,20 +215,47 @@ async def read_sibling_ticket_summary(state: BaselineState) -> BaselineState:
         raise ValueError("sibling summary accepts only Spring-owned runs")
     ticket_id = state["ticket_id"]
     generation_id = state["generation_id"]
+    base_url = os.environ["SPRING_INTERNAL_URL"]
+    scope_headers = {
+        "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+        "X-Agent-Generation-Id": generation_id,
+    }
     async with httpx.AsyncClient(timeout=3.0) as client:
-        response = await client.get(
-            f"{os.environ['SPRING_INTERNAL_URL']}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/sibling-summary",
-            headers={
-                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
-                "X-Agent-Generation-Id": generation_id,
-                "X-Agent-Operation": "READ_SIBLING_TICKET_SUMMARY",
-            },
+        response = await _request_with_retries(
+            lambda: client.get(
+                f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/sibling-summary",
+                headers={
+                    **scope_headers,
+                    "X-Agent-Operation": "READ_SIBLING_TICKET_SUMMARY",
+                },
+            )
         )
-        response.raise_for_status()
-        summary = response.json()
-    if not _valid_sibling_ticket_summary(summary):
-        raise ValueError("invalid sibling ticket summary")
-    return {"sibling_ticket_summary": summary}
+        if response is None:
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "TOOL_RETRY_EXHAUSTED",
+                [],
+            )
+        try:
+            summary = response.json()
+        except ValueError:
+            summary = None
+        if not _valid_sibling_ticket_summary(summary):
+            return await _human_handoff(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "INVALID_TOOL_RESPONSE",
+                [],
+            )
+        assert isinstance(summary, dict)
+        return {"sibling_ticket_summary": summary}
 
 
 def _valid_sibling_ticket_summary(value: object) -> bool:
@@ -1385,6 +1412,14 @@ def after_investigation(state: BaselineState) -> str:
     return END
 
 
+def after_sibling_summary(state: BaselineState) -> str:
+    return END if state.get("handoff") else "investigate_ticket"
+
+
+def after_clarification(_: BaselineState) -> str:
+    return "read_sibling_ticket_summary"
+
+
 builder = StateGraph(BaselineState)
 builder.add_node("probe_spring", probe_spring)
 builder.add_node("read_sibling_ticket_summary", read_sibling_ticket_summary)
@@ -1394,9 +1429,9 @@ builder.add_node("request_clarification", request_clarification)
 builder.add_node("await_clarification", await_clarification)
 builder.add_conditional_edges(START, select_work)
 builder.add_edge("probe_spring", END)
-builder.add_edge("read_sibling_ticket_summary", "investigate_ticket")
+builder.add_conditional_edges("read_sibling_ticket_summary", after_sibling_summary)
 builder.add_conditional_edges("investigate_ticket", after_investigation)
 builder.add_edge("shadow_investigation", END)
 builder.add_edge("request_clarification", "await_clarification")
-builder.add_edge("await_clarification", "investigate_ticket")
+builder.add_conditional_edges("await_clarification", after_clarification)
 graph = builder.compile()

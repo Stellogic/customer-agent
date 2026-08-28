@@ -5,6 +5,7 @@ import { SupportWorkbench } from "./SupportWorkbench";
 
 const HANDOFF_TICKET = "26000000-0000-0000-0000-000000000001";
 const BREACHED_TICKET = "26000000-0000-0000-0000-000000000002";
+const SNAPSHOT_URL = "/api/support/workbench/snapshot?schema=support-workbench-v2";
 
 describe("客服共享队列工作台", () => {
   afterEach(() => {
@@ -63,7 +64,7 @@ describe("客服共享队列工作台", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/快照游标/)).not.toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch).mock.calls[0]?.[0]).toBe("/api/auth/session");
-    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe("/api/support/workbench/snapshot");
+    expect(vi.mocked(globalThis.fetch).mock.calls[1]?.[0]).toBe(SNAPSHOT_URL);
     expect(
       new Headers(vi.mocked(globalThis.fetch).mock.calls[1]?.[1]?.headers).get(
         "X-Synthetic-Support-Id",
@@ -89,16 +90,13 @@ describe("客服共享队列工作台", () => {
       await screen.findByRole("heading", { name: "当前身份无权访问此页面" }),
     ).toBeInTheDocument();
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalledWith(
-      "/api/support/workbench/snapshot",
-      expect.anything(),
-    );
+    expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalledWith(SNAPSHOT_URL, expect.anything());
   });
 
   it("确认领取后才写入分配并分区呈现真实授权详情", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const path = String(input);
-      if (path === "/api/support/workbench/snapshot") {
+      if (path === SNAPSHOT_URL) {
         return snapshotResponse("support-workbench-v2:1", [handoffItem()], []);
       }
       if (path === "/api/support/workbench/events") return openStream();
@@ -182,7 +180,7 @@ describe("客服共享队列工作台", () => {
     let detailReads = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
-      if (path === "/api/support/workbench/snapshot") {
+      if (path === SNAPSHOT_URL) {
         return snapshotResponse("support-workbench-v2:1", [handoffItem()], []);
       }
       if (path === "/api/support/workbench/events") return openStream();
@@ -227,7 +225,7 @@ describe("客服共享队列工作台", () => {
   it("从旧详情切换领取失败时立即移除不再监控的旧详情", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
-      if (path === "/api/support/workbench/snapshot") {
+      if (path === SNAPSHOT_URL) {
         return snapshotResponse("support-workbench-v2:1", [handoffItem(), breachedItem()], []);
       }
       if (path === "/api/support/workbench/events") return openStream();
@@ -299,9 +297,7 @@ describe("客服共享队列工作台", () => {
     expect(await screen.findAllByText("26000000…0002")).toHaveLength(2);
     expect(screen.queryByText("26000000…0001")).not.toBeInTheDocument();
     expect(
-      vi
-        .mocked(globalThis.fetch)
-        .mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"),
+      vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => input === SNAPSHOT_URL),
     ).toHaveLength(2);
   });
 
@@ -316,9 +312,7 @@ describe("客服共享队列工作台", () => {
 
     await waitFor(() =>
       expect(
-        vi
-          .mocked(globalThis.fetch)
-          .mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"),
+        vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => input === SNAPSHOT_URL),
       ).toHaveLength(2),
     );
     expect(await screen.findByText("26000000…0002")).toBeInTheDocument();
@@ -356,9 +350,7 @@ describe("客服共享队列工作台", () => {
     expect(await screen.findAllByText("26000000…0002")).toHaveLength(2);
     expect(screen.queryByText("不得进入浏览器事件")).not.toBeInTheDocument();
     expect(
-      vi
-        .mocked(globalThis.fetch)
-        .mock.calls.filter(([input]) => input === "/api/support/workbench/snapshot"),
+      vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => input === SNAPSHOT_URL),
     ).toHaveLength(3);
   });
 
@@ -388,6 +380,30 @@ describe("客服共享队列工作台", () => {
     expect(await screen.findByRole("main", { name: "客服工作台" })).toBeInTheDocument();
     expect(screen.getByRole("table", { name: "待接手工单" })).toBeInTheDocument();
     expect(screen.getByText("队列可发现不等于工单详情授权")).toBeInTheDocument();
+  });
+
+  it("订单分组保持队列最早进入顺序而不是按订单号重排", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        snapshotResponse(
+          "support-workbench-v2:2",
+          [
+            { ...handoffItem(), orderReference: "ORDER-Z", enteredAt: "2026-08-11T01:00:00Z" },
+            { ...breachedItem(), orderReference: "ORDER-A", enteredAt: "2026-08-11T01:05:00Z" },
+          ],
+          [],
+        ),
+      )
+      .mockResolvedValueOnce(openStream());
+
+    const { container } = render(<SupportWorkbench />);
+
+    await screen.findByText("ORDER-Z");
+    expect(
+      [...container.querySelectorAll(".support-order-group > header strong")].map(
+        (element) => element.textContent,
+      ),
+    ).toEqual(["ORDER-Z", "ORDER-A"]);
   });
 });
 

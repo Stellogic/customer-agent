@@ -105,7 +105,14 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                                 + "on sibling.customer_id = current_ticket.customer_id "
                                 + "and sibling.order_reference = current_ticket.order_reference "
                                 + "where current_ticket.id = ? and current_ticket.order_reference = ? "
-                                + "and sibling.id <> current_ticket.id order by sibling.created_at, sibling.id",
+                                + "and (exists (select 1 from synthetic_order owned_order "
+                                + "where owned_order.customer_id = current_ticket.customer_id "
+                                + "and owned_order.order_reference = current_ticket.order_reference) "
+                                + "or (select count(distinct alias.order_reference) from synthetic_order_alias alias "
+                                + "where alias.customer_id = current_ticket.customer_id "
+                                + "and alias.alias = current_ticket.order_reference) = 1) "
+                                + "and sibling.id <> current_ticket.id "
+                                + "order by sibling.created_at, sibling.id limit 20",
                         (rs, row) ->
                                 new SiblingTicketSummaryItem(
                                         rs.getString(1),

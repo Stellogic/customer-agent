@@ -6,12 +6,31 @@ vi.mock("./csrf", () => ({
   loadCsrfToken: async () => ({ token: "customer-csrf", headerName: "X-CSRF-TOKEN" }),
 }));
 
+vi.mock("./OrderTicketGroups", () => ({
+  OrderTicketGroups: ({ autoLoad = false }: { autoLoad?: boolean }) => (
+    <section aria-label="订单工单总览" data-auto-load={String(autoLoad)}>
+      <h3>订单 ORDER-MULTI-001</h3>
+      <article aria-label="独立工单 mock-1" />
+      <article aria-label="独立工单 mock-2" />
+    </section>
+  ),
+}));
+
 describe("客户帮助中心", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
     globalThis.sessionStorage.clear();
     globalThis.history.replaceState(null, "", "/");
+  });
+
+  it("返回帮助中心时自动加载订单工单总览", () => {
+    render(<App />);
+
+    expect(screen.getByRole("region", { name: "订单工单总览" })).toHaveAttribute(
+      "data-auto-load",
+      "true",
+    );
   });
 
   it("自然语言受理确认后读取 PUBLIC_CONVERSATION v2 权威快照", async () => {

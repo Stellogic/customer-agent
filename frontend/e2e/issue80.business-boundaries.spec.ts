@@ -95,7 +95,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
 
   const minimumQueueItem = await support.evaluate(async (ticketId) => {
     const snapshot = (await (
-      await fetch("/api/support/workbench/snapshot", {
+      await fetch("/api/support/workbench/snapshot?schema=support-workbench-v2", {
         credentials: "same-origin",
         cache: "no-store",
       })

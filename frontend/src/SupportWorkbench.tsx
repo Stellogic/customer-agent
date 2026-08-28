@@ -96,10 +96,13 @@ export function SupportWorkbench() {
     reconnectTimer.current = null;
     setConnection(status);
     try {
-      const response = await humanSessionFetch("/api/support/workbench/snapshot", {
-        credentials: "same-origin",
-        cache: "no-store",
-      });
+      const response = await humanSessionFetch(
+        "/api/support/workbench/snapshot?schema=support-workbench-v2",
+        {
+          credentials: "same-origin",
+          cache: "no-store",
+        },
+      );
       if (!response.ok) throw new Error("snapshot request failed");
       const authoritative = (await response.json()) as unknown;
       if (!isSnapshot(authoritative)) throw new Error("incompatible snapshot");
@@ -817,7 +820,7 @@ function groupQueueItems(items: QueueItem[]) {
     group.push(item);
     groups.set(item.orderReference, group);
   }
-  return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right));
+  return [...groups.entries()];
 }
 
 function issueKindLabel(issueKind: string) {
