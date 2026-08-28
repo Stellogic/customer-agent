@@ -17,6 +17,84 @@ function completedSsePayload(payload: string): string {
   return last?.index === undefined ? "" : payload.slice(0, last.index + last[0].length);
 }
 
+type AuditedNetworkPayload = {
+  direction: "request" | "response";
+  path: string;
+  payload: string;
+};
+
+function normalizeExpectedCsrfResponse(audit: AuditedNetworkPayload): string {
+  if (
+    audit.direction !== "response" ||
+    new URL(audit.path, "http://audit.invalid").pathname !== "/api/auth/csrf"
+  ) {
+    return audit.payload;
+  }
+  try {
+    const value = JSON.parse(audit.payload) as Record<string, unknown>;
+    if (
+      Object.keys(value).sort().join(",") !== "headerName,token" ||
+      typeof value.token !== "string" ||
+      value.headerName !== "X-CSRF-TOKEN"
+    ) {
+      return audit.payload;
+    }
+    return JSON.stringify({ token: "<csrf-token>", headerName: value.headerName });
+  } catch {
+    return audit.payload;
+  }
+}
+
+describe("Issue #29 网络敏感内容审计", () => {
+  it("保留字段审计并归一化预期的随机 CSRF token 值", () => {
+    const collidingToken = ["UBS", "K-", "A".repeat(24)].join("");
+    const payload = JSON.stringify({ token: collidingToken, headerName: "X-CSRF-TOKEN" });
+    const forbidden = new RegExp(
+      [...sensitiveContent.contentPatterns, ...sensitiveContent.internalAddressPatterns].join("|"),
+      "i",
+    );
+
+    expect(payload).toMatch(forbidden);
+    const csrfResponse = { direction: "response", path: "/api/auth/csrf", payload } as const;
+    expect(normalizeExpectedCsrfResponse(csrfResponse)).toBe(
+      '{"token":"<csrf-token>","headerName":"X-CSRF-TOKEN"}',
+    );
+    expect(normalizeExpectedCsrfResponse(csrfResponse)).not.toMatch(forbidden);
+    expect(
+      normalizeExpectedCsrfResponse({
+        direction: "response",
+        path: "/api/other",
+        payload,
+      }),
+    ).toMatch(forbidden);
+    expect(
+      normalizeExpectedCsrfResponse({
+        direction: "response",
+        path: "/api/auth/csrf",
+        payload: JSON.stringify({
+          token: collidingToken,
+          headerName: "X-CSRF-TOKEN",
+          extra: true,
+        }),
+      }),
+    ).toMatch(forbidden);
+    expect(
+      normalizeExpectedCsrfResponse({
+        direction: "request",
+        path: "/api/auth/csrf",
+        payload,
+      }),
+    ).toMatch(forbidden);
+    expect(
+      normalizeExpectedCsrfResponse({
+        direction: "response",
+        path: "/api/auth/csrf",
+        payload: JSON.stringify({ message: collidingToken }),
+      }),
+    ).toMatch(forbidden);
+  });
+});
+
 describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
   const nativeFetch = globalThis.fetch;
 
@@ -27,18 +105,18 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
   });
 
   it(`从客户 React 表面贯穿真实 LangGraph、审批 React 表面与模拟执行器：${scenario}`, async () => {
-    const browserNetworkPayloads: string[] = [];
-    const streamAudits: Array<{ payload: string }> = [];
+    const browserNetworkPayloads: AuditedNetworkPayload[] = [];
+    const streamAudits: Array<{ path: string; payload: string }> = [];
     const browserFetch = createCookieBrowserFetch(nativeFetch, liveBaseUrl ?? "");
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const path =
         typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (typeof init?.body === "string") {
-        browserNetworkPayloads.push(init.body);
+        browserNetworkPayloads.push({ direction: "request", path, payload: init.body });
       }
       const response = await browserFetch(path, init);
       if (response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
-        const audit = { payload: "" };
+        const audit = { path, payload: "" };
         streamAudits.push(audit);
         const decoder = new TextDecoder();
         const auditedBody = response.body.pipeThrough(
@@ -58,7 +136,11 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
           headers: response.headers,
         });
       } else {
-        browserNetworkPayloads.push(await response.clone().text());
+        browserNetworkPayloads.push({
+          direction: "response",
+          path,
+          payload: await response.clone().text(),
+        });
       }
       return response;
     });
@@ -158,8 +240,8 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
     const resolvedByEvent = streamAudits.some((audit) =>
       completedSsePayload(audit.payload).includes("RESOLVED"),
     );
-    const resolvedByAuthoritativeSnapshot = browserNetworkPayloads.some((payload) =>
-      payload.includes('"lifecycleState":"RESOLVED"'),
+    const resolvedByAuthoritativeSnapshot = browserNetworkPayloads.some((audit) =>
+      audit.payload.includes('"lifecycleState":"RESOLVED"'),
     );
     expect(resolvedByEvent || resolvedByAuthoritativeSnapshot).toBe(true);
     const forbiddenNetworkContent = new RegExp(
@@ -167,7 +249,7 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
       "i",
     );
     const auditedNetworkContent = [
-      ...browserNetworkPayloads,
+      ...browserNetworkPayloads.map(normalizeExpectedCsrfResponse),
       ...streamAudits.map((audit) => completedSsePayload(audit.payload)),
     ].join("\n");
     expect(auditedNetworkContent).not.toMatch(forbiddenNetworkContent);

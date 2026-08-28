@@ -2,7 +2,7 @@
 
 ## 状态
 
-已接受，对应 #80。
+已接受，对应 #80；浏览器安全分组与 worker 决策由 #182 补充。
 
 ## 背景
 
@@ -12,7 +12,7 @@ Issue #80 要求以真实浏览器验证 React、Spring 与 PostgreSQL 的身份
 
 - 精确锁定 `@playwright/test@1.62.1` 为前端 devDependency，提交 npm lockfile，并由同版包安装对应 Chromium revision。
 - 浏览器及其系统依赖只存在于一次性 `browser-acceptance` 镜像；普通 React/Nginx 发布镜像不包含 Playwright、浏览器或 PostgreSQL 客户端。
-- 验收固定单 worker、零用例重试；镜像下载/构建允许最多五次有界重试。每次运行使用唯一 Compose project、端口、镜像标签和专用卷，并精确回读清理结果。
+- 验收保持零用例重试。#182 起，显式清单中经静态约束证明不创建 Session、不写共享数据库的两个匿名 UI 文件使用 `workers=2` 连续资格运行三次；任一次失败立即终止，不作为失败后的用例重试。Session、SSE、数据库、审批/竞态、重启恢复及其他状态型文件仍固定 `workers=1`。镜像下载/构建允许最多五次有界重试。每次运行使用唯一 Compose project、端口、镜像标签和专用卷，并精确回读清理结果。
 - Chromium 只访问隔离 Compose 内本项目自建 HTTPS 页面。数据库超级用户仅注入一次性验收容器，用于制造 assignment、lease 与版本撤权竞态，不进入前端 bundle 或生产服务，也不增加 HTTP 测试后门。
 - 版本升级必须同步 npm 包、浏览器 revision、系统依赖和容器缓存，并重跑完整规范化门禁；Firefox/WebKit 不在本票已验证范围内。
 
