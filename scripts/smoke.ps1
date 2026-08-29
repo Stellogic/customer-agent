@@ -221,7 +221,7 @@ if ($published -match ':(\d+)\s*$') {
 $status = $null
 foreach ($ignored in 1..40) {
     try {
-        $status = Invoke-RestMethod -Uri "http://127.0.0.1:$frontendPort/api/system/status"
+        $status = Invoke-RestMethod -NoProxy -Uri "http://127.0.0.1:$frontendPort/api/system/status"
         if ($status.status -eq 'UP') {
             break
         }
