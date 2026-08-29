@@ -4,6 +4,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+. "$PSScriptRoot/test-gate-lock.ps1"
+Assert-TestGateInherited
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 

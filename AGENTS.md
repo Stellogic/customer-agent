@@ -29,11 +29,19 @@
 
 ## 规范化验证
 
-- 完成任何实现任务前，必须从仓库根目录运行 `pwsh ./scripts/check.ps1`。
+- 完成任何实现任务前，必须从仓库根目录运行 `pwsh ./scripts/check.ps1`。正式任务加 `-Issue <编号>`。
 - 仅在快速、聚焦的迭代中使用 `-Component backend|agent|frontend -SkipAcceptance`。
-- 规范化检查属于硬性要求：检查未通过时不得提交变更。
+- 规范化检查属于硬性要求：未通过最终本地完整门禁前不得合并 PR 或关闭 Issue。开发期间允许频繁提交。
 - GitHub Actions CI 已按项目决定关闭；不得触发、等待或要求 CI，也不得把缺少 CI 结果视为交付阻塞。
 - 本地完整 `pwsh ./scripts/check.ps1` 是唯一自动化测试门槛；正式完成还需通过既定审查、合入 PR、关闭 Issue，并从 `origin/main` 回读结果。
+
+## 测试门禁锁
+
+运行 `pwsh ./scripts/check.ps1`、smoke、镜像构建、Docker/Compose 或浏览器验收前读取 `docs/agents/test-gate-lock.md`。代码编辑、提交与双轴审查不占锁。
+
+状态为 `FREE` / `BUSY` / `RECOVERY_REQUIRED`。`BUSY` 时立即停止并报告，不排队重试。`RECOVERY_REQUIRED` 时升级协调线程，不自动删残留。只读查询：`pwsh ./scripts/test-gate-lock.ps1 -Status`。
+
+并行开发可以继续；未通过最终本地完整门禁前不得合并或关票。测试是合入前的必做门禁。
 
 ## 正式交付顺序
 
