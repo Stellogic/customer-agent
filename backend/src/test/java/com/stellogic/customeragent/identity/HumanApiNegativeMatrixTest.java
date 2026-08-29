@@ -54,6 +54,12 @@ class HumanApiNegativeMatrixTest {
                     postApi("/api/approver/compensation-proposals/" + ID + "/release"),
                     postApi("/api/approver/compensation-proposals/" + ID + "/reject"),
                     postApi("/api/approver/compensation-proposals/" + ID + "/approve"));
+    private static final List<ApiRequest> KNOWLEDGE_APIS =
+            List.of(
+                    getApi("/api/internal/knowledge"),
+                    getApi("/api/internal/knowledge/index"),
+                    getApi("/api/internal/knowledge/articles/refund-policy"),
+                    postApi("/api/internal/knowledge/index/rebuild"));
 
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper json;
@@ -72,6 +78,7 @@ class HumanApiNegativeMatrixTest {
         assertWrongRole(CUSTOMER_APIS, "support-demo");
         assertWrongRole(SUPPORT_APIS, "customer-demo");
         assertWrongRole(APPROVAL_APIS, "support-demo");
+        assertWrongRole(KNOWLEDGE_APIS, "customer-demo");
     }
 
     private void assertWrongRole(List<ApiRequest> requests, String username) throws Exception {
@@ -98,7 +105,7 @@ class HumanApiNegativeMatrixTest {
     }
 
     private static List<ApiRequest> allApis() {
-        return java.util.stream.Stream.of(CUSTOMER_APIS, SUPPORT_APIS, APPROVAL_APIS)
+        return java.util.stream.Stream.of(CUSTOMER_APIS, SUPPORT_APIS, APPROVAL_APIS, KNOWLEDGE_APIS)
                 .flatMap(List::stream)
                 .toList();
     }
