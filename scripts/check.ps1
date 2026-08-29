@@ -54,26 +54,50 @@ $gateLock = Enter-TestGateLock `
     -ComposeProject $projectName `
     -ImageTag $imageTag
 
+function Set-TestGateFrontendPort {
+    $portProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $portProbe.Start()
+    $frontendPort = [string]$portProbe.LocalEndpoint.Port
+    $portProbe.Stop()
+    $env:CUSTOMER_AGENT_FRONTEND_PORT = $frontendPort
+    return $frontendPort
+}
+
 try {
     if ($runsFullAcceptance) {
         . "$PSScriptRoot/gate-images.ps1"
         . "$PSScriptRoot/gate-resources.ps1"
-        $portProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
-        $portProbe.Start()
-        $frontendPort = [string]$portProbe.LocalEndpoint.Port
-        $portProbe.Stop()
         $sourceFingerprint = Get-GateSourceFingerprint -RepoRoot $repoRoot
         $env:COMPOSE_PROJECT_NAME = $projectName
         $env:CUSTOMER_AGENT_IMAGE_TAG = $imageTag
-        $env:CUSTOMER_AGENT_FRONTEND_PORT = $frontendPort
         $env:CUSTOMER_AGENT_GATE_RUN_ID = $RunId
         $env:CUSTOMER_AGENT_GATE_SOURCE_FINGERPRINT = $sourceFingerprint
-        & "$PSScriptRoot/confirm-compose-reset-isolation.ps1"
     }
 
-    & pwsh -NoProfile -File "$PSScriptRoot/test-test-gate-lock.ps1"
-    if ($LASTEXITCODE -ne 0) {
-        throw "test-test-gate-lock.ps1 失败，退出码 $LASTEXITCODE"
+    $savedGateToken = $env:CUSTOMER_AGENT_TEST_GATE_TOKEN
+    $savedGateIdentity = $env:CUSTOMER_AGENT_TEST_GATE_IDENTITY
+    Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_TOKEN -ErrorAction SilentlyContinue
+    Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_IDENTITY -ErrorAction SilentlyContinue
+    try {
+        & pwsh -NoProfile -File "$PSScriptRoot/test-test-gate-lock.ps1"
+        if ($LASTEXITCODE -ne 0) {
+            throw "test-test-gate-lock.ps1 失败，退出码 $LASTEXITCODE"
+        }
+    } finally {
+        if ([string]::IsNullOrWhiteSpace($savedGateToken)) {
+            Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_TOKEN -ErrorAction SilentlyContinue
+        } else {
+            $env:CUSTOMER_AGENT_TEST_GATE_TOKEN = $savedGateToken
+        }
+        if ([string]::IsNullOrWhiteSpace($savedGateIdentity)) {
+            Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_IDENTITY -ErrorAction SilentlyContinue
+        } else {
+            $env:CUSTOMER_AGENT_TEST_GATE_IDENTITY = $savedGateIdentity
+        }
+    }
+    if ($runsFullAcceptance) {
+        Set-TestGateFrontendPort | Out-Null
+        & "$PSScriptRoot/confirm-compose-reset-isolation.ps1"
     }
     & "$PSScriptRoot/test-runtime-log-policy.ps1"
     & "$PSScriptRoot/test-gradle-proxy.ps1"
@@ -102,6 +126,9 @@ try {
             $buildWatch = [System.Diagnostics.Stopwatch]::StartNew()
             $buildResults = @(Invoke-GateImageBuilds -RepoRoot $repoRoot -RunId $RunId -SourceFingerprint $sourceFingerprint)
             $buildWatch.Stop()
+
+            Set-TestGateFrontendPort | Out-Null
+            & "$PSScriptRoot/confirm-compose-reset-isolation.ps1"
 
             $smokeWatch = [System.Diagnostics.Stopwatch]::StartNew()
             & "$PSScriptRoot/smoke.ps1" -Reset -SkipBuild

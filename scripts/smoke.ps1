@@ -211,8 +211,15 @@ if ($LASTEXITCODE -ne 0) {
     throw "React 实时验收失败，退出码: $LASTEXITCODE"
 }
 
+$nativePref = $PSNativeCommandUseErrorActionPreference
+$PSNativeCommandUseErrorActionPreference = $false
+$published = @(docker compose port frontend 8080 2>$null)[0]
+$PSNativeCommandUseErrorActionPreference = $nativePref
+if ($published -match ':(\d+)\s*$') {
+    $frontendPort = $Matches[1]
+}
 $status = $null
-foreach ($ignored in 1..20) {
+foreach ($ignored in 1..40) {
     try {
         $status = Invoke-RestMethod -Uri "http://127.0.0.1:$frontendPort/api/system/status"
         if ($status.status -eq 'UP') {
@@ -224,7 +231,7 @@ foreach ($ignored in 1..20) {
     Start-Sleep -Milliseconds 250
 }
 if ($null -eq $status -or $status.status -ne 'UP') {
-    throw "Spring 状态投影不是 UP: $($status | ConvertTo-Json -Compress)"
+    throw "Spring 状态投影不是 UP: port=$frontendPort published=$published $($status | ConvertTo-Json -Compress)"
 }
 
 $sensitiveRules = Get-Content "$PSScriptRoot/../frontend/src/sensitive-content-patterns.json" -Raw | ConvertFrom-Json
