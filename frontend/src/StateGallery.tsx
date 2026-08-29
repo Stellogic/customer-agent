@@ -64,7 +64,7 @@ export function StateGallery() {
             kicker="空状态 · 空队列"
             title="暂无队列条目"
           >
-            <p className="empty-queue" role="status">
+            <p aria-label="当前没有队列条目" className="empty-queue" role="status">
               当前没有队列条目
             </p>
           </StateCard>
