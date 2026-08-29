@@ -9,6 +9,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+. "$PSScriptRoot/test-gate-lock.ps1"
+Assert-TestGateInherited
 
 if ([string]::IsNullOrWhiteSpace($ProjectName)) {
     throw '执行 destructive Compose reset 前必须显式提供唯一的非 baseline Compose project。'
