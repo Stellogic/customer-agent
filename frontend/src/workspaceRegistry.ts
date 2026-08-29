@@ -10,6 +10,7 @@ export const ROUTES = {
 const INTERNAL_ROUTE_PATHS = {
   support: "/internal/support",
   approvals: "/internal/approvals",
+  knowledge: "/internal/knowledge",
 } as const;
 
 export const LEGACY_ROUTE_REDIRECTS = [
@@ -18,7 +19,7 @@ export const LEGACY_ROUTE_REDIRECTS = [
 ] as const;
 
 export type InternalWorkspace = {
-  id: "support" | "approvals";
+  id: "support" | "approvals" | "knowledge";
   capability: HumanCapability;
   path: `/internal/${string}`;
   menuLabel: string;
@@ -45,6 +46,15 @@ export const INTERNAL_WORKSPACES = [
     cardLabel: "审批工作区 · 补偿审查",
     eyebrow: "APPROVAL",
     description: "进入待审批队列，查看当前职责允许的补偿审查入口。",
+  },
+  {
+    id: "knowledge",
+    capability: "KNOWLEDGE_READ_ACCESS",
+    path: INTERNAL_ROUTE_PATHS.knowledge,
+    menuLabel: "知识目录",
+    cardLabel: "知识目录 · 规则与引用",
+    eyebrow: "KNOWLEDGE",
+    description: "检索真实版本化中文知识，查看适用范围与可追溯引用片段。",
   },
 ] as const satisfies readonly InternalWorkspace[];
 

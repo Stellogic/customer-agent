@@ -48,6 +48,7 @@ public final class HumanIdentityDirectory {
     public enum HumanCapability {
         CUSTOMER_HELP_ACCESS,
         SUPPORT_WORKBENCH_ACCESS,
-        APPROVAL_WORKBENCH_ACCESS
+        APPROVAL_WORKBENCH_ACCESS,
+        KNOWLEDGE_READ_ACCESS
     }
 }

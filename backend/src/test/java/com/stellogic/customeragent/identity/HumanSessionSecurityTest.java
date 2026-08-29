@@ -181,17 +181,20 @@ class HumanSessionSecurityTest {
                 "support-demo",
                 "INTERNAL",
                 List.of("SUPPORT"),
-                List.of("SUPPORT_WORKBENCH_ACCESS"));
+                List.of("SUPPORT_WORKBENCH_ACCESS", "KNOWLEDGE_READ_ACCESS"));
         assertProjection(
                 "approver-demo",
                 "INTERNAL",
                 List.of("APPROVER"),
-                List.of("APPROVAL_WORKBENCH_ACCESS"));
+                List.of("APPROVAL_WORKBENCH_ACCESS", "KNOWLEDGE_READ_ACCESS"));
         assertProjection(
                 "internal-demo",
                 "INTERNAL",
                 List.of("SUPPORT", "APPROVER"),
-                List.of("SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS"));
+                List.of(
+                        "SUPPORT_WORKBENCH_ACCESS",
+                        "APPROVAL_WORKBENCH_ACCESS",
+                        "KNOWLEDGE_READ_ACCESS"));
     }
 
     @Test
@@ -240,7 +243,7 @@ class HumanSessionSecurityTest {
                 .andExpect(jsonPath("$.subjectType").value("INTERNAL"))
                 .andExpect(jsonPath("$.roles.length()").value(1))
                 .andExpect(jsonPath("$.roles[0]").value("SUPPORT"))
-                .andExpect(jsonPath("$.capabilities.length()").value(1))
+                .andExpect(jsonPath("$.capabilities.length()").value(2))
                 .andExpect(jsonPath("$.capabilities[0]").value("SUPPORT_WORKBENCH_ACCESS"));
     }
 
