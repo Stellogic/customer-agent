@@ -179,7 +179,13 @@ async def test_programmable_provider_supports_only_the_frozen_reply_intents(
 
     model_input = CustomerCommunicationInput(
         order_reference="ORDER-123",
-        delay_seconds=80 * 60 * 60,
+        delay_seconds=(
+            80 * 60 * 60
+            if intent == "COMPENSATION_REVIEW_PENDING"
+            else 1 * 60 * 60
+            if intent == "NO_COMPENSATION_RESOLUTION"
+            else 80 * 60 * 60
+        ),
         compensation_review_required=intent == "COMPENSATION_REVIEW_PENDING",
         evidence_refs=("order:ORDER-123", "logistics:ORDER-123"),
         synthetic_customer_text="包裹还没到",

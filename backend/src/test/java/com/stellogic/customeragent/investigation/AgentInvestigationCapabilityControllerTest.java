@@ -132,6 +132,7 @@ class AgentInvestigationCapabilityControllerTest {
                                 InvestigationCapability.READ_LOGISTICS,
                                 80,
                                 288000,
+                                "IN_TRANSIT",
                                 List.of("logistics:ORDER-1")));
 
         mvc.perform(

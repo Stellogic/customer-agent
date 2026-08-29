@@ -13,6 +13,7 @@ class InvestigationCapability(StrEnum):
     READ_PAYMENT_AND_REFUNDS = "READ_PAYMENT_AND_REFUNDS"
     READ_COMPENSATION_AND_PENDING_ACTIONS = "READ_COMPENSATION_AND_PENDING_ACTIONS"
     READ_APPLICABLE_POLICY = "READ_APPLICABLE_POLICY"
+    READ_ORDER_RULES = "READ_ORDER_RULES"
 
 
 CAPABILITY_PARAMETER_NAMES: dict[InvestigationCapability, tuple[str, ...]] = {
@@ -21,6 +22,7 @@ CAPABILITY_PARAMETER_NAMES: dict[InvestigationCapability, tuple[str, ...]] = {
     InvestigationCapability.READ_PAYMENT_AND_REFUNDS: ("orderReference",),
     InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS: ("orderReference",),
     InvestigationCapability.READ_APPLICABLE_POLICY: ("orderReference",),
+    InvestigationCapability.READ_ORDER_RULES: ("orderReference",),
 }
 
 
@@ -63,6 +65,10 @@ class ActionUsage:
 EVIDENCE_APPLICABILITIES = (
     "ORDER_IDENTITY",
     "DELAY_DURATION",
+    "LOGISTICS_STATUS",
+    "PAYMENT_STATUS",
+    "REFUND_STATUS",
+    "ORDER_RULE",
     "ORDER_ELIGIBILITY",
     "EXISTING_COMPENSATION",
     "PENDING_ACTIONS",
@@ -248,6 +254,7 @@ class DeterministicActionModel:
                 InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
             ),
             ("policyVersion", InvestigationCapability.READ_APPLICABLE_POLICY),
+            ("orderRuleSummary", InvestigationCapability.READ_ORDER_RULES),
         )
         sibling_context_path = tuple(reversed(standard_path))
         path = sibling_context_path if facts.get("siblingTickets") else standard_path
@@ -657,22 +664,36 @@ def _deterministic_evidence_claims(catalog: object) -> tuple[EvidenceClaim, ...]
         references[item["actionType"]] = tuple(item["evidenceReferences"])
     required = {
         InvestigationCapability.CONFIRM_ORDER.value: ((0, "ORDER_IDENTITY"),),
-        InvestigationCapability.READ_LOGISTICS.value: ((0, "DELAY_DURATION"),),
-        InvestigationCapability.READ_PAYMENT_AND_REFUNDS.value: ((0, "ORDER_ELIGIBILITY"),),
+        InvestigationCapability.READ_LOGISTICS.value: (
+            (0, "DELAY_DURATION"),
+            (0, "LOGISTICS_STATUS"),
+        ),
+        InvestigationCapability.READ_PAYMENT_AND_REFUNDS.value: (
+            (0, "ORDER_ELIGIBILITY"),
+            (0, "PAYMENT_STATUS"),
+            (0, "REFUND_STATUS"),
+        ),
         InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS.value: (
             (0, "EXISTING_COMPENSATION"),
             (1, "PENDING_ACTIONS"),
         ),
         InvestigationCapability.READ_APPLICABLE_POLICY.value: ((0, "POLICY_BASIS"),),
+        InvestigationCapability.READ_ORDER_RULES.value: ((0, "ORDER_RULE"),),
     }
-    claims: list[EvidenceClaim] = []
+    merged: dict[str, list[str]] = {}
     try:
         for action_type, mappings in required.items():
             for index, applicability in mappings:
-                claims.append(EvidenceClaim(references[action_type][index], (applicability,)))
+                reference = references[action_type][index]
+                values = merged.setdefault(reference, [])
+                if applicability not in values:
+                    values.append(applicability)
     except (KeyError, IndexError):
         return ()
-    return tuple(claims)
+    return tuple(
+        EvidenceClaim(reference, tuple(applicabilities))
+        for reference, applicabilities in merged.items()
+    )
 
 
 def _decision(

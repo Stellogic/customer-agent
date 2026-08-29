@@ -102,12 +102,15 @@ REQUIRED_FACT_FIELDS = {
     "orderReference",
     "delayHours",
     "delaySeconds",
+    "logisticsStatus",
     "paid",
     "cancelled",
     "fullyRefunded",
+    "duplicateChargeSuspected",
     "existingCompensation",
     "pendingActionCount",
     "policyVersion",
+    "orderRuleSummary",
     "evidenceRefs",
 }
 
@@ -165,6 +168,7 @@ CAPABILITY_CONTRACTS = {
             CapabilityField("capability", STRING),
             CapabilityField("delayHours", INTEGER),
             CapabilityField("delaySeconds", INTEGER),
+            CapabilityField("logisticsStatus", STRING),
             CapabilityField("evidenceRefs", STRING_LIST),
         ),
     ),
@@ -175,6 +179,7 @@ CAPABILITY_CONTRACTS = {
             CapabilityField("paid", BOOLEAN),
             CapabilityField("cancelled", BOOLEAN),
             CapabilityField("fullyRefunded", BOOLEAN),
+            CapabilityField("duplicateChargeSuspected", BOOLEAN),
             CapabilityField("evidenceRefs", STRING_LIST),
         ),
     ),
@@ -192,6 +197,14 @@ CAPABILITY_CONTRACTS = {
         (
             CapabilityField("capability", STRING),
             CapabilityField("policyVersion", STRING),
+            CapabilityField("evidenceRefs", STRING_LIST),
+        ),
+    ),
+    InvestigationCapability.READ_ORDER_RULES: CapabilityContract(
+        _capability_parameters(InvestigationCapability.READ_ORDER_RULES),
+        (
+            CapabilityField("capability", STRING),
+            CapabilityField("orderRuleSummary", STRING),
             CapabilityField("evidenceRefs", STRING_LIST),
         ),
     ),
@@ -295,6 +308,8 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
         "LOGISTICS_DELAY",
         "PACKAGE_NOT_RECEIVED",
         "DUPLICATE_CHARGE",
+        "ORDER_OPERATION_OR_RULE",
+        "OTHER",
     }:
         raise ValueError("ticket investigation requires a supported issue kind")
     clarification_answer = state.get("clarification_answer", {})
@@ -302,16 +317,6 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
     if not isinstance(capability_request_scope, str):
         capability_request_scope = "invalid-resume"
     async with httpx.AsyncClient(timeout=5.0) as client:
-        if issue_kind != "LOGISTICS_DELAY":
-            return await _human_handoff(
-                client,
-                base_url,
-                ticket_id,
-                generation_id,
-                scope_headers,
-                "UNSUPPORTED_SCENARIO",
-                [],
-            )
         if state.get("investigation_progress") is None:
             await _publish_reply_event(
                 client,
@@ -420,7 +425,7 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                     state.get("investigation_run_evidence"),
                 ),
             }
-        unsafe_reason = _unsafe_facts_reason(facts)
+        unsafe_reason = _unsafe_facts_reason(facts, issue_kind)
         if unsafe_reason is not None:
             return await _human_handoff(
                 client,
@@ -502,17 +507,23 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 ),
                 judgment_evidence,
             )
-        conclusion = _build_conclusion(facts, judgment, loop_result.evidence_claims)
+        conclusion = _build_conclusion(facts, judgment, loop_result.evidence_claims, issue_kind)
         communication_input = CustomerCommunicationInput(
             order_reference=facts["orderReference"],
             delay_seconds=facts["delaySeconds"],
-            compensation_review_required=judgment.compensation_review_required,
+            compensation_review_required=(
+                judgment.compensation_review_required if issue_kind == "LOGISTICS_DELAY" else False
+            ),
             evidence_refs=tuple(facts["evidenceRefs"]),
             synthetic_customer_text=communication_context["syntheticCustomerText"],
             public_conversation=tuple(
                 CustomerConversationMessage(message["author"], message["body"])
                 for message in communication_context["publicConversation"]
             ),
+            risk_scenario=_risk_scenario_for(issue_kind, facts),
+            logistics_status=facts.get("logisticsStatus")
+            if isinstance(facts.get("logisticsStatus"), str)
+            else None,
         )
         communication_audit_offset = _communication_audit_offset()
         await _publish_reply_event(
@@ -524,33 +535,43 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
             "progress-composing",
             {"type": "PROGRESS", "stage": "COMPOSING_REPLY"},
         )
-        try:
-            publish_delta = _reply_delta_publisher(
-                client, base_url, ticket_id, generation_id, scope_headers
-            )
-            customer_reply = await customer_communication_model.compose(
-                communication_input, on_body_delta=publish_delta
-            )
-            validate_customer_reply_envelope(communication_input, customer_reply)
-        except Exception:
-            communication_evidence = _communication_call_evidence(
-                communication_audit_offset, "MODEL_CALL_FAILED"
-            )
-            return await _human_handoff(
-                client,
-                base_url,
-                ticket_id,
-                generation_id,
-                scope_headers,
-                "INVALID_MODEL_OUTPUT",
-                _controlled_summary_facts(facts),
-                action_records,
-                _completed_run_evidence(
-                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
-                ),
-                judgment_evidence,
-                communication_evidence,
-            )
+        customer_reply = None
+        communication_evidence = None
+        for correction_attempt in range(2):
+            try:
+                publish_delta = _reply_delta_publisher(
+                    client, base_url, ticket_id, generation_id, scope_headers
+                )
+                customer_reply = await customer_communication_model.compose(
+                    communication_input, on_body_delta=publish_delta
+                )
+                validate_customer_reply_envelope(communication_input, customer_reply)
+                communication_evidence = _communication_call_evidence(
+                    communication_audit_offset, ""
+                )
+                break
+            except Exception:
+                if correction_attempt == 0:
+                    continue
+                communication_evidence = _communication_call_evidence(
+                    communication_audit_offset, "MODEL_CALL_FAILED"
+                )
+                return await _human_handoff(
+                    client,
+                    base_url,
+                    ticket_id,
+                    generation_id,
+                    scope_headers,
+                    "INVALID_MODEL_OUTPUT",
+                    _controlled_summary_facts(facts),
+                    action_records,
+                    _completed_run_evidence(
+                        loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                    ),
+                    judgment_evidence,
+                    communication_evidence,
+                )
+        assert customer_reply is not None
         if customer_reply.intent is CustomerReplyIntent.HUMAN_HANDOFF:
             communication_evidence = _communication_call_evidence(communication_audit_offset, "")
             return await _human_handoff(
@@ -983,6 +1004,8 @@ def _valid_capability_evidence(
             f"compensation:{reference}",
             f"order-actions:{reference}",
         ]
+    elif capability is InvestigationCapability.READ_ORDER_RULES:
+        expected = [f"order-rule:{reference}"]
     else:
         expected = [f"policy:{result['policyVersion']}"]
     return result["evidenceRefs"] == expected
@@ -1242,7 +1265,7 @@ async def _request_with_retries(
     return None
 
 
-def _unsafe_facts_reason(facts: object) -> str | None:
+def _unsafe_facts_reason(facts: object, issue_kind: str = "LOGISTICS_DELAY") -> str | None:
     if not isinstance(facts, dict):
         return "INVALID_TOOL_RESPONSE"
     present = set(facts)
@@ -1252,12 +1275,15 @@ def _unsafe_facts_reason(facts: object) -> str | None:
         "orderReference": str,
         "delayHours": int,
         "delaySeconds": int,
+        "logisticsStatus": str,
         "paid": bool,
         "cancelled": bool,
         "fullyRefunded": bool,
+        "duplicateChargeSuspected": bool,
         "existingCompensation": bool,
         "pendingActionCount": int,
         "policyVersion": str,
+        "orderRuleSummary": str,
         "evidenceRefs": list,
         "matchStatus": str,
     }
@@ -1283,6 +1309,15 @@ def _unsafe_facts_reason(facts: object) -> str | None:
         return "INVALID_TOOL_RESPONSE"
     if facts["delaySeconds"] != facts["delayHours"] * 60 * 60:
         return "FACT_CONFLICT"
+    if facts["logisticsStatus"] not in {
+        "IN_TRANSIT",
+        "STALLED",
+        "SIGNED",
+        "SUSPECTED_LOST",
+    }:
+        return "INVALID_TOOL_RESPONSE"
+    if issue_kind != "LOGISTICS_DELAY":
+        return None
     if (
         not facts["paid"]
         or facts["cancelled"]
@@ -1306,12 +1341,15 @@ def _clarification_facts_reason(facts: object) -> str | None:
     nullable_fields = (
         "delayHours",
         "delaySeconds",
+        "logisticsStatus",
         "paid",
         "cancelled",
         "fullyRefunded",
+        "duplicateChargeSuspected",
         "existingCompensation",
         "pendingActionCount",
         "policyVersion",
+        "orderRuleSummary",
     )
     valid_ambiguity = (
         facts.get("matchStatus") == "AMBIGUOUS"
@@ -1527,24 +1565,90 @@ def _build_conclusion(
     facts: dict,
     judgment: InvestigationJudgment,
     evidence_claims: tuple[EvidenceClaim, ...],
+    issue_kind: str = "LOGISTICS_DELAY",
 ) -> dict:
+    risk_scenario = _risk_scenario_for(issue_kind, facts)
+    reason_code = _reason_code_for(issue_kind, facts, judgment)
+    compensation_required = (
+        issue_kind == "LOGISTICS_DELAY" and judgment.compensation_review_required
+    )
     return {
-        "compensationRequired": judgment.compensation_review_required,
-        "reasonCode": judgment.reason_code.value,
+        "compensationRequired": compensation_required,
+        "reasonCode": reason_code,
         "delayHours": facts["delayHours"],
         "delaySeconds": facts["delaySeconds"],
         "orderReference": facts["orderReference"],
         "evidenceRefs": facts["evidenceRefs"],
-        "riskScenario": "LOGISTICS_DELAY",
+        "riskScenario": risk_scenario,
         "sufficiencyPolicyVersion": "evidence-sufficiency-v1",
-        "evidence": [
-            {
-                "evidenceReference": claim.evidence_reference,
-                "applicability": list(claim.applicability),
-            }
-            for claim in evidence_claims
-        ],
+        "evidence": _merged_evidence_claims(evidence_claims, risk_scenario),
     }
+
+
+def _risk_scenario_for(issue_kind: str, facts: dict) -> str:
+    if issue_kind == "LOGISTICS_DELAY":
+        return "LOGISTICS_DELAY"
+    if issue_kind == "PACKAGE_NOT_RECEIVED":
+        status = facts.get("logisticsStatus")
+        if status == "SIGNED":
+            return "PACKAGE_SIGNED_NOT_RECEIVED"
+        if status == "SUSPECTED_LOST":
+            return "PACKAGE_SUSPECTED_LOST"
+        return "LOGISTICS_STALLED"
+    if issue_kind == "DUPLICATE_CHARGE":
+        if facts.get("fullyRefunded"):
+            return "REFUND_STATUS"
+        return "DUPLICATE_CHARGE"
+    if issue_kind == "ORDER_OPERATION_OR_RULE":
+        return "ORDER_ADDRESS_OR_CANCEL_RULE"
+    return "OTHER_GENERAL"
+
+
+def _reason_code_for(issue_kind: str, facts: dict, judgment: InvestigationJudgment) -> str:
+    if issue_kind == "LOGISTICS_DELAY":
+        return judgment.reason_code.value
+    if issue_kind == "PACKAGE_NOT_RECEIVED":
+        status = facts.get("logisticsStatus")
+        if status == "SIGNED":
+            return "PACKAGE_SIGNED_NOT_RECEIVED"
+        if status == "SUSPECTED_LOST":
+            return "PACKAGE_SUSPECTED_LOST"
+        return "LOGISTICS_STALLED"
+    if issue_kind == "DUPLICATE_CHARGE":
+        if facts.get("fullyRefunded"):
+            return "REFUND_STATUS_EXPLAINED"
+        return "DUPLICATE_CHARGE"
+    if issue_kind == "ORDER_OPERATION_OR_RULE":
+        return "ORDER_RULE_EXPLAINED"
+    return "OTHER_REQUIRES_HUMAN"
+
+
+def _merged_evidence_claims(
+    evidence_claims: tuple[EvidenceClaim, ...], risk_scenario: str
+) -> list[dict[str, object]]:
+    merged: dict[str, list[str]] = {}
+    for claim in evidence_claims:
+        values = merged.setdefault(claim.evidence_reference, [])
+        for item in claim.applicability:
+            if item not in values:
+                values.append(item)
+    # Delay-only conclusions still need eligibility applicability on payment evidence;
+    # multi-problem scenarios reuse the richer claim set produced by the action loop.
+    if risk_scenario == "LOGISTICS_DELAY":
+        return [
+            {
+                "evidenceReference": reference,
+                "applicability": applicability,
+            }
+            for reference, applicability in merged.items()
+        ]
+    return [
+        {
+            "evidenceReference": reference,
+            "applicability": applicability,
+        }
+        for reference, applicability in merged.items()
+    ]
 
 
 def select_work(state: BaselineState) -> str:

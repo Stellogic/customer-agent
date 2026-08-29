@@ -103,6 +103,46 @@ class EvidenceSufficiencyPolicyTest {
                 .isEqualTo("INVALID_EVIDENCE_APPLICABILITY");
     }
 
+    @Test
+    void acceptsMultiProblemScenariosWithScenarioSpecificRequiredFacts() {
+        assertThat(
+                        EvidenceSufficiencyPolicy.validate(
+                                conclusionFor(
+                                        InvestigationRiskScenario.PACKAGE_SIGNED_NOT_RECEIVED,
+                                        DecisionReasonCode.PACKAGE_SIGNED_NOT_RECEIVED,
+                                        logisticsStatusEvidence()),
+                                logisticsStatusFacts(),
+                                NOW))
+                .isNull();
+        assertThat(
+                        EvidenceSufficiencyPolicy.validate(
+                                conclusionFor(
+                                        InvestigationRiskScenario.DUPLICATE_CHARGE,
+                                        DecisionReasonCode.DUPLICATE_CHARGE,
+                                        paymentEvidence()),
+                                paymentFacts(),
+                                NOW))
+                .isNull();
+        assertThat(
+                        EvidenceSufficiencyPolicy.validate(
+                                conclusionFor(
+                                        InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE,
+                                        DecisionReasonCode.ORDER_RULE_EXPLAINED,
+                                        orderRuleEvidence()),
+                                orderRuleFacts(),
+                                NOW))
+                .isNull();
+        assertThat(
+                        EvidenceSufficiencyPolicy.validate(
+                                conclusionFor(
+                                        InvestigationRiskScenario.OTHER_GENERAL,
+                                        DecisionReasonCode.OTHER_REQUIRES_HUMAN,
+                                        otherEvidence()),
+                                otherFacts(),
+                                NOW))
+                .isNull();
+    }
+
     private static List<PersistedInvestigationFact> replace(
             String factType, PersistedInvestigationFact replacement) {
         return sufficientFacts().stream()
@@ -176,6 +216,116 @@ class EvidenceSufficiencyPolicyTest {
                         publicEvidence,
                         false,
                         "ORDER-122"));
+    }
+
+    private static InvestigationConclusion conclusionFor(
+            InvestigationRiskScenario scenario,
+            DecisionReasonCode reasonCode,
+            List<ConclusionEvidence> evidence) {
+        List<String> publicEvidence = List.of("order:ORDER-122", "logistics:ORDER-122");
+        return new InvestigationConclusion(
+                false,
+                reasonCode,
+                0,
+                0,
+                "ORDER-122",
+                publicEvidence,
+                new EvidenceSufficiencyClaim(scenario, "evidence-sufficiency-v1", evidence),
+                new CustomerReplyEnvelope(
+                        "customer-reply-v1",
+                        "经核验，订单 ORDER-122 的问题已说明，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+                        CustomerReplyIntent.NO_COMPENSATION_RESOLUTION,
+                        publicEvidence,
+                        false,
+                        "ORDER-122"));
+    }
+
+    private static List<PersistedInvestigationFact> logisticsStatusFacts() {
+        Instant validUntil = NOW.plusSeconds(60);
+        return List.of(
+                fact("ORDER", "ORDER-122", "order:ORDER-122", validUntil),
+                fact("LOGISTICS_STATUS", "SIGNED", "logistics:ORDER-122", validUntil),
+                fact("PAYMENT", "PAID", "payment:ORDER-122", validUntil),
+                fact("ORDER_CANCELLATION", "NOT_CANCELLED", "payment:ORDER-122", validUntil),
+                fact("REFUND_STATUS", "NOT_FULLY_REFUNDED", "payment:ORDER-122", validUntil),
+                fact("EXISTING_COMPENSATION", "false", "compensation:ORDER-122", validUntil),
+                fact("PENDING_ACTION_COUNT", "0", "order-actions:ORDER-122", validUntil),
+                fact("POLICY", "delay-policy-v1", "policy:delay-policy-v1", validUntil));
+    }
+
+    private static List<PersistedInvestigationFact> paymentFacts() {
+        Instant validUntil = NOW.plusSeconds(60);
+        return List.of(
+                fact("ORDER", "ORDER-122", "order:ORDER-122", validUntil),
+                fact("PAYMENT", "PAID", "payment:ORDER-122", validUntil),
+                fact("ORDER_CANCELLATION", "NOT_CANCELLED", "payment:ORDER-122", validUntil),
+                fact("REFUND_STATUS", "NOT_FULLY_REFUNDED", "payment:ORDER-122", validUntil),
+                fact("EXISTING_COMPENSATION", "false", "compensation:ORDER-122", validUntil),
+                fact("PENDING_ACTION_COUNT", "0", "order-actions:ORDER-122", validUntil),
+                fact("POLICY", "delay-policy-v1", "policy:delay-policy-v1", validUntil));
+    }
+
+    private static List<PersistedInvestigationFact> orderRuleFacts() {
+        Instant validUntil = NOW.plusSeconds(60);
+        return List.of(
+                fact("ORDER", "ORDER-122", "order:ORDER-122", validUntil),
+                fact(
+                        "ORDER_RULE",
+                        "ADDRESS_CHANGE_AND_CANCEL_RULES_V1",
+                        "order-rule:ORDER-122",
+                        validUntil),
+                fact("PAYMENT", "PAID", "payment:ORDER-122", validUntil),
+                fact("ORDER_CANCELLATION", "NOT_CANCELLED", "payment:ORDER-122", validUntil),
+                fact("PENDING_ACTION_COUNT", "0", "order-actions:ORDER-122", validUntil),
+                fact("POLICY", "delay-policy-v1", "policy:delay-policy-v1", validUntil));
+    }
+
+    private static List<PersistedInvestigationFact> otherFacts() {
+        Instant validUntil = NOW.plusSeconds(60);
+        return List.of(
+                fact("ORDER", "ORDER-122", "order:ORDER-122", validUntil),
+                fact("PENDING_ACTION_COUNT", "0", "order-actions:ORDER-122", validUntil),
+                fact("POLICY", "delay-policy-v1", "policy:delay-policy-v1", validUntil));
+    }
+
+    private static List<ConclusionEvidence> logisticsStatusEvidence() {
+        return List.of(
+                evidence("order:ORDER-122", EvidenceApplicability.ORDER_IDENTITY),
+                evidence("logistics:ORDER-122", EvidenceApplicability.LOGISTICS_STATUS),
+                evidence("payment:ORDER-122", EvidenceApplicability.ORDER_ELIGIBILITY),
+                evidence("compensation:ORDER-122", EvidenceApplicability.EXISTING_COMPENSATION),
+                evidence("order-actions:ORDER-122", EvidenceApplicability.PENDING_ACTIONS),
+                evidence("policy:delay-policy-v1", EvidenceApplicability.POLICY_BASIS));
+    }
+
+    private static List<ConclusionEvidence> paymentEvidence() {
+        return List.of(
+                evidence("order:ORDER-122", EvidenceApplicability.ORDER_IDENTITY),
+                new ConclusionEvidence(
+                        "payment:ORDER-122",
+                        List.of(
+                                EvidenceApplicability.PAYMENT_STATUS,
+                                EvidenceApplicability.ORDER_ELIGIBILITY,
+                                EvidenceApplicability.REFUND_STATUS)),
+                evidence("compensation:ORDER-122", EvidenceApplicability.EXISTING_COMPENSATION),
+                evidence("order-actions:ORDER-122", EvidenceApplicability.PENDING_ACTIONS),
+                evidence("policy:delay-policy-v1", EvidenceApplicability.POLICY_BASIS));
+    }
+
+    private static List<ConclusionEvidence> orderRuleEvidence() {
+        return List.of(
+                evidence("order:ORDER-122", EvidenceApplicability.ORDER_IDENTITY),
+                evidence("order-rule:ORDER-122", EvidenceApplicability.ORDER_RULE),
+                evidence("payment:ORDER-122", EvidenceApplicability.ORDER_ELIGIBILITY),
+                evidence("order-actions:ORDER-122", EvidenceApplicability.PENDING_ACTIONS),
+                evidence("policy:delay-policy-v1", EvidenceApplicability.POLICY_BASIS));
+    }
+
+    private static List<ConclusionEvidence> otherEvidence() {
+        return List.of(
+                evidence("order:ORDER-122", EvidenceApplicability.ORDER_IDENTITY),
+                evidence("order-actions:ORDER-122", EvidenceApplicability.PENDING_ACTIONS),
+                evidence("policy:delay-policy-v1", EvidenceApplicability.POLICY_BASIS));
     }
 
     private static ConclusionEvidence evidence(
