@@ -87,6 +87,9 @@ class SupportReplyUncertainError extends Error {}
 
 class SupportReplyRejectedError extends Error {}
 
+type PendingSupportReply = { idempotencyKey: string; body: string };
+const PENDING_REPLY_STORAGE_PREFIX = "support-workbench:pending-reply:";
+
 export function SupportWorkbench() {
   const [workspaceMode, setWorkspaceMode] = useState<"tickets" | "intake">("tickets");
   const [snapshot, setSnapshot] = useState<WorkbenchSnapshot | null>(null);
@@ -310,7 +313,7 @@ export function SupportWorkbench() {
     return value;
   }
 
-  async function sendPublicReply(ticketId: string, messageId: string, body: string) {
+  async function sendPublicReply(ticketId: string, idempotencyKey: string, body: string) {
     let csrf: Awaited<ReturnType<typeof loadCsrfToken>>;
     try {
       csrf = await loadCsrfToken();
@@ -326,7 +329,7 @@ export function SupportWorkbench() {
         headers: {
           [csrf.headerName]: csrf.token,
           "Content-Type": "application/json",
-          "Idempotency-Key": messageId,
+          "Idempotency-Key": idempotencyKey,
         },
         body: JSON.stringify({ schema: SUPPORT_SCHEMA, message: body }),
       });
@@ -348,20 +351,25 @@ export function SupportWorkbench() {
       );
     }
     const result =
-      (await parseReplyResponse(response, ticketId, messageId)) as SupportPublicReplyResponse;
+      (await parseReplyResponse(response, ticketId, idempotencyKey)) as SupportPublicReplyResponse;
     void refreshTicketDetails(ticketId);
     return result;
   }
 
-  async function queryPublicReply(ticketId: string, messageId: string) {
+  async function queryPublicReply(ticketId: string, idempotencyKey: string) {
     let response: Response;
     try {
       response = await humanSessionFetch(
-        `/api/support/workbench/tickets/${ticketId}/messages/${encodeURIComponent(messageId)}`,
+        `/api/support/workbench/tickets/${ticketId}/messages/${encodeURIComponent(idempotencyKey)}`,
         { credentials: "same-origin", cache: "no-store" },
       );
     } catch {
       throw new SupportReplyUncertainError("仍无法连接 Spring；请稍后再次查询发送结果。");
+    }
+    if (response.status === 404) {
+      throw new SupportReplyRejectedError(
+        "Spring 未找到该发送请求，可以安全重试公开回复。",
+      );
     }
     if (!response.ok) {
       throw new SupportReplyUncertainError(
@@ -369,7 +377,7 @@ export function SupportWorkbench() {
       );
     }
     const result =
-      (await parseReplyResponse(response, ticketId, messageId)) as SupportPublicReplyResponse;
+      (await parseReplyResponse(response, ticketId, idempotencyKey)) as SupportPublicReplyResponse;
     void refreshTicketDetails(ticketId);
     return result;
   }
@@ -377,14 +385,14 @@ export function SupportWorkbench() {
   async function parseReplyResponse(
     response: Response,
     ticketId: string,
-    messageId: string,
+    idempotencyKey: string,
   ) {
     try {
       const value = (await response.json()) as unknown;
       if (
         !isSupportReplyResponse(value) ||
         value.ticketId !== ticketId ||
-        value.messageId !== messageId
+        value.messageId !== idempotencyKey
       )
         throw new Error("incompatible reply response");
       return value;
@@ -688,29 +696,42 @@ function TicketDetail({
   onCopyError: (message: string) => void;
   onSendReply: (
     ticketId: string,
-    messageId: string,
+    idempotencyKey: string,
     body: string,
   ) => Promise<SupportPublicReplyResponse>;
-  onQueryReply: (ticketId: string, messageId: string) => Promise<SupportPublicReplyResponse>;
+  onQueryReply: (
+    ticketId: string,
+    idempotencyKey: string,
+  ) => Promise<SupportPublicReplyResponse>;
 }) {
-  const [draft, setDraft] = useState("");
+  const storedPendingReply = readPendingReply(details.ticketId);
+  const [draft, setDraft] = useState(
+    () => storedPendingReply?.body ?? "",
+  );
   const [replyState, setReplyState] = useState<
     "idle" | "sending" | "unknown" | "querying" | "error"
-  >("idle");
-  const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
-  const [replyNotice, setReplyNotice] = useState("");
+  >(() => (storedPendingReply ? "unknown" : "idle"));
+  const [pendingIdempotencyKey, setPendingIdempotencyKey] = useState<string | null>(
+    () => storedPendingReply?.idempotencyKey ?? null,
+  );
+  const [replyNotice, setReplyNotice] = useState(() =>
+    storedPendingReply ? "上次公开回复的发送结果尚未确认，请查询 Spring 权威结果。" : "",
+  );
+  const replyBusy = replyState === "sending" || replyState === "querying";
 
   async function submitReply() {
     const body = draft.trim();
     if (!body || replyState === "sending" || replyState === "querying") return;
-    const messageId = createMessageId();
-    setPendingMessageId(messageId);
+    const idempotencyKey = createMessageId();
+    storePendingReply(details.ticketId, { idempotencyKey, body });
+    setPendingIdempotencyKey(idempotencyKey);
     setReplyState("sending");
     setReplyNotice("");
     try {
-      await onSendReply(details.ticketId, messageId, body);
+      await onSendReply(details.ticketId, idempotencyKey, body);
+      clearPendingReply(details.ticketId);
       setDraft("");
-      setPendingMessageId(null);
+      setPendingIdempotencyKey(null);
       setReplyState("idle");
       setReplyNotice("公开回复已由 Spring 保存并对客户可见。");
     } catch (error) {
@@ -718,7 +739,8 @@ function TicketDetail({
         setReplyState("unknown");
         setReplyNotice(error.message);
       } else {
-        setPendingMessageId(null);
+        clearPendingReply(details.ticketId);
+        setPendingIdempotencyKey(null);
         setReplyState("error");
         setReplyNotice(
           error instanceof Error ? error.message : "公开回复未被接受，请稍后重试。",
@@ -728,13 +750,14 @@ function TicketDetail({
   }
 
   async function queryReplyResult() {
-    if (!pendingMessageId || replyState === "querying") return;
+    if (!pendingIdempotencyKey || replyState === "querying") return;
     setReplyState("querying");
     setReplyNotice("正在查询 Spring 权威发送结果…");
     try {
-      await onQueryReply(details.ticketId, pendingMessageId);
+      await onQueryReply(details.ticketId, pendingIdempotencyKey);
+      clearPendingReply(details.ticketId);
       setDraft("");
-      setPendingMessageId(null);
+      setPendingIdempotencyKey(null);
       setReplyState("idle");
       setReplyNotice("已从 Spring 权威结果确认公开回复已保存。");
     } catch (error) {
@@ -774,8 +797,8 @@ function TicketDetail({
             <dd>{details.handlingMode === "HUMAN" ? "人工处理" : "Agent 处理"}</dd>
           </div>
           <div>
-            <dt>负责人</dt>
-            <dd>{details.assignedSupportId ?? "当前客服"}</dd>
+            <dt>负责客服</dt>
+            <dd>{details.assignedSupportId ?? "当前负责客服"}</dd>
           </div>
         </dl>
         <section aria-labelledby="support-description-title">
@@ -788,7 +811,7 @@ function TicketDetail({
         <section className="support-reply-composer" aria-labelledby="support-reply-title">
           <div className="support-reply-heading">
             <div>
-              <p className="eyebrow">CUSTOMER VISIBLE</p>
+              <p className="eyebrow">客户可见</p>
               <h3 id="support-reply-title">人工公开回复</h3>
             </div>
             <span>由当前客服责任授权</span>
@@ -799,11 +822,7 @@ function TicketDetail({
             maxLength={2000}
             onChange={(event) => setDraft(event.target.value)}
             placeholder="写下客户可以看到的回复…"
-            disabled={
-              replyState === "sending" ||
-              replyState === "querying" ||
-              replyState === "unknown"
-            }
+            disabled={replyBusy || replyState === "unknown"}
             rows={4}
           />
           <div className="support-reply-actions">
@@ -811,22 +830,17 @@ function TicketDetail({
             <button
               type="button"
               onClick={() => void submitReply()}
-              disabled={
-                !draft.trim() ||
-                replyState === "sending" ||
-                replyState === "querying" ||
-                replyState === "unknown"
-              }
+              disabled={!draft.trim() || replyBusy || replyState === "unknown"}
             >
               {replyState === "sending" ? "正在发送…" : "发送公开回复"}
             </button>
           </div>
-          {replyState === "unknown" && pendingMessageId && (
+          {replyState === "unknown" && pendingIdempotencyKey && (
             <button
               type="button"
               className="support-reply-query"
               onClick={() => void queryReplyResult()}
-              disabled={replyState === "querying"}
+              disabled={replyBusy}
             >
               查询发送结果
             </button>
@@ -1120,6 +1134,50 @@ function isSupportReplyResponse(value: unknown): value is SupportPublicReplyResp
 
 function createMessageId() {
   return globalThis.crypto.randomUUID();
+}
+
+function readPendingReply(ticketId: string): PendingSupportReply | null {
+  try {
+    const raw = globalThis.sessionStorage.getItem(pendingReplyStorageKey(ticketId));
+    if (!raw) return null;
+    const value = JSON.parse(raw) as unknown;
+    if (
+      !isRecord(value) ||
+      typeof value.idempotencyKey !== "string" ||
+      value.idempotencyKey.trim().length === 0 ||
+      value.idempotencyKey.length > 200 ||
+      typeof value.body !== "string" ||
+      value.body.trim().length === 0 ||
+      value.body.length > 2000
+    )
+      return null;
+    return { idempotencyKey: value.idempotencyKey, body: value.body };
+  } catch {
+    return null;
+  }
+}
+
+function storePendingReply(ticketId: string, reply: PendingSupportReply) {
+  try {
+    globalThis.sessionStorage.setItem(
+      pendingReplyStorageKey(ticketId),
+      JSON.stringify(reply),
+    );
+  } catch {
+    // Query remains available during this render even if browser storage is unavailable.
+  }
+}
+
+function clearPendingReply(ticketId: string) {
+  try {
+    globalThis.sessionStorage.removeItem(pendingReplyStorageKey(ticketId));
+  } catch {
+    // Storage failures must not change the authoritative reply result.
+  }
+}
+
+function pendingReplyStorageKey(ticketId: string) {
+  return `${PENDING_REPLY_STORAGE_PREFIX}${ticketId}`;
 }
 
 function isLifecycleState(value: unknown): value is LifecycleState {

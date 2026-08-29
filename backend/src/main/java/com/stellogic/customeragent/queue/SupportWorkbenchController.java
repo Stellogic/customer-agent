@@ -70,12 +70,13 @@ public final class SupportWorkbenchController {
     ResponseEntity<PublicReplyResponse> publicReply(
             Authentication authentication,
             @PathVariable UUID ticketId,
-            @RequestHeader("Idempotency-Key") String messageId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestBody Map<String, Object> request) {
-        String normalizedMessageId = requireMessageId(messageId);
+        String normalizedIdempotencyKey = requireIdempotencyKey(idempotencyKey);
         String body = requireReplyBody(request);
         SupportPublicReplyResult result =
-                service.publicReply(authentication.getName(), ticketId, normalizedMessageId, body);
+                service.publicReply(
+                        authentication.getName(), ticketId, normalizedIdempotencyKey, body);
         return ResponseEntity.status(result.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .cacheControl(CacheControl.noStore())
                 .body(PublicReplyResponse.from(result));
@@ -88,7 +89,7 @@ public final class SupportWorkbenchController {
             @PathVariable String messageId) {
         SupportPublicReplyResult result =
                 service.queryPublicReply(
-                        authentication.getName(), ticketId, requireMessageId(messageId));
+                        authentication.getName(), ticketId, requireIdempotencyKey(messageId));
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(PublicReplyResponse.from(result));
@@ -239,11 +240,13 @@ public final class SupportWorkbenchController {
         }
     }
 
-    private static String requireMessageId(String messageId) {
-        if (messageId == null || messageId.isBlank() || messageId.length() > 200) {
+    private static String requireIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null
+                || idempotencyKey.isBlank()
+                || idempotencyKey.length() > 200) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key 无效");
         }
-        return messageId.trim();
+        return idempotencyKey.trim();
     }
 
     private static String requireReplyBody(Map<String, Object> request) {

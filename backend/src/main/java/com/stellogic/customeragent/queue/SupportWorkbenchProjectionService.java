@@ -18,6 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 class SupportWorkbenchProjectionService {
     static final String LEGACY_EPOCH = "support-workbench-v1";
     static final String EPOCH = "support-workbench-v2";
+    private static final Set<SupportTicketLifecycleState> PUBLIC_REPLY_LIFECYCLE_STATES =
+            Set.of(
+                    SupportTicketLifecycleState.NEW,
+                    SupportTicketLifecycleState.INVESTIGATING,
+                    SupportTicketLifecycleState.WAITING_FOR_CUSTOMER,
+                    SupportTicketLifecycleState.WAITING_FOR_EXTERNAL);
     private final JdbcTemplate jdbc;
     private final TicketAuthorityLock ticketLock;
     private final CustomerPublicProjectionAppender publicProjection;
@@ -196,14 +202,19 @@ class SupportWorkbenchProjectionService {
 
     @Transactional
     SupportPublicReplyResult publicReply(
-            String supportId, UUID ticketId, String messageId, String body) {
+            String supportId, UUID ticketId, String idempotencyKey, String body) {
         requireSupportPrincipal(supportId);
         String normalizedBody = body == null ? "" : body.trim();
         String digest = StableParameterDigest.sha256(ticketId.toString(), normalizedBody);
         ticketLock.acquire(ticketId);
-        lockReplyRequest(supportId, messageId);
+        lockReplyRequest(supportId, idempotencyKey);
 
-        List<SupportReplyRequest> existing = findReplyRequest(supportId, messageId);
+        SupportTicketScope ticket = currentTicketScope(supportId, ticketId);
+        if (ticket == null) throw new SupportTicketNotFoundException();
+
+        // A POST replay still requires current send authority; the query endpoint below is the
+        // read-only recovery path when the assignment has been revoked after an uncertain reply.
+        List<SupportReplyRequest> existing = findReplyRequest(supportId, idempotencyKey);
         if (!existing.isEmpty()) {
             SupportReplyRequest record = existing.getFirst();
             if (!record.ticketId().equals(ticketId) || !record.digest().equals(digest)) {
@@ -211,14 +222,12 @@ class SupportWorkbenchProjectionService {
             }
             return new SupportPublicReplyResult(
                     record.ticketId(),
-                    messageId,
+                    idempotencyKey,
                     record.publicMessageId(),
                     record.outcome(),
                     true);
         }
 
-        SupportTicketScope ticket = currentTicketScope(supportId, ticketId);
-        if (ticket == null) throw new SupportTicketNotFoundException();
         requireReplyAllowed(ticket);
 
         if (publicProjection == null) {
@@ -234,7 +243,7 @@ class SupportWorkbenchProjectionService {
                         + "(support_id, message_id, ticket_id, parameter_digest, public_message_id, outcome, received_at) "
                         + "values (?, ?, ?, ?, ?, 'ACCEPTED', ?)",
                 supportId,
-                messageId,
+                idempotencyKey,
                 ticketId,
                 digest,
                 publicMessageId,
@@ -245,19 +254,25 @@ class SupportWorkbenchProjectionService {
                 ticketId,
                 supportId,
                 databaseTime);
-        return new SupportPublicReplyResult(ticketId, messageId, publicMessageId, "ACCEPTED", false);
+        return new SupportPublicReplyResult(
+                ticketId, idempotencyKey, publicMessageId, "ACCEPTED", false);
     }
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
-    SupportPublicReplyResult queryPublicReply(String supportId, UUID ticketId, String messageId) {
+    SupportPublicReplyResult queryPublicReply(
+            String supportId, UUID ticketId, String idempotencyKey) {
         requireSupportPrincipal(supportId);
-        List<SupportReplyRequest> requests = findReplyRequest(supportId, messageId);
+        List<SupportReplyRequest> requests = findReplyRequest(supportId, idempotencyKey);
         if (requests.isEmpty() || !ticketId.equals(requests.getFirst().ticketId())) {
             throw new SupportTicketNotFoundException();
         }
         SupportReplyRequest record = requests.getFirst();
         return new SupportPublicReplyResult(
-                record.ticketId(), messageId, record.publicMessageId(), record.outcome(), true);
+                record.ticketId(),
+                idempotencyKey,
+                record.publicMessageId(),
+                record.outcome(),
+                true);
     }
 
     private UUID currentAssignmentTicketId(String supportId) {
@@ -282,13 +297,15 @@ class SupportWorkbenchProjectionService {
                                 + "and t.lifecycle_state not in ('RESOLVED', 'CLOSED') "
                                 + "for update of t, a",
                         (rs, row) ->
-                                new SupportTicketScope(rs.getString(1), rs.getString(2)),
+                                new SupportTicketScope(
+                                        SupportTicketLifecycleState.valueOf(rs.getString(1)),
+                                        SupportHandlingMode.valueOf(rs.getString(2))),
                         ticketId,
                         supportId);
         return tickets.isEmpty() ? null : tickets.getFirst();
     }
 
-    private List<SupportReplyRequest> findReplyRequest(String supportId, String messageId) {
+    private List<SupportReplyRequest> findReplyRequest(String supportId, String idempotencyKey) {
         return jdbc.query(
                 "select ticket_id, parameter_digest, public_message_id, outcome "
                         + "from support_public_message_request where support_id = ? and message_id = ?",
@@ -299,20 +316,19 @@ class SupportWorkbenchProjectionService {
                                 rs.getObject(3, UUID.class),
                                 rs.getString(4)),
                 supportId,
-                messageId);
+                idempotencyKey);
     }
 
-    private void lockReplyRequest(String supportId, String messageId) {
+    private void lockReplyRequest(String supportId, String idempotencyKey) {
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 resultSet -> null,
-                supportId + "\nSUPPORT_PUBLIC_REPLY\n" + messageId);
+                supportId + "\nSUPPORT_PUBLIC_REPLY\n" + idempotencyKey);
     }
 
     private static void requireReplyAllowed(SupportTicketScope ticket) {
-        if (!Set.of("NEW", "INVESTIGATING", "WAITING_FOR_CUSTOMER", "WAITING_FOR_EXTERNAL")
-                        .contains(ticket.lifecycleState())
-                || !"HUMAN".equals(ticket.handlingMode())) {
+        if (!PUBLIC_REPLY_LIFECYCLE_STATES.contains(ticket.lifecycleState())
+                || ticket.handlingMode() != SupportHandlingMode.HUMAN) {
             throw new SupportPublicReplyNotAllowedException();
         }
     }
@@ -357,7 +373,8 @@ class SupportWorkbenchProjectionService {
 
     private record WorkbenchCursor(String epoch, long sequence) {}
 
-    private record SupportTicketScope(String lifecycleState, String handlingMode) {}
+    private record SupportTicketScope(
+            SupportTicketLifecycleState lifecycleState, SupportHandlingMode handlingMode) {}
 
     private record SupportReplyRequest(
             UUID ticketId, String digest, UUID publicMessageId, String outcome) {}
