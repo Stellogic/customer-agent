@@ -211,9 +211,11 @@ public final class AgentInvestigationController {
                     requiredLong(payload, "delaySeconds"),
                     requiredText(payload, "orderReference"),
                     requiredTextList(payload, "evidenceRefs"),
-                    InvestigationRiskScenario.valueOf(requiredText(payload, "riskScenario")),
-                    requiredText(payload, "sufficiencyPolicyVersion"),
-                    requiredEvidence(payload, "evidence"),
+                    new EvidenceSufficiencyClaim(
+                            InvestigationRiskScenario.valueOf(
+                                    requiredText(payload, "riskScenario")),
+                            requiredText(payload, "sufficiencyPolicyVersion"),
+                            requiredEvidence(payload, "evidence")),
                     new CustomerReplyEnvelope(
                             requiredText(reply, "schemaVersion"),
                             requiredText(reply, "body"),

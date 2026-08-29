@@ -333,9 +333,9 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         Long.toString(conclusion.delaySeconds()),
                         conclusion.orderReference(),
                         String.join("\n", conclusion.evidenceRefs()),
-                        conclusion.riskScenario().name(),
-                        conclusion.sufficiencyPolicyVersion(),
-                        evidenceDigest(conclusion.evidence()),
+                        conclusion.sufficiency().riskScenario().name(),
+                        conclusion.sufficiency().policyVersion(),
+                        evidenceDigest(conclusion.sufficiency().evidence()),
                         replyDigest(conclusion.customerReply()));
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
@@ -537,9 +537,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 || conclusion.evidenceRefs() == null
                 || conclusion.evidenceRefs().size() != 2
                 || conclusion.evidenceRefs().stream().anyMatch(Objects::isNull)
-                || conclusion.riskScenario() == null
-                || conclusion.sufficiencyPolicyVersion() == null
-                || conclusion.evidence() == null
+                || conclusion.sufficiency() == null
+                || conclusion.sufficiency().riskScenario() == null
+                || conclusion.sufficiency().policyVersion() == null
+                || conclusion.sufficiency().evidence() == null
                 || conclusion.customerReply() == null
                 || conclusion.customerReply().schemaVersion() == null
                 || conclusion.customerReply().body() == null

@@ -152,9 +152,10 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                 288000,
                 "ORDER-122",
                 evidence,
-                InvestigationRiskScenario.LOGISTICS_DELAY,
-                EvidenceSufficiencyPolicy.VERSION,
-                structuredEvidence("ORDER-122"),
+                new EvidenceSufficiencyClaim(
+                        InvestigationRiskScenario.LOGISTICS_DELAY,
+                        EvidenceSufficiencyPolicy.VERSION,
+                        structuredEvidence("ORDER-122")),
                 new CustomerReplyEnvelope(
                         "customer-reply-v1",
                         "订单 ORDER-122 的调查已完成，补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",

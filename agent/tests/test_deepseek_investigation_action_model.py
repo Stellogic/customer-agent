@@ -19,6 +19,9 @@ from baseline_agent.investigation_action_loop import (
 
 
 def _completed_action(action: str) -> dict:
+    structured: dict[str, object] = {"action": action}
+    if action == "SUBMIT_CONCLUSION":
+        structured["evidence"] = _evidence_payload()
     return {
         "id": "response-128",
         "status": "completed",
@@ -30,7 +33,7 @@ def _completed_action(action: str) -> dict:
                 "content": [
                     {
                         "type": "output_text",
-                        "text": json.dumps({"action": action}),
+                        "text": json.dumps(structured),
                     }
                 ],
             }
@@ -41,6 +44,39 @@ def _completed_action(action: str) -> dict:
             "total_tokens": 40,
         },
     }
+
+
+def _evidence_catalog() -> list[dict[str, object]]:
+    return [
+        {"actionType": "CONFIRM_ORDER", "evidenceReferences": ["order:ORDER-128"]},
+        {"actionType": "READ_LOGISTICS", "evidenceReferences": ["logistics:ORDER-128"]},
+        {
+            "actionType": "READ_PAYMENT_AND_REFUNDS",
+            "evidenceReferences": ["payment:ORDER-128"],
+        },
+        {
+            "actionType": "READ_COMPENSATION_AND_PENDING_ACTIONS",
+            "evidenceReferences": ["compensation:ORDER-128", "actions:ORDER-128"],
+        },
+        {
+            "actionType": "READ_APPLICABLE_POLICY",
+            "evidenceReferences": ["policy:delay-policy-v1"],
+        },
+    ]
+
+
+def _evidence_payload() -> list[dict[str, object]]:
+    return [
+        {"evidenceReference": "order:ORDER-128", "applicability": ["ORDER_IDENTITY"]},
+        {"evidenceReference": "logistics:ORDER-128", "applicability": ["DELAY_DURATION"]},
+        {"evidenceReference": "payment:ORDER-128", "applicability": ["ORDER_ELIGIBILITY"]},
+        {
+            "evidenceReference": "compensation:ORDER-128",
+            "applicability": ["EXISTING_COMPENSATION"],
+        },
+        {"evidenceReference": "actions:ORDER-128", "applicability": ["PENDING_ACTIONS"]},
+        {"evidenceReference": "policy:delay-policy-v1", "applicability": ["POLICY_BASIS"]},
+    ]
 
 
 @pytest.mark.asyncio
@@ -138,11 +174,15 @@ async def test_flash_allows_terminal_action_without_order_parameter() -> None:
             "existingCompensation": False,
             "pendingActionCount": 0,
             "policyVersion": "delay-policy-v1",
+            "evidenceCatalog": _evidence_catalog(),
         }
     )
 
     assert decision.action.kind is TerminalAction.SUBMIT_CONCLUSION
     assert decision.action.parameter_map == {}
+    assert [claim.evidence_reference for claim in decision.evidence_claims] == [
+        item["evidenceReference"] for item in _evidence_payload()
+    ]
 
 
 @pytest.mark.asyncio

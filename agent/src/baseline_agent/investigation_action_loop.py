@@ -60,6 +60,31 @@ class ActionUsage:
             raise ValueError("action usage must contain non-negative integer consumption")
 
 
+EVIDENCE_APPLICABILITIES = (
+    "ORDER_IDENTITY",
+    "DELAY_DURATION",
+    "ORDER_ELIGIBILITY",
+    "EXISTING_COMPENSATION",
+    "PENDING_ACTIONS",
+    "POLICY_BASIS",
+)
+
+
+@dataclass(frozen=True)
+class EvidenceClaim:
+    evidence_reference: str
+    applicability: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if (
+            not self.evidence_reference
+            or not self.applicability
+            or len(set(self.applicability)) != len(self.applicability)
+            or not set(self.applicability).issubset(EVIDENCE_APPLICABILITIES)
+        ):
+            raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION)
+
+
 @dataclass(frozen=True)
 class InvestigationAction:
     kind: ActionKind
@@ -74,10 +99,15 @@ class InvestigationAction:
 class ActionDecision:
     action: InvestigationAction
     usage: ActionUsage = ActionUsage()
+    evidence_claims: tuple[EvidenceClaim, ...] = ()
 
     @classmethod
     def from_values(
-        cls, kind: ActionKind | str, parameters: dict[str, str], usage: ActionUsage
+        cls,
+        kind: ActionKind | str,
+        parameters: dict[str, str],
+        usage: ActionUsage,
+        evidence_claims: tuple[EvidenceClaim, ...] = (),
     ) -> "ActionDecision":
         try:
             controlled_kind: ActionKind = InvestigationCapability(kind)
@@ -95,7 +125,15 @@ class ActionDecision:
             isinstance(value, str) and value for value in parameters.values()
         ):
             raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION)
-        return cls(InvestigationAction(controlled_kind, tuple(sorted(parameters.items()))), usage)
+        if controlled_kind is not TerminalAction.SUBMIT_CONCLUSION and evidence_claims:
+            raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION)
+        if len({claim.evidence_reference for claim in evidence_claims}) != len(evidence_claims):
+            raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION)
+        return cls(
+            InvestigationAction(controlled_kind, tuple(sorted(parameters.items()))),
+            usage,
+            evidence_claims,
+        )
 
 
 @dataclass(frozen=True)
@@ -169,6 +207,7 @@ class ActionLoopResult:
     cost_micros: int
     provider_attempts: int
     model_calls: tuple[ActionModelCallRecord, ...]
+    evidence_claims: tuple[EvidenceClaim, ...]
 
 
 @dataclass(frozen=True)
@@ -215,7 +254,10 @@ class DeterministicActionModel:
         for field, kind in path:
             if field not in facts:
                 return _decision(kind, {"orderReference": reference})
-        return _decision(TerminalAction.SUBMIT_CONCLUSION)
+        return _decision(
+            TerminalAction.SUBMIT_CONCLUSION,
+            evidence_claims=_deterministic_evidence_claims(facts.get("evidenceCatalog")),
+        )
 
 
 class InvestigationActionModel(Protocol):
@@ -254,7 +296,7 @@ class ActionLoop:
         step_started = self._clock()
         try:
             async with asyncio.timeout(progress.remaining_wall_clock_ms / 1000):
-                decision = await self._choose(dict(progress.facts))
+                decision = await self._choose(_choice_context(progress))
         except TimeoutError as error:
             raise self._progress_failure(
                 ActionLoopFailureCode.BUDGET_EXHAUSTED, progress
@@ -315,6 +357,11 @@ class ActionLoop:
         if progress.remaining_wall_clock_ms <= 0:
             raise self._progress_failure(ActionLoopFailureCode.BUDGET_EXHAUSTED, progress)
         if isinstance(decision.action.kind, TerminalAction):
+            if (
+                decision.action.kind is TerminalAction.SUBMIT_CONCLUSION
+                and not decision.evidence_claims
+            ):
+                raise self._progress_failure(ActionLoopFailureCode.UNKNOWN_ACTION, progress)
             progress.records.append(ActionRecord(decision.action.kind.value, (), "SELECTED"))
             return ActionLoopResult(
                 decision.action.kind,
@@ -324,6 +371,7 @@ class ActionLoop:
                 progress.cost_micros,
                 progress.provider_attempts,
                 tuple(progress.model_calls),
+                decision.evidence_claims,
             )
         try:
             tool_started = self._clock()
@@ -580,8 +628,61 @@ def _seen_from_checkpoint(value: object) -> tuple[InvestigationAction, int]:
     return decision.action, value["count"]
 
 
-def _decision(kind: ActionKind, parameters: dict[str, str] | None = None) -> ActionDecision:
-    return ActionDecision.from_values(kind, parameters or {}, ActionUsage())
+def _choice_context(progress: _ActionLoopProgress) -> dict[str, object]:
+    context = dict(progress.facts)
+    context["evidenceCatalog"] = [
+        {
+            "actionType": record.action_type,
+            "evidenceReferences": list(record.evidence_references),
+        }
+        for record in progress.records
+        if record.evidence_references
+    ]
+    return context
+
+
+def _deterministic_evidence_claims(catalog: object) -> tuple[EvidenceClaim, ...]:
+    if not isinstance(catalog, list):
+        return ()
+    references: dict[str, tuple[str, ...]] = {}
+    for item in catalog:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"actionType", "evidenceReferences"}
+            or not isinstance(item["actionType"], str)
+            or not isinstance(item["evidenceReferences"], list)
+            or not all(isinstance(ref, str) and ref for ref in item["evidenceReferences"])
+        ):
+            return ()
+        references[item["actionType"]] = tuple(item["evidenceReferences"])
+    required = {
+        InvestigationCapability.CONFIRM_ORDER.value: ((0, "ORDER_IDENTITY"),),
+        InvestigationCapability.READ_LOGISTICS.value: ((0, "DELAY_DURATION"),),
+        InvestigationCapability.READ_PAYMENT_AND_REFUNDS.value: ((0, "ORDER_ELIGIBILITY"),),
+        InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS.value: (
+            (0, "EXISTING_COMPENSATION"),
+            (1, "PENDING_ACTIONS"),
+        ),
+        InvestigationCapability.READ_APPLICABLE_POLICY.value: ((0, "POLICY_BASIS"),),
+    }
+    claims: list[EvidenceClaim] = []
+    try:
+        for action_type, mappings in required.items():
+            for index, applicability in mappings:
+                claims.append(EvidenceClaim(references[action_type][index], (applicability,)))
+    except (KeyError, IndexError):
+        return ()
+    return tuple(claims)
+
+
+def _decision(
+    kind: ActionKind,
+    parameters: dict[str, str] | None = None,
+    evidence_claims: tuple[EvidenceClaim, ...] = (),
+) -> ActionDecision:
+    return ActionDecision.from_values(
+        kind, parameters or {}, ActionUsage(), evidence_claims=evidence_claims
+    )
 
 
 def _bounded(name: str, default: int, minimum: int, maximum: int) -> int:

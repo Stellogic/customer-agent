@@ -155,10 +155,13 @@ record InvestigationConclusion(
         long delaySeconds,
         String orderReference,
         List<String> evidenceRefs,
-        InvestigationRiskScenario riskScenario,
-        String sufficiencyPolicyVersion,
-        List<ConclusionEvidence> evidence,
+        EvidenceSufficiencyClaim sufficiency,
         CustomerReplyEnvelope customerReply) {}
+
+record EvidenceSufficiencyClaim(
+        InvestigationRiskScenario riskScenario,
+        String policyVersion,
+        List<ConclusionEvidence> evidence) {}
 
 record ConclusionEvidence(String evidenceReference, List<EvidenceApplicability> applicability) {}
 

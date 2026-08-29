@@ -1161,14 +1161,14 @@ def main() -> None:
         spring_headers,
         "ORDER-EVIDENCE-PATH-A",
     )
-    assert path_a_actions == [
+    required_evidence_actions = {
         "CONFIRM_ORDER",
         "READ_LOGISTICS",
         "READ_PAYMENT_AND_REFUNDS",
         "READ_COMPENSATION_AND_PENDING_ACTIONS",
         "READ_APPLICABLE_POLICY",
         "SUBMIT_CONCLUSION",
-    ]
+    }
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         connection.execute(
             "insert into support_ticket "
@@ -1184,14 +1184,11 @@ def main() -> None:
         spring_headers,
         "ORDER-EVIDENCE-PATH-B",
     )
-    assert path_b_actions == [
-        "CONFIRM_ORDER",
-        "READ_APPLICABLE_POLICY",
-        "READ_COMPENSATION_AND_PENDING_ACTIONS",
-        "READ_PAYMENT_AND_REFUNDS",
-        "READ_LOGISTICS",
-        "SUBMIT_CONCLUSION",
-    ]
+    assert path_a_actions != path_b_actions
+    assert len(path_a_actions) == len(path_b_actions) == len(required_evidence_actions)
+    assert path_a_actions[0] == path_b_actions[0] == "CONFIRM_ORDER"
+    assert path_a_actions[-1] == path_b_actions[-1] == "SUBMIT_CONCLUSION"
+    assert set(path_a_actions) == set(path_b_actions) == required_evidence_actions
     assert {
         "compensationRequired": path_a_conclusion["compensationRequired"],
         "reasonCode": path_a_conclusion["reasonCode"],

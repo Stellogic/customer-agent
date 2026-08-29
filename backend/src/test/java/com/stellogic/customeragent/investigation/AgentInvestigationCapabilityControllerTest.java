@@ -233,15 +233,18 @@ class AgentInvestigationCapabilityControllerTest {
                         org.mockito.ArgumentMatchers.argThat(
                                 conclusion ->
                                         conclusion
+                                                        .sufficiency()
                                                         .riskScenario()
                                                         .equals(
                                                                 InvestigationRiskScenario
                                                                         .LOGISTICS_DELAY)
                                                 && conclusion
-                                                        .sufficiencyPolicyVersion()
+                                                        .sufficiency()
+                                                        .policyVersion()
                                                         .equals("evidence-sufficiency-v1")
-                                                && conclusion.evidence().size() == 6
+                                                && conclusion.sufficiency().evidence().size() == 6
                                                 && conclusion
+                                                        .sufficiency()
                                                         .evidence()
                                                         .getFirst()
                                                         .applicability()
@@ -272,6 +275,41 @@ class AgentInvestigationCapabilityControllerTest {
                                 .headers(conclusionHeaders())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(validConclusion(",\"rawModel\":\"forbidden\"")))
+                .andExpect(status().isUnprocessableEntity());
+
+        verify(service).auditRejected(TICKET_ID, "MALFORMED_CONCLUSION");
+        org.mockito.Mockito.verifyNoMoreInteractions(service);
+    }
+
+    @Test
+    void rejectsConfidenceWithoutAReviewableEvidenceSufficiencyClaim() throws Exception {
+        mvc.perform(
+                        post(
+                                        "/internal/agent/tickets/{ticketId}/generations/{generationId}/conclusions",
+                                        TICKET_ID,
+                                        GENERATION_ID)
+                                .headers(conclusionHeaders())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {
+                                          "compensationRequired": true,
+                                          "reasonCode": "LOGISTICS_DELAY",
+                                          "delayHours": 80,
+                                          "delaySeconds": 288000,
+                                          "orderReference": "ORDER-122",
+                                          "evidenceRefs": ["order:ORDER-122"],
+                                          "confidence": 0.99,
+                                          "customerReply": {
+                                            "schemaVersion": "customer-reply-v1",
+                                            "body": "订单 ORDER-122 的调查已完成，正在等待人工审批。",
+                                            "intent": "COMPENSATION_REVIEW_PENDING",
+                                            "evidenceRefs": ["order:ORDER-122"],
+                                            "escalationRequired": false,
+                                            "referencedOrder": "ORDER-122"
+                                          }
+                                        }
+                                        """))
                 .andExpect(status().isUnprocessableEntity());
 
         verify(service).auditRejected(TICKET_ID, "MALFORMED_CONCLUSION");

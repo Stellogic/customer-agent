@@ -75,7 +75,7 @@ class EvidenceSufficiencyPolicyTest {
     }
 
     @Test
-    void confidenceEvidenceCountAndACompletedToolListCannotReplaceApplicability() {
+    void evidenceCountAndACompletedToolListCannotReplaceApplicability() {
         InvestigationConclusion missingApplicability =
                 new InvestigationConclusion(
                         true,
@@ -84,16 +84,19 @@ class EvidenceSufficiencyPolicyTest {
                         288000,
                         "ORDER-122",
                         List.of("order:ORDER-122", "logistics:ORDER-122"),
-                        InvestigationRiskScenario.LOGISTICS_DELAY,
-                        "evidence-sufficiency-v1",
-                        conclusion().evidence().stream()
-                                .map(
-                                        item ->
-                                                item.evidenceReference().equals("payment:ORDER-122")
-                                                        ? new ConclusionEvidence(
-                                                                item.evidenceReference(), List.of())
-                                                        : item)
-                                .toList(),
+                        new EvidenceSufficiencyClaim(
+                                InvestigationRiskScenario.LOGISTICS_DELAY,
+                                "evidence-sufficiency-v1",
+                                conclusion().sufficiency().evidence().stream()
+                                        .map(
+                                                item ->
+                                                        item.evidenceReference()
+                                                                        .equals("payment:ORDER-122")
+                                                                ? new ConclusionEvidence(
+                                                                        item.evidenceReference(),
+                                                                        List.of())
+                                                                : item)
+                                        .toList()),
                         conclusion().customerReply());
 
         assertThat(EvidenceSufficiencyPolicy.validate(missingApplicability, sufficientFacts(), NOW))
@@ -146,17 +149,26 @@ class EvidenceSufficiencyPolicyTest {
                 288000,
                 "ORDER-122",
                 publicEvidence,
-                InvestigationRiskScenario.LOGISTICS_DELAY,
-                "evidence-sufficiency-v1",
-                List.of(
-                        evidence("order:ORDER-122", EvidenceApplicability.ORDER_IDENTITY),
-                        evidence("logistics:ORDER-122", EvidenceApplicability.DELAY_DURATION),
-                        evidence("payment:ORDER-122", EvidenceApplicability.ORDER_ELIGIBILITY),
-                        evidence(
-                                "compensation:ORDER-122",
-                                EvidenceApplicability.EXISTING_COMPENSATION),
-                        evidence("order-actions:ORDER-122", EvidenceApplicability.PENDING_ACTIONS),
-                        evidence("policy:delay-policy-v1", EvidenceApplicability.POLICY_BASIS)),
+                new EvidenceSufficiencyClaim(
+                        InvestigationRiskScenario.LOGISTICS_DELAY,
+                        "evidence-sufficiency-v1",
+                        List.of(
+                                evidence("order:ORDER-122", EvidenceApplicability.ORDER_IDENTITY),
+                                evidence(
+                                        "logistics:ORDER-122",
+                                        EvidenceApplicability.DELAY_DURATION),
+                                evidence(
+                                        "payment:ORDER-122",
+                                        EvidenceApplicability.ORDER_ELIGIBILITY),
+                                evidence(
+                                        "compensation:ORDER-122",
+                                        EvidenceApplicability.EXISTING_COMPENSATION),
+                                evidence(
+                                        "order-actions:ORDER-122",
+                                        EvidenceApplicability.PENDING_ACTIONS),
+                                evidence(
+                                        "policy:delay-policy-v1",
+                                        EvidenceApplicability.POLICY_BASIS))),
                 new CustomerReplyEnvelope(
                         "customer-reply-v1",
                         "订单 ORDER-122 的调查已完成，正在等待人工审批。",

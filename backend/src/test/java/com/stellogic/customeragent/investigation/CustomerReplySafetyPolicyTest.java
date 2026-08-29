@@ -121,11 +121,13 @@ class CustomerReplySafetyPolicyTest {
                 288000,
                 ORDER,
                 EVIDENCE,
-                InvestigationRiskScenario.LOGISTICS_DELAY,
-                EvidenceSufficiencyPolicy.VERSION,
-                List.of(
-                        new ConclusionEvidence(
-                                "order:ORDER-122", List.of(EvidenceApplicability.ORDER_IDENTITY))),
+                new EvidenceSufficiencyClaim(
+                        InvestigationRiskScenario.LOGISTICS_DELAY,
+                        EvidenceSufficiencyPolicy.VERSION,
+                        List.of(
+                                new ConclusionEvidence(
+                                        "order:ORDER-122",
+                                        List.of(EvidenceApplicability.ORDER_IDENTITY)))),
                 reply);
     }
 

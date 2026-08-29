@@ -29,11 +29,13 @@ final class EvidenceSufficiencyPolicy {
             InvestigationConclusion conclusion,
             List<PersistedInvestigationFact> facts,
             Instant now) {
-        if (conclusion.riskScenario() != InvestigationRiskScenario.LOGISTICS_DELAY
-                || !VERSION.equals(conclusion.sufficiencyPolicyVersion())) {
+        EvidenceSufficiencyClaim sufficiency = conclusion.sufficiency();
+        if (sufficiency == null
+                || sufficiency.riskScenario() != InvestigationRiskScenario.LOGISTICS_DELAY
+                || !VERSION.equals(sufficiency.policyVersion())) {
             return "UNSUPPORTED_RISK_SCENARIO";
         }
-        String shapeFailure = validateEvidenceShape(conclusion.evidence());
+        String shapeFailure = validateEvidenceShape(sufficiency.evidence());
         if (shapeFailure != null) return shapeFailure;
         if (facts.isEmpty()) return "EVIDENCE_OUT_OF_SCOPE";
 
@@ -51,7 +53,7 @@ final class EvidenceSufficiencyPolicy {
         }
 
         Map<String, ConclusionEvidence> evidenceByReference = new HashMap<>();
-        for (ConclusionEvidence item : conclusion.evidence()) {
+        for (ConclusionEvidence item : sufficiency.evidence()) {
             evidenceByReference.put(item.evidenceReference(), item);
             List<PersistedInvestigationFact> referencedFacts =
                     factsByReference.get(item.evidenceReference());
