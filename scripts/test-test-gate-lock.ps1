@@ -41,8 +41,9 @@ function Invoke-LockCli {
 
 function Start-LockHolder {
     param(
-        [string[]]$ExtraArgs = @(),
-        [int]$HoldSeconds = 90
+        [int]$HoldSeconds = 90,
+        [string]$ComposeProject,
+        [string]$ImageTag
     )
     $outFile = Join-Path $env:TEMP "test-gate-hold-$identity.out"
     $errFile = Join-Path $env:TEMP "test-gate-hold-$identity.err"
@@ -51,13 +52,14 @@ function Start-LockHolder {
     $savedIdentity = $env:CUSTOMER_AGENT_TEST_GATE_IDENTITY
     Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_TOKEN -ErrorAction SilentlyContinue
     Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_IDENTITY -ErrorAction SilentlyContinue
-    $argumentList = @(
-        '-NoProfile', '-File', $lockScript,
-        '-Hold', '-LockIdentity', $identity,
-        '-Issue', '195', '-CommandType', 'check',
-        '-HoldSeconds', "$HoldSeconds"
-    ) + $ExtraArgs
-    $process = Start-Process -FilePath 'pwsh' -ArgumentList $argumentList -PassThru -WindowStyle Hidden `
+    $argLine = "-NoProfile -File `"$lockScript`" -Hold -LockIdentity $identity -Issue 195 -CommandType check -HoldSeconds $HoldSeconds"
+    if (-not [string]::IsNullOrWhiteSpace($ComposeProject)) {
+        $argLine += " -ComposeProject $ComposeProject"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ImageTag)) {
+        $argLine += " -ImageTag $ImageTag"
+    }
+    $process = Start-Process -FilePath 'pwsh' -ArgumentList $argLine -PassThru -WindowStyle Hidden `
         -RedirectStandardOutput $outFile -RedirectStandardError $errFile
     if ($null -eq $savedToken) {
         Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_TOKEN -ErrorAction SilentlyContinue
@@ -77,9 +79,6 @@ function Start-LockHolder {
             $text = Get-Content -LiteralPath $outFile -Raw -ErrorAction SilentlyContinue
         }
         if ($text -match 'TEST_GATE_HELD') {
-            if ($ExtraArgs -contains '-CrashAfterHold') {
-                $null = $process.WaitForExit(15000)
-            }
             break
         }
         if ($process.HasExited) {
@@ -319,7 +318,7 @@ try {
     }
     Assert-Pass '进程终止后操作系统释放互斥量，陈旧 JSON 不阻止新进程'
 
-    $recoverHolder = Start-LockHolder -ExtraArgs @('-ComposeProject', $leftoverProject, '-ImageTag', "gate-$identity") -HoldSeconds 90
+    $recoverHolder = Start-LockHolder -ComposeProject $leftoverProject -ImageTag "gate-$identity" -HoldSeconds 90
     $recoverRecord = $null
     foreach ($ignored in 1..20) {
         $statePath = Join-Path $stateDir 'state.json'
@@ -391,6 +390,13 @@ try {
     }
     Assert-Pass '异常放弃且不存在残留资源时可以恢复'
 
+    $outerToken = [string]$env:CUSTOMER_AGENT_TEST_GATE_TOKEN
+    $clearSentinel = $false
+    if ([string]::IsNullOrWhiteSpace($outerToken)) {
+        $env:CUSTOMER_AGENT_TEST_GATE_TOKEN = 'outer-token-sentinel'
+        $outerToken = 'outer-token-sentinel'
+        $clearSentinel = $true
+    }
     $evidenceHolder = Enter-TestGateLock -Issue '195' -RunId "issue195-$($identity.Substring($identity.Length-12))" -CommandType 'full-check' -LockIdentity $identity -BaseSha 'base-deadbeef' -HeadSha 'head-cafebabe'
     try {
         $saved = Save-TestGateFullGateEvidence -Holder $evidenceHolder -BaseSha 'base-deadbeef' -HeadSha 'head-cafebabe'
@@ -405,6 +411,12 @@ try {
         }
     } finally {
         Exit-TestGateLock $evidenceHolder
+    }
+    if ([string]$env:CUSTOMER_AGENT_TEST_GATE_TOKEN -ne $outerToken) {
+        throw '内层锁退出后应恢复外层所有权令牌'
+    }
+    if ($clearSentinel) {
+        Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_TOKEN -ErrorAction SilentlyContinue
     }
     Assert-Pass '完整门禁证据包含 Issue/RunId/base/head，基线变化后旧证据失效'
 } finally {

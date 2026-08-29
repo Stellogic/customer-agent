@@ -102,12 +102,18 @@ try {
 
             $smokeWatch = [System.Diagnostics.Stopwatch]::StartNew()
             & "$PSScriptRoot/smoke.ps1" -Reset -SkipBuild
+            if ($LASTEXITCODE -ne 0) {
+                throw "smoke.ps1 失败，退出码 $LASTEXITCODE"
+            }
             $smokeWatch.Stop()
             docker compose -p $projectName down --volumes --remove-orphans
             Assert-ComposeProjectResourcesEmpty -ProjectName $projectName -Phase '在 smoke 清理后'
 
             $browserWatch = [System.Diagnostics.Stopwatch]::StartNew()
             & "$PSScriptRoot/issue80-acceptance.ps1" -SkipBuild -RunId $RunId -SourceFingerprint $sourceFingerprint
+            if ($LASTEXITCODE -ne 0) {
+                throw "issue80-acceptance.ps1 失败，退出码 $LASTEXITCODE"
+            }
             $browserWatch.Stop()
             $completed = $true
         } finally {

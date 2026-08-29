@@ -419,6 +419,8 @@ function Enter-TestGateLock {
         }
     }
 
+    $previousToken = [string]$env:CUSTOMER_AGENT_TEST_GATE_TOKEN
+    $previousMutex = $script:TestGateHeldMutex
     $token = [guid]::NewGuid().ToString('N')
     $record = New-TestGateStateRecord `
         -Identity $identity `
@@ -434,13 +436,15 @@ function Enter-TestGateLock {
     $env:CUSTOMER_AGENT_TEST_GATE_TOKEN = $token
     $script:TestGateHeldMutex = $mutex
     return [pscustomobject]@{
-        AcquiredHere = $true
-        Identity     = $identity
-        OwnerToken   = $token
-        Mutex        = $mutex
-        Issue        = $Issue
-        RunId        = $RunId
-        Record       = $record
+        AcquiredHere   = $true
+        Identity       = $identity
+        OwnerToken     = $token
+        Mutex          = $mutex
+        PreviousToken  = $previousToken
+        PreviousMutex  = $previousMutex
+        Issue          = $Issue
+        RunId          = $RunId
+        Record         = $record
     }
 }
 
@@ -453,7 +457,11 @@ function Exit-TestGateLock {
         Remove-TestGateStateIfOwner -Identity $Holder.Identity -OwnerToken $Holder.OwnerToken
     } finally {
         if ($env:CUSTOMER_AGENT_TEST_GATE_TOKEN -eq $Holder.OwnerToken) {
-            Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_TOKEN -ErrorAction SilentlyContinue
+            if (-not [string]::IsNullOrWhiteSpace([string]$Holder.PreviousToken)) {
+                $env:CUSTOMER_AGENT_TEST_GATE_TOKEN = [string]$Holder.PreviousToken
+            } else {
+                Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_TOKEN -ErrorAction SilentlyContinue
+            }
         }
         $mutex = $Holder.Mutex
         if ($null -eq $mutex) {
@@ -467,7 +475,11 @@ function Exit-TestGateLock {
             }
             $mutex.Dispose()
         }
-        $script:TestGateHeldMutex = $null
+        if ($null -ne $Holder.PreviousMutex) {
+            $script:TestGateHeldMutex = $Holder.PreviousMutex
+        } elseif ($script:TestGateHeldMutex -eq $mutex) {
+            $script:TestGateHeldMutex = $null
+        }
     }
 }
 
