@@ -546,7 +546,8 @@ function Invoke-TestGateHold {
         [string]$ComposeProject,
         [string]$ImageTag,
         [int]$HoldSeconds = 600,
-        [switch]$CrashAfterHold
+        [switch]$CrashAfterHold,
+        [switch]$ThrowAfterHold
     )
     $holder = Enter-TestGateLock `
         -Issue $Issue `
@@ -563,6 +564,9 @@ function Invoke-TestGateHold {
         [Console]::Out.Flush()
         if ($CrashAfterHold) {
             [System.Environment]::FailFast('TEST_GATE_CRASH')
+        }
+        if ($ThrowAfterHold) {
+            throw 'TEST_GATE_HOLD_FAILED'
         }
         if ($HoldSeconds -lt 1) {
             $HoldSeconds = 1
@@ -586,6 +590,7 @@ function Invoke-TestGateLockCli {
     $imageTag = $null
     $holdSeconds = 600
     $crashAfterHold = $false
+    $throwAfterHold = $false
     $values = @($CliArgs)
     $i = 0
     while ($i -lt $values.Count) {
@@ -598,6 +603,7 @@ function Invoke-TestGateLockCli {
             '-Help' { $help = $true; $i++ }
             '-?' { $help = $true; $i++ }
             '-CrashAfterHold' { $crashAfterHold = $true; $i++ }
+            '-ThrowAfterHold' { $throwAfterHold = $true; $i++ }
             '-Issue' { $issue = $next; $i += 2 }
             '-RunId' { $runId = $next; $i += 2 }
             '-CommandType' { $commandType = $next; $i += 2 }
@@ -626,7 +632,8 @@ function Invoke-TestGateLockCli {
             -ComposeProject $composeProject `
             -ImageTag $imageTag `
             -HoldSeconds $holdSeconds `
-            -CrashAfterHold:$crashAfterHold
+            -CrashAfterHold:$crashAfterHold `
+            -ThrowAfterHold:$throwAfterHold
         return
     }
     Show-TestGateStatus -LockIdentity $lockIdentity

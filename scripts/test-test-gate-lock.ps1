@@ -6,6 +6,8 @@ $stateDir = Join-Path $env:LOCALAPPDATA "Stellogic\customer-agent\test-gate\$ide
 $holder = $null
 $leftoverContainer = $null
 $leftoverProject = "customer-agent-gate-$identity"
+$otherWorktree = $null
+$repoRoot = Split-Path -Parent $PSScriptRoot
 
 function Invoke-LockCli {
     param(
@@ -151,9 +153,21 @@ try {
     }
     Assert-Pass '第二进程在任何 Docker/构建前立即 TEST_GATE_BUSY'
 
-    $cross = Invoke-LockCli -Arguments @('-Hold', '-HoldSeconds', '1', '-Issue', '166')
-    if ($cross.ExitCode -ne 75 -or $cross.Output -notmatch 'TEST_GATE_BUSY') {
-        throw "不同工作目录仍应竞争同一把锁: $($cross.Output)"
+    $otherWorktree = Join-Path $env:TEMP "ca-tgl-wtb-$identity"
+    git -C $repoRoot worktree add --detach $otherWorktree HEAD 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $otherWorktree 'scripts\test-gate-lock.ps1'))) {
+        throw "无法创建独立 worktree: $otherWorktree"
+    }
+    $otherLock = Join-Path $otherWorktree 'scripts\test-gate-lock.ps1'
+    $crossOutput = & pwsh -NoProfile -File $otherLock -LockIdentity $identity -Hold -HoldSeconds 1 -Issue 166 2>&1 | ForEach-Object { "$_" }
+    $crossCode = $LASTEXITCODE
+    $crossText = $crossOutput -join "`n"
+    if ($crossCode -ne 75 -or $crossText -notmatch 'TEST_GATE_BUSY') {
+        throw "独立 worktree 仍应竞争同一把锁: exit=$crossCode $crossText"
+    }
+    $holderRecord = Get-Content -LiteralPath (Join-Path $stateDir 'state.json') -Raw -Encoding utf8 | ConvertFrom-Json
+    if ([string]$holderRecord.worktree -eq $otherWorktree) {
+        throw '占用记录不应变成第二棵 worktree 的路径'
     }
     Assert-Pass '工作树 B 不能获取工作树 A 已持有的锁'
 
@@ -298,6 +312,16 @@ try {
     }
     Assert-Pass '正常结束后后续进程能获取锁'
 
+    $failedHold = Invoke-LockCli -Arguments @('-Hold', '-HoldSeconds', '1', '-Issue', '195', '-ThrowAfterHold')
+    if ($failedHold.ExitCode -eq 0 -or $failedHold.Output -notmatch 'TEST_GATE_HELD') {
+        throw "异常抛出路径应先持锁再失败: exit=$($failedHold.ExitCode) $($failedHold.Output)"
+    }
+    $afterThrow = Invoke-LockCli -Arguments @('-Hold', '-HoldSeconds', '1', '-Issue', '195')
+    if ($afterThrow.ExitCode -ne 0 -or $afterThrow.Output -notmatch 'TEST_GATE_HELD') {
+        throw "异常抛出释放后应能再次获取锁: $($afterThrow.Output)"
+    }
+    Assert-Pass '异常抛出后后续进程能获取锁'
+
     $failHolder = Start-LockHolder -HoldSeconds 90
     Stop-LockHolder $failHolder
     $failHolder = $null
@@ -421,6 +445,13 @@ try {
     Assert-Pass '完整门禁证据包含 Issue/RunId/base/head，基线变化后旧证据失效'
 } finally {
     Stop-LockHolder $holder
+    if ($otherWorktree -and (Test-Path -LiteralPath $otherWorktree)) {
+        git -C $repoRoot worktree remove --force $otherWorktree 2>$null | Out-Null
+        if (Test-Path -LiteralPath $otherWorktree) {
+            Remove-Item -LiteralPath $otherWorktree -Recurse -Force -ErrorAction SilentlyContinue
+            git -C $repoRoot worktree prune 2>$null | Out-Null
+        }
+    }
     if ($leftoverContainer) {
         $PSNativeCommandUseErrorActionPreference = $false
         docker rm --force $leftoverContainer 2>$null | Out-Null
