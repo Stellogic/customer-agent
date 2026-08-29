@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
-final class JdbcAgentReplyStreamService implements AgentReplyStreamService {
+class JdbcAgentReplyStreamService implements AgentReplyStreamService {
     private static final String EPOCH = "customer-public-v1";
     private final JdbcTemplate jdbc;
     private final TicketAuthorityLock authorityLock;
