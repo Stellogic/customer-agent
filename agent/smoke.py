@@ -4213,9 +4213,10 @@ def main() -> None:
         handoff_generation_id, handoff_clarification_request_key = handoff_generation_row
         connection.execute(
             "insert into investigation_fact "
-            "(generation_id, fact_type, fact_value, evidence_reference, recorded_at) "
+            "(generation_id, fact_type, fact_value, evidence_reference, recorded_at, "
+            "valid_until) "
             "values (%s, 'ORDER', 'ORDER-DELAY-AMBIGUOUS', "
-            "'order:ORDER-DELAY-AMBIGUOUS', now())",
+            "'order:ORDER-DELAY-AMBIGUOUS', now(), now() + interval '1 hour')",
             (handoff_generation_id,),
         )
         lifecycle_before_handoff = connection.execute(
@@ -4439,9 +4440,12 @@ def main() -> None:
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         connection.execute(
             "insert into investigation_fact "
-            "(generation_id, fact_type, fact_value, evidence_reference, recorded_at) values "
-            "(%s, 'ORDER', 'ORDER-DELAY-AMBIGUOUS-A', 'order:ORDER-DELAY-AMBIGUOUS-A', now()), "
-            "(%s, 'LOGISTICS_DELAY_SECONDS', '288000', 'logistics:ORDER-DELAY-AMBIGUOUS-A', now())",
+            "(generation_id, fact_type, fact_value, evidence_reference, recorded_at, "
+            "valid_until) values "
+            "(%s, 'ORDER', 'ORDER-DELAY-AMBIGUOUS-A', 'order:ORDER-DELAY-AMBIGUOUS-A', "
+            "now(), now() + interval '1 hour'), "
+            "(%s, 'LOGISTICS_DELAY_SECONDS', '288000', "
+            "'logistics:ORDER-DELAY-AMBIGUOUS-A', now(), now() + interval '1 hour')",
             (agent_handoff_generation_id, agent_handoff_generation_id),
         )
     agent_handoff_request_id = f"{agent_handoff_generation_id}:human-handoff:FACT_CONFLICT"
