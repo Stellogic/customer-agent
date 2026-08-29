@@ -8,6 +8,18 @@ $leftoverContainer = $null
 $leftoverProject = "customer-agent-gate-$identity"
 $otherWorktree = $null
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$savedParentEnv = @{}
+foreach ($key in @(
+    'CUSTOMER_AGENT_TEST_GATE_TOKEN',
+    'CUSTOMER_AGENT_TEST_GATE_IDENTITY',
+    'COMPOSE_PROJECT_NAME',
+    'CUSTOMER_AGENT_IMAGE_TAG',
+    'CUSTOMER_AGENT_FRONTEND_PORT',
+    'CUSTOMER_AGENT_GATE_RUN_ID',
+    'CUSTOMER_AGENT_GATE_SOURCE_FINGERPRINT'
+)) {
+    $savedParentEnv[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
+}
 
 function Invoke-LockCli {
     param(
@@ -458,6 +470,13 @@ try {
     }
     if (Test-Path -LiteralPath $stateDir) {
         Remove-Item -LiteralPath $stateDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    foreach ($key in $savedParentEnv.Keys) {
+        if ($null -eq $savedParentEnv[$key] -or $savedParentEnv[$key] -eq '') {
+            Remove-Item -Path "Env:$key" -ErrorAction SilentlyContinue
+        } else {
+            Set-Item -Path "Env:$key" -Value $savedParentEnv[$key]
+        }
     }
 }
 

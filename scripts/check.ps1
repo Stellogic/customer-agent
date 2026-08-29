@@ -71,7 +71,10 @@ try {
         & "$PSScriptRoot/confirm-compose-reset-isolation.ps1"
     }
 
-    & "$PSScriptRoot/test-test-gate-lock.ps1"
+    & pwsh -NoProfile -File "$PSScriptRoot/test-test-gate-lock.ps1"
+    if ($LASTEXITCODE -ne 0) {
+        throw "test-test-gate-lock.ps1 失败，退出码 $LASTEXITCODE"
+    }
     & "$PSScriptRoot/test-runtime-log-policy.ps1"
     & "$PSScriptRoot/test-gradle-proxy.ps1"
     & "$PSScriptRoot/test-compose-network-policy.ps1"

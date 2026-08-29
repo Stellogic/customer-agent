@@ -211,8 +211,19 @@ if ($LASTEXITCODE -ne 0) {
     throw "React 实时验收失败，退出码: $LASTEXITCODE"
 }
 
-$status = Invoke-RestMethod -Uri "http://127.0.0.1:$frontendPort/api/system/status"
-if ($status.status -ne 'UP') {
+$status = $null
+foreach ($ignored in 1..20) {
+    try {
+        $status = Invoke-RestMethod -Uri "http://127.0.0.1:$frontendPort/api/system/status"
+        if ($status.status -eq 'UP') {
+            break
+        }
+    } catch {
+        $status = $null
+    }
+    Start-Sleep -Milliseconds 250
+}
+if ($null -eq $status -or $status.status -ne 'UP') {
     throw "Spring 状态投影不是 UP: $($status | ConvertTo-Json -Compress)"
 }
 
