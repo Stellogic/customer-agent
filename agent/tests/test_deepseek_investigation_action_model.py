@@ -62,6 +62,10 @@ def _evidence_catalog() -> list[dict[str, object]]:
             "actionType": "READ_APPLICABLE_POLICY",
             "evidenceReferences": ["policy:delay-policy-v1"],
         },
+        {
+            "actionType": "READ_ORDER_RULES",
+            "evidenceReferences": ["order-rule:ORDER-128"],
+        },
     ]
 
 
@@ -76,6 +80,7 @@ def _evidence_payload() -> list[dict[str, object]]:
         },
         {"evidenceReference": "actions:ORDER-128", "applicability": ["PENDING_ACTIONS"]},
         {"evidenceReference": "policy:delay-policy-v1", "applicability": ["POLICY_BASIS"]},
+        {"evidenceReference": "order-rule:ORDER-128", "applicability": ["ORDER_RULE"]},
     ]
 
 
@@ -174,6 +179,7 @@ async def test_flash_allows_terminal_action_without_order_parameter() -> None:
             "existingCompensation": False,
             "pendingActionCount": 0,
             "policyVersion": "delay-policy-v1",
+            "orderRuleSummary": "ADDRESS_CHANGE_AND_CANCEL_RULES_V1",
             "evidenceCatalog": _evidence_catalog(),
         }
     )
@@ -232,6 +238,7 @@ async def test_flash_schema_requires_handoff_for_known_fact_conflict() -> None:
             "existingCompensation": False,
             "pendingActionCount": 0,
             "policyVersion": "delay-policy-v1",
+            "orderRuleSummary": "ADDRESS_CHANGE_AND_CANCEL_RULES_V1",
         }
     )
 

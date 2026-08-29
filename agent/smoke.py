@@ -59,11 +59,11 @@ def evidence_sufficiency(order_reference: str) -> dict[str, object]:
             },
             {
                 "evidenceReference": f"logistics:{order_reference}",
-                "applicability": ["DELAY_DURATION"],
+                "applicability": ["DELAY_DURATION", "LOGISTICS_STATUS"],
             },
             {
                 "evidenceReference": f"payment:{order_reference}",
-                "applicability": ["ORDER_ELIGIBILITY"],
+                "applicability": ["ORDER_ELIGIBILITY", "PAYMENT_STATUS", "REFUND_STATUS"],
             },
             {
                 "evidenceReference": f"compensation:{order_reference}",
@@ -76,6 +76,10 @@ def evidence_sufficiency(order_reference: str) -> dict[str, object]:
             {
                 "evidenceReference": "policy:delay-policy-v1",
                 "applicability": ["POLICY_BASIS"],
+            },
+            {
+                "evidenceReference": f"order-rule:{order_reference}",
+                "applicability": ["ORDER_RULE"],
             },
         ],
     }
@@ -104,6 +108,7 @@ def collect_investigation_facts(
         "READ_PAYMENT_AND_REFUNDS",
         "READ_COMPENSATION_AND_PENDING_ACTIONS",
         "READ_APPLICABLE_POLICY",
+        "READ_ORDER_RULES",
     ]
     confirmation = client.post(
         f"{base_url}/capabilities/CONFIRM_ORDER",
@@ -140,6 +145,7 @@ def collect_investigation_facts(
     payment = invoke("READ_PAYMENT_AND_REFUNDS")
     compensation = invoke("READ_COMPENSATION_AND_PENDING_ACTIONS")
     policy = invoke("READ_APPLICABLE_POLICY")
+    invoke("READ_ORDER_RULES")
     if verify_duplicate_rejected:
         duplicate_confirmation = client.post(
             f"{base_url}/capabilities/CONFIRM_ORDER",
@@ -309,7 +315,7 @@ def run_evidence_sufficiency_path(
             "and source_authority = 'SPRING_AUTHORIZED_CAPABILITY' "
             "and valid_until > recorded_at and conflict_status = 'CLEAR'",
             (generation[0],),
-        ).fetchone() == (9,)
+        ).fetchone() == (12,)
 
     with httpx.Client(timeout=20.0) as client:
         state = client.get(
@@ -322,7 +328,7 @@ def run_evidence_sufficiency_path(
         conclusion = values["conclusion"]
         assert conclusion["sufficiencyPolicyVersion"] == "evidence-sufficiency-v1"
         assert conclusion["riskScenario"] == "LOGISTICS_DELAY"
-        assert len(conclusion["evidence"]) == 6
+        assert len(conclusion["evidence"]) == 7
         assert "confidence" not in conclusion
         return action_types, conclusion
 
@@ -987,11 +993,14 @@ def main() -> None:
             "where generation_id = %s",
             (generation[0],),
         ).fetchone()[0] == [
+            "DUPLICATE_CHARGE_SUSPECTED",
             "EXISTING_COMPENSATION",
             "LOGISTICS_DELAY_HOURS",
             "LOGISTICS_DELAY_SECONDS",
+            "LOGISTICS_STATUS",
             "ORDER",
             "ORDER_CANCELLATION",
+            "ORDER_RULE",
             "PAYMENT",
             "PENDING_ACTION_COUNT",
             "POLICY",
@@ -1002,7 +1011,7 @@ def main() -> None:
                 "select count(*) from agent_command_request where generation_id = %s",
                 (generation[0],),
             ).fetchone()[0]
-            == 6
+            == 7
         )
         assert (
             connection.execute(
@@ -1167,6 +1176,7 @@ def main() -> None:
         "READ_PAYMENT_AND_REFUNDS",
         "READ_COMPENSATION_AND_PENDING_ACTIONS",
         "READ_APPLICABLE_POLICY",
+        "READ_ORDER_RULES",
         "SUBMIT_CONCLUSION",
     }
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:

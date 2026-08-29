@@ -38,11 +38,14 @@ def _decision(
 def _evidence_claims() -> tuple[EvidenceClaim, ...]:
     return (
         EvidenceClaim("order:ORDER-120", ("ORDER_IDENTITY",)),
-        EvidenceClaim("logistics:ORDER-120", ("DELAY_DURATION",)),
-        EvidenceClaim("payment:ORDER-120", ("ORDER_ELIGIBILITY",)),
+        EvidenceClaim("logistics:ORDER-120", ("DELAY_DURATION", "LOGISTICS_STATUS")),
+        EvidenceClaim(
+            "payment:ORDER-120", ("ORDER_ELIGIBILITY", "PAYMENT_STATUS", "REFUND_STATUS")
+        ),
         EvidenceClaim("compensation:ORDER-120", ("EXISTING_COMPENSATION",)),
         EvidenceClaim("order-actions:ORDER-120", ("PENDING_ACTIONS",)),
         EvidenceClaim("policy:delay-policy-v1", ("POLICY_BASIS",)),
+        EvidenceClaim("order-rule:ORDER-120", ("ORDER_RULE",)),
     )
 
 
@@ -71,6 +74,7 @@ async def test_deterministic_model_selects_one_allowed_action_until_submission()
         InvestigationCapability.READ_PAYMENT_AND_REFUNDS,
         InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
         InvestigationCapability.READ_APPLICABLE_POLICY,
+        InvestigationCapability.READ_ORDER_RULES,
         TerminalAction.SUBMIT_CONCLUSION,
     ]
 
@@ -89,6 +93,7 @@ async def test_deterministic_model_can_choose_a_different_legal_order_for_siblin
     facts: dict = {"siblingTickets": [{"issueKind": "LOGISTICS_DELAY"}]}
     expected = [
         InvestigationCapability.CONFIRM_ORDER,
+        InvestigationCapability.READ_ORDER_RULES,
         InvestigationCapability.READ_APPLICABLE_POLICY,
         InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
         InvestigationCapability.READ_PAYMENT_AND_REFUNDS,
@@ -358,12 +363,14 @@ def _progress_for(kind: InvestigationCapability | TerminalAction) -> dict:
         InvestigationCapability.READ_LOGISTICS: {
             "delayHours": 80,
             "delaySeconds": 288000,
+            "logisticsStatus": "IN_TRANSIT",
             "evidenceRefs": ["logistics:ORDER-120"],
         },
         InvestigationCapability.READ_PAYMENT_AND_REFUNDS: {
             "paid": True,
             "cancelled": False,
             "fullyRefunded": False,
+            "duplicateChargeSuspected": False,
             "evidenceRefs": ["payment:ORDER-120"],
         },
         InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS: {
@@ -374,6 +381,10 @@ def _progress_for(kind: InvestigationCapability | TerminalAction) -> dict:
         InvestigationCapability.READ_APPLICABLE_POLICY: {
             "policyVersion": "delay-policy-v1",
             "evidenceRefs": ["policy:delay-policy-v1"],
+        },
+        InvestigationCapability.READ_ORDER_RULES: {
+            "orderRuleSummary": "ADDRESS_CHANGE_AND_CANCEL_RULES_V1",
+            "evidenceRefs": ["order-rule:ORDER-120"],
         },
         TerminalAction.SUBMIT_CONCLUSION: {},
         TerminalAction.REQUEST_CLARIFICATION: {},

@@ -71,7 +71,12 @@ type IntakeSnapshot = {
 };
 
 type IntakeIssue = {
-  kind: "LOGISTICS_DELAY" | "PACKAGE_NOT_RECEIVED" | "DUPLICATE_CHARGE";
+  kind:
+    | "LOGISTICS_DELAY"
+    | "PACKAGE_NOT_RECEIVED"
+    | "DUPLICATE_CHARGE"
+    | "ORDER_OPERATION_OR_RULE"
+    | "OTHER";
   summary: string;
 };
 
@@ -1438,6 +1443,9 @@ export function App() {
                   onChange={(event) => setTicketReplyIssueKind(event.target.value)}
                 >
                   <option value="LOGISTICS_DELAY">原物流延迟问题</option>
+                  <option value="PACKAGE_NOT_RECEIVED">包裹未收到</option>
+                  <option value="DUPLICATE_CHARGE">重复扣款</option>
+                  <option value="ORDER_OPERATION_OR_RULE">地址或取消规则</option>
                   <option value="OTHER">其他问题</option>
                 </select>
               </label>
@@ -1856,7 +1864,13 @@ function isIntakeIssue(value: unknown): value is IntakeIssue {
   return (
     isRecord(value) &&
     hasOnlyKeys(value, ["kind", "summary"]) &&
-    ["LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE"].includes(String(value.kind)) &&
+    [
+      "LOGISTICS_DELAY",
+      "PACKAGE_NOT_RECEIVED",
+      "DUPLICATE_CHARGE",
+      "ORDER_OPERATION_OR_RULE",
+      "OTHER",
+    ].includes(String(value.kind)) &&
     typeof value.summary === "string"
   );
 }
@@ -1867,6 +1881,10 @@ function intakeIssueLabel(kind: IntakeIssue["kind"]) {
       return "包裹未收到";
     case "DUPLICATE_CHARGE":
       return "重复扣款";
+    case "ORDER_OPERATION_OR_RULE":
+      return "地址或取消规则";
+    case "OTHER":
+      return "其他问题";
     default:
       return "物流延迟";
   }

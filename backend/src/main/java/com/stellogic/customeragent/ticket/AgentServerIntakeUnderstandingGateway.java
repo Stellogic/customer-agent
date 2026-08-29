@@ -219,7 +219,12 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
         for (JsonNode issue : value) {
             String kind = requiredText(issue, "kind");
             String summary = requiredText(issue, "summary");
-            if (!List.of("LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE")
+            if (!List.of(
+                                    "LOGISTICS_DELAY",
+                                    "PACKAGE_NOT_RECEIVED",
+                                    "DUPLICATE_CHARGE",
+                                    "ORDER_OPERATION_OR_RULE",
+                                    "OTHER")
                             .contains(kind)
                     || !kinds.add(kind)) {
                 throw new IntakeAgentUnavailableException();
@@ -234,7 +239,12 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
         java.util.ArrayList<String> kinds = new java.util.ArrayList<>();
         for (JsonNode item : value) {
             String kind = item.asText().trim();
-            if (!List.of("LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE")
+            if (!List.of(
+                                    "LOGISTICS_DELAY",
+                                    "PACKAGE_NOT_RECEIVED",
+                                    "DUPLICATE_CHARGE",
+                                    "ORDER_OPERATION_OR_RULE",
+                                    "OTHER")
                             .contains(kind)
                     || kinds.contains(kind)) {
                 throw new IntakeAgentUnavailableException();
