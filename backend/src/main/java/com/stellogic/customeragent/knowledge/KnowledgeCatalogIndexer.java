@@ -59,28 +59,28 @@ final class KnowledgeCatalogIndexer {
     }
 
     synchronized KnowledgeIndexState rebuild() {
+        KnowledgeIndexState baseState = readState();
         List<KnowledgeArticleDocument> articles;
         try {
             articles = loadAndValidate();
         } catch (IOException | KnowledgeCatalogValidationException exception) {
-            return markFailure(failureCode(exception), exception.getMessage());
+            return markFailure(failureCode(exception), exception.getMessage(), baseState);
         }
 
         try {
             return replaceIndex(articles);
+        } catch (KnowledgeCatalogValidationException exception) {
+            return markFailure(failureCode(exception), exception.getMessage(), baseState);
         } catch (RuntimeException exception) {
             LOG.warn("knowledge index rebuild failed code=INDEX_REBUILD_FAILED");
-            return markFailure("INDEX_REBUILD_FAILED", "知识索引重建失败，请检查数据库与索引状态");
+            return markFailure(
+                    "INDEX_REBUILD_FAILED", "知识索引重建失败，请检查数据库与索引状态", baseState);
         }
     }
 
     private List<KnowledgeArticleDocument> loadAndValidate()
             throws IOException, KnowledgeCatalogValidationException {
         Resource[] resolved = resources.getResources(resourcePattern);
-        if (resolved.length == 0) {
-            throw new KnowledgeCatalogValidationException(
-                    "EMPTY_KNOWLEDGE_CATALOG", "知识目录没有找到 Markdown 条目");
-        }
         Arrays.sort(resolved, Comparator.comparing(this::stableSourceFile));
         List<KnowledgeArticleDocument> articles =
                 Arrays.stream(resolved).map(this::parse).toList();
@@ -138,6 +138,7 @@ final class KnowledgeCatalogIndexer {
         return transactions.execute(
                 status -> {
                     acquireAdvisoryLock();
+                    validateImmutableVersions(articles);
                     Long previousGeneration =
                             jdbc.queryForObject(
                                     "select generation from knowledge_index_state where id = 1",
@@ -145,6 +146,10 @@ final class KnowledgeCatalogIndexer {
                     long generation = previousGeneration == null ? 1 : previousGeneration + 1;
                     Instant indexedAt = clock.instant();
                     String sourceDigest = sourceDigest(articles);
+                    KnowledgeIndexStatus indexStatus =
+                            articles.isEmpty()
+                                    ? KnowledgeIndexStatus.EMPTY
+                                    : KnowledgeIndexStatus.READY;
                     jdbc.update("delete from knowledge_chunk");
                     jdbc.update("delete from knowledge_article");
                     for (KnowledgeArticleDocument article : articles) insertArticle(article, indexedAt);
@@ -154,10 +159,11 @@ final class KnowledgeCatalogIndexer {
                         }
                     }
                     jdbc.update(
-                            "update knowledge_index_state set status = 'READY', generation = ?, "
+                            "update knowledge_index_state set status = ?, generation = ?, "
                                     + "source_digest = ?, indexed_at = ?, updated_at = ?, "
                                     + "article_count = ?, chunk_count = ?, failure_code = null, "
                                     + "failure_message = null where id = 1",
+                            indexStatus.name(),
                             generation,
                             sourceDigest,
                             indexedAt,
@@ -165,7 +171,7 @@ final class KnowledgeCatalogIndexer {
                             articles.size(),
                             articles.stream().mapToInt(article -> article.chunks().size()).sum());
                     return new KnowledgeIndexState(
-                            "READY",
+                            indexStatus,
                             generation,
                             sourceDigest,
                             indexedAt,
@@ -175,6 +181,37 @@ final class KnowledgeCatalogIndexer {
                             null,
                             null);
                 });
+    }
+
+    private void validateImmutableVersions(List<KnowledgeArticleDocument> articles) {
+        Map<String, IndexedVersion> existing = new HashMap<>();
+        jdbc.query(
+                        "select article_id, version, content_hash, source_file from knowledge_article",
+                        (rs, row) ->
+                                new IndexedVersion(
+                                        rs.getString(1),
+                                        rs.getString(2),
+                                        rs.getString(3),
+                                        rs.getString(4)))
+                .forEach(
+                        version ->
+                                existing.put(
+                                        articleVersionKey(version.articleId(), version.version()),
+                                        version));
+        for (KnowledgeArticleDocument article : articles) {
+            IndexedVersion previous =
+                    existing.get(articleVersionKey(article.articleId(), article.version()));
+            if (previous != null
+                    && (!previous.contentHash().equals(article.contentHash())
+                            || !previous.sourceFile().equals(article.sourceFile()))) {
+                throw new KnowledgeCatalogValidationException(
+                        "IMMUTABLE_KNOWLEDGE_VERSION",
+                        "知识条目版本不可原地修改，请创建新版本: "
+                                + article.articleId()
+                                + "@"
+                                + article.version());
+            }
+        }
     }
 
     private void insertArticle(KnowledgeArticleDocument article, Instant indexedAt) {
@@ -210,22 +247,30 @@ final class KnowledgeCatalogIndexer {
                 indexedAt);
     }
 
-    private KnowledgeIndexState markFailure(String code, String message) {
+    private KnowledgeIndexState markFailure(
+            String code, String message, KnowledgeIndexState baseState) {
         try {
             return transactions.execute(
                     status -> {
+                        acquireAdvisoryLock();
                         KnowledgeIndexState current = readState();
+                        if (current.generation() != baseState.generation()) return current;
                         Instant updatedAt = clock.instant();
                         String safeMessage = message == null ? "知识目录校验失败" : message;
                         if (safeMessage.length() > 500) safeMessage = safeMessage.substring(0, 500);
-                        jdbc.update(
-                                "update knowledge_index_state set status = 'FAILED', failure_code = ?, "
-                                        + "failure_message = ?, updated_at = ? where id = 1",
-                                code,
-                                safeMessage,
-                                updatedAt);
+                        if (jdbc.update(
+                                        "update knowledge_index_state set status = 'FAILED', "
+                                                + "failure_code = ?, failure_message = ?, "
+                                                + "updated_at = ? where id = 1 and generation = ?",
+                                        code,
+                                        safeMessage,
+                                        updatedAt,
+                                        baseState.generation())
+                                == 0) {
+                            return readState();
+                        }
                         return new KnowledgeIndexState(
-                                "FAILED",
+                                KnowledgeIndexStatus.FAILED,
                                 current.generation(),
                                 current.sourceDigest(),
                                 current.indexedAt(),
@@ -238,7 +283,15 @@ final class KnowledgeCatalogIndexer {
         } catch (RuntimeException persistenceFailure) {
             LOG.warn("knowledge index failure state unavailable code={}", code);
             return new KnowledgeIndexState(
-                    "FAILED", 0, null, null, clock.instant(), 0, 0, code, "知识索引当前不可用");
+                    KnowledgeIndexStatus.FAILED,
+                    0,
+                    null,
+                    null,
+                    clock.instant(),
+                    0,
+                    0,
+                    code,
+                    "知识索引当前不可用");
         }
     }
 
@@ -248,7 +301,7 @@ final class KnowledgeCatalogIndexer {
                         + "chunk_count, failure_code, failure_message from knowledge_index_state where id = 1",
                 (rs, row) ->
                         new KnowledgeIndexState(
-                                rs.getString(1),
+                                KnowledgeIndexStatus.valueOf(rs.getString(1)),
                                 rs.getLong(2),
                                 rs.getString(3),
                                 instant(rs.getTimestamp(4)),
@@ -287,14 +340,11 @@ final class KnowledgeCatalogIndexer {
                                                 + "\u0000"
                                                 + article.contentHash())
                         .reduce("", (left, right) -> left + right + "\n");
-        try {
-            return java.util.HexFormat.of()
-                    .formatHex(
-                            java.security.MessageDigest.getInstance("SHA-256")
-                                    .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-        } catch (java.security.NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
-        }
+        return KnowledgeDigests.sha256(value);
+    }
+
+    private static String articleVersionKey(String articleId, String version) {
+        return articleId + "\u0000" + version;
     }
 
     private String stableSourceFile(Resource resource) {
@@ -311,4 +361,7 @@ final class KnowledgeCatalogIndexer {
     private static Instant instant(java.sql.Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toInstant();
     }
+
+    private record IndexedVersion(
+            String articleId, String version, String contentHash, String sourceFile) {}
 }

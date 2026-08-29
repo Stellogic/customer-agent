@@ -126,6 +126,7 @@ export default function KnowledgeWorkspace() {
       setQuery(parsed.query);
       setCatalogState("ready");
     } catch (error) {
+      setCatalog(null);
       setCatalogState("error");
       setCatalogError(error instanceof Error ? error.message : "知识目录暂时无法读取。");
     }
@@ -172,12 +173,14 @@ export default function KnowledgeWorkspace() {
       const value = (await response.json().catch(() => undefined)) as unknown;
       if (!response.ok || !isIndexStatus(value)) throw new Error("索引重建结果尚未确认。");
       setIndex(value);
-      if (value.status === "READY") await loadCatalog(query);
+      if (value.status === "READY" || value.status === "EMPTY") await loadCatalog(query);
       else {
+        setCatalog(null);
         setCatalogState("error");
         setCatalogError("知识源校验未通过，旧索引已保留；请修正内容后再重建。");
       }
     } catch (error) {
+      setCatalog(null);
       setCatalogError(error instanceof Error ? error.message : "索引重建失败，未报告成功。");
       setCatalogState("error");
     } finally {
@@ -257,7 +260,13 @@ export default function KnowledgeWorkspace() {
             </div>
             <span>{catalogState === "ready" ? `${results.length} 条引用` : "—"}</span>
           </header>
-          {noResults ? (
+          {catalogState === "error" ? (
+            <div className="knowledge-empty" role="status">
+              <span aria-hidden="true">!</span>
+              <h3>当前无法显示检索结果</h3>
+              <p>请根据上方提示恢复知识索引后再试。</p>
+            </div>
+          ) : noResults ? (
             <div className="knowledge-empty" role="status">
               <span aria-hidden="true">⌕</span>
               <h3>{query ? "没有匹配的当前知识条目" : "知识目录为空"}</h3>

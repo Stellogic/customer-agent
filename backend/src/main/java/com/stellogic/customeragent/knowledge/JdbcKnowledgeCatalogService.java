@@ -62,7 +62,7 @@ final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
                                         rs.getString(3),
                                         rs.getString(4),
                                         timestamp(rs.getTimestamp(5)),
-                                        strings(rs.getArray(6)),
+                                        readSqlTextArray(rs.getArray(6)),
                                         rs.getString(7),
                                         rs.getInt(8),
                                         rs.getInt(9),
@@ -111,8 +111,8 @@ final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
                                                 rs.getString(2),
                                                 rs.getString(3),
                                                 timestamp(rs.getTimestamp(4)),
-                                                strings(rs.getArray(5)),
-                                                rs.getString(6),
+                                                readSqlTextArray(rs.getArray(5)),
+                                                KnowledgePublicationStatus.valueOf(rs.getString(6)),
                                                 rs.getBoolean(7),
                                                 rs.getString(8),
                                                 rs.getString(9),
@@ -136,8 +136,8 @@ final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
                                         rs.getString(2),
                                         rs.getString(3),
                                         timestamp(rs.getTimestamp(4)),
-                                        strings(rs.getArray(5)),
-                                        rs.getString(6),
+                                        readSqlTextArray(rs.getArray(5)),
+                                        KnowledgePublicationStatus.valueOf(rs.getString(6)),
                                         rs.getBoolean(7),
                                         rs.getString(8)),
                         articleId,
@@ -189,7 +189,10 @@ final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
 
     private KnowledgeIndexState requireReady() {
         KnowledgeIndexState state = readState();
-        if (!"READY".equals(state.status())) throw new KnowledgeIndexUnavailableException(state);
+        if (state.status() != KnowledgeIndexStatus.READY
+                && state.status() != KnowledgeIndexStatus.EMPTY) {
+            throw new KnowledgeIndexUnavailableException(state);
+        }
         return state;
     }
 
@@ -199,7 +202,7 @@ final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
                         + "chunk_count, failure_code, failure_message from knowledge_index_state where id = 1",
                 (rs, row) ->
                         new KnowledgeIndexState(
-                                rs.getString(1),
+                                KnowledgeIndexStatus.valueOf(rs.getString(1)),
                                 rs.getLong(2),
                                 rs.getString(3),
                                 timestamp(rs.getTimestamp(4)),
@@ -236,7 +239,7 @@ final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
         return prefix + content.substring(start, end) + suffix;
     }
 
-    private static List<String> strings(Array array) {
+    private static List<String> readSqlTextArray(Array array) {
         try {
             return List.of((String[]) array.getArray());
         } catch (java.sql.SQLException exception) {

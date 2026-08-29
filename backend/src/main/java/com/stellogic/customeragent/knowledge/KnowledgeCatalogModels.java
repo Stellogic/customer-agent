@@ -32,7 +32,7 @@ record KnowledgeChunkDocument(
         String content) {}
 
 record KnowledgeIndexState(
-        String status,
+        KnowledgeIndexStatus status,
         long generation,
         String sourceDigest,
         Instant indexedAt,
@@ -66,7 +66,7 @@ record KnowledgeArticleVersion(
         String version,
         Instant updatedAt,
         List<String> applicability,
-        String publicationStatus,
+        KnowledgePublicationStatus publicationStatus,
         boolean current,
         String sourceFile) {
     KnowledgeArticleVersion {
@@ -89,7 +89,7 @@ record KnowledgeArticleDetail(
         String version,
         Instant updatedAt,
         List<String> applicability,
-        String publicationStatus,
+        KnowledgePublicationStatus publicationStatus,
         boolean current,
         String sourceFile,
         String contentHash,
@@ -124,4 +124,10 @@ enum KnowledgePublicationStatus {
     DRAFT,
     PUBLISHED,
     RETIRED
+}
+
+enum KnowledgeIndexStatus {
+    EMPTY,
+    READY,
+    FAILED
 }

@@ -1,7 +1,5 @@
 package com.stellogic.customeragent.knowledge;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,7 +37,7 @@ final class KnowledgeChunker {
             for (String content : split(block.content())) {
                 String chunkId =
                         "chunk-"
-                                + sha256(
+                                + KnowledgeDigests.sha256(
                                         articleId
                                                 + "\u0000"
                                                 + version
@@ -98,17 +96,6 @@ final class KnowledgeChunker {
             while (offset < content.length() && Character.isWhitespace(content.charAt(offset))) offset++;
         }
         return parts;
-    }
-
-    private static String sha256(String value) {
-        try {
-            return java.util.HexFormat.of()
-                    .formatHex(
-                            MessageDigest.getInstance("SHA-256")
-                                    .digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (java.security.NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
-        }
     }
 
     private record LineBlock(int startLine, int endLine, String content) {}

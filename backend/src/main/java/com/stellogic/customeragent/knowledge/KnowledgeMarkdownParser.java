@@ -3,7 +3,6 @@ package com.stellogic.customeragent.knowledge;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -99,7 +98,7 @@ final class KnowledgeMarkdownParser {
                 status,
                 current,
                 sourceFile,
-                sha256(source),
+                KnowledgeDigests.sha256(source),
                 body,
                 chunks);
     }
@@ -194,12 +193,4 @@ final class KnowledgeMarkdownParser {
                 "INVALID_KNOWLEDGE_ARTICLE", sourceFile + ":" + line + " " + message);
     }
 
-    private static String sha256(String value) {
-        try {
-            return java.util.HexFormat.of()
-                    .formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (java.security.NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
-        }
-    }
 }

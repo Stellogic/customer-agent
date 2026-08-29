@@ -22,6 +22,7 @@ export type InternalWorkspace = {
   id: "support" | "approvals" | "knowledge";
   capability: HumanCapability;
   path: `/internal/${string}`;
+  icon: string;
   menuLabel: string;
   cardLabel: string;
   eyebrow: string;
@@ -33,6 +34,7 @@ export const INTERNAL_WORKSPACES = [
     id: "support",
     capability: "SUPPORT_WORKBENCH_ACCESS",
     path: INTERNAL_ROUTE_PATHS.support,
+    icon: "服",
     menuLabel: "客服工作区",
     cardLabel: "客服工作区 · 调查与响应",
     eyebrow: "SUPPORT",
@@ -42,6 +44,7 @@ export const INTERNAL_WORKSPACES = [
     id: "approvals",
     capability: "APPROVAL_WORKBENCH_ACCESS",
     path: INTERNAL_ROUTE_PATHS.approvals,
+    icon: "审",
     menuLabel: "审批工作区",
     cardLabel: "审批工作区 · 补偿审查",
     eyebrow: "APPROVAL",
@@ -51,6 +54,7 @@ export const INTERNAL_WORKSPACES = [
     id: "knowledge",
     capability: "KNOWLEDGE_READ_ACCESS",
     path: INTERNAL_ROUTE_PATHS.knowledge,
+    icon: "知",
     menuLabel: "知识目录",
     cardLabel: "知识目录 · 规则与引用",
     eyebrow: "KNOWLEDGE",
