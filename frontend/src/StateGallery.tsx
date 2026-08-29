@@ -83,6 +83,17 @@ export function StateGallery() {
                 title="队列刷新失败"
               />
             </StatusNotice>
+            <div
+              aria-label="仍保留的上一版队列数据示例"
+              className="state-stale-data-preview"
+            >
+              <div className="state-stale-data-meta">
+                <span>上一版投影 · 静态示例</span>
+                <span>最后同步 10:42 · 可能已过期</span>
+              </div>
+              <strong>示例队列条目</strong>
+              <span>当前仍显示上一版状态，等待权威数据恢复后再更新。</span>
+            </div>
           </StateCard>
 
           <StateCard
