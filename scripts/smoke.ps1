@@ -5,6 +5,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+. "$PSScriptRoot/test-gate-lock.ps1"
+Assert-TestGateInherited
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 . "$PSScriptRoot/gate-images.ps1"
@@ -49,7 +51,7 @@ docker compose exec -T agent-server sh -c 'test -z "${EXECUTOR_MACHINE_TOKEN+x}"
 docker compose exec -T compensation-executor sh -c 'test -z "${AGENT_MACHINE_TOKEN+x}"'
 
 $migrationHistory = docker compose exec -T postgres psql -U postgres -d customer_agent -Atc "select version || ':' || success from flyway_schema_history order by installed_rank"
-if (($migrationHistory -join ',') -ne '1:true,2:true,3:true,4:true,5:true,6:true,7:true,8:true,9:true,10:true,11:true,12:true,13:true,14:true,15:true,16:true,17:true,18:true,19:true,20:true,21:true,22:true,23:true,24:true,25:true,26:true,27:true,28:true,29:true,30:true,31:true,32:true') {
+if (($migrationHistory -join ',') -ne '1:true,2:true,3:true,4:true,5:true,6:true,7:true,8:true,9:true,10:true,11:true,12:true,13:true,14:true,15:true,16:true,17:true,18:true,19:true,20:true,21:true,22:true,23:true,24:true,25:true,26:true,27:true,28:true,29:true,30:true,31:true,32:true,33:true') {
     throw "Spring Flyway 迁移历史不完整: $($migrationHistory -join ',')"
 }
 
@@ -209,9 +211,27 @@ if ($LASTEXITCODE -ne 0) {
     throw "React 实时验收失败，退出码: $LASTEXITCODE"
 }
 
-$status = Invoke-RestMethod -Uri "http://127.0.0.1:$frontendPort/api/system/status"
-if ($status.status -ne 'UP') {
-    throw "Spring 状态投影不是 UP: $($status | ConvertTo-Json -Compress)"
+$nativePref = $PSNativeCommandUseErrorActionPreference
+$PSNativeCommandUseErrorActionPreference = $false
+$published = @(docker compose port frontend 8080 2>$null)[0]
+$PSNativeCommandUseErrorActionPreference = $nativePref
+if ($published -match ':(\d+)\s*$') {
+    $frontendPort = $Matches[1]
+}
+$status = $null
+foreach ($ignored in 1..40) {
+    try {
+        $status = Invoke-RestMethod -NoProxy -Uri "http://127.0.0.1:$frontendPort/api/system/status"
+        if ($status.status -eq 'UP') {
+            break
+        }
+    } catch {
+        $status = $null
+    }
+    Start-Sleep -Milliseconds 250
+}
+if ($null -eq $status -or $status.status -ne 'UP') {
+    throw "Spring 状态投影不是 UP: port=$frontendPort published=$published $($status | ConvertTo-Json -Compress)"
 }
 
 $sensitiveRules = Get-Content "$PSScriptRoot/../frontend/src/sensitive-content-patterns.json" -Raw | ConvertFrom-Json

@@ -20,7 +20,12 @@ class IntakeAssistanceService {
     static final String EPOCH = "intake-assistance-v1";
     private static final Duration CLAIM_DURATION = Duration.ofMinutes(15);
     private static final List<String> ALLOWED_ISSUE_KINDS =
-            List.of("LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE");
+            List.of(
+                    "LOGISTICS_DELAY",
+                    "PACKAGE_NOT_RECEIVED",
+                    "DUPLICATE_CHARGE",
+                    "ORDER_OPERATION_OR_RULE",
+                    "OTHER");
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final ObjectMapper json;

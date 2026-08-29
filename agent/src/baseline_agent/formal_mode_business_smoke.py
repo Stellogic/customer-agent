@@ -117,6 +117,7 @@ def _verify_autonomous_actions(
         "READ_PAYMENT_AND_REFUNDS",
         "READ_COMPENSATION_AND_PENDING_ACTIONS",
         "READ_APPLICABLE_POLICY",
+        "READ_ORDER_RULES",
         "SUBMIT_CONCLUSION",
     }
     if len(action_types) != len(required) or set(action_types) != required:

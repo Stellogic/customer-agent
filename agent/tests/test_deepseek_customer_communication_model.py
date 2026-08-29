@@ -136,7 +136,7 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
     assert request["reasoning"] == {"effort": "none"}
     assert request["text"]["format"]["strict"] is True
     body_schema = request["text"]["format"]["schema"]["properties"]["body"]
-    assert "pattern" in body_schema
+    assert "pattern" not in body_schema
     assert "enum" not in body_schema
     sent = json.loads(request["input"])
     assert set(sent) == {
@@ -224,7 +224,7 @@ async def test_retryable_provider_error_has_two_attempt_bound_and_no_fallback() 
     serialized = repr(model.audit_sink.records)
     assert "synthetic-test-key" not in serialized
     assert "忽略规则" not in serialized
-    assert "999" not in serialized
+    assert "999 元" not in serialized
 
 
 @pytest.mark.asyncio

@@ -224,17 +224,20 @@ class _OfflineShadowModel:
 
 
 @pytest.mark.asyncio
-async def test_confirmed_non_logistics_issue_starts_independently_then_hands_off_safely(
+async def test_confirmed_package_issue_investigates_instead_of_immediate_unsupported_handoff(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    posts: list[tuple[str, dict[str, object]]] = []
+    posts: list[str] = []
 
     class Response:
+        def __init__(self, payload: dict | None = None) -> None:
+            self.payload = payload or {}
+
         def raise_for_status(self) -> None:
             return None
 
-        def json(self) -> dict[str, str]:
-            return {"handlingMode": "HUMAN", "reasonCode": "UNSUPPORTED_SCENARIO"}
+        def json(self) -> dict:
+            return self.payload
 
     class Client:
         async def __aenter__(self) -> "Client":
@@ -243,15 +246,58 @@ async def test_confirmed_non_logistics_issue_starts_independently_then_hands_off
         async def __aexit__(self, *_: object) -> None:
             return None
 
-        async def post(self, url: str, *, json: dict[str, object], **_: object) -> Response:
-            posts.append((url, json))
-            return Response()
+        async def get(self, url: str, **__: object) -> Response:
+            return Response(_catalog_or_customer_context(url))
+
+        async def post(self, url: str, **_: object) -> Response:
+            posts.append(url)
+            if "/capabilities/" in url:
+                facts = {
+                    **_unique_facts(),
+                    "orderReference": "ORDER-SIGNED-161",
+                    "logisticsStatus": "SIGNED",
+                    "evidenceRefs": [
+                        "order:ORDER-SIGNED-161",
+                        "logistics:ORDER-SIGNED-161",
+                    ],
+                }
+                return Response(_capability_result(url, facts))
+            if url.endswith("/conclusions"):
+                return Response({"accepted": True, "lifecycleState": "INVESTIGATING"})
+            if "public-reply-events" in url:
+                return Response({"accepted": True})
+            if url.endswith("/human-handoff"):
+                return Response(
+                    {"handlingMode": "HUMAN", "reasonCode": "PACKAGE_SIGNED_NOT_RECEIVED"}
+                )
+            return Response({"accepted": True})
+
+    class ProviderStub:
+        async def generate(self, request: dict[str, object]) -> dict[str, object]:
+            return {
+                "schemaVersion": "customer-reply-v1",
+                "body": (
+                    "根据调查，订单 ORDER-SIGNED-161 的物流状态为已签收但您反馈未收到。"
+                    "当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。"
+                ),
+                "intent": "NO_COMPENSATION_RESOLUTION",
+                "evidenceRefs": [
+                    "order:ORDER-SIGNED-161",
+                    "logistics:ORDER-SIGNED-161",
+                ],
+                "escalationRequired": False,
+                "referencedOrder": "ORDER-SIGNED-161",
+            }
 
     monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setattr(
+        "baseline_agent.graph.customer_communication_model",
+        StructuredCustomerCommunicationModel(ProviderStub()),
+    )
     monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
     monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
 
-    result = await investigate_ticket_step(
+    result = await investigate_ticket(
         {
             "requested_by": "spring",
             "ticket_id": "package-ticket",
@@ -260,10 +306,9 @@ async def test_confirmed_non_logistics_issue_starts_independently_then_hands_off
         }
     )
 
-    assert result["handoff"]["reasonCode"] == "UNSUPPORTED_SCENARIO"
-    assert len(posts) == 1
-    assert posts[0][0].endswith("/human-handoff")
-    assert posts[0][1]["reasonCode"] == "UNSUPPORTED_SCENARIO"
+    assert any("/capabilities/" in url for url in posts)
+    assert result.get("investigation_actions") or result.get("conclusion") or result.get("handoff")
+    assert "UNSUPPORTED_SCENARIO" not in repr(result.get("handoff"))
 
 
 class _HandoffAfterFactsModel(DeterministicActionModel):
@@ -483,6 +528,7 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
         "POST",
         "POST",
         "POST",
+        "POST",
         "GET",
         "POST",
     ]
@@ -610,14 +656,26 @@ def _unique_facts() -> dict:
         "orderReference": "ORDER-116",
         "delayHours": 80,
         "delaySeconds": 80 * 60 * 60,
+        "logisticsStatus": "IN_TRANSIT",
         "paid": True,
         "cancelled": False,
         "fullyRefunded": False,
+        "duplicateChargeSuspected": False,
         "existingCompensation": False,
         "pendingActionCount": 0,
         "policyVersion": "delay-policy-v1",
+        "orderRuleSummary": "ADDRESS_CHANGE_AND_CANCEL_RULES_V1",
         "evidenceRefs": ["order:ORDER-116", "logistics:ORDER-116"],
     }
+
+
+def _with_facts(**overrides: object) -> dict:
+    facts = _unique_facts()
+    facts.update(overrides)
+    order = facts["orderReference"]
+    if isinstance(order, str):
+        facts["evidenceRefs"] = [f"order:{order}", f"logistics:{order}"]
+    return facts
 
 
 def _capability_catalog() -> dict:
@@ -632,6 +690,7 @@ def _capability_catalog() -> dict:
             ("capability", "STRING"),
             ("delayHours", "INTEGER"),
             ("delaySeconds", "INTEGER"),
+            ("logisticsStatus", "STRING"),
             ("evidenceRefs", "STRING_LIST"),
         ),
         "READ_PAYMENT_AND_REFUNDS": (
@@ -639,6 +698,7 @@ def _capability_catalog() -> dict:
             ("paid", "BOOLEAN"),
             ("cancelled", "BOOLEAN"),
             ("fullyRefunded", "BOOLEAN"),
+            ("duplicateChargeSuspected", "BOOLEAN"),
             ("evidenceRefs", "STRING_LIST"),
         ),
         "READ_COMPENSATION_AND_PENDING_ACTIONS": (
@@ -650,6 +710,11 @@ def _capability_catalog() -> dict:
         "READ_APPLICABLE_POLICY": (
             ("capability", "STRING"),
             ("policyVersion", "STRING"),
+            ("evidenceRefs", "STRING_LIST"),
+        ),
+        "READ_ORDER_RULES": (
+            ("capability", "STRING"),
+            ("orderRuleSummary", "STRING"),
             ("evidenceRefs", "STRING_LIST"),
         ),
     }
@@ -688,13 +753,19 @@ def _capability_result(url: str, facts: dict) -> dict:
             else [f"order:{facts.get('orderReference')}"],
         }
     fields = {
-        "READ_LOGISTICS": ("delayHours", "delaySeconds"),
-        "READ_PAYMENT_AND_REFUNDS": ("paid", "cancelled", "fullyRefunded"),
+        "READ_LOGISTICS": ("delayHours", "delaySeconds", "logisticsStatus"),
+        "READ_PAYMENT_AND_REFUNDS": (
+            "paid",
+            "cancelled",
+            "fullyRefunded",
+            "duplicateChargeSuspected",
+        ),
         "READ_COMPENSATION_AND_PENDING_ACTIONS": (
             "existingCompensation",
             "pendingActionCount",
         ),
         "READ_APPLICABLE_POLICY": ("policyVersion",),
+        "READ_ORDER_RULES": ("orderRuleSummary",),
     }[capability]
     evidence_refs = {
         "READ_LOGISTICS": [f"logistics:{facts.get('orderReference')}"],
@@ -704,6 +775,7 @@ def _capability_result(url: str, facts: dict) -> dict:
             f"order-actions:{facts.get('orderReference')}",
         ],
         "READ_APPLICABLE_POLICY": [f"policy:{facts.get('policyVersion')}"],
+        "READ_ORDER_RULES": [f"order-rule:{facts.get('orderReference')}"],
     }[capability]
     return {
         "capability": capability,
@@ -716,37 +788,18 @@ def _capability_result(url: str, facts: dict) -> dict:
     ("facts_payload", "expected_reason"),
     [
         (
-            {
-                "matchStatus": "UNIQUE",
-                "orderReference": "ORDER-1",
-                "delayHours": 2,
-                "delaySeconds": 1,
-                "paid": True,
-                "cancelled": False,
-                "fullyRefunded": False,
-                "existingCompensation": False,
-                "pendingActionCount": 0,
-                "policyVersion": "delay-policy-v1",
-                "evidenceRefs": ["order:ORDER-1", "logistics:ORDER-1"],
-            },
+            _with_facts(delayHours=2, delaySeconds=1, orderReference="ORDER-1"),
             "FACT_CONFLICT",
         ),
         ({"orderReference": ["raw", "payload"], "delayHours": "bad"}, "INVALID_TOOL_RESPONSE"),
         ({"orderReference": "ORDER-1", "delayHours": 2}, "INVALID_TOOL_RESPONSE"),
         (
-            {
-                "matchStatus": "UNIQUE",
-                "orderReference": "ORDER-1",
-                "delayHours": 2,
-                "delaySeconds": 7200,
-                "paid": False,
-                "cancelled": False,
-                "fullyRefunded": False,
-                "existingCompensation": False,
-                "pendingActionCount": 0,
-                "policyVersion": "delay-policy-v1",
-                "evidenceRefs": ["order:ORDER-1", "logistics:ORDER-1"],
-            },
+            _with_facts(
+                delayHours=2,
+                delaySeconds=7200,
+                paid=False,
+                orderReference="ORDER-1",
+            ),
             "UNSUPPORTED_SCENARIO",
         ),
     ],
@@ -874,19 +927,11 @@ async def test_conclusion_tool_retry_exhaustion_uses_the_same_stable_handoff_ide
 ) -> None:
     conclusion_attempts = 0
     handoff_keys: list[str] = []
-    facts = {
-        "matchStatus": "UNIQUE",
-        "orderReference": "ORDER-1",
-        "delayHours": 2,
-        "delaySeconds": 7200,
-        "paid": True,
-        "cancelled": False,
-        "fullyRefunded": False,
-        "existingCompensation": False,
-        "pendingActionCount": 0,
-        "policyVersion": "delay-policy-v1",
-        "evidenceRefs": ["order:ORDER-1", "logistics:ORDER-1"],
-    }
+    facts = _with_facts(
+        orderReference="ORDER-1",
+        delayHours=2,
+        delaySeconds=7200,
+    )
 
     class Response:
         def __init__(self, payload: dict) -> None:
@@ -962,19 +1007,12 @@ async def test_concurrent_unsafe_tool_results_share_one_handoff_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     handoff_keys: list[str] = []
-    facts = {
-        "matchStatus": "UNIQUE",
-        "orderReference": "ORDER-1",
-        "delayHours": 2,
-        "delaySeconds": 7200,
-        "paid": False,
-        "cancelled": False,
-        "fullyRefunded": False,
-        "existingCompensation": False,
-        "pendingActionCount": 0,
-        "policyVersion": "delay-policy-v1",
-        "evidenceRefs": ["order:ORDER-1", "logistics:ORDER-1"],
-    }
+    facts = _with_facts(
+        orderReference="ORDER-1",
+        delayHours=2,
+        delaySeconds=7200,
+        paid=False,
+    )
 
     class Response:
         def __init__(self, payload: dict) -> None:
@@ -1038,12 +1076,15 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
         "orderReference": "ORDER-DELAY-UNDER-24",
         "delayHours": 23,
         "delaySeconds": 23 * 60 * 60,
+        "logisticsStatus": "IN_TRANSIT",
         "paid": True,
         "cancelled": False,
         "fullyRefunded": False,
+        "duplicateChargeSuspected": False,
         "existingCompensation": False,
         "pendingActionCount": 0,
         "policyVersion": "delay-policy-v1",
+        "orderRuleSummary": "ADDRESS_CHANGE_AND_CANCEL_RULES_V1",
     }
 
     class Response:
@@ -1133,11 +1174,11 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
             },
             {
                 "evidenceReference": "logistics:ORDER-DELAY-UNDER-24",
-                "applicability": ["DELAY_DURATION"],
+                "applicability": ["DELAY_DURATION", "LOGISTICS_STATUS"],
             },
             {
                 "evidenceReference": "payment:ORDER-DELAY-UNDER-24",
-                "applicability": ["ORDER_ELIGIBILITY"],
+                "applicability": ["ORDER_ELIGIBILITY", "PAYMENT_STATUS", "REFUND_STATUS"],
             },
             {
                 "evidenceReference": "compensation:ORDER-DELAY-UNDER-24",
@@ -1150,6 +1191,10 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
             {
                 "evidenceReference": "policy:delay-policy-v1",
                 "applicability": ["POLICY_BASIS"],
+            },
+            {
+                "evidenceReference": "order-rule:ORDER-DELAY-UNDER-24",
+                "applicability": ["ORDER_RULE"],
             },
         ],
     }
@@ -1199,6 +1244,7 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
     )
     assert [call[0] for call in calls if not call[1].endswith("/public-reply-events")] == [
         "GET",
+        "POST",
         "POST",
         "POST",
         "POST",

@@ -10,21 +10,39 @@ class CustomerReplySafetyPolicyTest {
     private static final List<String> EVIDENCE = List.of("order:ORDER-122", "logistics:ORDER-122");
 
     @Test
-    void acceptsOnlyTheSafeDeterministicReplyEnvelope() {
+    void acceptsGroundedNaturalLanguageRepliesBeyondFixedTemplates() {
         assertThat(rejection(safeReply())).isNull();
         assertThat(
                         rejection(
                                 reply(
-                                        "我们已核对订单 ORDER-122 的物流记录。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+                                        "我们已核对订单 ORDER-122 的物流记录，确认存在延迟。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
                                         EVIDENCE,
                                         ORDER)))
                 .isNull();
         assertThat(
                         rejection(
                                 reply(
-                                        "调查结果显示，订单 ORDER-122 的物流出现延迟。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+                                        "根据调查，订单 ORDER-122 的物流出现了明显延迟。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
                                         EVIDENCE,
                                         ORDER)))
+                .isNull();
+        assertThat(
+                        rejection(
+                                reply(
+                                        "经核验，订单 ORDER-122 的物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+                                        EVIDENCE,
+                                        ORDER),
+                                false))
+                .isNull();
+        assertThat(
+                        rejection(
+                                reply(
+                                        "经核验，订单 ORDER-122 的退款状态已核对完毕，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+                                        EVIDENCE,
+                                        ORDER),
+                                false,
+                                InvestigationRiskScenario.REFUND_STATUS,
+                                DecisionReasonCode.REFUND_STATUS_EXPLAINED))
                 .isNull();
     }
 
@@ -64,6 +82,13 @@ class CustomerReplySafetyPolicyTest {
         assertThat(
                         rejection(
                                 reply(
+                                        "订单 ORDER-122 的调查已完成，当前属于疑似丢件。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+                                        EVIDENCE,
+                                        ORDER)))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT");
+        assertThat(
+                        rejection(
+                                reply(
                                         "订单 ORDER-122 正在等待人工审批。",
                                         List.of("order:ORDER-OTHER", "logistics:ORDER-OTHER"),
                                         ORDER)))
@@ -92,8 +117,8 @@ class CustomerReplySafetyPolicyTest {
     }
 
     @Test
-    void authorizesOnlySafeIncrementalPrefixesBeforeTheyReachThePublicProjection() {
-        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("经核验，订单 ORD", ORDER, false))
+    void authorizesSafeNaturalLanguagePrefixesWithoutFixedTemplateWhitelist() {
+        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("根据调查，订单 ORD", ORDER, false))
                 .isTrue();
         assertThat(
                         CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(
@@ -103,26 +128,64 @@ class CustomerReplySafetyPolicyTest {
                 .isFalse();
         assertThat(
                         CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(
-                                "经核验，订单 ORDER-OTHER", ORDER, false))
+                                "根据调查，订单 ORDER-OTHER", ORDER, false))
                 .isFalse();
-        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("经核验，订单 ORD", ORDER, true))
+        assertThat(
+                        CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(
+                                "根据调查，订单 ORDER-122 将补偿 20 元", ORDER, false))
+                .isFalse();
+        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("根据调查，订单 ORD", ORDER, true))
                 .isFalse();
     }
 
     private static String rejection(CustomerReplyEnvelope reply) {
-        return CustomerReplySafetyPolicy.rejectionReason(conclusion(reply), ORDER, EVIDENCE);
+        return rejection(reply, true);
     }
 
-    private static InvestigationConclusion conclusion(CustomerReplyEnvelope reply) {
+    private static String rejection(CustomerReplyEnvelope reply, boolean compensationRequired) {
+        return rejection(
+                reply,
+                compensationRequired,
+                InvestigationRiskScenario.LOGISTICS_DELAY,
+                compensationRequired
+                        ? DecisionReasonCode.LOGISTICS_DELAY
+                        : DecisionReasonCode.DELAY_UNDER_24_HOURS);
+    }
+
+    private static String rejection(
+            CustomerReplyEnvelope reply,
+            boolean compensationRequired,
+            InvestigationRiskScenario riskScenario,
+            DecisionReasonCode reasonCode) {
+        return CustomerReplySafetyPolicy.rejectionReason(
+                conclusion(reply, compensationRequired, riskScenario, reasonCode), ORDER, EVIDENCE);
+    }
+
+    private static InvestigationConclusion conclusion(
+            CustomerReplyEnvelope reply, boolean compensationRequired) {
+        return conclusion(
+                reply,
+                compensationRequired,
+                InvestigationRiskScenario.LOGISTICS_DELAY,
+                compensationRequired
+                        ? DecisionReasonCode.LOGISTICS_DELAY
+                        : DecisionReasonCode.DELAY_UNDER_24_HOURS);
+    }
+
+    private static InvestigationConclusion conclusion(
+            CustomerReplyEnvelope reply,
+            boolean compensationRequired,
+            InvestigationRiskScenario riskScenario,
+            DecisionReasonCode reasonCode) {
         return new InvestigationConclusion(
-                true,
-                DecisionReasonCode.LOGISTICS_DELAY,
-                80,
-                288000,
+                compensationRequired,
+                reasonCode,
+                compensationRequired ? 80 : 12,
+                compensationRequired ? 288000 : 43200,
                 ORDER,
                 EVIDENCE,
                 new EvidenceSufficiencyClaim(
-                        InvestigationRiskScenario.LOGISTICS_DELAY,
+                        riskScenario,
                         EvidenceSufficiencyPolicy.VERSION,
                         List.of(
                                 new ConclusionEvidence(
@@ -137,12 +200,11 @@ class CustomerReplySafetyPolicyTest {
 
     private static CustomerReplyEnvelope reply(
             String body, List<String> evidence, String referencedOrder) {
+        CustomerReplyIntent intent =
+                body.contains("当前不符合补偿条件")
+                        ? CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
+                        : CustomerReplyIntent.COMPENSATION_REVIEW_PENDING;
         return new CustomerReplyEnvelope(
-                "customer-reply-v1",
-                body,
-                CustomerReplyIntent.COMPENSATION_REVIEW_PENDING,
-                evidence,
-                false,
-                referencedOrder);
+                "customer-reply-v1", body, intent, evidence, false, referencedOrder);
     }
 }

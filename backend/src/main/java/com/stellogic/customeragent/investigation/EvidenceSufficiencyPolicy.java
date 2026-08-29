@@ -11,7 +11,8 @@ import java.util.Set;
 final class EvidenceSufficiencyPolicy {
     static final String VERSION = "evidence-sufficiency-v1";
     private static final String AUTHORIZED_SOURCE = "SPRING_AUTHORIZED_CAPABILITY";
-    private static final Map<String, EvidenceApplicability> REQUIRED_FACTS =
+
+    private static final Map<String, EvidenceApplicability> LOGISTICS_DELAY_REQUIRED =
             Map.of(
                     "ORDER", EvidenceApplicability.ORDER_IDENTITY,
                     "LOGISTICS_DELAY_HOURS", EvidenceApplicability.DELAY_DURATION,
@@ -23,6 +24,62 @@ final class EvidenceSufficiencyPolicy {
                     "PENDING_ACTION_COUNT", EvidenceApplicability.PENDING_ACTIONS,
                     "POLICY", EvidenceApplicability.POLICY_BASIS);
 
+    private static final Map<String, EvidenceApplicability> LOGISTICS_STATUS_REQUIRED =
+            Map.of(
+                    "ORDER", EvidenceApplicability.ORDER_IDENTITY,
+                    "LOGISTICS_STATUS", EvidenceApplicability.LOGISTICS_STATUS,
+                    "PAYMENT", EvidenceApplicability.ORDER_ELIGIBILITY,
+                    "ORDER_CANCELLATION", EvidenceApplicability.ORDER_ELIGIBILITY,
+                    "REFUND_STATUS", EvidenceApplicability.ORDER_ELIGIBILITY,
+                    "EXISTING_COMPENSATION", EvidenceApplicability.EXISTING_COMPENSATION,
+                    "PENDING_ACTION_COUNT", EvidenceApplicability.PENDING_ACTIONS,
+                    "POLICY", EvidenceApplicability.POLICY_BASIS);
+
+    private static final Map<String, EvidenceApplicability> PAYMENT_REQUIRED =
+            Map.of(
+                    "ORDER", EvidenceApplicability.ORDER_IDENTITY,
+                    "PAYMENT", EvidenceApplicability.PAYMENT_STATUS,
+                    "ORDER_CANCELLATION", EvidenceApplicability.ORDER_ELIGIBILITY,
+                    "REFUND_STATUS", EvidenceApplicability.REFUND_STATUS,
+                    "EXISTING_COMPENSATION", EvidenceApplicability.EXISTING_COMPENSATION,
+                    "PENDING_ACTION_COUNT", EvidenceApplicability.PENDING_ACTIONS,
+                    "POLICY", EvidenceApplicability.POLICY_BASIS);
+
+    private static final Map<String, EvidenceApplicability> ORDER_RULE_REQUIRED =
+            Map.of(
+                    "ORDER", EvidenceApplicability.ORDER_IDENTITY,
+                    "ORDER_RULE", EvidenceApplicability.ORDER_RULE,
+                    "PAYMENT", EvidenceApplicability.ORDER_ELIGIBILITY,
+                    "ORDER_CANCELLATION", EvidenceApplicability.ORDER_ELIGIBILITY,
+                    "PENDING_ACTION_COUNT", EvidenceApplicability.PENDING_ACTIONS,
+                    "POLICY", EvidenceApplicability.POLICY_BASIS);
+
+    private static final Map<String, EvidenceApplicability> OTHER_REQUIRED =
+            Map.of(
+                    "ORDER", EvidenceApplicability.ORDER_IDENTITY,
+                    "PENDING_ACTION_COUNT", EvidenceApplicability.PENDING_ACTIONS,
+                    "POLICY", EvidenceApplicability.POLICY_BASIS);
+
+    private static final Map<InvestigationRiskScenario, Map<String, EvidenceApplicability>>
+            REQUIRED_BY_SCENARIO =
+                    Map.of(
+                            InvestigationRiskScenario.LOGISTICS_DELAY,
+                            LOGISTICS_DELAY_REQUIRED,
+                            InvestigationRiskScenario.LOGISTICS_STALLED,
+                            LOGISTICS_STATUS_REQUIRED,
+                            InvestigationRiskScenario.PACKAGE_SIGNED_NOT_RECEIVED,
+                            LOGISTICS_STATUS_REQUIRED,
+                            InvestigationRiskScenario.PACKAGE_SUSPECTED_LOST,
+                            LOGISTICS_STATUS_REQUIRED,
+                            InvestigationRiskScenario.DUPLICATE_CHARGE,
+                            PAYMENT_REQUIRED,
+                            InvestigationRiskScenario.REFUND_STATUS,
+                            PAYMENT_REQUIRED,
+                            InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE,
+                            ORDER_RULE_REQUIRED,
+                            InvestigationRiskScenario.OTHER_GENERAL,
+                            OTHER_REQUIRED);
+
     private EvidenceSufficiencyPolicy() {}
 
     static String validate(
@@ -31,10 +88,13 @@ final class EvidenceSufficiencyPolicy {
             Instant now) {
         EvidenceSufficiencyClaim sufficiency = conclusion.sufficiency();
         if (sufficiency == null
-                || sufficiency.riskScenario() != InvestigationRiskScenario.LOGISTICS_DELAY
+                || sufficiency.riskScenario() == null
+                || !REQUIRED_BY_SCENARIO.containsKey(sufficiency.riskScenario())
                 || !VERSION.equals(sufficiency.policyVersion())) {
             return "UNSUPPORTED_RISK_SCENARIO";
         }
+        Map<String, EvidenceApplicability> requiredFacts =
+                REQUIRED_BY_SCENARIO.get(sufficiency.riskScenario());
         String shapeFailure = validateEvidenceShape(sufficiency.evidence());
         if (shapeFailure != null) return shapeFailure;
         if (facts.isEmpty()) return "EVIDENCE_OUT_OF_SCOPE";
@@ -48,7 +108,7 @@ final class EvidenceSufficiencyPolicy {
                             fact.evidenceReference(), ignored -> new java.util.ArrayList<>())
                     .add(fact);
         }
-        if (!factsByType.keySet().containsAll(REQUIRED_FACTS.keySet())) {
+        if (!factsByType.keySet().containsAll(requiredFacts.keySet())) {
             return "REQUIRED_FACT_MISSING";
         }
 
@@ -68,7 +128,7 @@ final class EvidenceSufficiencyPolicy {
             if (!fact.validUntil().isAfter(now)) return "EVIDENCE_EXPIRED";
             if (!"CLEAR".equals(fact.conflictStatus())) return "FACT_CONFLICT";
         }
-        for (Map.Entry<String, EvidenceApplicability> requirement : REQUIRED_FACTS.entrySet()) {
+        for (Map.Entry<String, EvidenceApplicability> requirement : requiredFacts.entrySet()) {
             PersistedInvestigationFact fact = factsByType.get(requirement.getKey());
             ConclusionEvidence item = evidenceByReference.get(fact.evidenceReference());
             if (item == null || !item.applicability().contains(requirement.getValue())) {
