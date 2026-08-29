@@ -1385,6 +1385,40 @@ describe("客户帮助中心", () => {
     expect(screen.queryByText("旧代次消息")).not.toBeInTheDocument();
   });
 
+  it("在首个内容片段到达前持续显示可读的等待状态", async () => {
+    const ticketId = "15900000-0000-0000-0000-000000000002";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:9",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "AGENT",
+              agentGeneration: 2,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: {
+              status: "LOADING",
+              body: "",
+              progressStage: "UNDERSTANDING",
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(openEventResponse());
+
+    render(<App />);
+
+    expect(await screen.findByText("等待首个内容片段")).toBeInTheDocument();
+  });
+
   it("从权威流状态恢复慢首字，并按真实内容片段持续更新直到完成", async () => {
     const ticketId = "15900000-0000-0000-0000-000000000003";
     globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);

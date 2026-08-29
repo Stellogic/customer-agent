@@ -1330,8 +1330,17 @@ export function App() {
                   header="智能客服"
                   loading={snapshot.replyStream.status === "LOADING"}
                   streaming={snapshot.replyStream.status === "STREAMING"}
-                  footer={replyStreamFooter(snapshot.replyStream.status)}
+                  footer={
+                    snapshot.replyStream.status === "LOADING"
+                      ? undefined
+                      : replyStreamFooter(snapshot.replyStream.status)
+                  }
                 />
+                {snapshot.replyStream.status === "LOADING" && (
+                  <p className="reply-stream-status" role="status">
+                    等待首个内容片段
+                  </p>
+                )}
                 {["STREAMING", "COMPLETED"].includes(snapshot.replyStream.status) && (
                   <Sources
                     rootClassName="reply-sources"
