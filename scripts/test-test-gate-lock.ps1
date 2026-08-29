@@ -215,8 +215,32 @@ try {
     )
     foreach ($item in $protectedScripts) {
         $scriptPath = Join-Path $PSScriptRoot $item.Name
-        $output = & pwsh -NoProfile -File $scriptPath @($item.Args) 2>&1 | ForEach-Object { "$_" }
-        $code = $LASTEXITCODE
+        $cleared = @(
+            'CUSTOMER_AGENT_TEST_GATE_TOKEN',
+            'CUSTOMER_AGENT_TEST_GATE_IDENTITY',
+            'COMPOSE_PROJECT_NAME',
+            'CUSTOMER_AGENT_IMAGE_TAG',
+            'CUSTOMER_AGENT_FRONTEND_PORT',
+            'CUSTOMER_AGENT_GATE_RUN_ID',
+            'CUSTOMER_AGENT_GATE_SOURCE_FINGERPRINT'
+        )
+        $previous = @{}
+        foreach ($key in $cleared) {
+            $previous[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
+            Remove-Item -Path "Env:$key" -ErrorAction SilentlyContinue
+        }
+        try {
+            $output = & pwsh -NoProfile -File $scriptPath @($item.Args) 2>&1 | ForEach-Object { "$_" }
+            $code = $LASTEXITCODE
+        } finally {
+            foreach ($key in $cleared) {
+                if ($null -eq $previous[$key] -or $previous[$key] -eq '') {
+                    Remove-Item -Path "Env:$key" -ErrorAction SilentlyContinue
+                } else {
+                    Set-Item -Path "Env:$key" -Value $previous[$key]
+                }
+            }
+        }
         $text = $output -join "`n"
         if ($code -ne 76 -or $text -notmatch 'TEST_GATE_LOCK_REQUIRED') {
             throw "$($item.Name) 无令牌应 TEST_GATE_LOCK_REQUIRED，实际 exit=$code $text"
