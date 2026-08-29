@@ -1328,14 +1328,22 @@ def main() -> None:
                 )
                 expect_status(restored_policy, 200)
 
-                with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
-                    connection.execute(
-                        "insert into synthetic_pending_action "
-                        "(id, order_reference, action_type, action_state) "
-                        "values (%s, %s, 'COMPENSATION_REVIEW', 'READY')",
-                        (uuid.uuid4(), order_reference),
-                    )
-                submit_rejected(conclusion_payload, "stale-pending-action-evidence")
+                stale_action_id = uuid.uuid4()
+                try:
+                    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                        connection.execute(
+                            "insert into synthetic_pending_action "
+                            "(id, order_reference, action_type, action_state) "
+                            "values (%s, %s, 'COMPENSATION_REVIEW', 'READY')",
+                            (stale_action_id, order_reference),
+                        )
+                    submit_rejected(conclusion_payload, "stale-pending-action-evidence")
+                finally:
+                    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                        connection.execute(
+                            "delete from synthetic_pending_action where id = %s",
+                            (stale_action_id,),
+                        )
 
                 with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
                     reasons = {
