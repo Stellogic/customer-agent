@@ -47,6 +47,8 @@ function Start-LockHolder {
     $outFile = Join-Path $env:TEMP "test-gate-hold-$identity.out"
     $errFile = Join-Path $env:TEMP "test-gate-hold-$identity.err"
     Remove-Item -LiteralPath $outFile, $errFile -ErrorAction SilentlyContinue
+    $savedToken = $env:CUSTOMER_AGENT_TEST_GATE_TOKEN
+    $savedIdentity = $env:CUSTOMER_AGENT_TEST_GATE_IDENTITY
     Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_TOKEN -ErrorAction SilentlyContinue
     Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_IDENTITY -ErrorAction SilentlyContinue
     $argumentList = @(
@@ -57,6 +59,16 @@ function Start-LockHolder {
     ) + $ExtraArgs
     $process = Start-Process -FilePath 'pwsh' -ArgumentList $argumentList -PassThru -WindowStyle Hidden `
         -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+    if ($null -eq $savedToken) {
+        Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_TOKEN -ErrorAction SilentlyContinue
+    } else {
+        $env:CUSTOMER_AGENT_TEST_GATE_TOKEN = $savedToken
+    }
+    if ($null -eq $savedIdentity) {
+        Remove-Item Env:CUSTOMER_AGENT_TEST_GATE_IDENTITY -ErrorAction SilentlyContinue
+    } else {
+        $env:CUSTOMER_AGENT_TEST_GATE_IDENTITY = $savedIdentity
+    }
     $deadline = (Get-Date).AddSeconds(20)
     $text = ''
     do {
