@@ -16,13 +16,10 @@ final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
 
     private final JdbcTemplate jdbc;
     private final KnowledgeAccessPolicy access;
-    private final KnowledgeCatalogIndexer indexer;
 
-    JdbcKnowledgeCatalogService(
-            JdbcTemplate jdbc, KnowledgeAccessPolicy access, KnowledgeCatalogIndexer indexer) {
+    JdbcKnowledgeCatalogService(JdbcTemplate jdbc, KnowledgeAccessPolicy access) {
         this.jdbc = jdbc;
         this.access = access;
-        this.indexer = indexer;
     }
 
     @Override
@@ -144,8 +141,9 @@ final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
                         scopeArray);
         List<KnowledgeChunkCitation> chunks =
                 jdbc.query(
-                        "select chunk_id, article_id, version, source_file, start_line, end_line, content "
-                                + "from knowledge_chunk where article_id = ? and version = ? order by ordinal",
+                        "select chunk_id, article_id, version, source_file, start_line, end_line, "
+                                + "applicability, content from knowledge_chunk "
+                                + "where article_id = ? and version = ? order by ordinal",
                         (rs, row) ->
                                 new KnowledgeChunkCitation(
                                         rs.getString(1),
@@ -154,7 +152,8 @@ final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
                                         rs.getString(4),
                                         rs.getInt(5),
                                         rs.getInt(6),
-                                        rs.getString(7)),
+                                        readSqlTextArray(rs.getArray(7)),
+                                        rs.getString(8)),
                         detail.articleId(),
                         detail.version());
         KnowledgeArticleDetail withRelated =
@@ -181,19 +180,14 @@ final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
         return readState();
     }
 
-    @Override
-    public KnowledgeIndexState rebuild(String principalId) {
-        access.requireScopes(principalId);
-        return indexer.rebuild();
-    }
-
     private KnowledgeIndexState requireReady() {
         KnowledgeIndexState state = readState();
-        if (state.status() != KnowledgeIndexStatus.READY
-                && state.status() != KnowledgeIndexStatus.EMPTY) {
-            throw new KnowledgeIndexUnavailableException(state);
+        if (state.status() == KnowledgeIndexStatus.READY
+                || state.status() == KnowledgeIndexStatus.EMPTY
+                || (state.status() == KnowledgeIndexStatus.FAILED && state.articleCount() > 0)) {
+            return state;
         }
-        return state;
+        throw new KnowledgeIndexUnavailableException(state);
     }
 
     private KnowledgeIndexState readState() {

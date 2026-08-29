@@ -74,6 +74,7 @@ const CURRENT_ARTICLE = {
       sourceFile: "knowledge/logistics-delay-v2.md",
       startLine: 10,
       endLine: 14,
+      applicability: ["INTERNAL", "SUPPORT"],
       content: SEARCH_RESULT.snippet,
     },
   ],
@@ -208,7 +209,8 @@ describe("版本化知识目录工作区", () => {
     fireEvent.click(screen.getByRole("button", { name: "审核（开发中）" }));
     fireEvent.click(screen.getByRole("button", { name: "发布（开发中）" }));
     fireEvent.click(screen.getByRole("button", { name: "回滚（开发中）" }));
-    expect(screen.getByRole("status")).toHaveTextContent("回滚入口正在开发中");
+    fireEvent.click(screen.getByRole("button", { name: "重建索引（开发中）" }));
+    expect(screen.getByRole("status")).toHaveTextContent("重建索引入口正在开发中");
     expect(vi.mocked(globalThis.fetch).mock.calls.length).toBe(writesBefore);
   });
 });

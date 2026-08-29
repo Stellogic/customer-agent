@@ -12,6 +12,7 @@ final class KnowledgeChunker {
             String articleId,
             String version,
             String sourceFile,
+            List<String> applicability,
             List<String> bodyLines,
             int bodyStartLine) {
         List<LineBlock> blocks = new ArrayList<>();
@@ -60,6 +61,7 @@ final class KnowledgeChunker {
                                 sourceFile,
                                 block.startLine(),
                                 block.endLine(),
+                                applicability,
                                 content));
             }
         }

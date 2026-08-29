@@ -34,6 +34,7 @@ class KnowledgeMarkdownParserTest {
         assertThat(first.articleId()).isEqualTo("logistics-delay");
         assertThat(first.version()).isEqualTo("v2");
         assertThat(first.sourceFile()).isEqualTo("knowledge/logistics-delay-v2.md");
+        assertThat(first.applicability()).containsExactly("INTERNAL", "SUPPORT");
         assertThat(first.startLine()).isGreaterThan(0);
         assertThat(first.endLine()).isGreaterThanOrEqualTo(first.startLine());
     }
@@ -48,6 +49,29 @@ class KnowledgeMarkdownParserTest {
         assertThat(article.publicationStatus()).isEqualTo(KnowledgePublicationStatus.RETIRED);
         assertThat(article.current()).isFalse();
         assertThat(article.body()).contains("旧版本规则只用于审计历史回复");
+    }
+
+    @Test
+    void versionUpgradeKeepsOldCitationAuditableAndOutOfOrdinarySearch() throws Exception {
+        KnowledgeArticleDocument retired =
+                parser.parse(new ClassPathResource("knowledge/logistics-delay-v1.md"));
+        KnowledgeArticleDocument current =
+                parser.parse(new ClassPathResource("knowledge/logistics-delay-v2.md"));
+
+        assertThat(retired.articleId()).isEqualTo(current.articleId());
+        assertThat(retired.version()).isEqualTo("v1");
+        assertThat(current.version()).isEqualTo("v2");
+        assertThat(retired.current()).isFalse();
+        assertThat(current.current()).isTrue();
+        assertThat(retired.publicationStatus()).isEqualTo(KnowledgePublicationStatus.RETIRED);
+        assertThat(current.publicationStatus()).isEqualTo(KnowledgePublicationStatus.PUBLISHED);
+        assertThat(ordinarySearchAdmits(retired)).isFalse();
+        assertThat(ordinarySearchAdmits(current)).isTrue();
+        assertThat(retired.chunks().getFirst().chunkId())
+                .isNotEqualTo(current.chunks().getFirst().chunkId());
+        assertThat(retired.chunks().getFirst().version()).isEqualTo("v1");
+        assertThat(retired.chunks().getFirst().applicability()).containsExactly("INTERNAL", "SUPPORT");
+        assertThat(current.chunks().getFirst().applicability()).containsExactly("INTERNAL", "SUPPORT");
     }
 
     @Test
@@ -166,6 +190,10 @@ class KnowledgeMarkdownParserTest {
                                                 """)))
                 .isInstanceOf(KnowledgeCatalogValidationException.class)
                 .hasMessageContaining("正文不能为空");
+    }
+
+    private static boolean ordinarySearchAdmits(KnowledgeArticleDocument article) {
+        return article.current() && article.publicationStatus() == KnowledgePublicationStatus.PUBLISHED;
     }
 
     private static String validArticle() {

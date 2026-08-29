@@ -6,6 +6,4 @@ public interface KnowledgeCatalogService {
     KnowledgeArticleResponse article(String principalId, String articleId, String version);
 
     KnowledgeIndexState index(String principalId);
-
-    KnowledgeIndexState rebuild(String principalId);
 }

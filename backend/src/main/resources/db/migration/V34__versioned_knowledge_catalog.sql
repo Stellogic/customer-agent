@@ -30,6 +30,7 @@ CREATE TABLE knowledge_chunk (
     source_file text NOT NULL CHECK (length(btrim(source_file)) > 0),
     start_line integer NOT NULL CHECK (start_line > 0),
     end_line integer NOT NULL CHECK (end_line >= start_line),
+    applicability text[] NOT NULL CHECK (cardinality(applicability) > 0),
     content text NOT NULL CHECK (length(btrim(content)) > 0),
     indexed_at timestamptz NOT NULL,
     search_vector tsvector GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED,

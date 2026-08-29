@@ -29,7 +29,12 @@ record KnowledgeChunkDocument(
         String sourceFile,
         int startLine,
         int endLine,
-        String content) {}
+        List<String> applicability,
+        String content) {
+    KnowledgeChunkDocument {
+        applicability = List.copyOf(applicability);
+    }
+}
 
 record KnowledgeIndexState(
         KnowledgeIndexStatus status,
@@ -81,7 +86,12 @@ record KnowledgeChunkCitation(
         String sourceFile,
         int startLine,
         int endLine,
-        String content) {}
+        List<String> applicability,
+        String content) {
+    KnowledgeChunkCitation {
+        applicability = List.copyOf(applicability);
+    }
+}
 
 record KnowledgeArticleDetail(
         String articleId,

@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Spin } from "antd";
 import { StatusNotice } from "../components/SystemState";
-import { loadCsrfToken } from "../csrf";
 import { humanSessionFetch } from "../humanSessionLifecycle";
 
 const SCHEMA = "knowledge-catalog-v1" as const;
@@ -60,6 +59,7 @@ type Citation = {
   sourceFile: string;
   startLine: number;
   endLine: number;
+  applicability: string[];
   content: string;
 };
 
@@ -94,7 +94,6 @@ export default function KnowledgeWorkspace() {
   const [detail, setDetail] = useState<ArticleDetail | null>(null);
   const [detailState, setDetailState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [detailError, setDetailError] = useState("");
-  const [rebuilding, setRebuilding] = useState(false);
   const [developmentNotice, setDevelopmentNotice] = useState("");
 
   useEffect(() => {
@@ -159,35 +158,6 @@ export default function KnowledgeWorkspace() {
     }
   }
 
-  async function rebuildIndex() {
-    if (rebuilding) return;
-    setRebuilding(true);
-    setDevelopmentNotice("");
-    try {
-      const csrf = await loadCsrfToken();
-      const response = await humanSessionFetch(`${CATALOG_URL}/index/rebuild`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { [csrf.headerName]: csrf.token },
-      });
-      const value = (await response.json().catch(() => undefined)) as unknown;
-      if (!response.ok || !isIndexStatus(value)) throw new Error("索引重建结果尚未确认。");
-      setIndex(value);
-      if (value.status === "READY" || value.status === "EMPTY") await loadCatalog(query);
-      else {
-        setCatalog(null);
-        setCatalogState("error");
-        setCatalogError("知识源校验未通过，旧索引已保留；请修正内容后再重建。");
-      }
-    } catch (error) {
-      setCatalog(null);
-      setCatalogError(error instanceof Error ? error.message : "索引重建失败，未报告成功。");
-      setCatalogState("error");
-    } finally {
-      setRebuilding(false);
-    }
-  }
-
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void loadCatalog(query);
@@ -227,9 +197,6 @@ export default function KnowledgeWorkspace() {
             />
             <button type="submit" disabled={catalogState === "loading"}>
               {catalogState === "loading" ? "正在检索…" : "检索知识"}
-            </button>
-            <button type="button" className="knowledge-secondary-action" onClick={() => void rebuildIndex()} disabled={rebuilding}>
-              {rebuilding ? "正在重建…" : "重建索引"}
             </button>
           </div>
         </form>
@@ -334,7 +301,7 @@ export default function KnowledgeWorkspace() {
           <p>第一阶段只提供真实查看、检索、版本和引用；内容变更仍通过仓库审阅。</p>
         </div>
         <div className="knowledge-development-actions">
-          {(["编辑", "审核", "发布", "回滚"] as const).map((label) => (
+          {(["编辑", "审核", "发布", "回滚", "重建索引"] as const).map((label) => (
             <button key={label} type="button" onClick={() => development(label)}>
               {label}（开发中）
             </button>
@@ -392,7 +359,7 @@ function ArticleDetail({ article, onVersion }: { article: ArticleDetail; onVersi
         <ol className="knowledge-citation-list">
           {article.chunks.map((chunk) => (
             <li key={chunk.chunkId}>
-              <div><strong>{chunk.sourceFile}</strong><span>第 {chunk.startLine}–{chunk.endLine} 行</span></div>
+              <div><strong>{chunk.sourceFile}</strong><span>第 {chunk.startLine}–{chunk.endLine} 行 · {chunk.applicability.join("、")}</span></div>
               <p>{chunk.content}</p>
               <small>{chunk.chunkId}</small>
             </li>
@@ -457,7 +424,7 @@ function isArticleVersion(value: unknown): value is ArticleVersion {
 }
 
 function isCitation(value: unknown): value is Citation {
-  return isRecord(value) && hasOnlyKeys(value, ["chunkId", "articleId", "version", "sourceFile", "startLine", "endLine", "content"]) && typeof value.chunkId === "string" && typeof value.articleId === "string" && typeof value.version === "string" && typeof value.sourceFile === "string" && Number.isSafeInteger(value.startLine) && Number.isSafeInteger(value.endLine) && typeof value.content === "string";
+  return isRecord(value) && hasOnlyKeys(value, ["chunkId", "articleId", "version", "sourceFile", "startLine", "endLine", "applicability", "content"]) && typeof value.chunkId === "string" && typeof value.articleId === "string" && typeof value.version === "string" && typeof value.sourceFile === "string" && Number.isSafeInteger(value.startLine) && Number.isSafeInteger(value.endLine) && Array.isArray(value.applicability) && value.applicability.every((entry) => typeof entry === "string") && typeof value.content === "string";
 }
 
 function hasOnlyKeys(value: Record<string, unknown>, keys: string[]) {

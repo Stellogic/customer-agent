@@ -235,7 +235,8 @@ final class KnowledgeCatalogIndexer {
     private void insertChunk(KnowledgeChunkDocument chunk, Instant indexedAt) {
         jdbc.update(
                 "insert into knowledge_chunk (chunk_id, article_id, version, ordinal, source_file, "
-                        + "start_line, end_line, content, indexed_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        + "start_line, end_line, applicability, content, indexed_at) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?::text[], ?, ?)",
                 chunk.chunkId(),
                 chunk.articleId(),
                 chunk.version(),
@@ -243,6 +244,7 @@ final class KnowledgeCatalogIndexer {
                 chunk.sourceFile(),
                 chunk.startLine(),
                 chunk.endLine(),
+                chunk.applicability().toArray(String[]::new),
                 chunk.content(),
                 indexedAt);
     }
@@ -258,10 +260,12 @@ final class KnowledgeCatalogIndexer {
                         Instant updatedAt = clock.instant();
                         String safeMessage = message == null ? "知识目录校验失败" : message;
                         if (safeMessage.length() > 500) safeMessage = safeMessage.substring(0, 500);
+                        KnowledgeIndexStatus retained = retainCatalogStatusAfterFailure(current);
                         if (jdbc.update(
-                                        "update knowledge_index_state set status = 'FAILED', "
+                                        "update knowledge_index_state set status = ?, "
                                                 + "failure_code = ?, failure_message = ?, "
                                                 + "updated_at = ? where id = 1 and generation = ?",
+                                        retained.name(),
                                         code,
                                         safeMessage,
                                         updatedAt,
@@ -270,7 +274,7 @@ final class KnowledgeCatalogIndexer {
                             return readState();
                         }
                         return new KnowledgeIndexState(
-                                KnowledgeIndexStatus.FAILED,
+                                retained,
                                 current.generation(),
                                 current.sourceDigest(),
                                 current.indexedAt(),
@@ -350,6 +354,16 @@ final class KnowledgeCatalogIndexer {
     private String stableSourceFile(Resource resource) {
         String filename = resource.getFilename();
         return filename == null ? resource.getDescription() : "knowledge/" + filename;
+    }
+
+    static KnowledgeIndexStatus retainCatalogStatusAfterFailure(KnowledgeIndexState previous) {
+        if (previous.status() == KnowledgeIndexStatus.READY) {
+            return KnowledgeIndexStatus.READY;
+        }
+        if (previous.status() == KnowledgeIndexStatus.EMPTY && previous.generation() > 0) {
+            return KnowledgeIndexStatus.EMPTY;
+        }
+        return KnowledgeIndexStatus.FAILED;
     }
 
     private static String failureCode(Exception exception) {

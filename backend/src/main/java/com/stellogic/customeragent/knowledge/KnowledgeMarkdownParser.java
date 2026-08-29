@@ -85,7 +85,12 @@ final class KnowledgeMarkdownParser {
         }
         List<KnowledgeChunkDocument> chunks =
                 KnowledgeChunker.chunk(
-                        articleId, version, sourceFile, bodyLines, closingBoundary + 2);
+                        articleId,
+                        version,
+                        sourceFile,
+                        applicability,
+                        bodyLines,
+                        closingBoundary + 2);
         if (chunks.isEmpty()) {
             throw invalid(sourceFile, closingBoundary + 1, "正文无法形成知识分段");
         }
