@@ -40,24 +40,24 @@ test("parallel-safe：状态画廊十态具有 status/alert/aria-busy 读屏语�
     "true",
   );
   await expect(gallery.getByRole("status", { name: "当前没有队列条目" })).toBeVisible();
-  await expect(gallery.getByRole("alert", { name: "待审批队列暂时不可用" })).toBeVisible();
+  await expectCardNotice(gallery, "数据加载失败", "alert", "待审批队列暂时不可用");
   await expect(gallery.getByRole("status", { name: "禁止访问示例" })).toBeVisible();
   await expect(gallery.getByRole("status", { name: "页面未找到示例" })).toBeVisible();
-  await expect(
-    gallery.getByRole("alert", { name: "实时连接已断开；当前队列可能过期。" }),
-  ).toBeVisible();
-  await expect(
-    gallery.getByRole("status", { name: "正在从 Spring 权威快照重新同步…" }),
-  ).toBeVisible();
-  await expect(
-    gallery.getByRole("status", { name: "审批责任已结束，证据和操作已移除。" }),
-  ).toBeVisible();
-  await expect(gallery.getByRole("status", { name: "操作已完成（静态示例）" })).toBeVisible();
-  await expect(
-    gallery.getByRole("status", { name: "结果尚未确认，正在恢复 Spring 权威状态…" }),
-  ).toBeVisible();
+  await expectCardNotice(gallery, "实时连接已断开", "alert", "实时连接已断开；当前队列可能过期。");
+  await expectCardNotice(gallery, "正在重新同步", "status", "正在从 Spring 权威快照重新同步…");
+  await expectCardNotice(gallery, "审批租约过期", "status", "审批责任已结束，证据和操作已移除。");
+  await expectCardNotice(gallery, "操作成功", "status", "操作已完成（静态示例）");
+  await expectCardNotice(
+    gallery,
+    "操作结果未知",
+    "status",
+    "结果尚未确认，正在恢复 Spring 权威状态…",
+  );
   await expect(gallery.getByText("补偿已批准")).toHaveCount(0);
-  await gallery.screenshot({ path: testInfo.outputPath("desktop-states-semantics.png"), fullPage: true });
+  await gallery.screenshot({
+    path: testInfo.outputPath("desktop-states-semantics.png"),
+    fullPage: true,
+  });
 
   const narrow = await context.newPage();
   await narrow.setViewportSize({ width: 360, height: 800 });
@@ -112,7 +112,10 @@ test("parallel-safe：未登录独立 403/404 提供安全入口且不展示受�
   await expect(forbidden.getByRole("link", { name: "前往客户登录" })).toBeVisible();
   await expect(forbidden.getByRole("link", { name: "前往内部登录" })).toBeVisible();
   await expect(forbidden.getByText(/工单详情|审批证据|内部备注/)).toHaveCount(0);
-  await forbidden.screenshot({ path: testInfo.outputPath("desktop-403-anonymous.png"), fullPage: true });
+  await forbidden.screenshot({
+    path: testInfo.outputPath("desktop-403-anonymous.png"),
+    fullPage: true,
+  });
 
   const notFound = await context.newPage();
   await notFound.goto("/404");
@@ -122,7 +125,10 @@ test("parallel-safe：未登录独立 403/404 提供安全入口且不展示受�
   await expect(notFound.getByText(/当前未登录，无法确定适合你的工作区/)).toBeVisible();
   await expect(notFound.getByRole("link", { name: "前往客户登录" })).toBeVisible();
   await expect(notFound.getByRole("link", { name: "前往内部登录" })).toBeVisible();
-  await notFound.screenshot({ path: testInfo.outputPath("desktop-404-anonymous.png"), fullPage: true });
+  await notFound.screenshot({
+    path: testInfo.outputPath("desktop-404-anonymous.png"),
+    fullPage: true,
+  });
 
   const narrow = await context.newPage();
   await narrow.setViewportSize({ width: 360, height: 800 });
@@ -135,6 +141,11 @@ test("parallel-safe：未登录独立 403/404 提供安全入口且不展示受�
 
   await context.close();
 });
+
+async function expectCardNotice(page: Page, title: string, role: "alert" | "status", text: string) {
+  const card = page.locator("article").filter({ has: page.getByRole("heading", { name: title }) });
+  await expect(card.getByRole(role)).toContainText(text);
+}
 
 async function assertNarrowGallery(page: Page) {
   await page.goto("/states");

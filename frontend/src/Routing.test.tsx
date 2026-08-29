@@ -434,31 +434,23 @@ describe("Issue #191 状态画廊与独立错误路由", () => {
     expect(screen.getByRole("heading", { name: "暂无队列条目" })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "当前没有队列条目" })).toHaveClass("empty-queue");
     expect(screen.getByRole("heading", { name: "数据加载失败" })).toBeInTheDocument();
-    expect(screen.getByRole("alert", { name: "待审批队列暂时不可用" })).toBeInTheDocument();
+    expectCardNotice("数据加载失败", "alert", "待审批队列暂时不可用");
     expect(screen.getByText("示例队列条目")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "当前身份无权访问此页面" })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "禁止访问示例" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "没有找到这个页面" })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "页面未找到示例" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "实时连接已断开" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("alert", { name: "实时连接已断开；当前队列可能过期。" }),
-    ).toBeInTheDocument();
+    expectCardNotice("实时连接已断开", "alert", "实时连接已断开；当前队列可能过期。");
     expect(screen.getByRole("heading", { name: "正在重新同步" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("status", { name: "正在从 Spring 权威快照重新同步…" }),
-    ).toBeInTheDocument();
+    expectCardNotice("正在重新同步", "status", "正在从 Spring 权威快照重新同步…");
     expect(screen.getByRole("heading", { name: "审批租约过期" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("status", { name: "审批责任已结束，证据和操作已移除。" }),
-    ).toBeInTheDocument();
+    expectCardNotice("审批租约过期", "status", "审批责任已结束，证据和操作已移除。");
     expect(screen.getByRole("heading", { name: "操作成功" })).toBeInTheDocument();
-    expect(screen.getByRole("status", { name: "操作已完成（静态示例）" })).toBeInTheDocument();
+    expectCardNotice("操作成功", "status", "操作已完成（静态示例）");
     expect(screen.queryByText("补偿已批准")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "操作结果未知" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("status", { name: "结果尚未确认，正在恢复 Spring 权威状态…" }),
-    ).toBeInTheDocument();
+    expectCardNotice("操作结果未知", "status", "结果尚未确认，正在恢复 Spring 权威状态…");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -568,6 +560,12 @@ describe("Issue #191 状态画廊与独立错误路由", () => {
     });
   });
 });
+
+function expectCardNotice(title: string, role: "alert" | "status", text: string) {
+  const card = screen.getByRole("heading", { name: title }).closest("article");
+  expect(card).not.toBeNull();
+  expect(within(card!).getByRole(role)).toHaveTextContent(text);
+}
 
 function mockSession(session: Session) {
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
