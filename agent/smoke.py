@@ -1273,7 +1273,7 @@ def main() -> None:
                 out_of_scope["evidence"][0]["evidenceReference"] = "order:OTHER-TICKET"
                 submit_rejected(out_of_scope, "out-of-scope-evidence")
 
-                with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                with psycopg.connect(os.environ["SPRING_FIXTURE_DATABASE_URI"]) as connection:
                     connection.execute(
                         "update investigation_fact set source_authority = 'UNVERIFIED_SOURCE' "
                         "where generation_id = %s and fact_type = 'ORDER'",
@@ -1281,7 +1281,7 @@ def main() -> None:
                     )
                 submit_rejected(conclusion_payload, "unauthorized-source")
 
-                with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                with psycopg.connect(os.environ["SPRING_FIXTURE_DATABASE_URI"]) as connection:
                     connection.execute(
                         "update investigation_fact set "
                         "source_authority = 'SPRING_AUTHORIZED_CAPABILITY', "
@@ -1292,7 +1292,7 @@ def main() -> None:
                     )
                 submit_rejected(conclusion_payload, "expired-evidence")
 
-                with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                with psycopg.connect(os.environ["SPRING_FIXTURE_DATABASE_URI"]) as connection:
                     connection.execute(
                         "update investigation_fact set "
                         "recorded_at = '2026-08-09T13:56:00Z', "
@@ -1303,7 +1303,7 @@ def main() -> None:
                     )
                 submit_rejected(conclusion_payload, "conflicting-evidence")
 
-                with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                with psycopg.connect(os.environ["SPRING_FIXTURE_DATABASE_URI"]) as connection:
                     connection.execute(
                         "update investigation_fact set conflict_status = 'CLEAR' "
                         "where generation_id = %s and fact_type = 'ORDER'",
@@ -1330,7 +1330,7 @@ def main() -> None:
 
                 stale_action_id = uuid.uuid4()
                 try:
-                    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                    with psycopg.connect(os.environ["SPRING_FIXTURE_DATABASE_URI"]) as connection:
                         connection.execute(
                             "insert into synthetic_pending_action "
                             "(id, order_reference, action_type, action_state) "
@@ -1339,7 +1339,7 @@ def main() -> None:
                         )
                     submit_rejected(conclusion_payload, "stale-pending-action-evidence")
                 finally:
-                    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                    with psycopg.connect(os.environ["SPRING_FIXTURE_DATABASE_URI"]) as connection:
                         connection.execute(
                             "delete from synthetic_pending_action where id = %s",
                             (stale_action_id,),
