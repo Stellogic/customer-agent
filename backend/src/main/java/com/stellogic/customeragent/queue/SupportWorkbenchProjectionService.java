@@ -291,8 +291,7 @@ class SupportWorkbenchProjectionService {
         if (publicProjection == null) {
             throw new IllegalStateException("support public projection is unavailable");
         }
-        Timestamp databaseTime =
-                jdbc.queryForObject("select clock_timestamp()", Timestamp.class);
+        Timestamp databaseTime = jdbc.queryForObject("select clock_timestamp()", Timestamp.class);
         Instant now = databaseTime == null ? Instant.now() : databaseTime.toInstant();
         UUID publicMessageId = UUID.randomUUID();
         publicProjection.appendSupportMessageWithId(ticketId, publicMessageId, normalizedBody, now);
@@ -374,8 +373,8 @@ class SupportWorkbenchProjectionService {
                         String.class,
                         ticketId);
         String queueReason =
-                "CUSTOMER_REQUESTED".equals(
-                                handoffReasons.isEmpty() ? null : handoffReasons.getFirst())
+                "CUSTOMER_REQUESTED"
+                                .equals(handoffReasons.isEmpty() ? null : handoffReasons.getFirst())
                         ? "CUSTOMER_REQUESTED_HANDOFF"
                         : "AGENT_HUMAN_HANDOFF";
         jdbc.update(

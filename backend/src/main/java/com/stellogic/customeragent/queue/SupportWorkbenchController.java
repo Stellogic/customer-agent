@@ -44,9 +44,7 @@ public final class SupportWorkbenchController {
                 SupportWorkbenchProjectionService.LEGACY_EPOCH.equals(snapshot.epoch())
                         ? LegacySnapshotResponse.from(snapshot)
                         : SnapshotResponse.from(snapshot);
-        return ResponseEntity.ok()
-                .cacheControl(CacheControl.noStore())
-                .body(response);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(response);
     }
 
     @GetMapping("/tickets/{ticketId}")
@@ -261,9 +259,7 @@ public final class SupportWorkbenchController {
     }
 
     private static String requireIdempotencyKey(String idempotencyKey) {
-        if (idempotencyKey == null
-                || idempotencyKey.isBlank()
-                || idempotencyKey.length() > 200) {
+        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 200) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key 无效");
         }
         return idempotencyKey.trim();

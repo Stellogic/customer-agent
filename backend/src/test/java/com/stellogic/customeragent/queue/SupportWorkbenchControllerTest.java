@@ -230,11 +230,7 @@ class SupportWorkbenchControllerTest {
         when(service.publicReply("support-demo", HANDOFF_TICKET, "reply-163-1", "包裹已在派送中"))
                 .thenReturn(
                         new SupportPublicReplyResult(
-                                HANDOFF_TICKET,
-                                "reply-163-1",
-                                publicMessageId,
-                                "ACCEPTED",
-                                false));
+                                HANDOFF_TICKET, "reply-163-1", publicMessageId, "ACCEPTED", false));
 
         mvc.perform(
                         post("/api/support/workbench/tickets/{ticketId}/messages", HANDOFF_TICKET)
@@ -262,11 +258,7 @@ class SupportWorkbenchControllerTest {
         when(service.publicReply("support-demo", HANDOFF_TICKET, "reply-163-1", "包裹已在派送中"))
                 .thenReturn(
                         new SupportPublicReplyResult(
-                                HANDOFF_TICKET,
-                                "reply-163-1",
-                                publicMessageId,
-                                "ACCEPTED",
-                                true));
+                                HANDOFF_TICKET, "reply-163-1", publicMessageId, "ACCEPTED", true));
 
         mvc.perform(
                         post("/api/support/workbench/tickets/{ticketId}/messages", HANDOFF_TICKET)
@@ -288,11 +280,7 @@ class SupportWorkbenchControllerTest {
         when(service.queryPublicReply("support-demo", HANDOFF_TICKET, "reply-163-1"))
                 .thenReturn(
                         new SupportPublicReplyResult(
-                                HANDOFF_TICKET,
-                                "reply-163-1",
-                                publicMessageId,
-                                "ACCEPTED",
-                                true));
+                                HANDOFF_TICKET, "reply-163-1", publicMessageId, "ACCEPTED", true));
 
         mvc.perform(
                         get(

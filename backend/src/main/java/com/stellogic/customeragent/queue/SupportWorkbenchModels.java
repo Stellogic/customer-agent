@@ -104,11 +104,7 @@ record SupportConversationMessage(UUID messageId, String author, String body, In
 }
 
 record SupportPublicReplyResult(
-        UUID ticketId,
-        String messageId,
-        UUID publicMessageId,
-        String outcome,
-        boolean replayed) {}
+        UUID ticketId, String messageId, UUID publicMessageId, String outcome, boolean replayed) {}
 
 record SupportInvestigationFact(
         String factType, String factValue, String evidenceReference, Instant recordedAt) {}
