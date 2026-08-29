@@ -256,6 +256,13 @@ class JdbcHumanHandoffService implements HumanHandoffService {
                         (rs, row) -> rs.getObject(1, UUID.class),
                         ticketId);
         UUID generationId = activeGenerations.isEmpty() ? null : activeGenerations.getFirst();
+        for (UUID activeGeneration : activeGenerations) {
+            publicProjection.terminalizeAgentReplyStream(
+                    ticketId,
+                    activeGeneration,
+                    CUSTOMER_REQUESTED_REASON.equals(handoffReason) ? "ABORTED" : "FAILED",
+                    at.toInstant());
+        }
         jdbc.update(
                 "update support_ticket set customer_human_preference = case when ? then true else customer_human_preference end, "
                         + "handling_mode = 'HUMAN', human_handoff_reason_code = ? where id = ?",

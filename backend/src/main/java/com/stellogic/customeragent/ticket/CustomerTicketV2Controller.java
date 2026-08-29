@@ -39,7 +39,14 @@ public final class CustomerTicketV2Controller {
                     "TICKET_CLOSED",
                     "CUSTOMER_MESSAGE_ACCEPTED",
                     "AGENT_PROCESSING_TERMINATED",
-                    "AGENT_PROCESSING_STARTED");
+                    "AGENT_PROCESSING_STARTED",
+                    "AGENT_REPLY_LOADING",
+                    "PUBLIC_PROGRESS_UPDATED",
+                    "AGENT_REPLY_STREAM_STARTED",
+                    "AGENT_REPLY_CONTENT_DELTA",
+                    "AGENT_REPLY_COMPLETED",
+                    "AGENT_REPLY_ABORTED",
+                    "AGENT_REPLY_FAILED");
 
     private final CustomerTicketService service;
 
@@ -196,7 +203,8 @@ public final class CustomerTicketV2Controller {
             String cursor,
             Ticket ticket,
             List<PublicMessage> messages,
-            CurrentClarification clarification) {
+            CurrentClarification clarification,
+            CurrentReplyStream replyStream) {
         static SnapshotResponse from(CustomerPublicSnapshot snapshot) {
             return new SnapshotResponse(
                     "PUBLIC_CONVERSATION",
@@ -208,7 +216,8 @@ public final class CustomerTicketV2Controller {
                             snapshot.handlingMode(),
                             snapshot.agentGeneration()),
                     snapshot.messages(),
-                    snapshot.clarification());
+                    snapshot.clarification(),
+                    snapshot.replyStream());
         }
     }
 

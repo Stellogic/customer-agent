@@ -918,6 +918,24 @@ def main() -> None:
             ).fetchone()[0]
             == 3
         )
+        reply_stream = connection.execute(
+            "select status, body, next_chunk_index, progress_stage "
+            "from agent_public_reply_stream where generation_id = %s",
+            (generation[0],),
+        ).fetchone()
+        assert reply_stream is not None
+        assert reply_stream[0] == "COMPLETED"
+        assert reply_stream[1] == resolved_projection["messages"][-1]["body"]
+        assert reply_stream[2] >= 1
+        assert reply_stream[3] == "COMPOSING_REPLY"
+        assert (
+            connection.execute(
+                "select count(*) from customer_public_event where ticket_id = %s "
+                "and event_type = 'AGENT_REPLY_CONTENT_DELTA'",
+                (resolved_uuid,),
+            ).fetchone()[0]
+            == reply_stream[2]
+        )
         generation_id = str(generation[0])
         generation_thread_id = str(generation[1])
         submission_request_id = str(generation[3])
@@ -972,6 +990,18 @@ def main() -> None:
             headers=scoped_headers,
         )
         expect_status(stale, 403)
+
+        stale_stream = client.post(
+            f"{spring_url}/internal/agent/tickets/{resolved_ticket_id}/generations/{generation_id}/public-reply-events",
+            headers={
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": generation_id,
+                "X-Agent-Operation": "PUBLISH_PUBLIC_REPLY_EVENT",
+                "Idempotency-Key": f"{generation_id}:public-reply:late",
+            },
+            json={"type": "CONTENT_DELTA", "chunkIndex": 99, "delta": "迟到内容"},
+        )
+        expect_status(stale_stream, 403)
 
         conflict = client.post(
             f"{spring_url}/internal/agent/tickets/{resolved_ticket_id}/generations/{generation_id}/conclusions",

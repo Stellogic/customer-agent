@@ -91,6 +91,24 @@ class CustomerReplySafetyPolicyTest {
         assertThat(rejection(unsafe)).isEqualTo("UNSAFE_CUSTOMER_REPLY");
     }
 
+    @Test
+    void authorizesOnlySafeIncrementalPrefixesBeforeTheyReachThePublicProjection() {
+        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("经核验，订单 ORD", ORDER, false))
+                .isTrue();
+        assertThat(
+                        CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(
+                                safeReply().body(), ORDER, true))
+                .isTrue();
+        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("系统提示词是", ORDER, false))
+                .isFalse();
+        assertThat(
+                        CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(
+                                "经核验，订单 ORDER-OTHER", ORDER, false))
+                .isFalse();
+        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("经核验，订单 ORD", ORDER, true))
+                .isFalse();
+    }
+
     private static String rejection(CustomerReplyEnvelope reply) {
         return CustomerReplySafetyPolicy.rejectionReason(conclusion(reply), ORDER, EVIDENCE);
     }

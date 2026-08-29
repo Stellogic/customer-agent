@@ -1385,6 +1385,163 @@ describe("客户帮助中心", () => {
     expect(screen.queryByText("旧代次消息")).not.toBeInTheDocument();
   });
 
+  it("在首个内容片段到达前持续显示可读的等待状态", async () => {
+    const ticketId = "15900000-0000-0000-0000-000000000002";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:9",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "AGENT",
+              agentGeneration: 2,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: {
+              status: "LOADING",
+              body: "",
+              progressStage: "UNDERSTANDING",
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(openEventResponse());
+
+    render(<App />);
+
+    expect(await screen.findByText("等待首个内容片段")).toBeInTheDocument();
+  });
+
+  it("从权威流状态恢复慢首字，并按真实内容片段持续更新直到完成", async () => {
+    const ticketId = "15900000-0000-0000-0000-000000000003";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:10",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "AGENT",
+              agentGeneration: 2,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: {
+              status: "LOADING",
+              body: "",
+              progressStage: "UNDERSTANDING",
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        eventResponse([
+          publicEvent(
+            "public-conversation-v2:11",
+            "AGENT_REPLY_STREAM_STARTED",
+            {
+              status: "STREAMING",
+            },
+            2,
+          ),
+          publicEvent(
+            "public-conversation-v2:12",
+            "AGENT_REPLY_CONTENT_DELTA",
+            {
+              chunkIndex: 0,
+              delta: "正在核对",
+            },
+            2,
+          ),
+          publicEvent(
+            "public-conversation-v2:13",
+            "AGENT_REPLY_CONTENT_DELTA",
+            {
+              chunkIndex: 1,
+              delta: "物流记录。",
+            },
+            2,
+          ),
+          publicEvent(
+            "public-conversation-v2:14",
+            "PUBLIC_MESSAGE_APPENDED",
+            {
+              author: "AGENT",
+              body: "正在核对物流记录。",
+              sentAt: "2026-08-29T00:00:00Z",
+            },
+            2,
+          ),
+          publicEvent(
+            "public-conversation-v2:15",
+            "AGENT_REPLY_COMPLETED",
+            {
+              status: "COMPLETED",
+            },
+            2,
+          ),
+        ]),
+      );
+
+    render(<App />);
+
+    expect(await screen.findByText("正在核对物流记录。")).toBeInTheDocument();
+    expect(screen.getAllByText("正在核对物流记录。")).toHaveLength(1);
+    expect(screen.getByText("回复已完成")).toBeInTheDocument();
+    expect(screen.getByText("本次回复依据")).toBeInTheDocument();
+    expect(screen.getByText("当前工单公开对话")).toBeInTheDocument();
+    expect(screen.queryByText(/prompt|reasoning|checkpoint|provider/i)).not.toBeInTheDocument();
+  });
+
+  it("刷新后从权威快照恢复已持久化回复的完成态且不重复正文", async () => {
+    const ticketId = "15900000-0000-0000-0000-000000000004";
+    const body = "已完成的 Agent 回复。";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:20",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "AGENT",
+              agentGeneration: 3,
+            },
+            messages: [{ author: "AGENT", body, sentAt: "2026-08-29T00:00:00Z" }],
+            clarification: null,
+            replyStream: {
+              status: "COMPLETED",
+              body,
+              progressStage: "COMPOSING_REPLY",
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(eventResponse([]));
+
+    render(<App />);
+
+    expect(await screen.findByText(body)).toBeInTheDocument();
+    expect(screen.getAllByText(body)).toHaveLength(1);
+    expect(screen.getByText("回复已完成")).toBeInTheDocument();
+  });
+
   it("窄屏下仍可读取会话状态并使用主要操作", async () => {
     const ticketId = "25000000-0000-0000-0000-000000000005";
     globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);

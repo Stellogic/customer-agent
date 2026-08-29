@@ -1,5 +1,5 @@
 import re
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
@@ -63,7 +63,11 @@ class CustomerReplyEnvelope:
 
 
 class CustomerCommunicationModel(Protocol):
-    async def compose(self, model_input: CustomerCommunicationInput) -> CustomerReplyEnvelope: ...
+    async def compose(
+        self,
+        model_input: CustomerCommunicationInput,
+        on_body_delta: Callable[[str], Awaitable[None]] | None = None,
+    ) -> CustomerReplyEnvelope: ...
 
 
 class CustomerCommunicationProvider(Protocol):
@@ -76,7 +80,11 @@ class StructuredCustomerCommunicationModel:
     def __init__(self, provider: CustomerCommunicationProvider) -> None:
         self._provider = provider
 
-    async def compose(self, model_input: CustomerCommunicationInput) -> CustomerReplyEnvelope:
+    async def compose(
+        self,
+        model_input: CustomerCommunicationInput,
+        on_body_delta: Callable[[str], Awaitable[None]] | None = None,
+    ) -> CustomerReplyEnvelope:
         validate_customer_communication_input(model_input)
         try:
             raw = await self._provider.generate(
@@ -90,11 +98,17 @@ class StructuredCustomerCommunicationModel:
             ) from None
         envelope = parse_customer_reply_envelope(raw)
         validate_customer_reply_envelope(model_input, envelope)
+        if on_body_delta is not None:
+            await on_body_delta(envelope.body)
         return envelope
 
 
 class FixedFakeCustomerCommunicationModel:
-    async def compose(self, model_input: CustomerCommunicationInput) -> CustomerReplyEnvelope:
+    async def compose(
+        self,
+        model_input: CustomerCommunicationInput,
+        on_body_delta: Callable[[str], Awaitable[None]] | None = None,
+    ) -> CustomerReplyEnvelope:
         validate_customer_communication_input(model_input)
         if customer_requested_human(model_input):
             intent = CustomerReplyIntent.HUMAN_HANDOFF
@@ -124,7 +138,34 @@ class FixedFakeCustomerCommunicationModel:
             referenced_order=model_input.order_reference,
         )
         validate_customer_reply_envelope(model_input, envelope)
+        if on_body_delta is not None:
+            await on_body_delta(envelope.body)
         return envelope
+
+
+def authorized_customer_reply_bodies(
+    order_reference: str, intent: CustomerReplyIntent
+) -> tuple[str, ...]:
+    if intent is CustomerReplyIntent.CLARIFICATION_REQUIRED:
+        return ("为确认需要调查的订单，请回复订单确认码（A 或 B）。",)
+    if intent is CustomerReplyIntent.HUMAN_HANDOFF:
+        return ("已按您的要求转由人工客服继续处理。",)
+    if intent is CustomerReplyIntent.COMPENSATION_REVIEW_PENDING:
+        return (
+            f"订单 {order_reference} 的调查已完成，补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+            f"我们已核对订单 {order_reference} 的物流记录。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+            f"经核验，订单 {order_reference} 的物流存在延迟。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+            f"经核验，订单 {order_reference} 的物流出现延迟。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+            f"调查结果显示，订单 {order_reference} 的物流存在延迟。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+            f"调查结果显示，订单 {order_reference} 的物流出现延迟。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+        )
+    return (
+        f"经核验，订单 {order_reference} 的本次物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+        f"经核验，订单 {order_reference} 的物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+        f"调查结果显示，订单 {order_reference} 的物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+        f"经核验，订单 {order_reference} 的物流延迟未达到 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+        f"调查结果显示，订单 {order_reference} 的物流延迟未达到 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+    )
 
 
 def validate_customer_communication_input(model_input: CustomerCommunicationInput) -> None:
@@ -288,19 +329,10 @@ def default_customer_reply_body(order_reference: str, intent: CustomerReplyInten
 
 
 def authorized_customer_reply_pattern(order_reference: str, intent: CustomerReplyIntent) -> str:
-    order = re.escape(order_reference)
-    if intent is CustomerReplyIntent.CLARIFICATION_REQUIRED:
-        return re.escape("为确认需要调查的订单，请回复订单确认码（A 或 B）。")
-    if intent is CustomerReplyIntent.HUMAN_HANDOFF:
-        return re.escape("已按您的要求转由人工客服继续处理。")
-    if intent is CustomerReplyIntent.COMPENSATION_REVIEW_PENDING:
-        return (
-            f"(?:订单 {order} 的调查已完成，|我们已核对订单 {order} 的物流记录。|"
-            f"(?:经核验|调查结果显示)，订单 {order} 的物流(?:存在|出现)延迟。)"
-            "补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
-        )
     return (
-        f"(?:经核验，订单 {order} 的本次物流延迟不足 24 小时|"
-        f"(?:经核验|调查结果显示)，订单 {order} 的物流延迟(?:不足 24 小时|未达到 24 小时))，"
-        "当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。"
+        "(?:"
+        + "|".join(
+            re.escape(body) for body in authorized_customer_reply_bodies(order_reference, intent)
+        )
+        + ")"
     )

@@ -311,6 +311,34 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 "UNSUPPORTED_SCENARIO",
                 [],
             )
+        if state.get("investigation_progress") is None:
+            await _publish_reply_event(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "loading",
+                {"type": "LOADING"},
+            )
+            await _publish_reply_event(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "progress-understanding",
+                {"type": "PROGRESS", "stage": "UNDERSTANDING"},
+            )
+            await _publish_reply_event(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "progress-facts",
+                {"type": "PROGRESS", "stage": "VERIFYING_FACTS"},
+            )
         try:
             loop_result = await _advance_investigation_action_loop(
                 client,
@@ -421,6 +449,15 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                     loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
                 ),
             )
+        await _publish_reply_event(
+            client,
+            base_url,
+            ticket_id,
+            generation_id,
+            scope_headers,
+            "progress-rules",
+            {"type": "PROGRESS", "stage": "QUERYING_RULES"},
+        )
         judgment_audit_offset = _judgment_audit_offset()
         try:
             judgment = await investigation_judgment_model.judge(
@@ -477,8 +514,22 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
             ),
         )
         communication_audit_offset = _communication_audit_offset()
+        await _publish_reply_event(
+            client,
+            base_url,
+            ticket_id,
+            generation_id,
+            scope_headers,
+            "progress-composing",
+            {"type": "PROGRESS", "stage": "COMPOSING_REPLY"},
+        )
         try:
-            customer_reply = await customer_communication_model.compose(communication_input)
+            publish_delta = _reply_delta_publisher(
+                client, base_url, ticket_id, generation_id, scope_headers
+            )
+            customer_reply = await customer_communication_model.compose(
+                communication_input, on_body_delta=publish_delta
+            )
             validate_customer_reply_envelope(communication_input, customer_reply)
         except Exception:
             communication_evidence = _communication_call_evidence(
@@ -1086,6 +1137,91 @@ def _tool_attempt_budget() -> int:
     except ValueError:
         return 3
     return min(max(configured, 1), 5)
+
+
+def _reply_delta_publisher(
+    client: httpx.AsyncClient,
+    base_url: str,
+    ticket_id: str,
+    generation_id: str,
+    scope_headers: dict[str, str],
+) -> Callable[[str], Awaitable[None]]:
+    chunk_index = 0
+
+    async def publish(delta: str) -> None:
+        nonlocal chunk_index
+        if chunk_index == 0:
+            await _publish_reply_event_required(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "stream-started",
+                {"type": "STREAM_STARTED"},
+            )
+        await _publish_reply_event_required(
+            client,
+            base_url,
+            ticket_id,
+            generation_id,
+            scope_headers,
+            f"content-{chunk_index}",
+            {"type": "CONTENT_DELTA", "chunkIndex": chunk_index, "delta": delta},
+        )
+        chunk_index += 1
+
+    return publish
+
+
+async def _publish_reply_event_required(
+    client: httpx.AsyncClient,
+    base_url: str,
+    ticket_id: str,
+    generation_id: str,
+    scope_headers: dict[str, str],
+    identity_suffix: str,
+    payload: dict[str, object],
+) -> None:
+    response = await _request_with_retries(
+        lambda: client.post(
+            f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/public-reply-events",
+            headers={
+                **scope_headers,
+                "X-Agent-Operation": "PUBLISH_PUBLIC_REPLY_EVENT",
+                "Idempotency-Key": f"{generation_id}:public-reply:{identity_suffix}",
+            },
+            json=payload,
+        )
+    )
+    if response is None:
+        raise httpx.ReadTimeout("public reply stream publication exhausted its retry budget")
+
+
+async def _publish_reply_event(
+    client: httpx.AsyncClient,
+    base_url: str,
+    ticket_id: str,
+    generation_id: str,
+    scope_headers: dict[str, str],
+    identity_suffix: str,
+    payload: dict[str, object],
+) -> None:
+    try:
+        response = await client.post(
+            f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/public-reply-events",
+            headers={
+                **scope_headers,
+                "X-Agent-Operation": "PUBLISH_PUBLIC_REPLY_EVENT",
+                "Idempotency-Key": f"{generation_id}:public-reply:{identity_suffix}",
+            },
+            json=payload,
+        )
+        response.raise_for_status()
+    except Exception:
+        # Streaming is a freshness projection. Spring's conclusion endpoint remains authoritative,
+        # and an unavailable stream must not manufacture a second business outcome.
+        return
 
 
 async def _request_with_retries(

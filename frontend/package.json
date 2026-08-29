@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@ant-design/pro-components": "3.1.14-6",
+    "@ant-design/x": "2.9.0",
     "antd": "6.6.1",
     "react": "19.2.7",
     "react-dom": "19.2.7",

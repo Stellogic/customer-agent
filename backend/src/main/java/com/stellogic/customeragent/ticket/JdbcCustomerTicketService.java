@@ -416,6 +416,7 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                                         rs.getLong(6),
                                         rs.getLong(7),
                                         List.of(),
+                                        null,
                                         null),
                         EPOCH,
                         ticketId,
@@ -437,6 +438,20 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                                         rs.getString(2),
                                         rs.getString(3)),
                         ticketId);
+        List<CurrentReplyStream> replyStreams =
+                jdbc.query(
+                        "select coalesce(s.status, case when g.status = 'ACTIVE' then 'LOADING' else null end), "
+                                + "coalesce(s.body, ''), coalesce(s.progress_stage, 'UNDERSTANDING') "
+                                + "from agent_processing_generation g left join agent_public_reply_stream s on s.generation_id = g.id "
+                                + "where g.ticket_id = ? order by g.generation_number desc limit 1",
+                        (rs, row) ->
+                                rs.getString(1) == null
+                                        ? null
+                                        : new CurrentReplyStream(
+                                                rs.getString(1), rs.getString(2), rs.getString(3)),
+                        ticketId);
+        CurrentReplyStream currentReplyStream =
+                replyStreams.isEmpty() ? null : replyStreams.getFirst();
         return new CustomerPublicSnapshot(
                 ticket.ticketId(),
                 ticket.lifecycleState(),
@@ -447,7 +462,8 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 ticket.sequence(),
                 ticket.agentGeneration(),
                 messages,
-                clarifications.isEmpty() ? null : clarifications.getFirst());
+                clarifications.isEmpty() ? null : clarifications.getFirst(),
+                currentReplyStream);
     }
 
     @Override

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Modal } from "antd";
+import { Bubble, Conversations, Sender, Sources } from "@ant-design/x";
 import {
   consumeSseEvents,
   hasOnlyKeys,
@@ -30,6 +31,11 @@ type Snapshot = {
   };
   messages: Array<{ author: string; body: string; sentAt: string }>;
   clarification: { id: string; promptCode: string; question: string } | null;
+  replyStream?: {
+    status: "LOADING" | "STREAMING" | "COMPLETED" | "ABORTED" | "FAILED";
+    body: string;
+    progressStage: "UNDERSTANDING" | "VERIFYING_FACTS" | "QUERYING_RULES" | "COMPOSING_REPLY";
+  } | null;
 };
 
 type EventEnvelope = {
@@ -762,6 +768,7 @@ export function App() {
         ...current,
         cursor: event.id,
         ticket: { ...current.ticket, agentGeneration: envelope.generation },
+        replyStream: { status: "LOADING", body: "", progressStage: "UNDERSTANDING" },
       };
       setLiveMessageState("accepted");
     } else if (envelope.generation > current.ticket.agentGeneration) {
@@ -785,15 +792,88 @@ export function App() {
           ...current,
           cursor: event.id,
           messages: duplicate ? current.messages : [...current.messages, message],
+          replyStream: current.replyStream,
         };
       }
     } else if (event.type === "AGENT_PROCESSING_TERMINATED") {
       if (!isProcessingTermination(payload)) return false;
-      next = { ...current, cursor: event.id };
+      next = {
+        ...current,
+        cursor: event.id,
+        replyStream: { status: "ABORTED", body: "", progressStage: "UNDERSTANDING" },
+      };
       setLiveMessageState("accepted");
     } else if (event.type === "AGENT_PROCESSING_STARTED") {
       if (!isProcessingState(payload)) return false;
-      next = { ...current, cursor: event.id };
+      next = {
+        ...current,
+        cursor: event.id,
+        replyStream: { status: "LOADING", body: "", progressStage: "UNDERSTANDING" },
+      };
+    } else if (event.type === "AGENT_REPLY_LOADING") {
+      if (!isReplyStatus(payload, "LOADING")) return false;
+      next = {
+        ...current,
+        cursor: event.id,
+        replyStream: { status: "LOADING", body: "", progressStage: "UNDERSTANDING" },
+      };
+    } else if (event.type === "PUBLIC_PROGRESS_UPDATED") {
+      if (!isProgress(payload)) return false;
+      next = {
+        ...current,
+        cursor: event.id,
+        replyStream: {
+          status: current.replyStream?.status ?? "LOADING",
+          body: current.replyStream?.body ?? "",
+          progressStage: payload.stage,
+        },
+      };
+    } else if (event.type === "AGENT_REPLY_STREAM_STARTED") {
+      if (!isReplyStatus(payload, "STREAMING")) return false;
+      next = {
+        ...current,
+        cursor: event.id,
+        replyStream: {
+          status: "STREAMING",
+          body: current.replyStream?.body ?? "",
+          progressStage: current.replyStream?.progressStage ?? "COMPOSING_REPLY",
+        },
+      };
+    } else if (event.type === "AGENT_REPLY_CONTENT_DELTA") {
+      if (!isContentDelta(payload) || current.replyStream?.status !== "STREAMING") return false;
+      next = {
+        ...current,
+        cursor: event.id,
+        replyStream: {
+          ...current.replyStream,
+          body: current.replyStream.body + payload.delta,
+        },
+      };
+    } else if (
+      event.type === "AGENT_REPLY_COMPLETED" ||
+      event.type === "AGENT_REPLY_ABORTED" ||
+      event.type === "AGENT_REPLY_FAILED"
+    ) {
+      const expected =
+        event.type === "AGENT_REPLY_COMPLETED"
+          ? "COMPLETED"
+          : event.type === "AGENT_REPLY_ABORTED"
+            ? "ABORTED"
+            : "FAILED";
+      if (!isReplyStatus(payload, expected)) return false;
+      if (expected === "COMPLETED" && !current.replyStream) {
+        next = { ...current, cursor: event.id };
+      } else {
+        next = {
+          ...current,
+          cursor: event.id,
+          replyStream: {
+            status: expected,
+            body: expected === "COMPLETED" ? (current.replyStream?.body ?? "") : "",
+            progressStage: current.replyStream?.progressStage ?? "COMPOSING_REPLY",
+          },
+        };
+      }
     } else if (event.type === "TICKET_ACCEPTED") {
       if (!isTicketTransition(payload)) return false;
       next = { ...current, cursor: event.id, ticket: { ...current.ticket, ...payload } };
@@ -816,6 +896,11 @@ export function App() {
         cursor: event.id,
         ticket: { ...current.ticket, handlingMode: payload.handlingMode },
         clarification: null,
+        replyStream:
+          current.replyStream &&
+          !["COMPLETED", "ABORTED", "FAILED"].includes(current.replyStream.status)
+            ? { status: "FAILED", body: "", progressStage: "COMPOSING_REPLY" }
+            : current.replyStream,
       };
     } else if (
       event.type === "TICKET_RESOLVED" ||
@@ -1202,23 +1287,78 @@ export function App() {
             </div>
             <span>{snapshot.messages.length} 条</span>
           </div>
-          <ol className="conversation">
-            {snapshot.messages.map((message, index) => (
-              <li key={`${message.sentAt}-${index}`} className={message.author.toLowerCase()}>
-                <span>
-                  {message.author === "CUSTOMER"
-                    ? "你"
-                    : message.author === "AGENT"
-                      ? "智能客服"
-                      : "客服"}
-                </span>
-                <p>{message.body}</p>
-              </li>
-            ))}
-            {snapshot.messages.length === 0 && (
-              <li className="empty-conversation">新消息会在这里出现。</li>
+          <Conversations
+            rootClassName="ticket-conversation-selector"
+            aria-label="当前工单会话"
+            activeKey={snapshot.ticket.id}
+            items={[{ key: snapshot.ticket.id, label: "当前公开沟通" }]}
+          />
+          <div className="conversation" role="log" aria-live="polite">
+            {snapshot.messages
+              .filter(
+                (message) =>
+                  !(
+                    message.author === "AGENT" &&
+                    snapshot.replyStream?.status === "COMPLETED" &&
+                    snapshot.replyStream.body === message.body
+                  ),
+              )
+              .map((message, index) => (
+                <Bubble
+                  key={`${message.sentAt}-${index}`}
+                  placement={message.author === "CUSTOMER" ? "end" : "start"}
+                  variant={message.author === "AGENT" ? "outlined" : "filled"}
+                  content={message.body}
+                  header={
+                    message.author === "CUSTOMER"
+                      ? "你"
+                      : message.author === "AGENT"
+                        ? "智能客服"
+                        : "客服"
+                  }
+                />
+              ))}
+            {snapshot.replyStream && (
+              <>
+                <Bubble
+                  key={`stream-${snapshot.ticket.agentGeneration}`}
+                  placement="start"
+                  variant="outlined"
+                  content={
+                    snapshot.replyStream.body || progressLabel(snapshot.replyStream.progressStage)
+                  }
+                  header="智能客服"
+                  loading={snapshot.replyStream.status === "LOADING"}
+                  streaming={snapshot.replyStream.status === "STREAMING"}
+                  footer={
+                    snapshot.replyStream.status === "LOADING"
+                      ? undefined
+                      : replyStreamFooter(snapshot.replyStream.status)
+                  }
+                />
+                {snapshot.replyStream.status === "LOADING" && (
+                  <p className="reply-stream-status" role="status">
+                    等待首个内容片段
+                  </p>
+                )}
+                {["STREAMING", "COMPLETED"].includes(snapshot.replyStream.status) && (
+                  <Sources
+                    rootClassName="reply-sources"
+                    title="本次回复依据"
+                    defaultExpanded
+                    items={[
+                      { key: "conversation", title: "当前工单公开对话" },
+                      { key: "business-facts", title: "已核对的订单与物流事实" },
+                      { key: "policy", title: "适用的客服规则" },
+                    ]}
+                  />
+                )}
+              </>
             )}
-          </ol>
+          </div>
+          {snapshot.messages.length === 0 && !snapshot.replyStream && (
+            <p className="empty-conversation">新消息会在这里出现。</p>
+          )}
           {snapshot.clarification && snapshot.ticket.handlingMode === "AGENT" && (
             <form className="clarification-form" onSubmit={submitClarification}>
               <label>
@@ -1238,17 +1378,25 @@ export function App() {
           {snapshot.ticket.handlingMode === "AGENT" &&
             !["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState) && (
               <form className="clarification-form live-message-form" onSubmit={submitLiveMessage}>
-                <label>
+                <label className="sender-label">
                   继续补充消息
-                  <textarea
-                    aria-label="继续补充消息"
+                  <Sender
+                    rootClassName="customer-message-sender"
+                    placeholder="继续补充消息"
                     value={liveMessageBody}
-                    onChange={(event) => {
-                      setLiveMessageBody(event.target.value);
+                    loading={liveMessageState === "sending"}
+                    suffix={false}
+                    onChange={(value) => {
+                      setLiveMessageBody(value);
                       if (liveMessageState !== "sending") setLiveMessageState("idle");
                     }}
-                    required
-                    rows={3}
+                    onSubmit={() => {
+                      if (liveMessageBody.trim()) {
+                        document
+                          .querySelector<HTMLFormElement>(".live-message-form")
+                          ?.requestSubmit();
+                      }
+                    }}
                   />
                 </label>
                 <button disabled={liveMessageState === "sending"}>
@@ -1360,7 +1508,15 @@ export function App() {
 function isSnapshot(value: unknown): value is Snapshot {
   if (
     !isRecord(value) ||
-    !hasOnlyKeys(value, ["view", "schema", "cursor", "ticket", "messages", "clarification"]) ||
+    !hasOnlyKeys(value, [
+      "view",
+      "schema",
+      "cursor",
+      "ticket",
+      "messages",
+      "clarification",
+      "replyStream",
+    ]) ||
     value.view !== "PUBLIC_CONVERSATION" ||
     value.schema !== PUBLIC_CONVERSATION_SCHEMA
   )
@@ -1377,8 +1533,70 @@ function isSnapshot(value: unknown): value is Snapshot {
     Number.isSafeInteger(value.ticket.agentGeneration) &&
     Number(value.ticket.agentGeneration) >= 0 &&
     value.messages.every(isPublicMessage) &&
-    isClarification(value.clarification)
+    isClarification(value.clarification) &&
+    (value.replyStream === undefined || isReplyStream(value.replyStream))
   );
+}
+
+function isReplyStream(value: unknown): value is NonNullable<Snapshot["replyStream"]> | null {
+  return (
+    value === null ||
+    (isRecord(value) &&
+      hasOnlyKeys(value, ["status", "body", "progressStage"]) &&
+      ["LOADING", "STREAMING", "COMPLETED", "ABORTED", "FAILED"].includes(String(value.status)) &&
+      typeof value.body === "string" &&
+      value.body.length <= 1_000 &&
+      ["UNDERSTANDING", "VERIFYING_FACTS", "QUERYING_RULES", "COMPOSING_REPLY"].includes(
+        String(value.progressStage),
+      ))
+  );
+}
+
+function isReplyStatus(value: unknown, status: string) {
+  return isRecord(value) && hasOnlyKeys(value, ["status"]) && value.status === status;
+}
+
+function isProgress(
+  value: unknown,
+): value is { stage: NonNullable<Snapshot["replyStream"]>["progressStage"] } {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["stage"]) &&
+    ["UNDERSTANDING", "VERIFYING_FACTS", "QUERYING_RULES", "COMPOSING_REPLY"].includes(
+      String(value.stage),
+    )
+  );
+}
+
+function isContentDelta(value: unknown): value is { chunkIndex: number; delta: string } {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["chunkIndex", "delta"]) &&
+    Number.isSafeInteger(value.chunkIndex) &&
+    Number(value.chunkIndex) >= 0 &&
+    typeof value.delta === "string" &&
+    value.delta.length > 0 &&
+    value.delta.length <= 512
+  );
+}
+
+function progressLabel(stage: NonNullable<Snapshot["replyStream"]>["progressStage"]) {
+  return {
+    UNDERSTANDING: "正在理解问题",
+    VERIFYING_FACTS: "正在核对业务事实",
+    QUERYING_RULES: "正在查询规则",
+    COMPOSING_REPLY: "正在整理回复",
+  }[stage];
+}
+
+function replyStreamFooter(status: NonNullable<Snapshot["replyStream"]>["status"]) {
+  return {
+    LOADING: "等待首个内容片段",
+    STREAMING: "正在接收回复",
+    COMPLETED: "回复已完成",
+    ABORTED: "旧回复已终止",
+    FAILED: "回复失败，正在转人工处理",
+  }[status];
 }
 
 function isProcessingTermination(value: unknown) {

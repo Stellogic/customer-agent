@@ -678,6 +678,12 @@ h2 {
   padding: 0;
   list-style: none;
 }
+.reply-stream-status {
+  margin: -10px 0 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
 .conversation li {
   max-width: 86%;
 }

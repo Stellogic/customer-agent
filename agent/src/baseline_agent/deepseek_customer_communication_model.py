@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -17,6 +18,7 @@ from baseline_agent.customer_communication_model import (
     CustomerCommunicationInput,
     CustomerReplyEnvelope,
     CustomerReplyIntent,
+    authorized_customer_reply_bodies,
     authorized_customer_reply_pattern,
     customer_communication_provider_request,
     customer_requested_human,
@@ -86,7 +88,11 @@ class DeepSeekResponsesCustomerCommunicationModel:
         self._transport = transport
         self.audit_sink = audit_sink or InMemoryModelCallAuditSink()
 
-    async def compose(self, model_input: CustomerCommunicationInput) -> CustomerReplyEnvelope:
+    async def compose(
+        self,
+        model_input: CustomerCommunicationInput,
+        on_body_delta: Callable[[str], Awaitable[None]] | None = None,
+    ) -> CustomerReplyEnvelope:
         validate_customer_communication_input(model_input)
         request_body = _build_request(self._config, model_input)
         internal_call_id = str(uuid.uuid4())
@@ -109,9 +115,24 @@ class DeepSeekResponsesCustomerCommunicationModel:
                 attempt_id = str(uuid.uuid4())
                 attempt_started = time.monotonic()
                 payload: object = None
+                published_length = 0
+
+                async def publish(delta: str) -> None:
+                    nonlocal published_length
+                    if on_body_delta is not None:
+                        await on_body_delta(delta)
+                    published_length += len(delta)
+
                 try:
-                    response = await asyncio.wait_for(
-                        client.post(self._endpoint, json=request_body), timeout=remaining
+                    payload = await asyncio.wait_for(
+                        _read_streamed_response(
+                            client,
+                            self._endpoint,
+                            request_body,
+                            model_input,
+                            publish,
+                        ),
+                        timeout=remaining,
                     )
                 except asyncio.CancelledError:
                     await self._record(
@@ -149,11 +170,13 @@ class DeepSeekResponsesCustomerCommunicationModel:
                         request_body,
                         classification,
                     )
-                    if await self._can_retry(attempt_number, call_started):
+                    if published_length == 0 and await self._can_retry(
+                        attempt_number, call_started
+                    ):
                         continue
                     raise _failure() from None
-                if response.status_code >= 400:
-                    transient = response.status_code in _TRANSIENT_HTTP_STATUSES
+                except httpx.HTTPStatusError as error:
+                    transient = error.response.status_code in _TRANSIENT_HTTP_STATUSES
                     await self._record(
                         internal_call_id,
                         attempt_id,
@@ -165,13 +188,27 @@ class DeepSeekResponsesCustomerCommunicationModel:
                             if transient
                             else DeepSeekFailureClassification.PROVIDER_REQUEST_REJECTED
                         ),
-                        provider_http_status=response.status_code,
+                        provider_http_status=error.response.status_code,
                     )
-                    if transient and await self._can_retry(attempt_number, call_started):
+                    if (
+                        transient
+                        and published_length == 0
+                        and await self._can_retry(attempt_number, call_started)
+                    ):
                         continue
-                    raise _failure()
+                    raise _failure() from error
+                except CustomerCommunicationFailure:
+                    await self._record(
+                        internal_call_id,
+                        attempt_id,
+                        attempt_number,
+                        attempt_started,
+                        request_body,
+                        DeepSeekFailureClassification.SCHEMA_MISMATCH,
+                        provider_http_status=200,
+                    )
+                    raise
                 try:
-                    payload = response.json()
                     envelope = _parse_response(payload)
                     validate_customer_reply_envelope(model_input, envelope)
                     _validate_public_body(envelope)
@@ -184,7 +221,19 @@ class DeepSeekResponsesCustomerCommunicationModel:
                         request_body,
                         DeepSeekFailureClassification.SCHEMA_MISMATCH,
                         payload if isinstance(payload, dict) else None,
-                        provider_http_status=response.status_code,
+                        provider_http_status=200,
+                    )
+                    raise _failure() from None
+                if published_length != len(envelope.body):
+                    await self._record(
+                        internal_call_id,
+                        attempt_id,
+                        attempt_number,
+                        attempt_started,
+                        request_body,
+                        DeepSeekFailureClassification.SCHEMA_MISMATCH,
+                        payload if isinstance(payload, dict) else None,
+                        provider_http_status=200,
                     )
                     raise _failure() from None
                 await self._record(
@@ -195,7 +244,7 @@ class DeepSeekResponsesCustomerCommunicationModel:
                     request_body,
                     None,
                     payload if isinstance(payload, dict) else None,
-                    provider_http_status=response.status_code,
+                    provider_http_status=200,
                 )
                 return envelope
         raise AssertionError("attempt budget must terminate")
@@ -270,6 +319,134 @@ class DeepSeekResponsesCustomerCommunicationModel:
         )
 
 
+async def _read_streamed_response(
+    client: httpx.AsyncClient,
+    endpoint: str,
+    request_body: dict[str, Any],
+    model_input: CustomerCommunicationInput,
+    publish: Callable[[str], Awaitable[None]],
+) -> dict[str, Any]:
+    expected_intent = (
+        CustomerReplyIntent.CLARIFICATION_REQUIRED
+        if model_input.compensation_review_required is None
+        else CustomerReplyIntent.COMPENSATION_REVIEW_PENDING
+        if model_input.compensation_review_required
+        else CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
+    )
+    allowed_bodies = list(
+        authorized_customer_reply_bodies(model_input.order_reference, expected_intent)
+    )
+    if customer_requested_human(model_input):
+        allowed_bodies.extend(
+            authorized_customer_reply_bodies(
+                model_input.order_reference, CustomerReplyIntent.HUMAN_HANDOFF
+            )
+        )
+    output_text = ""
+    published_body = ""
+    final_response: dict[str, Any] | None = None
+    last_sequence = -1
+    async with client.stream("POST", endpoint, json=request_body) as response:
+        response.raise_for_status()
+        async for line in response.aiter_lines():
+            if not line.startswith("data:"):
+                continue
+            try:
+                event = json.loads(line[5:].strip())
+            except json.JSONDecodeError:
+                raise _failure() from None
+            if not isinstance(event, dict):
+                raise _failure()
+            sequence = event.get("sequence_number")
+            if (
+                not isinstance(sequence, int)
+                or isinstance(sequence, bool)
+                or sequence <= last_sequence
+            ):
+                raise _failure()
+            last_sequence = sequence
+            event_type = event.get("type")
+            if event_type == "response.output_text.delta":
+                delta = event.get("delta")
+                if not isinstance(delta, str) or not delta:
+                    raise _failure()
+                output_text += delta
+                body_prefix = _partial_json_string_field(output_text, "body")
+                if body_prefix is None:
+                    continue
+                if not any(candidate.startswith(body_prefix) for candidate in allowed_bodies):
+                    raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+                new_delta = body_prefix[len(published_body) :]
+                if new_delta:
+                    await publish(new_delta)
+                    published_body = body_prefix
+            elif event_type == "response.completed":
+                candidate = event.get("response")
+                if not isinstance(candidate, dict):
+                    raise _failure()
+                final_response = candidate
+            elif event_type in {"response.incomplete", "response.failed"}:
+                raise _failure()
+    if final_response is None:
+        raise _failure()
+    envelope = _parse_response(final_response)
+    if output_text != _response_output_text(final_response) or published_body != envelope.body:
+        raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+    return final_response
+
+
+def _partial_json_string_field(value: str, field: str) -> str | None:
+    match = re.search(rf'{re.escape(json.dumps(field))}\s*:\s*"', value)
+    if match is None:
+        return None
+    decoded: list[str] = []
+    index = match.end()
+    while index < len(value):
+        character = value[index]
+        if character == '"':
+            return "".join(decoded)
+        if character != "\\":
+            if ord(character) < 0x20:
+                raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+            decoded.append(character)
+            index += 1
+            continue
+        if index + 1 >= len(value):
+            return "".join(decoded)
+        escape = value[index : index + 2]
+        if escape == "\\u":
+            if index + 6 > len(value):
+                return "".join(decoded)
+            escape = value[index : index + 6]
+        try:
+            decoded.append(json.loads(f'"{escape}"'))
+        except json.JSONDecodeError:
+            raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT) from None
+        index += len(escape)
+    return "".join(decoded)
+
+
+def _response_output_text(payload: dict[str, Any]) -> str:
+    output = payload.get("output")
+    texts: list[str] = []
+    if not isinstance(output, list):
+        return ""
+    for item in output:
+        if not isinstance(item, dict) or item.get("type") != "message":
+            continue
+        content = item.get("content")
+        if not isinstance(content, list):
+            continue
+        texts.extend(
+            part["text"]
+            for part in content
+            if isinstance(part, dict)
+            and part.get("type") == "output_text"
+            and isinstance(part.get("text"), str)
+        )
+    return "".join(texts)
+
+
 def _build_request(
     config: DeepSeekCustomerCommunicationConfig,
     model_input: CustomerCommunicationInput,
@@ -336,7 +513,7 @@ def _build_request(
         ),
         "max_output_tokens": config.max_output_tokens,
         "reasoning": {"effort": "none"},
-        "stream": False,
+        "stream": True,
         "text": {
             "format": {
                 "type": "json_schema",
