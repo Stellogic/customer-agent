@@ -44,6 +44,9 @@ class HumanApiNegativeMatrixTest {
                     getApi("/api/support/workbench/snapshot"),
                     getApi("/api/support/workbench/tickets/" + ID),
                     postApi("/api/support/workbench/tickets/" + ID + "/claims"),
+                    postApi("/api/support/workbench/tickets/" + ID + "/messages"),
+                    getApi("/api/support/workbench/tickets/" + ID + "/messages/reply-163"),
+                    getApi("/api/support/workbench/tickets/" + ID + "/events"),
                     getApi("/api/support/workbench/events"));
     private static final List<ApiRequest> APPROVAL_APIS =
             List.of(

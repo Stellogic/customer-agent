@@ -11,6 +11,11 @@ import { loadCsrfToken } from "./csrf";
 import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import { IntakeAssistancePanel } from "./IntakeAssistancePanel";
+import {
+  clearPendingReply,
+  readPendingReply,
+  storePendingReply,
+} from "./supportReplyStorage";
 
 const SUPPORT_SCHEMA = "support-workbench-v2" as const;
 const lifecycleStates = [
@@ -86,9 +91,6 @@ type SupportPublicReplyResponse = {
 class SupportReplyUncertainError extends Error {}
 
 class SupportReplyRejectedError extends Error {}
-
-type PendingSupportReply = { idempotencyKey: string; body: string };
-const PENDING_REPLY_STORAGE_PREFIX = "support-workbench:pending-reply:";
 
 export function SupportWorkbench() {
   const [workspaceMode, setWorkspaceMode] = useState<"tickets" | "intake">("tickets");
@@ -722,7 +724,7 @@ function TicketDetail({
   async function submitReply() {
     const body = draft.trim();
     if (!body || replyState === "sending" || replyState === "querying") return;
-    const idempotencyKey = createMessageId();
+    const idempotencyKey = createIdempotencyKey();
     storePendingReply(details.ticketId, { idempotencyKey, body });
     setPendingIdempotencyKey(idempotencyKey);
     setReplyState("sending");
@@ -761,6 +763,13 @@ function TicketDetail({
       setReplyState("idle");
       setReplyNotice("已从 Spring 权威结果确认公开回复已保存。");
     } catch (error) {
+      if (error instanceof SupportReplyRejectedError) {
+        clearPendingReply(details.ticketId);
+        setPendingIdempotencyKey(null);
+        setReplyState("error");
+        setReplyNotice(error.message);
+        return;
+      }
       setReplyState("unknown");
       setReplyNotice(
         error instanceof Error ? error.message : "仍无法确认发送结果，请稍后再次查询。",
@@ -1132,52 +1141,8 @@ function isSupportReplyResponse(value: unknown): value is SupportPublicReplyResp
   );
 }
 
-function createMessageId() {
+function createIdempotencyKey() {
   return globalThis.crypto.randomUUID();
-}
-
-function readPendingReply(ticketId: string): PendingSupportReply | null {
-  try {
-    const raw = globalThis.sessionStorage.getItem(pendingReplyStorageKey(ticketId));
-    if (!raw) return null;
-    const value = JSON.parse(raw) as unknown;
-    if (
-      !isRecord(value) ||
-      typeof value.idempotencyKey !== "string" ||
-      value.idempotencyKey.trim().length === 0 ||
-      value.idempotencyKey.length > 200 ||
-      typeof value.body !== "string" ||
-      value.body.trim().length === 0 ||
-      value.body.length > 2000
-    )
-      return null;
-    return { idempotencyKey: value.idempotencyKey, body: value.body };
-  } catch {
-    return null;
-  }
-}
-
-function storePendingReply(ticketId: string, reply: PendingSupportReply) {
-  try {
-    globalThis.sessionStorage.setItem(
-      pendingReplyStorageKey(ticketId),
-      JSON.stringify(reply),
-    );
-  } catch {
-    // Query remains available during this render even if browser storage is unavailable.
-  }
-}
-
-function clearPendingReply(ticketId: string) {
-  try {
-    globalThis.sessionStorage.removeItem(pendingReplyStorageKey(ticketId));
-  } catch {
-    // Storage failures must not change the authoritative reply result.
-  }
-}
-
-function pendingReplyStorageKey(ticketId: string) {
-  return `${PENDING_REPLY_STORAGE_PREFIX}${ticketId}`;
 }
 
 function isLifecycleState(value: unknown): value is LifecycleState {

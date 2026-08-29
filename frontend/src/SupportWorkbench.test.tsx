@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { announceHumanSessionChange } from "./humanSessionLifecycle";
 import { RootApplication } from "./RootApplication";
 import { SupportWorkbench } from "./SupportWorkbench";
 
@@ -11,6 +12,8 @@ describe("客服共享队列工作台", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    globalThis.sessionStorage.clear();
+    globalThis.localStorage.clear();
     globalThis.history.replaceState(null, "", "/");
   });
 
@@ -405,6 +408,240 @@ describe("客服共享队列工作台", () => {
       ),
     ).toEqual(["ORDER-Z", "ORDER-A"]);
   });
+
+  it("刷新后从权威快照恢复当前负责工单详情", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:4", [], [], HANDOFF_TICKET);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json(humanDetails());
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+
+    expect(await screen.findByRole("heading", { name: "授权工单详情" })).toBeInTheDocument();
+    expect(screen.getByText("customer-demo")).toBeInTheDocument();
+    expect(screen.getByText("support-demo")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "人工公开回复" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `领取工单 ${HANDOFF_TICKET}` })).not.toBeInTheDocument();
+  });
+
+  it("HUMAN 模式下当前负责客服发送公开回复并使用稳定幂等键", async () => {
+    const idempotencyKey = "16300000-0000-4000-8000-000000000001";
+    const publicMessageId = "16300000-0000-4000-8000-000000000101";
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(idempotencyKey);
+    let conversation = humanDetails().publicConversation;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [handoffItem()], []);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/claims`) {
+        return Response.json(
+          { ticketId: HANDOFF_TICKET, supportId: "support-demo", replayed: false },
+          { status: 201 },
+        );
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json({ ...humanDetails(), publicConversation: conversation });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/messages`) {
+        expect(init?.method).toBe("POST");
+        expect(new Headers(init?.headers).get("Idempotency-Key")).toBe(idempotencyKey);
+        expect(new Headers(init?.headers).get("X-CSRF-TOKEN")).toBe("support-csrf");
+        expect(JSON.parse(String(init?.body))).toEqual({
+          schema: "support-workbench-v2",
+          message: "包裹已在派送中，请再观察今天的物流更新。",
+        });
+        conversation = [
+          ...conversation,
+          {
+            messageId: publicMessageId,
+            author: "SUPPORT",
+            body: "包裹已在派送中，请再观察今天的物流更新。",
+            sentAt: "2026-08-11T01:20:00Z",
+          },
+        ];
+        return Response.json(
+          {
+            schema: "support-workbench-v2",
+            ticketId: HANDOFF_TICKET,
+            messageId: idempotencyKey,
+            publicMessageId,
+            outcome: "ACCEPTED",
+            accepted: true,
+            replayed: false,
+          },
+          { status: 201 },
+        );
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+    await confirmClaim(HANDOFF_TICKET);
+    fireEvent.change(await screen.findByRole("textbox", { name: "公开回复" }), {
+      target: { value: "包裹已在派送中，请再观察今天的物流更新。" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "发送公开回复" }));
+
+    expect(await screen.findByText("公开回复已由 Spring 保存并对客户可见。")).toBeInTheDocument();
+    expect(screen.getByText("包裹已在派送中，请再观察今天的物流更新。")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查询发送结果" })).not.toBeInTheDocument();
+  });
+
+  it("发送结果不明确时只允许查询权威结果而不是重新发送", async () => {
+    const idempotencyKey = "16300000-0000-4000-8000-000000000002";
+    const publicMessageId = "16300000-0000-4000-8000-000000000102";
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(idempotencyKey);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [handoffItem()], []);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/claims`) {
+        return Response.json(
+          { ticketId: HANDOFF_TICKET, supportId: "support-demo", replayed: false },
+          { status: 201 },
+        );
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json(humanDetails());
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/messages`) {
+        throw new TypeError("disconnected");
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/messages/${idempotencyKey}`) {
+        expect(init?.method ?? "GET").toBe("GET");
+        return Response.json({
+          schema: "support-workbench-v2",
+          ticketId: HANDOFF_TICKET,
+          messageId: idempotencyKey,
+          publicMessageId,
+          outcome: "ACCEPTED",
+          accepted: true,
+          replayed: true,
+        });
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+    await confirmClaim(HANDOFF_TICKET);
+    fireEvent.change(await screen.findByRole("textbox", { name: "公开回复" }), {
+      target: { value: "请先不要重复提交。" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "发送公开回复" }));
+
+    expect(await screen.findByRole("button", { name: "查询发送结果" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发送公开回复" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "公开回复" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "查询发送结果" }));
+    expect(await screen.findByText("已从 Spring 权威结果确认公开回复已保存。")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查询发送结果" })).not.toBeInTheDocument();
+  });
+
+  it("AGENT 处理模式不展示人工公开回复 composer", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [breachedItem()], []);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === `/api/support/workbench/tickets/${BREACHED_TICKET}/claims`) {
+        return Response.json(
+          { ticketId: BREACHED_TICKET, supportId: "support-demo", replayed: false },
+          { status: 201 },
+        );
+      }
+      if (path === `/api/support/workbench/tickets/${BREACHED_TICKET}`) {
+        return Response.json({
+          ...humanDetails(),
+          ticketId: BREACHED_TICKET,
+          handlingMode: "AGENT",
+          lifecycleState: "INVESTIGATING",
+        });
+      }
+      if (path === `/api/support/workbench/tickets/${BREACHED_TICKET}/events`) {
+        return openStream();
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+    await confirmClaim(BREACHED_TICKET);
+
+    expect(await screen.findByRole("heading", { name: "授权工单详情" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "人工公开回复" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "公开回复" })).not.toBeInTheDocument();
+  });
+
+  it("重新登录后不会沿用上一主体未确认发送请求", async () => {
+    globalThis.sessionStorage.setItem(
+      `support-workbench:pending-reply:${HANDOFF_TICKET}`,
+      JSON.stringify({
+        idempotencyKey: "16300000-0000-4000-8000-000000000003",
+        body: "上一主体未确认的回复",
+      }),
+    );
+    announceHumanSessionChange("logged-out");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:4", [], [], HANDOFF_TICKET);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json(humanDetails());
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+
+    expect(await screen.findByRole("heading", { name: "人工公开回复" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查询发送结果" })).not.toBeInTheDocument();
+    expect(screen.queryByText("上一主体未确认的回复")).not.toBeInTheDocument();
+  });
+
+  it("空队列展示 empty 状态且领取前详情区保持等待", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(snapshotResponse("support-workbench-v2:1", [], []))
+      .mockResolvedValueOnce(openStream());
+
+    render(<SupportWorkbench />);
+
+    expect(await screen.findAllByText("当前没有队列条目")).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "领取后查看授权详情" })).toBeInTheDocument();
+  });
 });
 
 function handoffItem() {
@@ -434,13 +671,54 @@ function breachedItem() {
   };
 }
 
-function snapshotResponse(cursor: string, sharedQueue: unknown[], escalationQueue: unknown[]) {
+function humanDetails() {
+  return {
+    ticketId: HANDOFF_TICKET,
+    customerId: "customer-demo",
+    orderReference: "ORDER-DELAY-001",
+    description: "物流延迟",
+    lifecycleState: "WAITING_FOR_CUSTOMER",
+    handlingMode: "HUMAN",
+    assignedSupportId: "support-demo",
+    publicConversation: [
+      {
+        messageId: "26000000-0000-0000-0000-000000000201",
+        author: "CUSTOMER",
+        body: "物流一直没有更新",
+        sentAt: "2026-08-11T01:10:00Z",
+      },
+    ],
+    investigationFacts: [
+      {
+        factType: "DELIVERY_DELAY",
+        factValue: "26 hours",
+        evidenceReference: "shipment:ORDER-DELAY-001",
+        recordedAt: "2026-08-11T01:12:00Z",
+      },
+    ],
+    businessTimeline: [
+      {
+        eventType: "SUPPORT_ASSIGNMENT_CREATED",
+        actorId: "support-demo",
+        occurredAt: "2026-08-11T01:15:00Z",
+      },
+    ],
+  };
+}
+
+function snapshotResponse(
+  cursor: string,
+  sharedQueue: unknown[],
+  escalationQueue: unknown[],
+  assignedTicketId?: string | null,
+) {
   return Response.json({
     view: "SUPPORT_WORKBENCH",
     schema: "support-workbench-v2",
     cursor,
     sharedQueue,
     escalationQueue,
+    ...(assignedTicketId === undefined ? {} : { assignedTicketId }),
   });
 }
 
