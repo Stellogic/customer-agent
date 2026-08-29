@@ -6,6 +6,7 @@ import { SupportWorkbench } from "./SupportWorkbench";
 
 const HANDOFF_TICKET = "26000000-0000-0000-0000-000000000001";
 const BREACHED_TICKET = "26000000-0000-0000-0000-000000000002";
+const SECOND_HUMAN_TICKET = "26000000-0000-0000-0000-000000000003";
 const SNAPSHOT_URL = "/api/support/workbench/snapshot?schema=support-workbench-v2";
 
 describe("客服共享队列工作台", () => {
@@ -229,7 +230,7 @@ describe("客服共享队列工作台", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path === SNAPSHOT_URL) {
-        return snapshotResponse("support-workbench-v2:1", [handoffItem(), breachedItem()], []);
+        return snapshotResponse("support-workbench-v2:1", [handoffItem(), secondHumanItem()], []);
       }
       if (path === "/api/support/workbench/events") return openStream();
       if (path === "/api/auth/csrf") {
@@ -257,7 +258,7 @@ describe("客服共享队列工作台", () => {
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
         return openStream();
       }
-      if (path === `/api/support/workbench/tickets/${BREACHED_TICKET}/claims`) {
+      if (path === `/api/support/workbench/tickets/${SECOND_HUMAN_TICKET}/claims`) {
         return Response.json({}, { status: 404 });
       }
       throw new Error(`unexpected request: ${path}`);
@@ -267,7 +268,7 @@ describe("客服共享队列工作台", () => {
     await confirmClaim(HANDOFF_TICKET);
     expect((await screen.findAllByText("ORDER-DELAY-001")).length).toBeGreaterThan(0);
 
-    await confirmClaim(BREACHED_TICKET);
+    await confirmClaim(SECOND_HUMAN_TICKET);
     expect(await screen.findByRole("alert")).toHaveTextContent("领取未完成");
     expect(screen.queryByText("customer-demo")).not.toBeInTheDocument();
   });
@@ -413,7 +414,7 @@ describe("客服共享队列工作台", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path === SNAPSHOT_URL) {
-        return snapshotResponse("support-workbench-v2:4", [], [], HANDOFF_TICKET);
+        return snapshotResponse("support-workbench-v2:4", [], [], [HANDOFF_TICKET]);
       }
       if (path === "/api/support/workbench/events") return openStream();
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
@@ -432,6 +433,95 @@ describe("客服共享队列工作台", () => {
     expect(screen.getByText("support-demo")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "人工公开回复" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: `领取工单 ${HANDOFF_TICKET}` })).not.toBeInTheDocument();
+  });
+
+  it("刷新后恢复同一客服全部 ACTIVE 领取并可切换详情", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:5", [], [], [HANDOFF_TICKET, SECOND_HUMAN_TICKET]);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json(humanDetails());
+      }
+      if (path === `/api/support/workbench/tickets/${SECOND_HUMAN_TICKET}`) {
+        return Response.json({
+          ...humanDetails(),
+          ticketId: SECOND_HUMAN_TICKET,
+          description: "第二张已领取工单",
+          assignedSupportId: "support-demo",
+        });
+      }
+      if (
+        path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events` ||
+        path === `/api/support/workbench/tickets/${SECOND_HUMAN_TICKET}/events`
+      ) {
+        return openStream();
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+
+    expect(await screen.findByRole("heading", { name: "授权工单详情" })).toBeInTheDocument();
+    expect(screen.getByText("物流延迟")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "已领取工单" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `打开已领取工单 ${SECOND_HUMAN_TICKET}` }));
+    expect(await screen.findByText("第二张已领取工单")).toBeInTheDocument();
+    expect(screen.queryByText("物流延迟")).not.toBeInTheDocument();
+  });
+
+  it("AGENT 处理模式的队列条目不能领取", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(snapshotResponse("support-workbench-v2:1", [breachedItem()], []))
+      .mockResolvedValueOnce(openStream());
+
+    render(<SupportWorkbench />);
+
+    expect(await screen.findByText("Agent 处理中")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `领取工单 ${BREACHED_TICKET}` })).not.toBeInTheDocument();
+  });
+
+  it("释放领取后清除详情并重新读取权威快照", async () => {
+    let released = false;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse(
+          released ? "support-workbench-v2:6" : "support-workbench-v2:5",
+          released ? [handoffItem()] : [],
+          [],
+          released ? [] : [HANDOFF_TICKET],
+        );
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        if (released) return Response.json({}, { status: 404 });
+        return Response.json(humanDetails());
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/release`) {
+        expect(init?.method).toBe("POST");
+        released = true;
+        return Response.json(
+          { ticketId: HANDOFF_TICKET, supportId: "support-demo", replayed: false },
+          { status: 201 },
+        );
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+    expect(await screen.findByRole("heading", { name: "授权工单详情" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "释放领取" }));
+    expect(await screen.findByRole("heading", { name: "领取后查看授权详情" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "授权工单详情" })).not.toBeInTheDocument();
   });
 
   it("HUMAN 模式下当前负责客服发送公开回复并使用稳定幂等键", async () => {
@@ -567,18 +657,9 @@ describe("客服共享队列工作台", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path === SNAPSHOT_URL) {
-        return snapshotResponse("support-workbench-v2:1", [breachedItem()], []);
+        return snapshotResponse("support-workbench-v2:1", [], [], [BREACHED_TICKET]);
       }
       if (path === "/api/support/workbench/events") return openStream();
-      if (path === "/api/auth/csrf") {
-        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
-      }
-      if (path === `/api/support/workbench/tickets/${BREACHED_TICKET}/claims`) {
-        return Response.json(
-          { ticketId: BREACHED_TICKET, supportId: "support-demo", replayed: false },
-          { status: 201 },
-        );
-      }
       if (path === `/api/support/workbench/tickets/${BREACHED_TICKET}`) {
         return Response.json({
           ...humanDetails(),
@@ -594,7 +675,6 @@ describe("客服共享队列工作台", () => {
     });
 
     render(<SupportWorkbench />);
-    await confirmClaim(BREACHED_TICKET);
 
     expect(await screen.findByRole("heading", { name: "授权工单详情" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "人工公开回复" })).not.toBeInTheDocument();
@@ -613,7 +693,7 @@ describe("客服共享队列工作台", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path === SNAPSHOT_URL) {
-        return snapshotResponse("support-workbench-v2:4", [], [], HANDOFF_TICKET);
+        return snapshotResponse("support-workbench-v2:4", [], [], [HANDOFF_TICKET]);
       }
       if (path === "/api/support/workbench/events") return openStream();
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
@@ -671,6 +751,17 @@ function breachedItem() {
   };
 }
 
+function secondHumanItem() {
+  return {
+    ticketId: SECOND_HUMAN_TICKET,
+    orderReference: "ORDER-DELAY-002",
+    issueKind: "PACKAGE_NOT_RECEIVED",
+    lifecycleState: "WAITING_FOR_CUSTOMER",
+    handlingMode: "HUMAN",
+    enteredAt: "2026-08-11T01:08:00Z",
+  };
+}
+
 function humanDetails() {
   return {
     ticketId: HANDOFF_TICKET,
@@ -710,7 +801,7 @@ function snapshotResponse(
   cursor: string,
   sharedQueue: unknown[],
   escalationQueue: unknown[],
-  assignedTicketId?: string | null,
+  assignedTicketIds: string[] = [],
 ) {
   return Response.json({
     view: "SUPPORT_WORKBENCH",
@@ -718,7 +809,7 @@ function snapshotResponse(
     cursor,
     sharedQueue,
     escalationQueue,
-    ...(assignedTicketId === undefined ? {} : { assignedTicketId }),
+    assignedTicketIds,
   });
 }
 

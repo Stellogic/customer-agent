@@ -31,17 +31,22 @@ record SupportWorkbenchSnapshot(
         long sequence,
         List<SupportQueueItem> sharedQueue,
         List<SupportQueueItem> escalationQueue,
-        UUID assignedTicketId) {
+        List<UUID> assignedTicketIds) {
     SupportWorkbenchSnapshot(
             String epoch,
             long sequence,
             List<SupportQueueItem> sharedQueue,
             List<SupportQueueItem> escalationQueue) {
-        this(epoch, sequence, sharedQueue, escalationQueue, null);
+        this(epoch, sequence, sharedQueue, escalationQueue, List.of());
     }
 }
 
 record SupportAssignmentClaim(UUID ticketId, String supportId, boolean replayed) {}
+
+record SupportAssignmentRelease(UUID ticketId, String supportId, boolean replayed) {}
+
+record SupportAssignmentReassignment(
+        UUID ticketId, String supportId, String previousSupportId, boolean replayed) {}
 
 record SupportWorkbenchEvent(String epoch, long sequence, String type, String jsonPayload) {
     String cursor() {

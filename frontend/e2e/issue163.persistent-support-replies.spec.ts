@@ -37,9 +37,22 @@ test("Issue #163 持久化领取、人工公开回复与刷新恢复", async ({ 
   await expect(support.getByRole("heading", { name: "客服共享队列" })).toBeVisible();
   await expect(support.getByText(description)).toHaveCount(0);
 
+  await support.setViewportSize({ width: 640, height: 960 });
+  const queueScroller = support.locator(".queue-table-wrap").first();
+  await expect(queueScroller).toBeVisible();
+  await expect
+    .poll(() => queueScroller.evaluate((element) => element.scrollWidth > element.clientWidth))
+    .toBe(true);
+  await expect(support.getByLabel("授权详情等待区")).toHaveCSS("position", "static");
+
   await support.getByRole("button", { name: `领取工单 ${created.ticketId}` }).first().click();
   await expect(support.getByRole("dialog", { name: "确认领取工单" })).toBeVisible();
   await support.getByRole("button", { name: "确认领取" }).click();
+  await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
+  await expect(support.locator(".support-ticket-detail")).toHaveCSS("position", "static");
+  await expect(support.getByRole("heading", { name: "人工公开回复" })).toBeVisible();
+  await expect(support.getByRole("button", { name: "释放领取" })).toBeVisible();
+  await support.setViewportSize({ width: 1440, height: 960 });
   await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
   await expect(support.getByRole("heading", { name: "人工公开回复" })).toBeVisible();
   await support.getByRole("textbox", { name: "公开回复" }).fill(replyBody);

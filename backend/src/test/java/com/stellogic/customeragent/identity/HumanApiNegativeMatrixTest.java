@@ -44,6 +44,8 @@ class HumanApiNegativeMatrixTest {
                     getApi("/api/support/workbench/snapshot"),
                     getApi("/api/support/workbench/tickets/" + ID),
                     postApi("/api/support/workbench/tickets/" + ID + "/claims"),
+                    postApi("/api/support/workbench/tickets/" + ID + "/release"),
+                    postApi("/api/support/workbench/tickets/" + ID + "/reassignments"),
                     postApi("/api/support/workbench/tickets/" + ID + "/messages"),
                     getApi("/api/support/workbench/tickets/" + ID + "/messages/reply-163"),
                     getApi("/api/support/workbench/tickets/" + ID + "/events"),

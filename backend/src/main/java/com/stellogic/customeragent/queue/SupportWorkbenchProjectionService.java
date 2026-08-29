@@ -58,9 +58,9 @@ class SupportWorkbenchProjectionService {
                         "select coalesce(max(epoch_sequence), 0) from support_workbench_event where epoch = ?",
                         Long.class,
                         epoch);
-        UUID assignedTicketId = currentAssignmentTicketId(supportId);
+        List<UUID> assignedTicketIds = currentAssignmentTicketIds(supportId);
         return new SupportWorkbenchSnapshot(
-                epoch, sequence == null ? 0 : sequence, shared, escalations, assignedTicketId);
+                epoch, sequence == null ? 0 : sequence, shared, escalations, assignedTicketIds);
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -160,12 +160,8 @@ class SupportWorkbenchProjectionService {
     SupportAssignmentClaim claim(String supportId, UUID ticketId) {
         requireSupportPrincipal(supportId);
         ticketLock.acquire(ticketId);
-        List<String> activeTicketStates =
-                jdbc.queryForList(
-                        "select lifecycle_state from support_ticket where id = ? and lifecycle_state not in ('RESOLVED', 'CLOSED') for update",
-                        String.class,
-                        ticketId);
-        if (activeTicketStates.isEmpty()) throw new SupportTicketNotFoundException();
+        SupportTicketScope ticket = lockClaimableHumanTicket(ticketId);
+        if (ticket == null) throw new SupportTicketNotFoundException();
         List<String> activeAssignees =
                 jdbc.queryForList(
                         "select support_id from support_assignment where ticket_id = ? and status = 'ACTIVE'",
@@ -198,6 +194,70 @@ class SupportWorkbenchProjectionService {
                 ticketId,
                 supportId);
         return new SupportAssignmentClaim(ticketId, supportId, false);
+    }
+
+    @Transactional
+    SupportAssignmentRelease release(String supportId, UUID ticketId) {
+        requireSupportPrincipal(supportId);
+        ticketLock.acquire(ticketId);
+        List<String> activeAssignees =
+                jdbc.queryForList(
+                        "select support_id from support_assignment where ticket_id = ? and status = 'ACTIVE'",
+                        String.class,
+                        ticketId);
+        if (activeAssignees.isEmpty()) {
+            if (isQueued(ticketId)) {
+                return new SupportAssignmentRelease(ticketId, supportId, true);
+            }
+            throw new SupportTicketNotFoundException();
+        }
+        if (!supportId.equals(activeAssignees.getFirst())) {
+            throw new SupportTicketNotFoundException();
+        }
+        revokeActiveAssignment(ticketId);
+        returnTicketToSharedQueue(ticketId);
+        jdbc.update(
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                        + "values (?, 'SUPPORT_ASSIGNMENT_RELEASED', ?, clock_timestamp())",
+                ticketId,
+                supportId);
+        return new SupportAssignmentRelease(ticketId, supportId, false);
+    }
+
+    @Transactional
+    SupportAssignmentReassignment reassign(String actorId, UUID ticketId, String targetSupportId) {
+        requireSupportPrincipal(actorId);
+        requireSupportPrincipal(targetSupportId);
+        ticketLock.acquire(ticketId);
+        SupportTicketScope ticket = lockClaimableHumanTicket(ticketId);
+        if (ticket == null) throw new SupportTicketNotFoundException();
+        List<String> activeAssignees =
+                jdbc.queryForList(
+                        "select support_id from support_assignment where ticket_id = ? and status = 'ACTIVE'",
+                        String.class,
+                        ticketId);
+        if (!activeAssignees.isEmpty() && targetSupportId.equals(activeAssignees.getFirst())) {
+            return new SupportAssignmentReassignment(
+                    ticketId, targetSupportId, targetSupportId, true);
+        }
+        String previousSupportId = activeAssignees.isEmpty() ? null : activeAssignees.getFirst();
+        if (!activeAssignees.isEmpty()) {
+            revokeActiveAssignment(ticketId);
+        }
+        jdbc.update(
+                "insert into support_assignment (id, ticket_id, support_id, status, assigned_at) "
+                        + "values (?, ?, ?, 'ACTIVE', clock_timestamp())",
+                UUID.randomUUID(),
+                ticketId,
+                targetSupportId);
+        jdbc.update("delete from shared_support_queue_entry where ticket_id = ?", ticketId);
+        jdbc.update(
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                        + "values (?, 'SUPPORT_ASSIGNMENT_REASSIGNED', ?, clock_timestamp())",
+                ticketId,
+                actorId);
+        return new SupportAssignmentReassignment(
+                ticketId, targetSupportId, previousSupportId, false);
     }
 
     @Transactional
@@ -275,17 +335,70 @@ class SupportWorkbenchProjectionService {
                 true);
     }
 
-    private UUID currentAssignmentTicketId(String supportId) {
-        List<UUID> assignments =
+    private List<UUID> currentAssignmentTicketIds(String supportId) {
+        return jdbc.query(
+                "select a.ticket_id from support_assignment a "
+                        + "join support_ticket t on t.id = a.ticket_id "
+                        + "where a.support_id = ? and a.status = 'ACTIVE' "
+                        + "and t.lifecycle_state not in ('RESOLVED', 'CLOSED') "
+                        + "order by a.assigned_at, a.id",
+                (rs, row) -> rs.getObject(1, UUID.class),
+                supportId);
+    }
+
+    private SupportTicketScope lockClaimableHumanTicket(UUID ticketId) {
+        List<SupportTicketScope> tickets =
                 jdbc.query(
-                        "select a.ticket_id from support_assignment a "
-                                + "join support_ticket t on t.id = a.ticket_id "
-                                + "where a.support_id = ? and a.status = 'ACTIVE' "
-                                + "and t.lifecycle_state not in ('RESOLVED', 'CLOSED') "
-                                + "order by a.assigned_at desc, a.id desc limit 1",
-                        (rs, row) -> rs.getObject(1, UUID.class),
-                        supportId);
-        return assignments.isEmpty() ? null : assignments.getFirst();
+                        "select lifecycle_state, handling_mode from support_ticket "
+                                + "where id = ? and lifecycle_state not in ('RESOLVED', 'CLOSED') for update",
+                        (rs, row) ->
+                                new SupportTicketScope(
+                                        SupportTicketLifecycleState.valueOf(rs.getString(1)),
+                                        SupportHandlingMode.valueOf(rs.getString(2))),
+                        ticketId);
+        if (tickets.isEmpty() || tickets.getFirst().handlingMode() != SupportHandlingMode.HUMAN) {
+            return null;
+        }
+        return tickets.getFirst();
+    }
+
+    private void revokeActiveAssignment(UUID ticketId) {
+        jdbc.update(
+                "update support_assignment set status = 'REVOKED', revoked_at = clock_timestamp() "
+                        + "where ticket_id = ? and status = 'ACTIVE'",
+                ticketId);
+    }
+
+    private void returnTicketToSharedQueue(UUID ticketId) {
+        List<String> handoffReasons =
+                jdbc.queryForList(
+                        "select human_handoff_reason_code from support_ticket where id = ?",
+                        String.class,
+                        ticketId);
+        String queueReason =
+                "CUSTOMER_REQUESTED".equals(
+                                handoffReasons.isEmpty() ? null : handoffReasons.getFirst())
+                        ? "CUSTOMER_REQUESTED_HANDOFF"
+                        : "AGENT_HUMAN_HANDOFF";
+        jdbc.update(
+                "insert into shared_support_queue_entry (ticket_id, reason_code, entered_at) "
+                        + "values (?, ?, clock_timestamp()) on conflict do nothing",
+                ticketId,
+                queueReason);
+        jdbc.update(
+                "insert into shared_support_queue_entry (ticket_id, reason_code, entered_at) "
+                        + "select ticket_id, 'SLA_BREACH', clock_timestamp() from ticket_sla_fact "
+                        + "where ticket_id = ? and fact_type = 'BREACH' on conflict do nothing",
+                ticketId);
+    }
+
+    private boolean isQueued(UUID ticketId) {
+        Integer queued =
+                jdbc.queryForObject(
+                        "select count(*) from shared_support_queue_entry where ticket_id = ?",
+                        Integer.class,
+                        ticketId);
+        return queued != null && queued > 0;
     }
 
     private SupportTicketScope currentTicketScope(String supportId, UUID ticketId) {

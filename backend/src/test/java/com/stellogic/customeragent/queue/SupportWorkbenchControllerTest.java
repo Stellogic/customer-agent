@@ -94,7 +94,7 @@ class SupportWorkbenchControllerTest {
                                 8,
                                 List.of(),
                                 List.of(),
-                                HANDOFF_TICKET));
+                                List.of(HANDOFF_TICKET, BREACHED_TICKET)));
 
         mvc.perform(
                         get("/api/support/workbench/snapshot")
@@ -102,8 +102,61 @@ class SupportWorkbenchControllerTest {
                                 .principal(support()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
-                .andExpect(jsonPath("$.assignedTicketId").value(HANDOFF_TICKET.toString()))
+                .andExpect(jsonPath("$.assignedTicketIds.length()").value(2))
+                .andExpect(jsonPath("$.assignedTicketIds[0]").value(HANDOFF_TICKET.toString()))
+                .andExpect(jsonPath("$.assignedTicketIds[1]").value(BREACHED_TICKET.toString()))
+                .andExpect(jsonPath("$.assignedTicketId").doesNotExist())
                 .andExpect(jsonPath("$.sharedQueue.length()").value(0));
+    }
+
+    @Test
+    void agentModeTicketsCannotBeClaimed() throws Exception {
+        when(service.claim("support-demo", BREACHED_TICKET))
+                .thenThrow(new SupportTicketNotFoundException());
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/claims", BREACHED_TICKET)
+                                .principal(support()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SUPPORT_TICKET_NOT_FOUND"));
+    }
+
+    @Test
+    void currentAssigneeCanReleaseTheAssignmentBackToTheQueue() throws Exception {
+        when(service.release("support-demo", HANDOFF_TICKET))
+                .thenReturn(new SupportAssignmentRelease(HANDOFF_TICKET, "support-demo", false));
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/release", HANDOFF_TICKET)
+                                .principal(support()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ticketId").value(HANDOFF_TICKET.toString()))
+                .andExpect(jsonPath("$.supportId").value("support-demo"))
+                .andExpect(jsonPath("$.replayed").value(false));
+    }
+
+    @Test
+    void reassignmentTerminatesThePreviousAssignee() throws Exception {
+        when(service.reassign("support-demo", HANDOFF_TICKET, "internal-demo"))
+                .thenReturn(
+                        new SupportAssignmentReassignment(
+                                HANDOFF_TICKET, "internal-demo", "support-demo", false));
+
+        mvc.perform(
+                        post(
+                                        "/api/support/workbench/tickets/{ticketId}/reassignments",
+                                        HANDOFF_TICKET)
+                                .principal(support())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","targetSupportId":"internal-demo"}
+                                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ticketId").value(HANDOFF_TICKET.toString()))
+                .andExpect(jsonPath("$.supportId").value("internal-demo"))
+                .andExpect(jsonPath("$.previousSupportId").value("support-demo"))
+                .andExpect(jsonPath("$.replayed").value(false));
     }
 
     @Test

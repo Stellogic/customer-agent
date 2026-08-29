@@ -66,6 +66,26 @@ public final class SupportWorkbenchController {
                 .body(claim);
     }
 
+    @PostMapping("/tickets/{ticketId}/release")
+    ResponseEntity<SupportAssignmentRelease> release(
+            Authentication authentication, @PathVariable UUID ticketId) {
+        SupportAssignmentRelease release = service.release(authentication.getName(), ticketId);
+        return ResponseEntity.status(release.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
+                .body(release);
+    }
+
+    @PostMapping("/tickets/{ticketId}/reassignments")
+    ResponseEntity<SupportAssignmentReassignment> reassign(
+            Authentication authentication,
+            @PathVariable UUID ticketId,
+            @RequestBody Map<String, Object> request) {
+        SupportAssignmentReassignment reassignment =
+                service.reassign(
+                        authentication.getName(), ticketId, requireTargetSupportId(request));
+        return ResponseEntity.status(reassignment.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
+                .body(reassignment);
+    }
+
     @PostMapping("/tickets/{ticketId}/messages")
     ResponseEntity<PublicReplyResponse> publicReply(
             Authentication authentication,
@@ -181,7 +201,7 @@ public final class SupportWorkbenchController {
             String cursor,
             List<?> sharedQueue,
             List<?> escalationQueue,
-            UUID assignedTicketId) {
+            List<UUID> assignedTicketIds) {
         static SnapshotResponse from(SupportWorkbenchSnapshot snapshot) {
             return new SnapshotResponse(
                     "SUPPORT_WORKBENCH",
@@ -189,7 +209,7 @@ public final class SupportWorkbenchController {
                     snapshot.epoch() + ":" + snapshot.sequence(),
                     snapshot.sharedQueue(),
                     snapshot.escalationQueue(),
-                    snapshot.assignedTicketId());
+                    snapshot.assignedTicketIds());
         }
     }
 
@@ -261,6 +281,17 @@ public final class SupportWorkbenchController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "公开回复内容长度无效");
         }
         return body;
+    }
+
+    private static String requireTargetSupportId(Map<String, Object> request) {
+        if (request == null
+                || !request.keySet().equals(Set.of("schema", "targetSupportId"))
+                || !SupportWorkbenchProjectionService.EPOCH.equals(request.get("schema"))
+                || !(request.get("targetSupportId") instanceof String target)
+                || target.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "重分配请求格式无效");
+        }
+        return target.trim();
     }
 
     private static List<LegacyQueueItem> legacyItems(List<SupportQueueItem> items) {

@@ -1140,6 +1140,40 @@ h2 {
 .support-ticket-detail {
   overflow: hidden;
 }
+.support-assigned-detail {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.assigned-ticket-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.assigned-ticket-list button {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+}
+.assigned-ticket-list button[aria-pressed="true"] {
+  border-color: var(--forest-400);
+  background: var(--forest-50);
+}
+.support-detail-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.support-release-action {
+  border-color: rgb(255 255 255 / 20%);
+  background: rgb(255 255 255 / 8%);
+  color: white;
+}
+.queue-claim-unavailable {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
 .support-detail-header {
   display: flex;
   align-items: flex-start;
@@ -1540,8 +1574,14 @@ select:focus-visible {
   .support-ticket-detail {
     position: static;
   }
-  .support-detail-header {
+  .support-detail-header,
+  .support-detail-header-actions,
+  .assigned-ticket-list {
     flex-direction: column;
+    align-items: stretch;
+  }
+  .support-release-action {
+    width: 100%;
   }
   .support-detail-summary dl {
     grid-template-columns: 1fr;

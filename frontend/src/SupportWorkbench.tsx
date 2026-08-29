@@ -45,7 +45,7 @@ type WorkbenchSnapshot = {
   cursor: string;
   sharedQueue: QueueItem[];
   escalationQueue: QueueItem[];
-  assignedTicketId?: string | null;
+  assignedTicketIds: string[];
 };
 
 type EventEnvelope = {
@@ -148,7 +148,7 @@ export function SupportWorkbench() {
       snapshotRef.current = authoritative;
       setSnapshot(authoritative);
       setConnection("live");
-      void restoreAssignedDetails(authoritative.assignedTicketId);
+      void restoreAssignedDetails(authoritative.assignedTicketIds);
       void consumeEvents(authoritative.cursor);
     } catch {
       if (generation === snapshotRequestGeneration.current) setConnection("stale");
@@ -278,6 +278,15 @@ export function SupportWorkbench() {
       const value = await readTicketDetails(ticketId);
       if (generation !== detailAuthorityGeneration.current) return;
       setDetails(value);
+      setSnapshot((current) => {
+        if (!current) return current;
+        const assignedTicketIds = current.assignedTicketIds.includes(ticketId)
+          ? current.assignedTicketIds
+          : [...current.assignedTicketIds, ticketId];
+        const next = { ...current, assignedTicketIds };
+        snapshotRef.current = next;
+        return next;
+      });
       void monitorTicketAuthority(ticketId, generation);
     } catch {
       setActionError("领取未完成或分配已失效；请重新同步队列后再试。");
@@ -286,12 +295,25 @@ export function SupportWorkbench() {
     }
   }
 
-  async function restoreAssignedDetails(ticketId: string | null | undefined) {
+  async function restoreAssignedDetails(ticketIds: string[]) {
     const generation = invalidateDetailAuthority();
-    if (ticketId === undefined) return;
-    if (ticketId === null) {
-      return;
+    if (ticketIds.length === 0) return;
+    const preferred =
+      details?.ticketId && ticketIds.includes(details.ticketId) ? details.ticketId : ticketIds[0];
+    try {
+      const value = await readTicketDetails(preferred);
+      if (generation !== detailAuthorityGeneration.current) return;
+      setDetails(value);
+      void monitorTicketAuthority(preferred, generation);
+    } catch {
+      if (generation !== detailAuthorityGeneration.current) return;
+      setDetails(null);
+      setActionError("当前负责客服责任未能恢复；旧工单详情已清除，请重新同步。");
     }
+  }
+
+  async function openAssignedTicket(ticketId: string) {
+    const generation = invalidateDetailAuthority();
     try {
       const value = await readTicketDetails(ticketId);
       if (generation !== detailAuthorityGeneration.current) return;
@@ -300,7 +322,27 @@ export function SupportWorkbench() {
     } catch {
       if (generation !== detailAuthorityGeneration.current) return;
       setDetails(null);
-      setActionError("当前客服责任未能恢复；旧工单详情已清除，请重新同步。");
+      setActionError("该工单的负责客服责任已失效；详情已清除，请重新同步。");
+    }
+  }
+
+  async function releaseTicket(ticketId: string) {
+    setActionError("");
+    try {
+      const csrf = await loadCsrfToken();
+      const response = await humanSessionFetch(
+        `/api/support/workbench/tickets/${ticketId}/release`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { [csrf.headerName]: csrf.token },
+        },
+      );
+      if (!response.ok) throw new Error("release rejected");
+      invalidateDetailAuthority();
+      await loadSnapshot("syncing");
+    } catch {
+      setActionError("释放领取未完成；请重新同步后再试。");
     }
   }
 
@@ -526,13 +568,31 @@ export function SupportWorkbench() {
             </div>
 
             {details ? (
-              <TicketDetail
-                key={details.ticketId}
-                details={details}
-                onCopyError={setActionError}
-                onSendReply={sendPublicReply}
-                onQueryReply={queryPublicReply}
-              />
+              <div className="support-assigned-detail">
+                {(snapshot?.assignedTicketIds.length ?? 0) > 1 && (
+                  <nav className="assigned-ticket-list" aria-label="已领取工单">
+                    {snapshot?.assignedTicketIds.map((ticketId) => (
+                      <button
+                        key={ticketId}
+                        type="button"
+                        aria-pressed={details.ticketId === ticketId}
+                        aria-label={`打开已领取工单 ${ticketId}`}
+                        onClick={() => void openAssignedTicket(ticketId)}
+                      >
+                        {shortTicketId(ticketId)}
+                      </button>
+                    ))}
+                  </nav>
+                )}
+                <TicketDetail
+                  key={details.ticketId}
+                  details={details}
+                  onCopyError={setActionError}
+                  onSendReply={sendPublicReply}
+                  onQueryReply={queryPublicReply}
+                  onRelease={() => void releaseTicket(details.ticketId)}
+                />
+              </div>
             ) : (
               <aside className="detail-placeholder" aria-label="授权详情等待区">
                 <span aria-hidden="true">↳</span>
@@ -663,15 +723,19 @@ function QueueSection({
                           <time dateTime={item.enteredAt}>{formatTime(item.enteredAt)}</time>
                         </td>
                         <td>
-                          <button
-                            type="button"
-                            className="queue-claim-action"
-                            aria-label={`领取工单 ${item.ticketId}`}
-                            disabled={claimingTicketId !== null}
-                            onClick={() => onClaim(item.ticketId)}
-                          >
-                            {claimingTicketId === item.ticketId ? "正在领取…" : "领取"}
-                          </button>
+                          {item.handlingMode === "HUMAN" ? (
+                            <button
+                              type="button"
+                              className="queue-claim-action"
+                              aria-label={`领取工单 ${item.ticketId}`}
+                              disabled={claimingTicketId !== null}
+                              onClick={() => onClaim(item.ticketId)}
+                            >
+                              {claimingTicketId === item.ticketId ? "正在领取…" : "领取"}
+                            </button>
+                          ) : (
+                            <span className="queue-claim-unavailable">Agent 处理中</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -693,6 +757,7 @@ function TicketDetail({
   onCopyError,
   onSendReply,
   onQueryReply,
+  onRelease,
 }: {
   details: TicketDetails;
   onCopyError: (message: string) => void;
@@ -705,6 +770,7 @@ function TicketDetail({
     ticketId: string,
     idempotencyKey: string,
   ) => Promise<SupportPublicReplyResponse>;
+  onRelease: () => void;
 }) {
   const storedPendingReply = readPendingReply(details.ticketId);
   const [draft, setDraft] = useState(
@@ -784,7 +850,12 @@ function TicketDetail({
           <p className="eyebrow">CURRENT ASSIGNMENT</p>
           <h2 id="support-ticket-detail-title">授权工单详情</h2>
         </div>
-        <TicketIdentifier ticketId={details.ticketId} onCopyError={onCopyError} />
+        <div className="support-detail-header-actions">
+          <TicketIdentifier ticketId={details.ticketId} onCopyError={onCopyError} />
+          <button type="button" className="support-release-action" onClick={onRelease}>
+            释放领取
+          </button>
+        </div>
       </header>
 
       <div className="support-detail-summary">
@@ -985,7 +1056,7 @@ function isSnapshot(value: unknown): value is WorkbenchSnapshot {
       "cursor",
       "sharedQueue",
       "escalationQueue",
-      "assignedTicketId",
+      "assignedTicketIds",
     ]) ||
     value.view !== "SUPPORT_WORKBENCH" ||
     value.schema !== SUPPORT_SCHEMA ||
@@ -993,9 +1064,8 @@ function isSnapshot(value: unknown): value is WorkbenchSnapshot {
     parseCursor(value.cursor) === null ||
     !Array.isArray(value.sharedQueue) ||
     !Array.isArray(value.escalationQueue) ||
-    (value.assignedTicketId !== undefined &&
-      value.assignedTicketId !== null &&
-      !isTicketId(value.assignedTicketId))
+    !Array.isArray(value.assignedTicketIds) ||
+    !value.assignedTicketIds.every((ticketId) => isTicketId(ticketId))
   )
     return false;
   return value.sharedQueue.every(isQueueItem) && value.escalationQueue.every(isQueueItem);
