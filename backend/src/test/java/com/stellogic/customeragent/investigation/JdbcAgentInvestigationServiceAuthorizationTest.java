@@ -152,6 +152,9 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                 288000,
                 "ORDER-122",
                 evidence,
+                InvestigationRiskScenario.LOGISTICS_DELAY,
+                EvidenceSufficiencyPolicy.VERSION,
+                structuredEvidence("ORDER-122"),
                 new CustomerReplyEnvelope(
                         "customer-reply-v1",
                         "订单 ORDER-122 的调查已完成，补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
@@ -159,5 +162,25 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                         evidence,
                         false,
                         "ORDER-122"));
+    }
+
+    private static List<ConclusionEvidence> structuredEvidence(String orderReference) {
+        return List.of(
+                new ConclusionEvidence(
+                        "order:" + orderReference, List.of(EvidenceApplicability.ORDER_IDENTITY)),
+                new ConclusionEvidence(
+                        "logistics:" + orderReference,
+                        List.of(EvidenceApplicability.DELAY_DURATION)),
+                new ConclusionEvidence(
+                        "payment:" + orderReference,
+                        List.of(EvidenceApplicability.ORDER_ELIGIBILITY)),
+                new ConclusionEvidence(
+                        "compensation:" + orderReference,
+                        List.of(EvidenceApplicability.EXISTING_COMPENSATION)),
+                new ConclusionEvidence(
+                        "order-actions:" + orderReference,
+                        List.of(EvidenceApplicability.PENDING_ACTIONS)),
+                new ConclusionEvidence(
+                        "policy:delay-policy-v1", List.of(EvidenceApplicability.POLICY_BASIS)));
     }
 }

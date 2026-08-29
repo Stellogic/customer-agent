@@ -233,6 +233,23 @@ class AgentInvestigationCapabilityControllerTest {
                         org.mockito.ArgumentMatchers.argThat(
                                 conclusion ->
                                         conclusion
+                                                        .riskScenario()
+                                                        .equals(
+                                                                InvestigationRiskScenario
+                                                                        .LOGISTICS_DELAY)
+                                                && conclusion
+                                                        .sufficiencyPolicyVersion()
+                                                        .equals("evidence-sufficiency-v1")
+                                                && conclusion.evidence().size() == 6
+                                                && conclusion
+                                                        .evidence()
+                                                        .getFirst()
+                                                        .applicability()
+                                                        .equals(
+                                                                List.of(
+                                                                        EvidenceApplicability
+                                                                                .ORDER_IDENTITY))
+                                                && conclusion
                                                         .customerReply()
                                                         .schemaVersion()
                                                         .equals("customer-reply-v1")
@@ -270,6 +287,16 @@ class AgentInvestigationCapabilityControllerTest {
                   "delaySeconds": 288000,
                   "orderReference": "ORDER-122",
                   "evidenceRefs": ["order:ORDER-122", "logistics:ORDER-122"],
+                  "riskScenario": "LOGISTICS_DELAY",
+                  "sufficiencyPolicyVersion": "evidence-sufficiency-v1",
+                  "evidence": [
+                    {"evidenceReference":"order:ORDER-122","applicability":["ORDER_IDENTITY"]},
+                    {"evidenceReference":"logistics:ORDER-122","applicability":["DELAY_DURATION"]},
+                    {"evidenceReference":"payment:ORDER-122","applicability":["ORDER_ELIGIBILITY"]},
+                    {"evidenceReference":"compensation:ORDER-122","applicability":["EXISTING_COMPENSATION"]},
+                    {"evidenceReference":"order-actions:ORDER-122","applicability":["PENDING_ACTIONS"]},
+                    {"evidenceReference":"policy:delay-policy-v1","applicability":["POLICY_BASIS"]}
+                  ],
                   "customerReply": {
                     "schemaVersion": "customer-reply-v1",
                     "body": "订单 ORDER-122 的调查已完成，正在等待人工审批。",

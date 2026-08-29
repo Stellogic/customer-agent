@@ -501,7 +501,7 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 ),
                 judgment_evidence,
             )
-        conclusion = _build_conclusion(facts, judgment)
+        conclusion = _build_conclusion(facts, judgment, loop_result.records)
         communication_input = CustomerCommunicationInput(
             order_reference=facts["orderReference"],
             delay_seconds=facts["delaySeconds"],
@@ -1522,7 +1522,11 @@ def await_clarification(state: BaselineState) -> BaselineState:
     }
 
 
-def _build_conclusion(facts: dict, judgment: InvestigationJudgment) -> dict:
+def _build_conclusion(
+    facts: dict,
+    judgment: InvestigationJudgment,
+    records: tuple[ActionRecord, ...],
+) -> dict:
     return {
         "compensationRequired": judgment.compensation_review_required,
         "reasonCode": judgment.reason_code.value,
@@ -1530,7 +1534,35 @@ def _build_conclusion(facts: dict, judgment: InvestigationJudgment) -> dict:
         "delaySeconds": facts["delaySeconds"],
         "orderReference": facts["orderReference"],
         "evidenceRefs": facts["evidenceRefs"],
+        "riskScenario": "LOGISTICS_DELAY",
+        "sufficiencyPolicyVersion": "evidence-sufficiency-v1",
+        "evidence": _structured_conclusion_evidence(records),
     }
+
+
+def _structured_conclusion_evidence(
+    records: tuple[ActionRecord, ...],
+) -> list[dict[str, object]]:
+    by_action = {record.action_type: record.evidence_references for record in records}
+    mappings = (
+        ("CONFIRM_ORDER", 0, "ORDER_IDENTITY"),
+        ("READ_LOGISTICS", 0, "DELAY_DURATION"),
+        ("READ_PAYMENT_AND_REFUNDS", 0, "ORDER_ELIGIBILITY"),
+        ("READ_COMPENSATION_AND_PENDING_ACTIONS", 0, "EXISTING_COMPENSATION"),
+        ("READ_COMPENSATION_AND_PENDING_ACTIONS", 1, "PENDING_ACTIONS"),
+        ("READ_APPLICABLE_POLICY", 0, "POLICY_BASIS"),
+    )
+    result: list[dict[str, object]] = []
+    for action_type, evidence_index, applicability in mappings:
+        references = by_action.get(action_type, ())
+        if evidence_index < len(references):
+            result.append(
+                {
+                    "evidenceReference": references[evidence_index],
+                    "applicability": [applicability],
+                }
+            )
+    return result
 
 
 def select_work(state: BaselineState) -> str:

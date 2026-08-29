@@ -70,6 +70,28 @@ async def test_deterministic_model_selects_one_allowed_action_until_submission()
 
 
 @pytest.mark.asyncio
+async def test_deterministic_model_can_choose_a_different_legal_order_for_sibling_context() -> None:
+    model = DeterministicActionModel()
+    facts: dict = {"siblingTickets": [{"issueKind": "LOGISTICS_DELAY"}]}
+    expected = [
+        InvestigationCapability.CONFIRM_ORDER,
+        InvestigationCapability.READ_APPLICABLE_POLICY,
+        InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
+        InvestigationCapability.READ_PAYMENT_AND_REFUNDS,
+        InvestigationCapability.READ_LOGISTICS,
+        TerminalAction.SUBMIT_CONCLUSION,
+    ]
+
+    selected = []
+    for kind in expected:
+        decision = await model.choose(facts)
+        selected.append(decision.action.kind)
+        facts.update(_progress_for(kind))
+
+    assert selected == expected
+
+
+@pytest.mark.asyncio
 async def test_loop_allows_different_legal_tool_order_and_records_only_controlled_results() -> None:
     decisions = iter(
         [

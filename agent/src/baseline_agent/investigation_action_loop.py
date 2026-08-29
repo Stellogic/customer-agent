@@ -201,7 +201,7 @@ class DeterministicActionModel:
         reference = facts.get("orderReference")
         if not isinstance(reference, str) or not reference:
             return _decision(TerminalAction.HANDOFF)
-        for field, kind in (
+        standard_path = (
             ("delaySeconds", InvestigationCapability.READ_LOGISTICS),
             ("paid", InvestigationCapability.READ_PAYMENT_AND_REFUNDS),
             (
@@ -209,7 +209,10 @@ class DeterministicActionModel:
                 InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
             ),
             ("policyVersion", InvestigationCapability.READ_APPLICABLE_POLICY),
-        ):
+        )
+        sibling_context_path = tuple(reversed(standard_path))
+        path = sibling_context_path if facts.get("siblingTickets") else standard_path
+        for field, kind in path:
             if field not in facts:
                 return _decision(kind, {"orderReference": reference})
         return _decision(TerminalAction.SUBMIT_CONCLUSION)

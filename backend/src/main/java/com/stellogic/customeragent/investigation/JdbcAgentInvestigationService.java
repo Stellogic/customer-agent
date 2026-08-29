@@ -266,6 +266,12 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         recordFact(generationId, "PAYMENT", order.paid() ? "PAID" : "UNPAID", evidence, now);
         recordFact(
                 generationId,
+                "ORDER_CANCELLATION",
+                order.cancelled() ? "CANCELLED" : "NOT_CANCELLED",
+                evidence,
+                now);
+        recordFact(
+                generationId,
                 "REFUND_STATUS",
                 order.fullyRefunded() ? "FULLY_REFUNDED" : "NOT_FULLY_REFUNDED",
                 evidence,
@@ -327,6 +333,9 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         Long.toString(conclusion.delaySeconds()),
                         conclusion.orderReference(),
                         String.join("\n", conclusion.evidenceRefs()),
+                        conclusion.riskScenario().name(),
+                        conclusion.sufficiencyPolicyVersion(),
+                        evidenceDigest(conclusion.evidence()),
                         replyDigest(conclusion.customerReply()));
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
@@ -371,6 +380,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         }
 
         ScopedOrder order = currentOrder(ticketId, generationId);
+        String evidenceFailure =
+                EvidenceSufficiencyPolicy.validate(
+                        conclusion, persistedFacts(ticketId, generationId), clock.instant());
+        if (evidenceFailure != null) reject(ticketId, evidenceFailure);
         List<String> expectedEvidence = order.evidenceRefs();
         boolean factsMatch =
                 conclusion.delayHours() == order.delayHours()
@@ -524,6 +537,9 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 || conclusion.evidenceRefs() == null
                 || conclusion.evidenceRefs().size() != 2
                 || conclusion.evidenceRefs().stream().anyMatch(Objects::isNull)
+                || conclusion.riskScenario() == null
+                || conclusion.sufficiencyPolicyVersion() == null
+                || conclusion.evidence() == null
                 || conclusion.customerReply() == null
                 || conclusion.customerReply().schemaVersion() == null
                 || conclusion.customerReply().body() == null
@@ -555,6 +571,27 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 reply.evidenceRefs() == null ? "null" : String.join("\n", reply.evidenceRefs()),
                 Boolean.toString(reply.escalationRequired()),
                 reply.referencedOrder());
+    }
+
+    private static String evidenceDigest(List<ConclusionEvidence> evidence) {
+        if (evidence == null) return "missing-evidence";
+        return evidence.stream()
+                .map(
+                        item ->
+                                item == null
+                                        ? "null"
+                                        : item.evidenceReference()
+                                                + ":"
+                                                + (item.applicability() == null
+                                                        ? "null"
+                                                        : item.applicability().stream()
+                                                                .map(Enum::name)
+                                                                .sorted()
+                                                                .collect(
+                                                                        java.util.stream.Collectors
+                                                                                .joining(","))))
+                .sorted()
+                .collect(java.util.stream.Collectors.joining("\n"));
     }
 
     private static boolean eligibleOrderState(ScopedOrder order) {
@@ -661,13 +698,35 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private void recordFact(
             UUID generationId, String type, String value, String evidence, Instant now) {
         jdbc.update(
-                "insert into investigation_fact (generation_id, fact_type, fact_value, evidence_reference, recorded_at) "
-                        + "values (?, ?, ?, ?, ?) on conflict (generation_id, fact_type) do nothing",
+                "insert into investigation_fact (generation_id, fact_type, fact_value, evidence_reference, "
+                        + "recorded_at, source_authority, valid_until, conflict_status) "
+                        + "values (?, ?, ?, ?, ?, 'SPRING_AUTHORIZED_CAPABILITY', ?, 'CLEAR') "
+                        + "on conflict (generation_id, fact_type) do nothing",
                 generationId,
                 type,
                 value,
                 evidence,
-                Timestamp.from(now));
+                Timestamp.from(now),
+                Timestamp.from(now.plus(Duration.ofHours(1))));
+    }
+
+    private List<PersistedInvestigationFact> persistedFacts(UUID ticketId, UUID generationId) {
+        return jdbc.query(
+                "select f.fact_type, f.fact_value, f.evidence_reference, f.source_authority, "
+                        + "f.recorded_at, f.valid_until, f.conflict_status "
+                        + "from investigation_fact f join agent_processing_generation g "
+                        + "on g.id = f.generation_id where f.generation_id = ? and g.ticket_id = ?",
+                (rs, row) ->
+                        new PersistedInvestigationFact(
+                                rs.getString(1),
+                                rs.getString(2),
+                                rs.getString(3),
+                                rs.getString(4),
+                                rs.getTimestamp(5).toInstant(),
+                                rs.getTimestamp(6).toInstant(),
+                                rs.getString(7)),
+                generationId,
+                ticketId);
     }
 
     private void auditRejectedInTransaction(UUID ticketId, String reason) {

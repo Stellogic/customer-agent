@@ -1124,6 +1124,34 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
         "delaySeconds": 23 * 60 * 60,
         "orderReference": "ORDER-DELAY-UNDER-24",
         "evidenceRefs": ["order:ORDER-DELAY-UNDER-24", "logistics:ORDER-DELAY-UNDER-24"],
+        "riskScenario": "LOGISTICS_DELAY",
+        "sufficiencyPolicyVersion": "evidence-sufficiency-v1",
+        "evidence": [
+            {
+                "evidenceReference": "order:ORDER-DELAY-UNDER-24",
+                "applicability": ["ORDER_IDENTITY"],
+            },
+            {
+                "evidenceReference": "logistics:ORDER-DELAY-UNDER-24",
+                "applicability": ["DELAY_DURATION"],
+            },
+            {
+                "evidenceReference": "payment:ORDER-DELAY-UNDER-24",
+                "applicability": ["ORDER_ELIGIBILITY"],
+            },
+            {
+                "evidenceReference": "compensation:ORDER-DELAY-UNDER-24",
+                "applicability": ["EXISTING_COMPENSATION"],
+            },
+            {
+                "evidenceReference": "order-actions:ORDER-DELAY-UNDER-24",
+                "applicability": ["PENDING_ACTIONS"],
+            },
+            {
+                "evidenceReference": "policy:delay-policy-v1",
+                "applicability": ["POLICY_BASIS"],
+            },
+        ],
     }
     assert result["model_mode"] == "fixed-fake-model-v1"
     assert result["customer_reply"] == {

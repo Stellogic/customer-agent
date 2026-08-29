@@ -48,6 +48,39 @@ def customer_reply(
     }
 
 
+def evidence_sufficiency(order_reference: str) -> dict[str, object]:
+    return {
+        "riskScenario": "LOGISTICS_DELAY",
+        "sufficiencyPolicyVersion": "evidence-sufficiency-v1",
+        "evidence": [
+            {
+                "evidenceReference": f"order:{order_reference}",
+                "applicability": ["ORDER_IDENTITY"],
+            },
+            {
+                "evidenceReference": f"logistics:{order_reference}",
+                "applicability": ["DELAY_DURATION"],
+            },
+            {
+                "evidenceReference": f"payment:{order_reference}",
+                "applicability": ["ORDER_ELIGIBILITY"],
+            },
+            {
+                "evidenceReference": f"compensation:{order_reference}",
+                "applicability": ["EXISTING_COMPENSATION"],
+            },
+            {
+                "evidenceReference": f"order-actions:{order_reference}",
+                "applicability": ["PENDING_ACTIONS"],
+            },
+            {
+                "evidenceReference": "policy:delay-policy-v1",
+                "applicability": ["POLICY_BASIS"],
+            },
+        ],
+    }
+
+
 def collect_investigation_facts(
     client: httpx.Client,
     spring_url: str,
@@ -235,6 +268,63 @@ def isolated_customer_browser_client(spring_url: str) -> Iterator[httpx.Client]:
     with httpx.Client(timeout=20.0) as client:
         login_human(client, spring_url, "customer-demo", ["CUSTOMER_HELP_ACCESS"])
         yield client
+
+
+def run_evidence_sufficiency_path(
+    spring_url: str,
+    agent_url: str,
+    spring_headers: dict[str, str],
+    order_reference: str,
+) -> tuple[list[str], dict]:
+    with customer_browser_client(spring_url) as client:
+        accepted = client.post(
+            f"{spring_url}/api/customer/tickets",
+            headers={"Idempotency-Key": f"issue-160-{uuid.uuid4()}"},
+            json={
+                "orderReference": order_reference,
+                "description": "合成订单物流状态解释",
+            },
+        )
+        expect_status(accepted, 201)
+        ticket_id = accepted.json()["ticketId"]
+        projection = None
+        for _ in range(60):
+            response = client.get(f"{spring_url}/api/customer/tickets/{ticket_id}")
+            expect_status(response, 200)
+            projection = response.json()
+            if projection["ticket"]["lifecycleState"] == "RESOLVED":
+                break
+            time.sleep(0.5)
+        assert projection is not None
+        assert projection["ticket"]["lifecycleState"] == "RESOLVED", projection
+
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        generation = connection.execute(
+            "select id, thread_id from agent_processing_generation where ticket_id = %s",
+            (uuid.UUID(ticket_id),),
+        ).fetchone()
+        assert generation is not None
+        assert connection.execute(
+            "select count(*) from investigation_fact where generation_id = %s "
+            "and source_authority = 'SPRING_AUTHORIZED_CAPABILITY' "
+            "and valid_until > recorded_at and conflict_status = 'CLEAR'",
+            (generation[0],),
+        ).fetchone() == (9,)
+
+    with httpx.Client(timeout=20.0) as client:
+        state = client.get(
+            f"{agent_url}/threads/{generation[1]}/state",
+            headers=spring_headers,
+        )
+        expect_status(state, 200)
+        values = state.json()["values"]
+        action_types = [item["actionType"] for item in values["investigation_actions"]]
+        conclusion = values["conclusion"]
+        assert conclusion["sufficiencyPolicyVersion"] == "evidence-sufficiency-v1"
+        assert conclusion["riskScenario"] == "LOGISTICS_DELAY"
+        assert len(conclusion["evidence"]) == 6
+        assert "confidence" not in conclusion
+        return action_types, conclusion
 
 
 def main() -> None:
@@ -828,6 +918,7 @@ def main() -> None:
                     "delaySeconds": facts["delaySeconds"],
                     "orderReference": order_reference,
                     "evidenceRefs": facts["evidenceRefs"],
+                    **evidence_sufficiency(order_reference),
                     **customer_reply(order_reference, facts["evidenceRefs"], compensation_required),
                 },
             )
@@ -900,6 +991,7 @@ def main() -> None:
             "LOGISTICS_DELAY_HOURS",
             "LOGISTICS_DELAY_SECONDS",
             "ORDER",
+            "ORDER_CANCELLATION",
             "PAYMENT",
             "PENDING_ACTION_COUNT",
             "POLICY",
@@ -1020,6 +1112,7 @@ def main() -> None:
                     "order:ORDER-DELAY-UNDER-24",
                     "logistics:ORDER-DELAY-UNDER-24",
                 ],
+                **evidence_sufficiency("ORDER-DELAY-UNDER-24"),
                 **customer_reply(
                     "ORDER-DELAY-UNDER-24",
                     [
@@ -1049,6 +1142,7 @@ def main() -> None:
                     "order:ORDER-DELAY-UNDER-24",
                     "logistics:ORDER-DELAY-UNDER-24",
                 ],
+                **evidence_sufficiency("ORDER-DELAY-UNDER-24"),
                 **customer_reply(
                     "ORDER-DELAY-UNDER-24",
                     [
@@ -1060,6 +1154,53 @@ def main() -> None:
             },
         )
         expect_status(wrong_ticket_replay, 403)
+
+    path_a_actions, path_a_conclusion = run_evidence_sufficiency_path(
+        spring_url,
+        agent_url,
+        spring_headers,
+        "ORDER-EVIDENCE-PATH-A",
+    )
+    assert path_a_actions == [
+        "CONFIRM_ORDER",
+        "READ_LOGISTICS",
+        "READ_PAYMENT_AND_REFUNDS",
+        "READ_COMPENSATION_AND_PENDING_ACTIONS",
+        "READ_APPLICABLE_POLICY",
+        "SUBMIT_CONCLUSION",
+    ]
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        connection.execute(
+            "insert into support_ticket "
+            "(id, customer_id, order_reference, description, lifecycle_state, handling_mode, "
+            "created_at, first_responded_at) values "
+            "(%s, 'customer-demo', 'ORDER-EVIDENCE-PATH-B', '同订单历史解释', "
+            "'INVESTIGATING', 'HUMAN', '2026-08-01T00:00:00Z', '2026-08-01T00:01:00Z')",
+            (uuid.uuid4(),),
+        )
+    path_b_actions, path_b_conclusion = run_evidence_sufficiency_path(
+        spring_url,
+        agent_url,
+        spring_headers,
+        "ORDER-EVIDENCE-PATH-B",
+    )
+    assert path_b_actions == [
+        "CONFIRM_ORDER",
+        "READ_APPLICABLE_POLICY",
+        "READ_COMPENSATION_AND_PENDING_ACTIONS",
+        "READ_PAYMENT_AND_REFUNDS",
+        "READ_LOGISTICS",
+        "SUBMIT_CONCLUSION",
+    ]
+    assert {
+        "compensationRequired": path_a_conclusion["compensationRequired"],
+        "reasonCode": path_a_conclusion["reasonCode"],
+        "delaySeconds": path_a_conclusion["delaySeconds"],
+    } == {
+        "compensationRequired": path_b_conclusion["compensationRequired"],
+        "reasonCode": path_b_conclusion["reasonCode"],
+        "delaySeconds": path_b_conclusion["delaySeconds"],
+    }
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert (
@@ -1102,6 +1243,111 @@ def main() -> None:
                 ineligible_headers,
                 verify_duplicate_rejected=order_reference == "ORDER-DELAY-ZERO-PAID",
             )
+            conclusion_payload = {
+                "compensationRequired": True,
+                "reasonCode": "LOGISTICS_DELAY",
+                "delayHours": facts["delayHours"],
+                "delaySeconds": facts["delaySeconds"],
+                "orderReference": order_reference,
+                "evidenceRefs": facts["evidenceRefs"],
+                **evidence_sufficiency(order_reference),
+                **customer_reply(order_reference, facts["evidenceRefs"], True),
+            }
+
+            if order_reference == "ORDER-DELAY-ZERO-PAID":
+                conclusion_url = (
+                    f"{spring_url}/internal/agent/tickets/{ineligible_ticket_id}/generations/"
+                    f"{ineligible_generation_id}/conclusions"
+                )
+
+                def submit_rejected(payload: dict, suffix: str) -> None:
+                    response = client.post(
+                        conclusion_url,
+                        headers={
+                            **ineligible_headers,
+                            "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
+                            "Idempotency-Key": f"{ineligible_generation_id}:{suffix}",
+                        },
+                        json=payload,
+                    )
+                    expect_status(response, 422)
+
+                out_of_scope = json.loads(json.dumps(conclusion_payload))
+                out_of_scope["evidence"][0]["evidenceReference"] = "order:OTHER-TICKET"
+                submit_rejected(out_of_scope, "out-of-scope-evidence")
+
+                with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                    connection.execute(
+                        "update investigation_fact set source_authority = 'UNVERIFIED_SOURCE' "
+                        "where generation_id = %s and fact_type = 'ORDER'",
+                        (ineligible_generation_id,),
+                    )
+                submit_rejected(conclusion_payload, "unauthorized-source")
+
+                with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                    connection.execute(
+                        "update investigation_fact set "
+                        "source_authority = 'SPRING_AUTHORIZED_CAPABILITY', "
+                        "recorded_at = '2020-01-01T00:00:00Z', "
+                        "valid_until = '2020-01-01T01:00:00Z' "
+                        "where generation_id = %s and fact_type = 'ORDER'",
+                        (ineligible_generation_id,),
+                    )
+                submit_rejected(conclusion_payload, "expired-evidence")
+
+                with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                    connection.execute(
+                        "update investigation_fact set "
+                        "recorded_at = '2026-08-09T13:56:00Z', "
+                        "valid_until = '2026-08-09T14:56:00Z', "
+                        "conflict_status = 'CONFLICT' "
+                        "where generation_id = %s and fact_type = 'ORDER'",
+                        (ineligible_generation_id,),
+                    )
+                submit_rejected(conclusion_payload, "conflicting-evidence")
+
+                with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                    connection.execute(
+                        "update investigation_fact set conflict_status = 'CLEAR' "
+                        "where generation_id = %s and fact_type = 'ORDER'",
+                        (ineligible_generation_id,),
+                    )
+                    connection.execute(
+                        "delete from investigation_fact where generation_id = %s "
+                        "and fact_type = 'POLICY'",
+                        (ineligible_generation_id,),
+                    )
+                submit_rejected(conclusion_payload, "missing-required-fact")
+
+                restored_policy = client.post(
+                    f"{spring_url}/internal/agent/tickets/{ineligible_ticket_id}/generations/"
+                    f"{ineligible_generation_id}/capabilities/READ_APPLICABLE_POLICY",
+                    headers={
+                        **ineligible_headers,
+                        "X-Agent-Operation": "USE_INVESTIGATION_CAPABILITY",
+                        "Idempotency-Key": f"{ineligible_generation_id}:restore-policy",
+                    },
+                    json={"orderReference": order_reference},
+                )
+                expect_status(restored_policy, 200)
+
+                with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                    reasons = {
+                        row[0]
+                        for row in connection.execute(
+                            "select event_type from audit_event where ticket_id = %s "
+                            "and event_type like 'AGENT_COMMAND_REJECTED_%%'",
+                            (ineligible_ticket_id,),
+                        ).fetchall()
+                    }
+                assert {
+                    "AGENT_COMMAND_REJECTED_EVIDENCE_OUT_OF_SCOPE",
+                    "AGENT_COMMAND_REJECTED_EVIDENCE_SOURCE_UNAUTHORIZED",
+                    "AGENT_COMMAND_REJECTED_EVIDENCE_EXPIRED",
+                    "AGENT_COMMAND_REJECTED_FACT_CONFLICT",
+                    "AGENT_COMMAND_REJECTED_REQUIRED_FACT_MISSING",
+                }.issubset(reasons)
+
             conclusion = client.post(
                 f"{spring_url}/internal/agent/tickets/{ineligible_ticket_id}/generations/"
                 f"{ineligible_generation_id}/conclusions",
@@ -1110,15 +1356,7 @@ def main() -> None:
                     "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
                     "Idempotency-Key": f"{ineligible_generation_id}:submit-conclusion",
                 },
-                json={
-                    "compensationRequired": True,
-                    "reasonCode": "LOGISTICS_DELAY",
-                    "delayHours": facts["delayHours"],
-                    "delaySeconds": facts["delaySeconds"],
-                    "orderReference": order_reference,
-                    "evidenceRefs": facts["evidenceRefs"],
-                    **customer_reply(order_reference, facts["evidenceRefs"], True),
-                },
+                json=conclusion_payload,
             )
             expect_status(conclusion, 422)
 
@@ -1235,6 +1473,7 @@ def main() -> None:
                 "delaySeconds": 288000,
                 "orderReference": proposal_order_reference,
                 "evidenceRefs": reused_facts["evidenceRefs"],
+                **evidence_sufficiency(proposal_order_reference),
                 **customer_reply(proposal_order_reference, reused_facts["evidenceRefs"], True),
             },
         )
@@ -1792,6 +2031,7 @@ def main() -> None:
                 "delaySeconds": 288001,
                 "orderReference": proposal_order_reference,
                 "evidenceRefs": evidence_refs,
+                **evidence_sufficiency(proposal_order_reference),
                 **customer_reply(proposal_order_reference, evidence_refs, True),
             },
         )
@@ -1880,6 +2120,7 @@ def main() -> None:
                 "delaySeconds": 295200,
                 "orderReference": proposal_order_reference,
                 "evidenceRefs": third_facts["evidenceRefs"],
+                **evidence_sufficiency(proposal_order_reference),
                 **customer_reply(proposal_order_reference, third_facts["evidenceRefs"], True),
             },
         )
@@ -4088,6 +4329,7 @@ def main() -> None:
                     "order:ORDER-DELAY-AMBIGUOUS-A",
                     "logistics:ORDER-DELAY-AMBIGUOUS-A",
                 ],
+                **evidence_sufficiency("ORDER-DELAY-AMBIGUOUS-A"),
                 **customer_reply(
                     "ORDER-DELAY-AMBIGUOUS-A",
                     [
@@ -4413,6 +4655,7 @@ def main() -> None:
                     "order:ORDER-DELAY-UNDER-24",
                     "logistics:ORDER-DELAY-UNDER-24",
                 ],
+                **evidence_sufficiency("ORDER-DELAY-UNDER-24"),
                 **customer_reply(
                     "ORDER-DELAY-UNDER-24",
                     [
