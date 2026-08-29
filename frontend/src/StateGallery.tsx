@@ -79,10 +79,7 @@ export function StateGallery() {
             <StatusNotice role="alert" tone="danger">
               待审批队列暂时不可用
             </StatusNotice>
-            <div
-              aria-label="仍保留的上一版队列数据示例"
-              className="state-stale-data-preview"
-            >
+            <div aria-label="仍保留的上一版队列数据示例" className="state-stale-data-preview">
               <div className="state-stale-data-meta">
                 <span>上一版投影 · 静态示例</span>
                 <span>最后同步 10:42 · 可能已过期</span>

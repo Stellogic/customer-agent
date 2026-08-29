@@ -257,8 +257,7 @@ function PublicForbiddenRoute() {
       Page={ForbiddenState}
       copy={{
         loading: "正在确认当前身份。系统不会加载任何受保护内容，请稍候。",
-        unavailable:
-          "当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+        unavailable: "当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
         anonymous:
           "当前未登录或没有访问此页面的权限。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
         customer:
@@ -276,8 +275,7 @@ function PublicNotFoundRoute() {
       Page={NotFound}
       copy={{
         loading: "正在确认当前身份，以提供安全返回入口。系统不会加载任何受保护内容。",
-        unavailable:
-          "当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+        unavailable: "当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
         anonymous:
           "当前未登录，无法确定适合你的工作区。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
         customer: "当前客户身份找不到这个页面。系统没有加载受保护内容，请返回帮助中心继续。",
