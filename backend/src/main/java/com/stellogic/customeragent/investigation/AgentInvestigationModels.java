@@ -155,7 +155,28 @@ record InvestigationConclusion(
         long delaySeconds,
         String orderReference,
         List<String> evidenceRefs,
+        EvidenceSufficiencyClaim sufficiency,
         CustomerReplyEnvelope customerReply) {}
+
+record EvidenceSufficiencyClaim(
+        InvestigationRiskScenario riskScenario,
+        String policyVersion,
+        List<ConclusionEvidence> evidence) {}
+
+record ConclusionEvidence(String evidenceReference, List<EvidenceApplicability> applicability) {}
+
+enum InvestigationRiskScenario {
+    LOGISTICS_DELAY
+}
+
+enum EvidenceApplicability {
+    ORDER_IDENTITY,
+    DELAY_DURATION,
+    ORDER_ELIGIBILITY,
+    EXISTING_COMPENSATION,
+    PENDING_ACTIONS,
+    POLICY_BASIS
+}
 
 record CustomerReplyEnvelope(
         String schemaVersion,

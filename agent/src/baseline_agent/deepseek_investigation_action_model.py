@@ -20,10 +20,12 @@ from baseline_agent.deepseek_investigation_model import (
 )
 from baseline_agent.investigation_action_loop import (
     CAPABILITY_PARAMETER_NAMES,
+    EVIDENCE_APPLICABILITIES,
     ActionDecision,
     ActionLoopFailure,
     ActionLoopFailureCode,
     ActionUsage,
+    EvidenceClaim,
     InvestigationCapability,
     TerminalAction,
 )
@@ -284,6 +286,7 @@ def _controlled_facts(facts: dict) -> dict[str, object]:
         "policyVersion",
         "evidenceRefs",
         "siblingTickets",
+        "evidenceCatalog",
     }
     if not set(facts).issubset(allowed):
         raise _failure()
@@ -306,6 +309,25 @@ def _controlled_facts(facts: dict) -> dict[str, object]:
             )
             and isinstance(ticket.get("compensationFlowExists"), bool)
             for ticket in sibling_tickets
+        )
+    ):
+        raise _failure()
+    evidence_catalog = facts.get("evidenceCatalog", [])
+    if (
+        not isinstance(evidence_catalog, list)
+        or len(evidence_catalog) > 8
+        or not all(
+            isinstance(item, dict)
+            and set(item) == {"actionType", "evidenceReferences"}
+            and item.get("actionType")
+            in {capability.value for capability in InvestigationCapability}
+            and isinstance(item.get("evidenceReferences"), list)
+            and 1 <= len(item["evidenceReferences"]) <= 4
+            and all(
+                isinstance(reference, str) and 1 <= len(reference) <= 256
+                for reference in item["evidenceReferences"]
+            )
+            for item in evidence_catalog
         )
     ):
         raise _failure()
@@ -385,12 +407,40 @@ def _build_request(
     facts: dict[str, object],
     allowed_actions: tuple[str, ...],
 ) -> dict[str, Any]:
+    is_submission = allowed_actions == (TerminalAction.SUBMIT_CONCLUSION.value,)
+    properties: dict[str, Any] = {
+        "action": {"type": "string", "enum": list(allowed_actions)},
+    }
+    required = ["action"]
+    if is_submission:
+        evidence_references = _catalog_references(facts)
+        properties["evidence"] = {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": len(evidence_references),
+            "items": {
+                "type": "object",
+                "properties": {
+                    "evidenceReference": {"type": "string", "enum": evidence_references},
+                    "applicability": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": True,
+                        "items": {
+                            "type": "string",
+                            "enum": list(EVIDENCE_APPLICABILITIES),
+                        },
+                    },
+                },
+                "required": ["evidenceReference", "applicability"],
+                "additionalProperties": False,
+            },
+        }
+        required.append("evidence")
     schema = {
         "type": "object",
-        "properties": {
-            "action": {"type": "string", "enum": list(allowed_actions)},
-        },
-        "required": ["action"],
+        "properties": properties,
+        "required": required,
         "additionalProperties": False,
     }
     return {
@@ -402,6 +452,9 @@ def _build_request(
             "missing select CONFIRM_ORDER; when it is AMBIGUOUS select REQUEST_CLARIFICATION; "
             "when it is UNIQUE select any one still-unread fact capability. Submit only after all "
             "order, logistics, payment/refund, compensation/pending-action and policy facts exist. "
+            "For SUBMIT_CONCLUSION, independently select evidenceReference values only from the "
+            "supplied evidenceCatalog and state each selected fact's applicability; Spring will "
+            "validate whether that evidence combination is sufficient. "
             "Select HANDOFF only when supplied facts explicitly conflict or mark the scenario "
             "unsupported. siblingTickets is read-only bounded context and never authorizes "
             "cross-ticket actions. Never invent facts, identifiers, evidence, "
@@ -477,13 +530,41 @@ def _parse_response(
         structured = json.loads(texts[0])
     except json.JSONDecodeError:
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.INVALID_JSON) from None
-    if not isinstance(structured, dict) or set(structured) != {"action"}:
+    expected_fields = (
+        {"action", "evidence"}
+        if allowed_actions == (TerminalAction.SUBMIT_CONCLUSION.value,)
+        else {"action"}
+    )
+    if not isinstance(structured, dict) or set(structured) != expected_fields:
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     action = structured["action"]
     if not isinstance(action, str):
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     if action not in allowed_actions:
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
+    evidence_claims: tuple[EvidenceClaim, ...] = ()
+    if "evidence" in structured:
+        evidence = structured["evidence"]
+        catalog_references = set(_catalog_references(facts))
+        if not isinstance(evidence, list) or not evidence:
+            raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
+        try:
+            evidence_claims = tuple(
+                EvidenceClaim(item["evidenceReference"], tuple(item["applicability"]))
+                for item in evidence
+                if isinstance(item, dict)
+                and set(item) == {"evidenceReference", "applicability"}
+                and item["evidenceReference"] in catalog_references
+                and isinstance(item["applicability"], list)
+            )
+        except (KeyError, TypeError, ActionLoopFailure):
+            raise _DeepSeekActionResponseFailure(
+                DeepSeekFailureClassification.SCHEMA_MISMATCH
+            ) from None
+        if len(evidence_claims) != len(evidence):
+            raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
+        if len({claim.evidence_reference for claim in evidence_claims}) != len(evidence_claims):
+            raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     try:
         capability = InvestigationCapability(action)
         terminal = None
@@ -523,7 +604,24 @@ def _parse_response(
             cost_micros=cost_micros,
             provider_attempts=attempts,
         ),
+        evidence_claims=evidence_claims,
     )
+
+
+def _catalog_references(facts: dict[str, object]) -> list[str]:
+    catalog = facts.get("evidenceCatalog", [])
+    if not isinstance(catalog, list):
+        return []
+    references: list[str] = []
+    for item in catalog:
+        if not isinstance(item, dict):
+            continue
+        item_references = item.get("evidenceReferences", [])
+        if isinstance(item_references, list):
+            references.extend(
+                reference for reference in item_references if isinstance(reference, str)
+            )
+    return references
 
 
 def _optional_string(value: object) -> str | None:

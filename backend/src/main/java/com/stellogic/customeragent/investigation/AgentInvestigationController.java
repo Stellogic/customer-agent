@@ -184,6 +184,9 @@ public final class AgentInvestigationController {
                         "delaySeconds",
                         "orderReference",
                         "evidenceRefs",
+                        "riskScenario",
+                        "sufficiencyPolicyVersion",
+                        "evidence",
                         "customerReply");
         if (payload == null || !payload.isObject() || !expected.equals(properties(payload))) {
             return malformedConclusion(ticketId);
@@ -208,6 +211,11 @@ public final class AgentInvestigationController {
                     requiredLong(payload, "delaySeconds"),
                     requiredText(payload, "orderReference"),
                     requiredTextList(payload, "evidenceRefs"),
+                    new EvidenceSufficiencyClaim(
+                            InvestigationRiskScenario.valueOf(
+                                    requiredText(payload, "riskScenario")),
+                            requiredText(payload, "sufficiencyPolicyVersion"),
+                            requiredEvidence(payload, "evidence")),
                     new CustomerReplyEnvelope(
                             requiredText(reply, "schemaVersion"),
                             requiredText(reply, "body"),
@@ -269,6 +277,29 @@ public final class AgentInvestigationController {
                 throw new IllegalArgumentException("invalid string list item");
             }
             result.add(item.asText());
+        }
+        return java.util.List.copyOf(result);
+    }
+
+    private static java.util.List<ConclusionEvidence> requiredEvidence(
+            JsonNode object, String name) {
+        JsonNode value = object.get(name);
+        if (value == null || !value.isArray() || value.isEmpty()) {
+            throw new IllegalArgumentException("invalid evidence list");
+        }
+        java.util.ArrayList<ConclusionEvidence> result = new java.util.ArrayList<>();
+        for (JsonNode item : value) {
+            if (item == null
+                    || !item.isObject()
+                    || !Set.of("evidenceReference", "applicability").equals(properties(item))) {
+                throw new IllegalArgumentException("invalid evidence item");
+            }
+            java.util.List<EvidenceApplicability> applicability =
+                    requiredTextList(item, "applicability").stream()
+                            .map(EvidenceApplicability::valueOf)
+                            .toList();
+            result.add(
+                    new ConclusionEvidence(requiredText(item, "evidenceReference"), applicability));
         }
         return java.util.List.copyOf(result);
     }

@@ -39,6 +39,7 @@ from baseline_agent.investigation_action_loop import (
     ActionLoopResult,
     ActionModelCallRecord,
     ActionRecord,
+    EvidenceClaim,
     InvestigationAction,
     InvestigationCapability,
     TerminalAction,
@@ -501,7 +502,7 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 ),
                 judgment_evidence,
             )
-        conclusion = _build_conclusion(facts, judgment)
+        conclusion = _build_conclusion(facts, judgment, loop_result.evidence_claims)
         communication_input = CustomerCommunicationInput(
             order_reference=facts["orderReference"],
             delay_seconds=facts["delaySeconds"],
@@ -1522,7 +1523,11 @@ def await_clarification(state: BaselineState) -> BaselineState:
     }
 
 
-def _build_conclusion(facts: dict, judgment: InvestigationJudgment) -> dict:
+def _build_conclusion(
+    facts: dict,
+    judgment: InvestigationJudgment,
+    evidence_claims: tuple[EvidenceClaim, ...],
+) -> dict:
     return {
         "compensationRequired": judgment.compensation_review_required,
         "reasonCode": judgment.reason_code.value,
@@ -1530,6 +1535,15 @@ def _build_conclusion(facts: dict, judgment: InvestigationJudgment) -> dict:
         "delaySeconds": facts["delaySeconds"],
         "orderReference": facts["orderReference"],
         "evidenceRefs": facts["evidenceRefs"],
+        "riskScenario": "LOGISTICS_DELAY",
+        "sufficiencyPolicyVersion": "evidence-sufficiency-v1",
+        "evidence": [
+            {
+                "evidenceReference": claim.evidence_reference,
+                "applicability": list(claim.applicability),
+            }
+            for claim in evidence_claims
+        ],
     }
 
 

@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -266,6 +267,12 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         recordFact(generationId, "PAYMENT", order.paid() ? "PAID" : "UNPAID", evidence, now);
         recordFact(
                 generationId,
+                "ORDER_CANCELLATION",
+                order.cancelled() ? "CANCELLED" : "NOT_CANCELLED",
+                evidence,
+                now);
+        recordFact(
+                generationId,
                 "REFUND_STATUS",
                 order.fullyRefunded() ? "FULLY_REFUNDED" : "NOT_FULLY_REFUNDED",
                 evidence,
@@ -327,6 +334,9 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         Long.toString(conclusion.delaySeconds()),
                         conclusion.orderReference(),
                         String.join("\n", conclusion.evidenceRefs()),
+                        conclusion.sufficiency().riskScenario().name(),
+                        conclusion.sufficiency().policyVersion(),
+                        evidenceDigest(conclusion.sufficiency().evidence()),
                         replyDigest(conclusion.customerReply()));
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
@@ -371,6 +381,13 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         }
 
         ScopedOrder order = currentOrder(ticketId, generationId);
+        List<PersistedInvestigationFact> persistedFacts = persistedFacts(ticketId, generationId);
+        String evidenceFailure =
+                EvidenceSufficiencyPolicy.validate(conclusion, persistedFacts, clock.instant());
+        if (evidenceFailure != null) reject(ticketId, evidenceFailure);
+        if (!factsStillMatchCurrentOrder(persistedFacts, order)) {
+            reject(ticketId, "EVIDENCE_STALE");
+        }
         List<String> expectedEvidence = order.evidenceRefs();
         boolean factsMatch =
                 conclusion.delayHours() == order.delayHours()
@@ -440,6 +457,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         if (conclusion.reasonCode() != DecisionReasonCode.LOGISTICS_DELAY
                 || !eligibleOrderState(order)
                 || order.existingCompensation()
+                || order.pendingActionCount() != 0
                 || !DelayCompensationPolicy.VERSION.equals(order.policyVersion())) {
             reject(ticketId, "COMPENSATION_PROPOSAL_INELIGIBLE");
         }
@@ -524,6 +542,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 || conclusion.evidenceRefs() == null
                 || conclusion.evidenceRefs().size() != 2
                 || conclusion.evidenceRefs().stream().anyMatch(Objects::isNull)
+                || conclusion.sufficiency() == null
+                || conclusion.sufficiency().riskScenario() == null
+                || conclusion.sufficiency().policyVersion() == null
+                || conclusion.sufficiency().evidence() == null
                 || conclusion.customerReply() == null
                 || conclusion.customerReply().schemaVersion() == null
                 || conclusion.customerReply().body() == null
@@ -557,8 +579,59 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 reply.referencedOrder());
     }
 
+    private static String evidenceDigest(List<ConclusionEvidence> evidence) {
+        if (evidence == null) return "missing-evidence";
+        return evidence.stream()
+                .map(
+                        item ->
+                                item == null
+                                        ? "null"
+                                        : item.evidenceReference()
+                                                + ":"
+                                                + (item.applicability() == null
+                                                        ? "null"
+                                                        : item.applicability().stream()
+                                                                .map(Enum::name)
+                                                                .sorted()
+                                                                .collect(
+                                                                        java.util.stream.Collectors
+                                                                                .joining(","))))
+                .sorted()
+                .collect(java.util.stream.Collectors.joining("\n"));
+    }
+
     private static boolean eligibleOrderState(ScopedOrder order) {
         return order.paid() && !order.cancelled() && !order.fullyRefunded();
+    }
+
+    private static boolean factsStillMatchCurrentOrder(
+            List<PersistedInvestigationFact> facts, ScopedOrder order) {
+        Map<String, String> currentValues =
+                Map.ofEntries(
+                        Map.entry("ORDER", order.orderReference()),
+                        Map.entry("LOGISTICS_DELAY_HOURS", Integer.toString(order.delayHours())),
+                        Map.entry("LOGISTICS_DELAY_SECONDS", Long.toString(order.delaySeconds())),
+                        Map.entry("PAYMENT", order.paid() ? "PAID" : "UNPAID"),
+                        Map.entry(
+                                "ORDER_CANCELLATION",
+                                order.cancelled() ? "CANCELLED" : "NOT_CANCELLED"),
+                        Map.entry(
+                                "REFUND_STATUS",
+                                order.fullyRefunded() ? "FULLY_REFUNDED" : "NOT_FULLY_REFUNDED"),
+                        Map.entry(
+                                "EXISTING_COMPENSATION",
+                                Boolean.toString(order.existingCompensation())),
+                        Map.entry(
+                                "PENDING_ACTION_COUNT",
+                                Integer.toString(order.pendingActionCount())),
+                        Map.entry("POLICY", order.policyVersion()));
+        return facts.stream()
+                .allMatch(
+                        fact ->
+                                currentValues.containsKey(fact.factType())
+                                        && currentValues
+                                                .get(fact.factType())
+                                                .equals(fact.factValue()));
     }
 
     private void reject(UUID ticketId, String reason) {
@@ -661,13 +734,35 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private void recordFact(
             UUID generationId, String type, String value, String evidence, Instant now) {
         jdbc.update(
-                "insert into investigation_fact (generation_id, fact_type, fact_value, evidence_reference, recorded_at) "
-                        + "values (?, ?, ?, ?, ?) on conflict (generation_id, fact_type) do nothing",
+                "insert into investigation_fact (generation_id, fact_type, fact_value, evidence_reference, "
+                        + "recorded_at, source_authority, valid_until, conflict_status) "
+                        + "values (?, ?, ?, ?, ?, 'SPRING_AUTHORIZED_CAPABILITY', ?, 'CLEAR') "
+                        + "on conflict (generation_id, fact_type) do nothing",
                 generationId,
                 type,
                 value,
                 evidence,
-                Timestamp.from(now));
+                Timestamp.from(now),
+                Timestamp.from(now.plus(Duration.ofHours(1))));
+    }
+
+    private List<PersistedInvestigationFact> persistedFacts(UUID ticketId, UUID generationId) {
+        return jdbc.query(
+                "select f.fact_type, f.fact_value, f.evidence_reference, f.source_authority, "
+                        + "f.recorded_at, f.valid_until, f.conflict_status "
+                        + "from investigation_fact f join agent_processing_generation g "
+                        + "on g.id = f.generation_id where f.generation_id = ? and g.ticket_id = ?",
+                (rs, row) ->
+                        new PersistedInvestigationFact(
+                                rs.getString(1),
+                                rs.getString(2),
+                                rs.getString(3),
+                                rs.getString(4),
+                                rs.getTimestamp(5).toInstant(),
+                                rs.getTimestamp(6).toInstant(),
+                                rs.getString(7)),
+                generationId,
+                ticketId);
     }
 
     private void auditRejectedInTransaction(UUID ticketId, String reason) {

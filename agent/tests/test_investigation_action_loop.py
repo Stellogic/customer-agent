@@ -11,6 +11,7 @@ from baseline_agent.investigation_action_loop import (
     ActionLoopFailureCode,
     ActionUsage,
     DeterministicActionModel,
+    EvidenceClaim,
     InvestigationCapability,
     TerminalAction,
 )
@@ -25,10 +26,23 @@ def _decision(
     provider_attempts: int = 1,
 ) -> ActionDecision:
     parameters = {} if order_reference is None else {"orderReference": order_reference}
+    evidence_claims = _evidence_claims() if kind is TerminalAction.SUBMIT_CONCLUSION else ()
     return ActionDecision.from_values(
         kind,
         parameters,
         ActionUsage(tokens=tokens, cost_micros=cost_micros, provider_attempts=provider_attempts),
+        evidence_claims=evidence_claims,
+    )
+
+
+def _evidence_claims() -> tuple[EvidenceClaim, ...]:
+    return (
+        EvidenceClaim("order:ORDER-120", ("ORDER_IDENTITY",)),
+        EvidenceClaim("logistics:ORDER-120", ("DELAY_DURATION",)),
+        EvidenceClaim("payment:ORDER-120", ("ORDER_ELIGIBILITY",)),
+        EvidenceClaim("compensation:ORDER-120", ("EXISTING_COMPENSATION",)),
+        EvidenceClaim("order-actions:ORDER-120", ("PENDING_ACTIONS",)),
+        EvidenceClaim("policy:delay-policy-v1", ("POLICY_BASIS",)),
     )
 
 
@@ -70,6 +84,28 @@ async def test_deterministic_model_selects_one_allowed_action_until_submission()
 
 
 @pytest.mark.asyncio
+async def test_deterministic_model_can_choose_a_different_legal_order_for_sibling_context() -> None:
+    model = DeterministicActionModel()
+    facts: dict = {"siblingTickets": [{"issueKind": "LOGISTICS_DELAY"}]}
+    expected = [
+        InvestigationCapability.CONFIRM_ORDER,
+        InvestigationCapability.READ_APPLICABLE_POLICY,
+        InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
+        InvestigationCapability.READ_PAYMENT_AND_REFUNDS,
+        InvestigationCapability.READ_LOGISTICS,
+        TerminalAction.SUBMIT_CONCLUSION,
+    ]
+
+    selected = []
+    for kind in expected:
+        decision = await model.choose(facts)
+        selected.append(decision.action.kind)
+        facts.update(_progress_for(kind))
+
+    assert selected == expected
+
+
+@pytest.mark.asyncio
 async def test_loop_allows_different_legal_tool_order_and_records_only_controlled_results() -> None:
     decisions = iter(
         [
@@ -82,7 +118,10 @@ async def test_loop_allows_different_legal_tool_order_and_records_only_controlle
         ]
     )
 
-    async def choose(_: dict) -> ActionDecision:
+    choice_contexts: list[dict] = []
+
+    async def choose(facts: dict) -> ActionDecision:
+        choice_contexts.append(facts)
         return next(decisions)
 
     async def execute(action) -> dict:
@@ -92,6 +131,29 @@ async def test_loop_allows_different_legal_tool_order_and_records_only_controlle
 
     assert result.terminal_action is TerminalAction.SUBMIT_CONCLUSION
     assert result.facts["policyVersion"] == "delay-policy-v1"
+    assert result.evidence_claims == _evidence_claims()
+    assert choice_contexts[-1]["evidenceCatalog"] == [
+        {
+            "actionType": "CONFIRM_ORDER",
+            "evidenceReferences": ["order:ORDER-120"],
+        },
+        {
+            "actionType": "READ_APPLICABLE_POLICY",
+            "evidenceReferences": ["policy:delay-policy-v1"],
+        },
+        {
+            "actionType": "READ_LOGISTICS",
+            "evidenceReferences": ["logistics:ORDER-120"],
+        },
+        {
+            "actionType": "READ_PAYMENT_AND_REFUNDS",
+            "evidenceReferences": ["payment:ORDER-120"],
+        },
+        {
+            "actionType": "READ_COMPENSATION_AND_PENDING_ACTIONS",
+            "evidenceReferences": ["compensation:ORDER-120", "order-actions:ORDER-120"],
+        },
+    ]
     assert [record.action_type for record in result.records] == [
         "CONFIRM_ORDER",
         "READ_APPLICABLE_POLICY",
