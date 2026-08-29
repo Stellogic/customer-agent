@@ -22,6 +22,7 @@
         'e2e/issue156.intake-assistance.spec.ts'
         'e2e/issue157.order-ticket-groups.spec.ts'
         'e2e/issue159.public-reply-stream.spec.ts'
+        'e2e/issue163.persistent-support-replies.spec.ts'
     )
     Excluded = @{
         'e2e/issue129.flash-customer-communication.spec.ts' = '仅由显式授权的真实模型验收脚本运行，不属于离线完整门禁。'
