@@ -1,4 +1,4 @@
-import { Card, Empty, Skeleton } from "antd";
+import { Card, Skeleton } from "antd";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Brand } from "./components/Brand";
@@ -64,10 +64,9 @@ export function StateGallery() {
             kicker="空状态 · 空队列"
             title="暂无队列条目"
           >
-            <div className="state-empty-preview">
-              <Empty description="当前没有待处理工单（示例）" />
-              <p>新的工作项会在权威状态同步后出现。</p>
-            </div>
+            <p className="empty-queue" role="status">
+              当前没有队列条目
+            </p>
           </StateCard>
 
           <StateCard
@@ -78,10 +77,7 @@ export function StateGallery() {
             title="数据加载失败"
           >
             <StatusNotice role="alert" tone="danger">
-              <StateNoticeCopy
-                detail="仍保留上一次读取的数据；当前内容可能已过期。"
-                title="队列刷新失败"
-              />
+              待审批队列暂时不可用
             </StatusNotice>
             <div
               aria-label="仍保留的上一版队列数据示例"
@@ -106,6 +102,7 @@ export function StateGallery() {
             <StateCodePreview
               code="403"
               detail="系统不会向未授权身份加载受保护内容。"
+              label="禁止访问示例"
               title="当前身份无权访问此页面"
             />
           </StateCard>
@@ -120,6 +117,7 @@ export function StateGallery() {
             <StateCodePreview
               code="404"
               detail="请检查地址，或从安全入口重新开始。"
+              label="页面未找到示例"
               title="没有找到这个页面"
             />
           </StateCard>
@@ -131,11 +129,8 @@ export function StateGallery() {
             kicker="连接 · 实时连接断开"
             title="实时连接已断开"
           >
-            <StatusNotice role="status" tone="danger">
-              <StateNoticeCopy
-                detail="页面不会自动更新，当前数据可能已过期。"
-                title="实时连接已断开"
-              />
+            <StatusNotice role="alert" tone="danger">
+              实时连接已断开；当前队列可能过期。
             </StatusNotice>
           </StateCard>
 
@@ -147,10 +142,7 @@ export function StateGallery() {
             title="正在重新同步"
           >
             <StatusNotice role="status" tone="busy">
-              <StateNoticeCopy
-                detail="正在核对权威状态与当前页面投影。"
-                title="正在重新同步队列"
-              />
+              正在从 Spring 权威快照重新同步…
             </StatusNotice>
           </StateCard>
 
@@ -162,10 +154,7 @@ export function StateGallery() {
             title="审批租约过期"
           >
             <StatusNotice role="status" tone="warning">
-              <StateNoticeCopy
-                detail="此提案已退回队列，请重新领取后再查看授权内容。"
-                title="审批责任已过期"
-              />
+              审批责任已结束，证据和操作已移除。
             </StatusNotice>
           </StateCard>
 
@@ -177,10 +166,7 @@ export function StateGallery() {
             title="操作成功"
           >
             <StatusNotice role="status" tone="success">
-              <StateNoticeCopy
-                detail="这里只展示成功反馈，不代表真实审批或补偿记录。"
-                title="操作已完成（静态示例）"
-              />
+              操作已完成（静态示例）
             </StatusNotice>
           </StateCard>
 
@@ -191,11 +177,8 @@ export function StateGallery() {
             kicker="操作 · 操作结果未知"
             title="操作结果未知"
           >
-            <StatusNotice role="alert" tone="warning">
-              <StateNoticeCopy
-                detail="请不要重复提交，使用幂等查询确认最终状态。"
-                title="暂时无法确认操作结果"
-              />
+            <StatusNotice role="status" tone="warning">
+              结果尚未确认，正在恢复 Spring 权威状态…
             </StatusNotice>
           </StateCard>
         </section>
@@ -236,28 +219,21 @@ function StateCard({
 function StateCodePreview({
   code,
   detail,
+  label,
   title,
 }: {
   code: string;
   detail: string;
+  label: string;
   title: string;
 }) {
   return (
-    <div className="state-code-preview">
+    <div aria-label={label} className="state-code-preview" role="status">
       <span aria-hidden="true" className="state-preview-code">
         {code}
       </span>
       <strong>{title}</strong>
       <span>{detail}</span>
     </div>
-  );
-}
-
-function StateNoticeCopy({ detail, title }: { detail: string; title: string }) {
-  return (
-    <span className="state-notice-copy">
-      <strong>{title}</strong>
-      <span>{detail}</span>
-    </span>
   );
 }

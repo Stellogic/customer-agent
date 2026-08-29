@@ -432,94 +432,127 @@ describe("Issue #191 状态画廊与独立错误路由", () => {
       "true",
     );
     expect(screen.getByRole("heading", { name: "暂无队列条目" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "当前没有队列条目" })).toHaveClass("empty-queue");
     expect(screen.getByRole("heading", { name: "数据加载失败" })).toBeInTheDocument();
-    expect(
-      screen.getByText("仍保留上一次读取的数据；当前内容可能已过期。"),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("alert", { name: "待审批队列暂时不可用" })).toBeInTheDocument();
     expect(screen.getByText("示例队列条目")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "当前身份无权访问此页面" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "禁止访问示例" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "没有找到这个页面" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "页面未找到示例" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "实时连接已断开" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("alert", { name: "实时连接已断开；当前队列可能过期。" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "正在重新同步" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: "正在从 Spring 权威快照重新同步…" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "审批租约过期" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: "审批责任已结束，证据和操作已移除。" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "操作成功" })).toBeInTheDocument();
-    expect(screen.getByText("操作已完成（静态示例）")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "操作已完成（静态示例）" })).toBeInTheDocument();
     expect(screen.queryByText("补偿已批准")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "操作结果未知" })).toBeInTheDocument();
     expect(
-      screen.getByText("请不要重复提交，使用幂等查询确认最终状态。"),
+      screen.getByRole("status", { name: "结果尚未确认，正在恢复 Spring 权威状态…" }),
     ).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("独立 /403 仅读取当前身份并给出安全返回入口", async () => {
-    globalThis.history.replaceState(null, "", "/403");
-    const fetchMock = mockSession(customer);
-
-    render(<RootApplication />);
-
-    const heading = await screen.findByRole("heading", { name: "当前身份无权访问此页面" });
-    const state = heading.closest("main");
-    expect(state).not.toBeNull();
-    expect(within(state!).getByText("403")).toBeInTheDocument();
-    expect(within(state!).getByText(/当前客户身份不能进入这个内部页面/)).toBeInTheDocument();
-    expect(
-      within(state!).queryByText(/工单详情|审批证据|内部备注|capability/i),
-    ).not.toBeInTheDocument();
-    expect(within(state!).getByRole("link", { name: "返回帮助中心" })).toHaveAttribute(
-      "href",
+  it.each([
+    [
+      "/403",
+      customer,
+      "当前身份无权访问此页面",
+      "403",
+      "返回帮助中心",
       "/help",
-    );
-    expect(within(state!).getByRole("link", { name: "查看状态画廊" })).toHaveAttribute(
-      "href",
-      "/states",
-    );
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("/api/auth/session", {
-      credentials: "same-origin",
-      cache: "no-store",
-    });
-  });
-
-  it("独立 /404 按工作人员身份提供返回入口且不加载业务投影", async () => {
-    globalThis.history.replaceState(null, "", "/404");
-    const fetchMock = mockSession(support);
-
-    render(<RootApplication />);
-
-    const heading = await screen.findByRole("heading", { name: "没有找到这个页面" });
-    const state = heading.closest("main");
-    expect(state).not.toBeNull();
-    expect(within(state!).getByText("404")).toBeInTheDocument();
-    expect(within(state!).getByText(/当前工作人员找不到这个页面/)).toBeInTheDocument();
-    expect(within(state!).queryByText(/工单详情|审批证据|内部备注/)).not.toBeInTheDocument();
-    expect(within(state!).getByRole("link", { name: "返回可访问工作区" })).toHaveAttribute(
-      "href",
+      /当前客户身份不能进入这个内部页面/,
+    ],
+    [
+      "/404",
+      customer,
+      "没有找到这个页面",
+      "404",
+      "返回帮助中心",
+      "/help",
+      /当前客户身份找不到这个页面/,
+    ],
+    [
+      "/403",
+      support,
+      "当前身份无权访问此页面",
+      "403",
+      "返回可访问工作区",
       "/internal/support",
-    );
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("/api/auth/session", {
-      credentials: "same-origin",
-      cache: "no-store",
-    });
-  });
+      /当前工作人员没有访问此页面的权限/,
+    ],
+    [
+      "/404",
+      support,
+      "没有找到这个页面",
+      "404",
+      "返回可访问工作区",
+      "/internal/support",
+      /当前工作人员找不到这个页面/,
+    ],
+  ] as const)(
+    "独立 %s 按当前身份提供说明和安全返回入口",
+    async (path, session, headingName, code, returnLabel, returnHref, description) => {
+      globalThis.history.replaceState(null, "", path);
+      const fetchMock = mockSession(session);
 
-  it("未登录访问独立错误页只提供安全登录入口", async () => {
-    globalThis.history.replaceState(null, "", "/403");
+      render(<RootApplication />);
+
+      const heading = await screen.findByRole("heading", { name: headingName });
+      const state = heading.closest("main");
+      expect(state).not.toBeNull();
+      expect(within(state!).getByText(code)).toBeInTheDocument();
+      expect(within(state!).getByText(description)).toBeInTheDocument();
+      expect(within(state!).queryByText(/capability/i)).not.toBeInTheDocument();
+      expect(within(state!).queryByText(/TKT-|PRP-|ORD-/)).not.toBeInTheDocument();
+      expect(within(state!).getByRole("link", { name: returnLabel })).toHaveAttribute(
+        "href",
+        returnHref,
+      );
+      expect(within(state!).getByRole("link", { name: "查看状态画廊" })).toHaveAttribute(
+        "href",
+        "/states",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith("/api/auth/session", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+    },
+  );
+
+  it.each([
+    [
+      "/403",
+      "当前身份无权访问此页面",
+      "当前未登录或没有访问此页面的权限。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+    ],
+    [
+      "/404",
+      "没有找到这个页面",
+      "当前未登录，无法确定适合你的工作区。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+    ],
+  ] as const)("未登录访问独立 %s 只提供安全登录入口", async (path, headingName, description) => {
+    globalThis.history.replaceState(null, "", path);
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response(null, { status: 401 }));
 
     render(<RootApplication />);
 
-    const heading = await screen.findByRole("heading", { name: "当前身份无权访问此页面" });
+    const heading = await screen.findByRole("heading", { name: headingName });
     const state = heading.closest("main");
     expect(state).not.toBeNull();
-    expect(
-      within(state!).getByText(
-        "当前未登录或没有访问此页面的权限。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
-      ),
-    ).toBeInTheDocument();
+    expect(within(state!).getByText(description)).toBeInTheDocument();
     expect(within(state!).getByRole("link", { name: "前往客户登录" })).toHaveAttribute(
       "href",
       "/help/login",
