@@ -89,6 +89,18 @@ final class KnowledgeMarkdownParser {
         if (chunks.isEmpty()) {
             throw invalid(sourceFile, closingBoundary + 1, "正文无法形成知识分段");
         }
+        String immutableContent =
+                articleId
+                        + "\u0000"
+                        + title
+                        + "\u0000"
+                        + version
+                        + "\u0000"
+                        + updatedAt
+                        + "\u0000"
+                        + String.join(",", applicability)
+                        + "\u0000"
+                        + body;
         return new KnowledgeArticleDocument(
                 articleId,
                 title,
@@ -98,7 +110,7 @@ final class KnowledgeMarkdownParser {
                 status,
                 current,
                 sourceFile,
-                KnowledgeDigests.sha256(source),
+                KnowledgeDigests.sha256(immutableContent),
                 body,
                 chunks);
     }

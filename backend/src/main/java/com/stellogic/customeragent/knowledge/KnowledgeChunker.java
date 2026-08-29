@@ -25,7 +25,7 @@ final class KnowledgeChunker {
                 startLine = -1;
                 continue;
             }
-            if (startLine < 0) startLine = index + 1;
+            if (startLine < 0) startLine = index;
             if (current.length() > 0) current.append('\n');
             current.append(line.stripTrailing());
         }
