@@ -252,108 +252,78 @@ function Forbidden() {
 }
 
 function PublicForbiddenRoute() {
-  const state = usePublicSessionState();
-
-  if (state.status === "loading") {
-    return (
-      <ForbiddenState
-        actions={<StateGalleryAction />}
-        description="正在确认当前身份。系统不会加载任何受保护内容，请稍候。"
-      />
-    );
-  }
-
-  if (state.status === "unavailable") {
-    return (
-      <ForbiddenState
-        actions={
-          <>
-            <PublicLoginActions />
-            <StateGalleryAction />
-          </>
-        }
-        description="当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。"
-      />
-    );
-  }
-
-  if (state.status === "anonymous") {
-    return (
-      <ForbiddenState
-        actions={
-          <>
-            <PublicLoginActions />
-            <StateGalleryAction />
-          </>
-        }
-        description="当前未登录或没有访问此页面的权限。系统不会加载任何受保护内容，请从安全登录入口重新开始。"
-      />
-    );
-  }
-
-  const isCustomer = state.session.subjectType === "CUSTOMER";
   return (
-    <ForbiddenState
-      actions={
-        <>
-          <Link className="route-state-action" to={defaultPathFor(state.session)}>
-            {isCustomer ? "返回帮助中心" : "返回可访问工作区"}
-          </Link>
-          <StateGalleryAction />
-        </>
-      }
-      description={
-        isCustomer
-          ? "当前客户身份不能进入这个内部页面。系统不会加载任何内部工作台数据，请返回帮助中心继续。"
-          : "当前工作人员没有访问此页面的权限。系统不会加载未授权的工单详情、审批证据或内部备注，请返回当前职责允许的工作区。"
-      }
+    <PublicIdentityErrorRoute
+      Page={ForbiddenState}
+      copy={{
+        loading: "正在确认当前身份。系统不会加载任何受保护内容，请稍候。",
+        unavailable:
+          "当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+        anonymous:
+          "当前未登录或没有访问此页面的权限。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+        customer:
+          "当前客户身份不能进入这个内部页面。系统不会加载任何内部工作台数据，请返回帮助中心继续。",
+        internal:
+          "当前工作人员没有访问此页面的权限。系统不会加载未授权的工单详情、审批证据或内部备注，请返回当前职责允许的工作区。",
+      }}
     />
   );
 }
 
 function PublicNotFoundRoute() {
+  return (
+    <PublicIdentityErrorRoute
+      Page={NotFound}
+      copy={{
+        loading: "正在确认当前身份，以提供安全返回入口。系统不会加载任何受保护内容。",
+        unavailable:
+          "当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+        anonymous:
+          "当前未登录，无法确定适合你的工作区。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+        customer: "当前客户身份找不到这个页面。系统没有加载受保护内容，请返回帮助中心继续。",
+        internal:
+          "当前工作人员找不到这个页面。系统没有加载受保护工单或审批内容，请返回当前职责允许的工作区。",
+      }}
+    />
+  );
+}
+
+function PublicIdentityErrorRoute({
+  Page,
+  copy,
+}: {
+  Page: typeof ForbiddenState | typeof NotFound;
+  copy: {
+    loading: string;
+    unavailable: string;
+    anonymous: string;
+    customer: string;
+    internal: string;
+  };
+}) {
   const state = usePublicSessionState();
 
   if (state.status === "loading") {
-    return (
-      <NotFound
-        actions={<StateGalleryAction />}
-        description="正在确认当前身份，以提供安全返回入口。系统不会加载任何受保护内容。"
-      />
-    );
+    return <Page actions={<StateGalleryAction />} description={copy.loading} />;
   }
 
-  if (state.status === "unavailable") {
+  if (state.status === "unavailable" || state.status === "anonymous") {
     return (
-      <NotFound
+      <Page
         actions={
           <>
             <PublicLoginActions />
             <StateGalleryAction />
           </>
         }
-        description="当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。"
-      />
-    );
-  }
-
-  if (state.status === "anonymous") {
-    return (
-      <NotFound
-        actions={
-          <>
-            <PublicLoginActions />
-            <StateGalleryAction />
-          </>
-        }
-        description="当前未登录，无法确定适合你的工作区。系统不会加载任何受保护内容，请从安全登录入口重新开始。"
+        description={state.status === "unavailable" ? copy.unavailable : copy.anonymous}
       />
     );
   }
 
   const isCustomer = state.session.subjectType === "CUSTOMER";
   return (
-    <NotFound
+    <Page
       actions={
         <>
           <Link className="route-state-action" to={defaultPathFor(state.session)}>
@@ -362,11 +332,7 @@ function PublicNotFoundRoute() {
           <StateGalleryAction />
         </>
       }
-      description={
-        isCustomer
-          ? "当前客户身份找不到这个页面。系统没有加载受保护内容，请返回帮助中心继续。"
-          : "当前工作人员找不到这个页面。系统没有加载受保护工单或审批内容，请返回当前职责允许的工作区。"
-      }
+      description={isCustomer ? copy.customer : copy.internal}
     />
   );
 }
