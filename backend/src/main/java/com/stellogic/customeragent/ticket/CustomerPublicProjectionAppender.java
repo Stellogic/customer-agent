@@ -18,7 +18,13 @@ public final class CustomerPublicProjectionAppender {
     }
 
     public void appendSupportMessage(UUID ticketId, String body, Instant now) {
-        appendMessage(ticketId, body, now);
+        appendMessage(ticketId, UUID.randomUUID(), null, "SUPPORT", body, now);
+    }
+
+    public UUID appendSupportMessageWithId(
+            UUID ticketId, UUID publicMessageId, String body, Instant now) {
+        appendMessage(ticketId, publicMessageId, null, "SUPPORT", body, now);
+        return publicMessageId;
     }
 
     public void appendCustomerReplyAndReopened(UUID ticketId, String body, Instant now) {
@@ -219,11 +225,21 @@ public final class CustomerPublicProjectionAppender {
     }
 
     private long appendMessage(UUID ticketId, String body, Instant now) {
-        return appendMessage(ticketId, null, "SUPPORT", body, now);
+        return appendMessage(ticketId, UUID.randomUUID(), null, "SUPPORT", body, now);
     }
 
     private long appendMessage(
             UUID ticketId, UUID generationId, String author, String body, Instant now) {
+        return appendMessage(ticketId, UUID.randomUUID(), generationId, author, body, now);
+    }
+
+    private long appendMessage(
+            UUID ticketId,
+            UUID publicMessageId,
+            UUID generationId,
+            String author,
+            String body,
+            Instant now) {
         Timestamp at = Timestamp.from(now);
         Long messageSequence =
                 jdbc.queryForObject(
@@ -239,7 +255,7 @@ public final class CustomerPublicProjectionAppender {
         jdbc.update(
                 "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) "
                         + "values (?, ?, ?, ?, ?, ?)",
-                UUID.randomUUID(),
+                publicMessageId,
                 ticketId,
                 messageSequence,
                 author,

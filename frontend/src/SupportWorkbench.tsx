@@ -40,6 +40,7 @@ type WorkbenchSnapshot = {
   cursor: string;
   sharedQueue: QueueItem[];
   escalationQueue: QueueItem[];
+  assignedTicketId?: string | null;
 };
 
 type EventEnvelope = {
@@ -56,7 +57,13 @@ type TicketDetails = {
   description: string;
   lifecycleState: LifecycleState;
   handlingMode: HandlingMode;
-  publicConversation: Array<{ author: string; body: string; sentAt: string }>;
+  assignedSupportId?: string | null;
+  publicConversation: Array<{
+    messageId?: string | null;
+    author: string;
+    body: string;
+    sentAt: string;
+  }>;
   investigationFacts: Array<{
     factType: string;
     factValue: string;
@@ -65,6 +72,20 @@ type TicketDetails = {
   }>;
   businessTimeline: Array<{ eventType: string; actorId: string; occurredAt: string }>;
 };
+
+type SupportPublicReplyResponse = {
+  schema: typeof SUPPORT_SCHEMA;
+  ticketId: string;
+  messageId: string;
+  publicMessageId: string;
+  outcome: "ACCEPTED";
+  accepted: true;
+  replayed: boolean;
+};
+
+class SupportReplyUncertainError extends Error {}
+
+class SupportReplyRejectedError extends Error {}
 
 export function SupportWorkbench() {
   const [workspaceMode, setWorkspaceMode] = useState<"tickets" | "intake">("tickets");
@@ -79,6 +100,8 @@ export function SupportWorkbench() {
   const snapshotRef = useRef<WorkbenchSnapshot | null>(null);
   const streamController = useRef<AbortController | null>(null);
   const detailStreamController = useRef<AbortController | null>(null);
+  const detailAuthorityGeneration = useRef(0);
+  const snapshotRequestGeneration = useRef(0);
   const reconnectTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -90,8 +113,18 @@ export function SupportWorkbench() {
     };
   }, []);
 
+  function invalidateDetailAuthority() {
+    detailAuthorityGeneration.current += 1;
+    detailStreamController.current?.abort();
+    detailStreamController.current = null;
+    setDetails(null);
+    return detailAuthorityGeneration.current;
+  }
+
   async function loadSnapshot(status: "loading" | "syncing" | "resetting" = "syncing") {
+    const generation = ++snapshotRequestGeneration.current;
     streamController.current?.abort();
+    invalidateDetailAuthority();
     if (reconnectTimer.current !== null) globalThis.clearTimeout(reconnectTimer.current);
     reconnectTimer.current = null;
     setConnection(status);
@@ -106,12 +139,14 @@ export function SupportWorkbench() {
       if (!response.ok) throw new Error("snapshot request failed");
       const authoritative = (await response.json()) as unknown;
       if (!isSnapshot(authoritative)) throw new Error("incompatible snapshot");
+      if (generation !== snapshotRequestGeneration.current) return;
       snapshotRef.current = authoritative;
       setSnapshot(authoritative);
       setConnection("live");
+      void restoreAssignedDetails(authoritative.assignedTicketId);
       void consumeEvents(authoritative.cursor);
     } catch {
-      setConnection("stale");
+      if (generation === snapshotRequestGeneration.current) setConnection("stale");
     }
   }
 
@@ -141,7 +176,7 @@ export function SupportWorkbench() {
     if (!controller.signal.aborted && streamController.current === controller) {
       snapshotRef.current = null;
       setSnapshot(null);
-      setDetails(null);
+      invalidateDetailAuthority();
       setConnection("syncing");
       reconnectTimer.current = globalThis.setTimeout(() => {
         reconnectTimer.current = null;
@@ -224,9 +259,7 @@ export function SupportWorkbench() {
   }
 
   async function claimTicket(ticketId: string) {
-    detailStreamController.current?.abort();
-    detailStreamController.current = null;
-    setDetails(null);
+    const generation = invalidateDetailAuthority();
     setClaimingTicketId(ticketId);
     setActionError("");
     try {
@@ -237,15 +270,10 @@ export function SupportWorkbench() {
         headers: { [csrf.headerName]: csrf.token },
       });
       if (!claim.ok) throw new Error("claim rejected");
-      const detailResponse = await humanSessionFetch(`/api/support/workbench/tickets/${ticketId}`, {
-        credentials: "same-origin",
-        cache: "no-store",
-      });
-      if (!detailResponse.ok) throw new Error("assigned detail unavailable");
-      const value = (await detailResponse.json()) as unknown;
-      if (!isTicketDetails(value)) throw new Error("incompatible detail");
+      const value = await readTicketDetails(ticketId);
+      if (generation !== detailAuthorityGeneration.current) return;
       setDetails(value);
-      void monitorTicketAuthority(ticketId);
+      void monitorTicketAuthority(ticketId, generation);
     } catch {
       setActionError("领取未完成或分配已失效；请重新同步队列后再试。");
     } finally {
@@ -253,7 +281,131 @@ export function SupportWorkbench() {
     }
   }
 
-  async function monitorTicketAuthority(ticketId: string) {
+  async function restoreAssignedDetails(ticketId: string | null | undefined) {
+    const generation = invalidateDetailAuthority();
+    if (ticketId === undefined) return;
+    if (ticketId === null) {
+      return;
+    }
+    try {
+      const value = await readTicketDetails(ticketId);
+      if (generation !== detailAuthorityGeneration.current) return;
+      setDetails(value);
+      void monitorTicketAuthority(ticketId, generation);
+    } catch {
+      if (generation !== detailAuthorityGeneration.current) return;
+      setDetails(null);
+      setActionError("当前客服责任未能恢复；旧工单详情已清除，请重新同步。");
+    }
+  }
+
+  async function readTicketDetails(ticketId: string) {
+    const response = await humanSessionFetch(`/api/support/workbench/tickets/${ticketId}`, {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error("assigned detail unavailable");
+    const value = (await response.json()) as unknown;
+    if (!isTicketDetails(value)) throw new Error("incompatible detail");
+    return value;
+  }
+
+  async function sendPublicReply(ticketId: string, messageId: string, body: string) {
+    let csrf: Awaited<ReturnType<typeof loadCsrfToken>>;
+    try {
+      csrf = await loadCsrfToken();
+    } catch {
+      throw new SupportReplyRejectedError("无法取得发送凭证，请稍后重试。");
+    }
+
+    let response: Response;
+    try {
+      response = await humanSessionFetch(`/api/support/workbench/tickets/${ticketId}/messages`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          [csrf.headerName]: csrf.token,
+          "Content-Type": "application/json",
+          "Idempotency-Key": messageId,
+        },
+        body: JSON.stringify({ schema: SUPPORT_SCHEMA, message: body }),
+      });
+    } catch {
+      throw new SupportReplyUncertainError(
+        "发送结果暂未确认；请查询 Spring 权威结果，不要重复发送。",
+      );
+    }
+    if (!response.ok && response.status < 500) {
+      throw new SupportReplyRejectedError(
+        response.status === 409
+          ? "当前工单不允许发送公开回复，或人工处理责任已经失效。"
+          : "公开回复未被接受，请确认当前客服责任后重试。",
+      );
+    }
+    if (!response.ok) {
+      throw new SupportReplyUncertainError(
+        "发送结果暂未确认；请查询 Spring 权威结果，不要重复发送。",
+      );
+    }
+    const result =
+      (await parseReplyResponse(response, ticketId, messageId)) as SupportPublicReplyResponse;
+    void refreshTicketDetails(ticketId);
+    return result;
+  }
+
+  async function queryPublicReply(ticketId: string, messageId: string) {
+    let response: Response;
+    try {
+      response = await humanSessionFetch(
+        `/api/support/workbench/tickets/${ticketId}/messages/${encodeURIComponent(messageId)}`,
+        { credentials: "same-origin", cache: "no-store" },
+      );
+    } catch {
+      throw new SupportReplyUncertainError("仍无法连接 Spring；请稍后再次查询发送结果。");
+    }
+    if (!response.ok) {
+      throw new SupportReplyUncertainError(
+        "Spring 尚未返回可确认结果；请不要重新发送相同内容。",
+      );
+    }
+    const result =
+      (await parseReplyResponse(response, ticketId, messageId)) as SupportPublicReplyResponse;
+    void refreshTicketDetails(ticketId);
+    return result;
+  }
+
+  async function parseReplyResponse(
+    response: Response,
+    ticketId: string,
+    messageId: string,
+  ) {
+    try {
+      const value = (await response.json()) as unknown;
+      if (
+        !isSupportReplyResponse(value) ||
+        value.ticketId !== ticketId ||
+        value.messageId !== messageId
+      )
+        throw new Error("incompatible reply response");
+      return value;
+    } catch {
+      throw new SupportReplyUncertainError(
+        "发送结果暂未确认；请查询 Spring 权威结果，不要重复发送。",
+      );
+    }
+  }
+
+  async function refreshTicketDetails(ticketId: string) {
+    try {
+      const value = await readTicketDetails(ticketId);
+      setDetails((current) => (current?.ticketId === ticketId ? value : current));
+    } catch {
+      // The authority stream will clear the detail if the assignment changed meanwhile.
+    }
+  }
+
+  async function monitorTicketAuthority(ticketId: string, generation: number) {
+    if (generation !== detailAuthorityGeneration.current) return;
     const controller = new AbortController();
     detailStreamController.current = controller;
     try {
@@ -271,18 +423,19 @@ export function SupportWorkbench() {
     } catch {
       // Re-read the assigned detail below; the cached detail is never kept on an uncertain stream.
     }
-    if (controller.signal.aborted || detailStreamController.current !== controller) return;
+    if (
+      controller.signal.aborted ||
+      detailStreamController.current !== controller ||
+      generation !== detailAuthorityGeneration.current
+    )
+      return;
     try {
-      const response = await humanSessionFetch(`/api/support/workbench/tickets/${ticketId}`, {
-        credentials: "same-origin",
-        cache: "no-store",
-      });
-      if (!response.ok) throw new Error("assignment no longer current");
-      const value = (await response.json()) as unknown;
-      if (!isTicketDetails(value)) throw new Error("incompatible detail");
-      setDetails(value);
-      void monitorTicketAuthority(ticketId);
+      const value = await readTicketDetails(ticketId);
+      if (generation !== detailAuthorityGeneration.current) return;
+      setDetails((current) => (current?.ticketId === ticketId ? value : current));
+      void monitorTicketAuthority(ticketId, generation);
     } catch {
+      if (generation !== detailAuthorityGeneration.current) return;
       setDetails(null);
       setActionError("客服分配已失效；旧工单详情已移除，请重新同步队列。");
     }
@@ -363,7 +516,13 @@ export function SupportWorkbench() {
             </div>
 
             {details ? (
-              <TicketDetail details={details} onCopyError={setActionError} />
+              <TicketDetail
+                key={details.ticketId}
+                details={details}
+                onCopyError={setActionError}
+                onSendReply={sendPublicReply}
+                onQueryReply={queryPublicReply}
+              />
             ) : (
               <aside className="detail-placeholder" aria-label="授权详情等待区">
                 <span aria-hidden="true">↳</span>
@@ -522,10 +681,70 @@ function QueueSection({
 function TicketDetail({
   details,
   onCopyError,
+  onSendReply,
+  onQueryReply,
 }: {
   details: TicketDetails;
   onCopyError: (message: string) => void;
+  onSendReply: (
+    ticketId: string,
+    messageId: string,
+    body: string,
+  ) => Promise<SupportPublicReplyResponse>;
+  onQueryReply: (ticketId: string, messageId: string) => Promise<SupportPublicReplyResponse>;
 }) {
+  const [draft, setDraft] = useState("");
+  const [replyState, setReplyState] = useState<
+    "idle" | "sending" | "unknown" | "querying" | "error"
+  >("idle");
+  const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
+  const [replyNotice, setReplyNotice] = useState("");
+
+  async function submitReply() {
+    const body = draft.trim();
+    if (!body || replyState === "sending" || replyState === "querying") return;
+    const messageId = createMessageId();
+    setPendingMessageId(messageId);
+    setReplyState("sending");
+    setReplyNotice("");
+    try {
+      await onSendReply(details.ticketId, messageId, body);
+      setDraft("");
+      setPendingMessageId(null);
+      setReplyState("idle");
+      setReplyNotice("公开回复已由 Spring 保存并对客户可见。");
+    } catch (error) {
+      if (error instanceof SupportReplyUncertainError) {
+        setReplyState("unknown");
+        setReplyNotice(error.message);
+      } else {
+        setPendingMessageId(null);
+        setReplyState("error");
+        setReplyNotice(
+          error instanceof Error ? error.message : "公开回复未被接受，请稍后重试。",
+        );
+      }
+    }
+  }
+
+  async function queryReplyResult() {
+    if (!pendingMessageId || replyState === "querying") return;
+    setReplyState("querying");
+    setReplyNotice("正在查询 Spring 权威发送结果…");
+    try {
+      await onQueryReply(details.ticketId, pendingMessageId);
+      setDraft("");
+      setPendingMessageId(null);
+      setReplyState("idle");
+      setReplyNotice("已从 Spring 权威结果确认公开回复已保存。");
+    } catch (error) {
+      setReplyState("unknown");
+      setReplyNotice(
+        error instanceof Error ? error.message : "仍无法确认发送结果，请稍后再次查询。",
+      );
+    }
+  }
+
   return (
     <article className="support-ticket-detail" aria-labelledby="support-ticket-detail-title">
       <header className="support-detail-header">
@@ -554,6 +773,10 @@ function TicketDetail({
             <dt>处理模式</dt>
             <dd>{details.handlingMode === "HUMAN" ? "人工处理" : "Agent 处理"}</dd>
           </div>
+          <div>
+            <dt>负责人</dt>
+            <dd>{details.assignedSupportId ?? "当前客服"}</dd>
+          </div>
         </dl>
         <section aria-labelledby="support-description-title">
           <h3 id="support-description-title">问题描述</h3>
@@ -561,13 +784,76 @@ function TicketDetail({
         </section>
       </div>
 
+      {details.handlingMode === "HUMAN" && (
+        <section className="support-reply-composer" aria-labelledby="support-reply-title">
+          <div className="support-reply-heading">
+            <div>
+              <p className="eyebrow">CUSTOMER VISIBLE</p>
+              <h3 id="support-reply-title">人工公开回复</h3>
+            </div>
+            <span>由当前客服责任授权</span>
+          </div>
+          <textarea
+            aria-label="公开回复"
+            value={draft}
+            maxLength={2000}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="写下客户可以看到的回复…"
+            disabled={
+              replyState === "sending" ||
+              replyState === "querying" ||
+              replyState === "unknown"
+            }
+            rows={4}
+          />
+          <div className="support-reply-actions">
+            <small>{draft.trim().length}/2000</small>
+            <button
+              type="button"
+              onClick={() => void submitReply()}
+              disabled={
+                !draft.trim() ||
+                replyState === "sending" ||
+                replyState === "querying" ||
+                replyState === "unknown"
+              }
+            >
+              {replyState === "sending" ? "正在发送…" : "发送公开回复"}
+            </button>
+          </div>
+          {replyState === "unknown" && pendingMessageId && (
+            <button
+              type="button"
+              className="support-reply-query"
+              onClick={() => void queryReplyResult()}
+              disabled={replyState === "querying"}
+            >
+              查询发送结果
+            </button>
+          )}
+          {replyNotice && (
+            <p
+              className={replyState === "error" ? "error" : "support-reply-notice"}
+              role={
+                replyState === "error" || replyState === "unknown" ? "alert" : "status"
+              }
+            >
+              {replyNotice}
+            </p>
+          )}
+        </section>
+      )}
+
       <div className="support-detail-sections">
         <DetailSection
           eyebrow="CUSTOMER VISIBLE"
           title="公开沟通"
           empty="暂无公开沟通"
           items={details.publicConversation.map((message, index) => (
-            <li key={`${message.sentAt}-${index}`} className="conversation-entry">
+            <li
+              key={message.messageId ?? `${message.sentAt}-${index}`}
+              className="conversation-entry"
+            >
               <div>
                 <strong>{message.author}</strong>
                 <time dateTime={message.sentAt}>{formatTime(message.sentAt)}</time>
@@ -670,13 +956,23 @@ function TicketIdentifier({
 function isSnapshot(value: unknown): value is WorkbenchSnapshot {
   if (
     !isRecord(value) ||
-    !hasOnlyKeys(value, ["view", "schema", "cursor", "sharedQueue", "escalationQueue"]) ||
+    !hasOnlyKeys(value, [
+      "view",
+      "schema",
+      "cursor",
+      "sharedQueue",
+      "escalationQueue",
+      "assignedTicketId",
+    ]) ||
     value.view !== "SUPPORT_WORKBENCH" ||
     value.schema !== SUPPORT_SCHEMA ||
     typeof value.cursor !== "string" ||
     parseCursor(value.cursor) === null ||
     !Array.isArray(value.sharedQueue) ||
-    !Array.isArray(value.escalationQueue)
+    !Array.isArray(value.escalationQueue) ||
+    (value.assignedTicketId !== undefined &&
+      value.assignedTicketId !== null &&
+      !isTicketId(value.assignedTicketId))
   )
     return false;
   return value.sharedQueue.every(isQueueItem) && value.escalationQueue.every(isQueueItem);
@@ -712,6 +1008,7 @@ function isTicketDetails(value: unknown): value is TicketDetails {
       "description",
       "lifecycleState",
       "handlingMode",
+      "assignedSupportId",
       "publicConversation",
       "investigationFacts",
       "businessTimeline",
@@ -722,6 +1019,9 @@ function isTicketDetails(value: unknown): value is TicketDetails {
     typeof value.description === "string" &&
     isLifecycleState(value.lifecycleState) &&
     isHandlingMode(value.handlingMode) &&
+    (value.assignedSupportId === undefined ||
+      value.assignedSupportId === null ||
+      typeof value.assignedSupportId === "string") &&
     Array.isArray(value.publicConversation) &&
     value.publicConversation.every(isConversationMessage) &&
     Array.isArray(value.investigationFacts) &&
@@ -736,7 +1036,8 @@ function isConversationMessage(
 ): value is TicketDetails["publicConversation"][number] {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ["author", "body", "sentAt"]) &&
+    hasOnlyKeys(value, ["messageId", "author", "body", "sentAt"]) &&
+    (value.messageId === undefined || value.messageId === null || isTicketId(value.messageId)) &&
     typeof value.author === "string" &&
     typeof value.body === "string" &&
     typeof value.sentAt === "string"
@@ -792,6 +1093,33 @@ function isUpsert(value: unknown): value is QueueUpsert {
 
 function isTicketId(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
+}
+
+function isSupportReplyResponse(value: unknown): value is SupportPublicReplyResponse {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "schema",
+      "ticketId",
+      "messageId",
+      "publicMessageId",
+      "outcome",
+      "accepted",
+      "replayed",
+    ]) &&
+    value.schema === SUPPORT_SCHEMA &&
+    isTicketId(value.ticketId) &&
+    typeof value.messageId === "string" &&
+    value.messageId.trim().length > 0 &&
+    isTicketId(value.publicMessageId) &&
+    value.outcome === "ACCEPTED" &&
+    value.accepted === true &&
+    typeof value.replayed === "boolean"
+  );
+}
+
+function createMessageId() {
+  return globalThis.crypto.randomUUID();
 }
 
 function isLifecycleState(value: unknown): value is LifecycleState {
