@@ -1329,6 +1329,15 @@ def main() -> None:
                 expect_status(restored_policy, 200)
 
                 with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+                    connection.execute(
+                        "insert into synthetic_pending_action "
+                        "(id, order_reference, action_type, action_state) "
+                        "values (%s, %s, 'COMPENSATION_REVIEW', 'READY')",
+                        (uuid.uuid4(), order_reference),
+                    )
+                submit_rejected(conclusion_payload, "stale-pending-action-evidence")
+
+                with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
                     reasons = {
                         row[0]
                         for row in connection.execute(
@@ -1343,6 +1352,7 @@ def main() -> None:
                     "AGENT_COMMAND_REJECTED_EVIDENCE_EXPIRED",
                     "AGENT_COMMAND_REJECTED_FACT_CONFLICT",
                     "AGENT_COMMAND_REJECTED_REQUIRED_FACT_MISSING",
+                    "AGENT_COMMAND_REJECTED_EVIDENCE_STALE",
                 }.issubset(reasons)
 
             conclusion = client.post(

@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -380,10 +381,13 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         }
 
         ScopedOrder order = currentOrder(ticketId, generationId);
+        List<PersistedInvestigationFact> persistedFacts = persistedFacts(ticketId, generationId);
         String evidenceFailure =
-                EvidenceSufficiencyPolicy.validate(
-                        conclusion, persistedFacts(ticketId, generationId), clock.instant());
+                EvidenceSufficiencyPolicy.validate(conclusion, persistedFacts, clock.instant());
         if (evidenceFailure != null) reject(ticketId, evidenceFailure);
+        if (!factsStillMatchCurrentOrder(persistedFacts, order)) {
+            reject(ticketId, "EVIDENCE_STALE");
+        }
         List<String> expectedEvidence = order.evidenceRefs();
         boolean factsMatch =
                 conclusion.delayHours() == order.delayHours()
@@ -453,6 +457,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         if (conclusion.reasonCode() != DecisionReasonCode.LOGISTICS_DELAY
                 || !eligibleOrderState(order)
                 || order.existingCompensation()
+                || order.pendingActionCount() != 0
                 || !DelayCompensationPolicy.VERSION.equals(order.policyVersion())) {
             reject(ticketId, "COMPENSATION_PROPOSAL_INELIGIBLE");
         }
@@ -597,6 +602,36 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
 
     private static boolean eligibleOrderState(ScopedOrder order) {
         return order.paid() && !order.cancelled() && !order.fullyRefunded();
+    }
+
+    private static boolean factsStillMatchCurrentOrder(
+            List<PersistedInvestigationFact> facts, ScopedOrder order) {
+        Map<String, String> currentValues =
+                Map.ofEntries(
+                        Map.entry("ORDER", order.orderReference()),
+                        Map.entry("LOGISTICS_DELAY_HOURS", Integer.toString(order.delayHours())),
+                        Map.entry("LOGISTICS_DELAY_SECONDS", Long.toString(order.delaySeconds())),
+                        Map.entry("PAYMENT", order.paid() ? "PAID" : "UNPAID"),
+                        Map.entry(
+                                "ORDER_CANCELLATION",
+                                order.cancelled() ? "CANCELLED" : "NOT_CANCELLED"),
+                        Map.entry(
+                                "REFUND_STATUS",
+                                order.fullyRefunded() ? "FULLY_REFUNDED" : "NOT_FULLY_REFUNDED"),
+                        Map.entry(
+                                "EXISTING_COMPENSATION",
+                                Boolean.toString(order.existingCompensation())),
+                        Map.entry(
+                                "PENDING_ACTION_COUNT",
+                                Integer.toString(order.pendingActionCount())),
+                        Map.entry("POLICY", order.policyVersion()));
+        return facts.stream()
+                .allMatch(
+                        fact ->
+                                currentValues.containsKey(fact.factType())
+                                        && currentValues
+                                                .get(fact.factType())
+                                                .equals(fact.factValue()));
     }
 
     private void reject(UUID ticketId, String reason) {
