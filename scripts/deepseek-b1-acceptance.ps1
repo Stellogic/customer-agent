@@ -6,6 +6,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+. "$PSScriptRoot/test-gate-lock.ps1"
+Assert-TestGateInherited
 
 if (-not $ConfirmProviderSpend) {
     throw '必须显式传入 -ConfirmProviderSpend 才能运行 Issue #128 B1 正式验收。'
