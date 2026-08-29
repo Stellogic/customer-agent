@@ -237,6 +237,7 @@ function issueLabel(issueKind: string) {
       LOGISTICS_DELAY: "物流延迟",
       PACKAGE_NOT_RECEIVED: "包裹未收到",
       DUPLICATE_CHARGE: "重复扣款",
+      ORDER_OPERATION_OR_RULE: "地址或取消规则",
       OTHER: "其他问题",
     }[issueKind] ?? "客服问题"
   );

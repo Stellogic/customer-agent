@@ -284,6 +284,9 @@ def _controlled_facts(facts: dict) -> dict[str, object]:
         "existingCompensation",
         "pendingActionCount",
         "policyVersion",
+        "orderRuleSummary",
+        "logisticsStatus",
+        "duplicateChargeSuspected",
         "evidenceRefs",
         "siblingTickets",
         "evidenceCatalog",
@@ -348,6 +351,7 @@ def _allowed_actions(facts: dict[str, object]) -> tuple[str, ...]:
         InvestigationCapability.READ_PAYMENT_AND_REFUNDS: "paid",
         InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS: "existingCompensation",
         InvestigationCapability.READ_APPLICABLE_POLICY: "policyVersion",
+        InvestigationCapability.READ_ORDER_RULES: "orderRuleSummary",
     }
     missing_capabilities = tuple(
         capability.value

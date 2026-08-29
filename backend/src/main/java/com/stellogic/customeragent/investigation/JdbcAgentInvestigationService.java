@@ -171,6 +171,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         case READ_COMPENSATION_AND_PENDING_ACTIONS ->
                                 compensationAndActions(generationId, order, now);
                         case READ_APPLICABLE_POLICY -> policy(generationId, order, now);
+                        case READ_ORDER_RULES -> orderRules(generationId, order, now);
                         case CONFIRM_ORDER -> throw new IllegalStateException("handled above");
                     };
             jdbc.update(
@@ -254,10 +255,12 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 Long.toString(order.delaySeconds()),
                 evidence,
                 now);
+        recordFact(generationId, "LOGISTICS_STATUS", order.logisticsStatus(), evidence, now);
         return new LogisticsFactsResult(
                 InvestigationCapability.READ_LOGISTICS,
                 order.delayHours(),
                 order.delaySeconds(),
+                order.logisticsStatus(),
                 List.of(evidence));
     }
 
@@ -277,11 +280,18 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 order.fullyRefunded() ? "FULLY_REFUNDED" : "NOT_FULLY_REFUNDED",
                 evidence,
                 now);
+        recordFact(
+                generationId,
+                "DUPLICATE_CHARGE_SUSPECTED",
+                Boolean.toString(order.duplicateChargeSuspected()),
+                evidence,
+                now);
         return new PaymentRefundFactsResult(
                 InvestigationCapability.READ_PAYMENT_AND_REFUNDS,
                 order.paid(),
                 order.cancelled(),
                 order.fullyRefunded(),
+                order.duplicateChargeSuspected(),
                 List.of(evidence));
     }
 
@@ -314,6 +324,15 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         return new ApplicablePolicyResult(
                 InvestigationCapability.READ_APPLICABLE_POLICY,
                 order.policyVersion(),
+                List.of(evidence));
+    }
+
+    private OrderRuleFactsResult orderRules(UUID generationId, ScopedOrder order, Instant now) {
+        String evidence = "order-rule:" + order.orderReference();
+        recordFact(generationId, "ORDER_RULE", order.orderRuleSummary(), evidence, now);
+        return new OrderRuleFactsResult(
+                InvestigationCapability.READ_ORDER_RULES,
+                order.orderRuleSummary(),
                 List.of(evidence));
     }
 
@@ -398,11 +417,63 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         validateCustomerReply(ticketId, conclusion, order);
 
         if (!conclusion.compensationRequired()) {
+            if (requiresHumanAfterGroundedReply(conclusion.reasonCode())) {
+                return acceptGroundedReplyThenHandoff(
+                        ticketId, generationId, requestId, parameterDigest, conclusion);
+            }
             return acceptNoCompensation(
                     ticketId, generationId, requestId, parameterDigest, conclusion, order);
         }
         return acceptCompensationProposal(
                 ticketId, generationId, requestId, parameterDigest, conclusion, order);
+    }
+
+    private static boolean requiresHumanAfterGroundedReply(DecisionReasonCode reasonCode) {
+        return reasonCode == DecisionReasonCode.LOGISTICS_STALLED
+                || reasonCode == DecisionReasonCode.PACKAGE_SIGNED_NOT_RECEIVED
+                || reasonCode == DecisionReasonCode.PACKAGE_SUSPECTED_LOST
+                || reasonCode == DecisionReasonCode.DUPLICATE_CHARGE
+                || reasonCode == DecisionReasonCode.OTHER_REQUIRES_HUMAN
+                || reasonCode == DecisionReasonCode.FACTS_INSUFFICIENT;
+    }
+
+    private ConclusionAcceptance acceptGroundedReplyThenHandoff(
+            UUID ticketId,
+            UUID generationId,
+            String requestId,
+            String parameterDigest,
+            InvestigationConclusion conclusion) {
+        Instant now = clock.instant();
+        Timestamp databaseTime = Timestamp.from(now);
+        int updated =
+                jdbc.update(
+                        "update support_ticket set handling_mode = 'HUMAN', human_handoff_reason_code = ? "
+                                + "where id = ? and handling_mode = 'AGENT' and lifecycle_state = 'INVESTIGATING'",
+                        conclusion.reasonCode().name(),
+                        ticketId);
+        if (updated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
+        completeGeneration(generationId, databaseTime);
+        publicProjection.completeAgentReplyStream(
+                ticketId, generationId, conclusion.customerReply().body(), now);
+        publicProjection.appendAgentMessage(
+                ticketId, generationId, conclusion.customerReply().body(), now, false);
+        jdbc.update(
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values "
+                        + "(?, 'AGENT_CONCLUSION_ACCEPTED', 'agent-machine', ?), "
+                        + "(?, 'HUMAN_HANDOFF_RECORDED', 'spring-system', ?)",
+                ticketId,
+                databaseTime,
+                ticketId,
+                databaseTime);
+        jdbc.update(
+                "insert into agent_command_request (generation_id, request_id, operation, parameter_digest, response_payload, created_at) "
+                        + "values (?, ?, 'SUBMIT_INVESTIGATION_CONCLUSION', ?, "
+                        + "jsonb_build_object('accepted', true, 'lifecycleState', 'INVESTIGATING'), ?)",
+                generationId,
+                requestId,
+                parameterDigest,
+                databaseTime);
+        return new ConclusionAcceptance(true, TicketLifecycleState.INVESTIGATING, null, null, null);
     }
 
     private ConclusionAcceptance acceptNoCompensation(
@@ -412,12 +483,20 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             String parameterDigest,
             InvestigationConclusion conclusion,
             ScopedOrder order) {
-        boolean valid =
+        boolean delayUnderThreshold =
                 conclusion.reasonCode() == DecisionReasonCode.DELAY_UNDER_24_HOURS
                         && order.delaySeconds() < Duration.ofHours(24).toSeconds()
                         && eligibleOrderState(order)
                         && order.pendingActionCount() == 0;
-        if (!valid) reject(ticketId, "DETERMINISTIC_REVIEW_FAILED");
+        boolean informational =
+                (conclusion.reasonCode() == DecisionReasonCode.ORDER_RULE_EXPLAINED
+                                || conclusion.reasonCode()
+                                        == DecisionReasonCode.REFUND_STATUS_EXPLAINED)
+                        && eligibleOrderState(order)
+                        && order.pendingActionCount() == 0;
+        if (!delayUnderThreshold && !informational) {
+            reject(ticketId, "DETERMINISTIC_REVIEW_FAILED");
+        }
 
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
@@ -611,6 +690,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         Map.entry("ORDER", order.orderReference()),
                         Map.entry("LOGISTICS_DELAY_HOURS", Integer.toString(order.delayHours())),
                         Map.entry("LOGISTICS_DELAY_SECONDS", Long.toString(order.delaySeconds())),
+                        Map.entry("LOGISTICS_STATUS", order.logisticsStatus()),
                         Map.entry("PAYMENT", order.paid() ? "PAID" : "UNPAID"),
                         Map.entry(
                                 "ORDER_CANCELLATION",
@@ -618,6 +698,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         Map.entry(
                                 "REFUND_STATUS",
                                 order.fullyRefunded() ? "FULLY_REFUNDED" : "NOT_FULLY_REFUNDED"),
+                        Map.entry(
+                                "DUPLICATE_CHARGE_SUSPECTED",
+                                Boolean.toString(order.duplicateChargeSuspected())),
+                        Map.entry("ORDER_RULE", order.orderRuleSummary()),
                         Map.entry(
                                 "EXISTING_COMPENSATION",
                                 Boolean.toString(order.existingCompensation())),
@@ -682,7 +766,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         "select o.order_reference, o.delay_hours, o.delay_seconds, o.paid, o.cancelled, o.fully_refunded, "
                                 + "o.existing_compensation, o.policy_version, o.paid_amount, o.available_compensation_amount, "
                                 + "(select count(*) from synthetic_pending_action a where a.order_reference = o.order_reference), "
-                                + "coalesce((select sum(r.amount) from compensation_reservation r where r.order_reference = o.order_reference and r.status = 'ACTIVE'), 0) "
+                                + "coalesce((select sum(r.amount) from compensation_reservation r where r.order_reference = o.order_reference and r.status = 'ACTIVE'), 0), "
+                                + "o.logistics_status, o.order_rule_summary, o.duplicate_charge_suspected "
                                 + "from support_ticket t join synthetic_order o on o.order_reference = t.order_reference "
                                 + "and o.customer_id = t.customer_id where t.id = ? and o.order_reference = ?",
                         (rs, row) ->
@@ -698,7 +783,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                                         rs.getBigDecimal(9),
                                         rs.getBigDecimal(10),
                                         rs.getInt(11),
-                                        rs.getBigDecimal(12)),
+                                        rs.getBigDecimal(12),
+                                        rs.getString(13),
+                                        rs.getString(14),
+                                        rs.getBoolean(15)),
                         ticketId,
                         orderReference);
         if (orders.isEmpty()) {
@@ -814,7 +902,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             BigDecimal paidAmount,
             BigDecimal totalAvailableCompensationAmount,
             int pendingActionCount,
-            BigDecimal activeReservationAmount) {
+            BigDecimal activeReservationAmount,
+            String logisticsStatus,
+            String orderRuleSummary,
+            boolean duplicateChargeSuspected) {
         List<String> evidenceRefs() {
             return List.of("order:" + orderReference, "logistics:" + orderReference);
         }

@@ -43,7 +43,8 @@ sealed interface InvestigationCapabilityResult
                 LogisticsFactsResult,
                 PaymentRefundFactsResult,
                 CompensationActionsFactsResult,
-                ApplicablePolicyResult {}
+                ApplicablePolicyResult,
+                OrderRuleFactsResult {}
 
 record OrderConfirmationResult(
         InvestigationCapability capability,
@@ -56,6 +57,7 @@ record LogisticsFactsResult(
         InvestigationCapability capability,
         int delayHours,
         long delaySeconds,
+        String logisticsStatus,
         List<String> evidenceRefs)
         implements InvestigationCapabilityResult {}
 
@@ -64,6 +66,7 @@ record PaymentRefundFactsResult(
         Boolean paid,
         Boolean cancelled,
         Boolean fullyRefunded,
+        Boolean duplicateChargeSuspected,
         List<String> evidenceRefs)
         implements InvestigationCapabilityResult {}
 
@@ -76,6 +79,10 @@ record CompensationActionsFactsResult(
 
 record ApplicablePolicyResult(
         InvestigationCapability capability, String policyVersion, List<String> evidenceRefs)
+        implements InvestigationCapabilityResult {}
+
+record OrderRuleFactsResult(
+        InvestigationCapability capability, String orderRuleSummary, List<String> evidenceRefs)
         implements InvestigationCapabilityResult {}
 
 enum InvestigationCapability {
@@ -92,6 +99,7 @@ enum InvestigationCapability {
                     field("capability", InvestigationCapabilityValueType.STRING),
                     field("delayHours", InvestigationCapabilityValueType.INTEGER),
                     field("delaySeconds", InvestigationCapabilityValueType.INTEGER),
+                    field("logisticsStatus", InvestigationCapabilityValueType.STRING),
                     field("evidenceRefs", InvestigationCapabilityValueType.STRING_LIST))),
     READ_PAYMENT_AND_REFUNDS(
             orderReferenceParameter(),
@@ -100,6 +108,7 @@ enum InvestigationCapability {
                     field("paid", InvestigationCapabilityValueType.BOOLEAN),
                     field("cancelled", InvestigationCapabilityValueType.BOOLEAN),
                     field("fullyRefunded", InvestigationCapabilityValueType.BOOLEAN),
+                    field("duplicateChargeSuspected", InvestigationCapabilityValueType.BOOLEAN),
                     field("evidenceRefs", InvestigationCapabilityValueType.STRING_LIST))),
     READ_COMPENSATION_AND_PENDING_ACTIONS(
             orderReferenceParameter(),
@@ -113,6 +122,12 @@ enum InvestigationCapability {
             fields(
                     field("capability", InvestigationCapabilityValueType.STRING),
                     field("policyVersion", InvestigationCapabilityValueType.STRING),
+                    field("evidenceRefs", InvestigationCapabilityValueType.STRING_LIST))),
+    READ_ORDER_RULES(
+            orderReferenceParameter(),
+            fields(
+                    field("capability", InvestigationCapabilityValueType.STRING),
+                    field("orderRuleSummary", InvestigationCapabilityValueType.STRING),
                     field("evidenceRefs", InvestigationCapabilityValueType.STRING_LIST)));
 
     private final List<InvestigationCapabilityField> parameters;
@@ -166,12 +181,23 @@ record EvidenceSufficiencyClaim(
 record ConclusionEvidence(String evidenceReference, List<EvidenceApplicability> applicability) {}
 
 enum InvestigationRiskScenario {
-    LOGISTICS_DELAY
+    LOGISTICS_DELAY,
+    LOGISTICS_STALLED,
+    PACKAGE_SIGNED_NOT_RECEIVED,
+    PACKAGE_SUSPECTED_LOST,
+    DUPLICATE_CHARGE,
+    REFUND_STATUS,
+    ORDER_ADDRESS_OR_CANCEL_RULE,
+    OTHER_GENERAL
 }
 
 enum EvidenceApplicability {
     ORDER_IDENTITY,
     DELAY_DURATION,
+    LOGISTICS_STATUS,
+    PAYMENT_STATUS,
+    REFUND_STATUS,
+    ORDER_RULE,
     ORDER_ELIGIBILITY,
     EXISTING_COMPENSATION,
     PENDING_ACTIONS,
@@ -200,7 +226,15 @@ record ConclusionAcceptance(
 
 enum DecisionReasonCode {
     DELAY_UNDER_24_HOURS,
-    LOGISTICS_DELAY
+    LOGISTICS_DELAY,
+    LOGISTICS_STALLED,
+    PACKAGE_SIGNED_NOT_RECEIVED,
+    PACKAGE_SUSPECTED_LOST,
+    DUPLICATE_CHARGE,
+    REFUND_STATUS_EXPLAINED,
+    ORDER_RULE_EXPLAINED,
+    OTHER_REQUIRES_HUMAN,
+    FACTS_INSUFFICIENT
 }
 
 enum TicketLifecycleState {

@@ -40,6 +40,8 @@ class CustomerCommunicationInput:
     evidence_refs: tuple[str, ...]
     synthetic_customer_text: str = ""
     public_conversation: tuple[CustomerConversationMessage, ...] = ()
+    risk_scenario: str | None = None
+    logistics_status: str | None = None
 
 
 @dataclass(frozen=True)
@@ -202,6 +204,50 @@ def validate_customer_communication_input(model_input: CustomerCommunicationInpu
         raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_INPUT)
 
 
+_MONEY_PATTERN = re.compile(
+    r"(?:[¥￥$]|USD|CNY|RMB)\s*(?:\d+(?:\.\d+)?|[零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬]+)"
+    r"|(?:\d+(?:\.\d+)?|[零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬]+)\s*"
+    r"(?:元|块钱|美元|人民币|USD|CNY|RMB)",
+    re.IGNORECASE,
+)
+_RESPONSE_TIME_PROMISE_PATTERN = re.compile(
+    r"(?:\d+(?:\.\d+)?|[零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬]+)\s*"
+    r"(?:秒|分钟|小时|天|工作日)(?:之内|以内|内).{0,8}(?:回复|联系|处理|解决)"
+)
+_ORDER_REFERENCE_PATTERN = re.compile(r"ORDER-[A-Z0-9-]+", re.IGNORECASE)
+_SENSITIVE_LEAK_PATTERN = re.compile(
+    r"(系统提示词|prompt|reasoning|checkpoint|thread_id|api[_\s-]?key|bearer\s+[a-z0-9._-]+)",
+    re.IGNORECASE,
+)
+_PERSON_NAME_CLAIM_PATTERN = re.compile(r"(?:由|被)\s*[\u4e00-\u9fff]{2,4}\s*签收")
+
+
+def is_authorized_body_prefix(body: str, order_reference: str, *, complete: bool) -> bool:
+    if not body or not order_reference or len(body) > 1_000:
+        return False
+    if _MONEY_PATTERN.search(body) is not None:
+        return False
+    if _RESPONSE_TIME_PROMISE_PATTERN.search(body) is not None:
+        return False
+    if _SENSITIVE_LEAK_PATTERN.search(body) is not None:
+        return False
+    if _PERSON_NAME_CLAIM_PATTERN.search(body) is not None:
+        return False
+    saw_scoped_order = False
+    for match in _ORDER_REFERENCE_PATTERN.finditer(body):
+        if match.group(0).upper() != order_reference.upper():
+            return False
+        saw_scoped_order = True
+    if complete:
+        if not saw_scoped_order and order_reference not in body:
+            return False
+        if not _has_only_allowed_compensation_language(
+            body, _infer_intent_from_compensation_language(body)
+        ):
+            return False
+    return True
+
+
 def validate_customer_reply_envelope(
     model_input: CustomerCommunicationInput, envelope: CustomerReplyEnvelope
 ) -> None:
@@ -233,13 +279,94 @@ def validate_customer_reply_envelope(
         or envelope.evidence_refs != expected_evidence
         or envelope.escalation_required is not expected_escalation
         or envelope.referenced_order != model_input.order_reference
-        or re.fullmatch(
-            authorized_customer_reply_pattern(model_input.order_reference, envelope.intent),
-            envelope.body,
-        )
-        is None
     ):
         raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+    if envelope.intent in {
+        CustomerReplyIntent.CLARIFICATION_REQUIRED,
+        CustomerReplyIntent.HUMAN_HANDOFF,
+    }:
+        # Keep clarification / handoff bodies on the frozen safe templates.
+        if (
+            re.fullmatch(
+                authorized_customer_reply_pattern(model_input.order_reference, envelope.intent),
+                envelope.body,
+            )
+            is None
+        ):
+            raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+        return
+    if not is_authorized_body_prefix(envelope.body, model_input.order_reference, complete=True):
+        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+    if not _has_grounded_investigation_narrative(model_input, envelope.body):
+        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+
+
+def _infer_intent_from_compensation_language(body: str) -> CustomerReplyIntent:
+    if "补偿建议正在等待人工审批" in body:
+        return CustomerReplyIntent.COMPENSATION_REVIEW_PENDING
+    return CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
+
+
+def _has_only_allowed_compensation_language(body: str, intent: CustomerReplyIntent) -> bool:
+    remaining = body
+    if intent is CustomerReplyIntent.COMPENSATION_REVIEW_PENDING:
+        pending = "补偿建议正在等待人工审批"
+        no_execution = "审批完成前不会执行补偿或退款"
+        if pending not in remaining or no_execution not in remaining:
+            return False
+        remaining = remaining.replace(pending, "").replace(no_execution, "")
+        return "补偿" not in remaining and "退款" not in remaining
+    if intent is CustomerReplyIntent.NO_COMPENSATION_RESOLUTION:
+        ineligible = "当前不符合补偿条件"
+        if ineligible not in remaining:
+            return False
+        remaining = remaining.replace(ineligible, "")
+        # Refund-status explanations may mention 退款 as a fact; ban only action/promise forms.
+        return (
+            "补偿" not in remaining
+            and "将退款" not in remaining
+            and "已退款" not in remaining
+            and "办理退款" not in remaining
+            and "可以获得退款" not in remaining
+        )
+    return False
+
+
+def _has_grounded_investigation_narrative(
+    model_input: CustomerCommunicationInput, body: str
+) -> bool:
+    if model_input.order_reference not in body:
+        return False
+    if _PERSON_NAME_CLAIM_PATTERN.search(body) is not None:
+        return False
+    scenario = model_input.risk_scenario or "LOGISTICS_DELAY"
+    claim_rules = {
+        "签收": {"PACKAGE_SIGNED_NOT_RECEIVED"},
+        "未收到": {"PACKAGE_SIGNED_NOT_RECEIVED"},
+        "丢件": {"PACKAGE_SUSPECTED_LOST"},
+        "丢失": {"PACKAGE_SUSPECTED_LOST"},
+        "停滞": {"LOGISTICS_STALLED"},
+        "重复扣款": {"DUPLICATE_CHARGE"},
+        "疑似丢件": {"PACKAGE_SUSPECTED_LOST"},
+    }
+    for token, allowed_scenarios in claim_rules.items():
+        if token in body and scenario not in allowed_scenarios:
+            if (
+                token == "退款"
+                and "审批完成前不会执行补偿或退款" in body
+                and body.count("退款") == 1
+            ):
+                continue
+            return False
+    if model_input.delay_seconds is not None:
+        claimed_hours = [int(match.group(1)) for match in re.finditer(r"(\d+)\s*小时", body)]
+        authority_hours = model_input.delay_seconds // 3600
+        for hours in claimed_hours:
+            matches_authority = hours == authority_hours
+            mentions_threshold = authority_hours < 24 and hours == 24
+            if not matches_authority and not mentions_threshold:
+                return False
+    return True
 
 
 def customer_communication_provider_request(

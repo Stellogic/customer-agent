@@ -6,7 +6,13 @@ import { consumeSseEvents, hasOnlyKeys, isRecord, parseViewCursor } from "./stre
 
 const SCHEMA = "intake-assistance-v1" as const;
 const statuses = ["QUEUED", "CLAIMED", "WAITING_FOR_CUSTOMER"] as const;
-const issueKinds = ["LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE"] as const;
+const issueKinds = [
+  "LOGISTICS_DELAY",
+  "PACKAGE_NOT_RECEIVED",
+  "DUPLICATE_CHARGE",
+  "ORDER_OPERATION_OR_RULE",
+  "OTHER",
+] as const;
 type AssistanceStatus = (typeof statuses)[number];
 type IssueKind = (typeof issueKinds)[number];
 
@@ -408,6 +414,8 @@ function emptyIssues(): DraftIssues {
     LOGISTICS_DELAY: { selected: false, summary: "" },
     PACKAGE_NOT_RECEIVED: { selected: false, summary: "" },
     DUPLICATE_CHARGE: { selected: false, summary: "" },
+    ORDER_OPERATION_OR_RULE: { selected: false, summary: "" },
+    OTHER: { selected: false, summary: "" },
   };
 }
 
@@ -545,6 +553,8 @@ function issueLabel(kind: IssueKind) {
     LOGISTICS_DELAY: "物流延迟",
     PACKAGE_NOT_RECEIVED: "包裹未收到",
     DUPLICATE_CHARGE: "重复扣款",
+    ORDER_OPERATION_OR_RULE: "地址或取消规则",
+    OTHER: "其他问题",
   }[kind];
 }
 
