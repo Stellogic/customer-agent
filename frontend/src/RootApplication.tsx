@@ -60,7 +60,7 @@ export function RootApplication() {
             <Route path={ROUTES.internalLogin} element={<LoginRoute audience="internal" />} />
             <Route path={ROUTES.states} element={<StateGallery />} />
             <Route path={ROUTES.forbidden} element={<PublicForbiddenRoute />} />
-            <Route path={ROUTES.notFound} element={<NotFound />} />
+            <Route path={ROUTES.notFound} element={<PublicNotFoundRoute />} />
             {LEGACY_ROUTE_REDIRECTS.map((route) => (
               <Route key={route.path} path={route.path} element={<LegacyRoute to={route.to} />} />
             ))}
@@ -103,7 +103,7 @@ export function RootApplication() {
                 })}
               </Route>
             </Route>
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={<PublicNotFoundRoute />} />
           </Routes>
         </Suspense>
       </BrowserRouter>
@@ -252,63 +252,170 @@ function Forbidden() {
 }
 
 function PublicForbiddenRoute() {
-  const [session, setSession] = useState<CurrentSession>();
+  const state = usePublicSessionState();
+
+  if (state.status === "loading") {
+    return (
+      <ForbiddenState
+        actions={<StateGalleryAction />}
+        description="正在确认当前身份。系统不会加载任何受保护内容，请稍候。"
+      />
+    );
+  }
+
+  if (state.status === "unavailable") {
+    return (
+      <ForbiddenState
+        actions={
+          <>
+            <PublicLoginActions />
+            <StateGalleryAction />
+          </>
+        }
+        description="当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。"
+      />
+    );
+  }
+
+  if (state.status === "anonymous") {
+    return (
+      <ForbiddenState
+        actions={
+          <>
+            <PublicLoginActions />
+            <StateGalleryAction />
+          </>
+        }
+        description="当前未登录或没有访问此页面的权限。系统不会加载任何受保护内容，请从安全登录入口重新开始。"
+      />
+    );
+  }
+
+  const isCustomer = state.session.subjectType === "CUSTOMER";
+  return (
+    <ForbiddenState
+      actions={
+        <>
+          <Link className="route-state-action" to={defaultPathFor(state.session)}>
+            {isCustomer ? "返回帮助中心" : "返回可访问工作区"}
+          </Link>
+          <StateGalleryAction />
+        </>
+      }
+      description={
+        isCustomer
+          ? "当前客户身份不能进入这个内部页面。系统不会加载任何内部工作台数据，请返回帮助中心继续。"
+          : "当前工作人员没有访问此页面的权限。系统不会加载未授权的工单详情、审批证据或内部备注，请返回当前职责允许的工作区。"
+      }
+    />
+  );
+}
+
+function PublicNotFoundRoute() {
+  const state = usePublicSessionState();
+
+  if (state.status === "loading") {
+    return (
+      <NotFound
+        actions={<StateGalleryAction />}
+        description="正在确认当前身份，以提供安全返回入口。系统不会加载任何受保护内容。"
+      />
+    );
+  }
+
+  if (state.status === "unavailable") {
+    return (
+      <NotFound
+        actions={
+          <>
+            <PublicLoginActions />
+            <StateGalleryAction />
+          </>
+        }
+        description="当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。"
+      />
+    );
+  }
+
+  if (state.status === "anonymous") {
+    return (
+      <NotFound
+        actions={
+          <>
+            <PublicLoginActions />
+            <StateGalleryAction />
+          </>
+        }
+        description="当前未登录，无法确定适合你的工作区。系统不会加载任何受保护内容，请从安全登录入口重新开始。"
+      />
+    );
+  }
+
+  const isCustomer = state.session.subjectType === "CUSTOMER";
+  return (
+    <NotFound
+      actions={
+        <>
+          <Link className="route-state-action" to={defaultPathFor(state.session)}>
+            {isCustomer ? "返回帮助中心" : "返回可访问工作区"}
+          </Link>
+          <StateGalleryAction />
+        </>
+      }
+      description={
+        isCustomer
+          ? "当前客户身份找不到这个页面。系统没有加载受保护内容，请返回帮助中心继续。"
+          : "当前工作人员找不到这个页面。系统没有加载受保护工单或审批内容，请返回当前职责允许的工作区。"
+      }
+    />
+  );
+}
+
+type PublicSessionState =
+  | { status: "loading" }
+  | { status: "anonymous" }
+  | { status: "authenticated"; session: CurrentSession }
+  | { status: "unavailable" };
+
+function usePublicSessionState(): PublicSessionState {
+  const [state, setState] = useState<PublicSessionState>({ status: "loading" });
 
   useEffect(() => {
     let active = true;
     void loadOptionalCurrentSession()
-      .then((current) => {
-        if (active) setSession(current);
+      .then((session) => {
+        if (!active) return;
+        setState(session ? { status: "authenticated", session } : { status: "anonymous" });
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (active) setState({ status: "unavailable" });
+      });
     return () => {
       active = false;
     };
   }, []);
 
-  if (!session) {
-    return (
-      <ForbiddenState
-        actions={
-          <>
-            <Link className="route-state-action" to={ROUTES.customerLogin}>
-              前往客户登录
-            </Link>
-            <Link
-              className="route-state-action route-state-action-secondary"
-              to={ROUTES.internalLogin}
-            >
-              前往内部登录
-            </Link>
-            <Link className="route-state-action route-state-action-secondary" to={ROUTES.states}>
-              查看状态画廊
-            </Link>
-          </>
-        }
-        description="当前会话无法访问此页面。系统不会加载任何受保护内容，请从安全登录入口重新开始。"
-      />
-    );
-  }
+  return state;
+}
 
-  const customer = session.subjectType === "CUSTOMER";
+function PublicLoginActions() {
   return (
-    <ForbiddenState
-      actions={
-        <>
-          <Link className="route-state-action" to={defaultPathFor(session)}>
-            {customer ? "返回帮助中心" : "返回可访问工作区"}
-          </Link>
-          <Link className="route-state-action route-state-action-secondary" to={ROUTES.states}>
-            查看状态画廊
-          </Link>
-        </>
-      }
-      description={
-        customer
-          ? "当前客户身份不能进入这个内部页面。系统不会加载任何内部工作台数据，请返回帮助中心继续。"
-          : "当前工作人员没有访问此页面的权限。系统不会加载未授权的工单详情、审批证据或内部备注，请返回当前职责允许的工作区。"
-      }
-    />
+    <>
+      <Link className="route-state-action" to={ROUTES.customerLogin}>
+        前往客户登录
+      </Link>
+      <Link className="route-state-action route-state-action-secondary" to={ROUTES.internalLogin}>
+        前往内部登录
+      </Link>
+    </>
+  );
+}
+
+function StateGalleryAction() {
+  return (
+    <Link className="route-state-action route-state-action-secondary" to={ROUTES.states}>
+      查看状态画廊
+    </Link>
   );
 }
 
@@ -327,29 +434,14 @@ function ForbiddenState({ actions, description }: { actions: ReactNode; descript
   );
 }
 
-function NotFound() {
+function NotFound({ actions, description }: { actions: ReactNode; description: string }) {
   return (
     <SystemState
-      actions={
-        <>
-          <Link className="route-state-action" to={ROUTES.customerLogin}>
-            前往客户登录
-          </Link>
-          <Link
-            className="route-state-action route-state-action-secondary"
-            to={ROUTES.internalLogin}
-          >
-            前往内部登录
-          </Link>
-          <Link className="route-state-action route-state-action-secondary" to={ROUTES.states}>
-            查看状态画廊
-          </Link>
-        </>
-      }
+      actions={actions}
       announcement="status"
       announcementLabel="页面未找到说明"
       code="404"
-      description="请检查地址，或从安全登录入口重新开始。"
+      description={description}
       eyebrow="WAYFINDING"
       title="没有找到这个页面"
       variant="not-found"
