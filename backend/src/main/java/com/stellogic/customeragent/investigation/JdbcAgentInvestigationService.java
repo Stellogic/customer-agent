@@ -408,6 +408,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         int ticketUpdated = ticketResolution.fromAgentInvestigation(ticketId, now);
         if (ticketUpdated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
         completeGeneration(generationId, databaseTime);
+        publicProjection.completeAgentReplyStream(
+                ticketId, generationId, conclusion.customerReply().body(), now);
         publicProjection.appendAgentMessage(
                 ticketId, generationId, conclusion.customerReply().body(), now, true);
         jdbc.update(
@@ -480,6 +482,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
+        publicProjection.completeAgentReplyStream(
+                ticketId, generationId, conclusion.customerReply().body(), now);
         publicProjection.appendAgentMessage(
                 ticketId, generationId, conclusion.customerReply().body(), now, false);
         jdbc.update(

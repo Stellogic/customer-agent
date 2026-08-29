@@ -524,18 +524,14 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
             {"type": "PROGRESS", "stage": "COMPOSING_REPLY"},
         )
         try:
-            customer_reply = await customer_communication_model.compose(communication_input)
+            publish_delta = _reply_delta_publisher(
+                client, base_url, ticket_id, generation_id, scope_headers
+            )
+            customer_reply = await customer_communication_model.compose(
+                communication_input, on_body_delta=publish_delta
+            )
             validate_customer_reply_envelope(communication_input, customer_reply)
         except Exception:
-            await _publish_reply_event(
-                client,
-                base_url,
-                ticket_id,
-                generation_id,
-                scope_headers,
-                "failed",
-                {"type": "FAILED"},
-            )
             communication_evidence = _communication_call_evidence(
                 communication_audit_offset, "MODEL_CALL_FAILED"
             )
@@ -555,15 +551,6 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 communication_evidence,
             )
         if customer_reply.intent is CustomerReplyIntent.HUMAN_HANDOFF:
-            await _publish_reply_event(
-                client,
-                base_url,
-                ticket_id,
-                generation_id,
-                scope_headers,
-                "aborted-human-handoff",
-                {"type": "ABORTED"},
-            )
             communication_evidence = _communication_call_evidence(communication_audit_offset, "")
             return await _human_handoff(
                 client,
@@ -580,14 +567,6 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 judgment_evidence,
                 communication_evidence,
             )
-        await _publish_validated_reply(
-            client,
-            base_url,
-            ticket_id,
-            generation_id,
-            scope_headers,
-            customer_reply.body,
-        )
         completion = {**conclusion, "customerReply": customer_reply.as_request_value()}
         try:
             conclusion_response = await _request_with_retries(
@@ -603,15 +582,6 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
             )
         except httpx.HTTPStatusError as error:
             if error.response.status_code == 422:
-                await _publish_reply_event(
-                    client,
-                    base_url,
-                    ticket_id,
-                    generation_id,
-                    scope_headers,
-                    "failed-conclusion-rejected",
-                    {"type": "FAILED"},
-                )
                 return await _human_handoff(
                     client,
                     base_url,
@@ -626,26 +596,8 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                     ),
                     judgment_evidence,
                 )
-            await _publish_reply_event(
-                client,
-                base_url,
-                ticket_id,
-                generation_id,
-                scope_headers,
-                "failed-conclusion-error",
-                {"type": "FAILED"},
-            )
             raise
         if conclusion_response is None:
-            await _publish_reply_event(
-                client,
-                base_url,
-                ticket_id,
-                generation_id,
-                scope_headers,
-                "failed-conclusion-timeout",
-                {"type": "FAILED"},
-            )
             return await _human_handoff(
                 client,
                 base_url,
@@ -660,15 +612,6 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 ),
                 judgment_evidence,
             )
-        await _publish_reply_event(
-            client,
-            base_url,
-            ticket_id,
-            generation_id,
-            scope_headers,
-            "completed",
-            {"type": "COMPLETED"},
-        )
         return {
             "facts": facts,
             "conclusion": conclusion,
@@ -1196,33 +1139,63 @@ def _tool_attempt_budget() -> int:
     return min(max(configured, 1), 5)
 
 
-async def _publish_validated_reply(
+def _reply_delta_publisher(
     client: httpx.AsyncClient,
     base_url: str,
     ticket_id: str,
     generation_id: str,
     scope_headers: dict[str, str],
-    body: str,
-) -> None:
-    await _publish_reply_event(
-        client,
-        base_url,
-        ticket_id,
-        generation_id,
-        scope_headers,
-        "stream-started",
-        {"type": "STREAM_STARTED"},
-    )
-    for index, delta in enumerate(_validated_reply_chunks(body)):
-        await _publish_reply_event(
+) -> Callable[[str], Awaitable[None]]:
+    chunk_index = 0
+
+    async def publish(delta: str) -> None:
+        nonlocal chunk_index
+        if chunk_index == 0:
+            await _publish_reply_event_required(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "stream-started",
+                {"type": "STREAM_STARTED"},
+            )
+        await _publish_reply_event_required(
             client,
             base_url,
             ticket_id,
             generation_id,
             scope_headers,
-            f"content-{index}",
-            {"type": "CONTENT_DELTA", "chunkIndex": index, "delta": delta},
+            f"content-{chunk_index}",
+            {"type": "CONTENT_DELTA", "chunkIndex": chunk_index, "delta": delta},
         )
+        chunk_index += 1
+
+    return publish
+
+
+async def _publish_reply_event_required(
+    client: httpx.AsyncClient,
+    base_url: str,
+    ticket_id: str,
+    generation_id: str,
+    scope_headers: dict[str, str],
+    identity_suffix: str,
+    payload: dict[str, object],
+) -> None:
+    response = await _request_with_retries(
+        lambda: client.post(
+            f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/public-reply-events",
+            headers={
+                **scope_headers,
+                "X-Agent-Operation": "PUBLISH_PUBLIC_REPLY_EVENT",
+                "Idempotency-Key": f"{generation_id}:public-reply:{identity_suffix}",
+            },
+            json=payload,
+        )
+    )
+    if response is None:
+        raise httpx.ReadTimeout("public reply stream publication exhausted its retry budget")
 
 
 async def _publish_reply_event(
@@ -1249,19 +1222,6 @@ async def _publish_reply_event(
         # Streaming is a freshness projection. Spring's conclusion endpoint remains authoritative,
         # and an unavailable stream must not manufacture a second business outcome.
         return
-
-
-def _validated_reply_chunks(body: str) -> tuple[str, ...]:
-    chunks: list[str] = []
-    current = ""
-    for character in body:
-        current += character
-        if character in "。；！？" or len(current) >= 96:
-            chunks.append(current)
-            current = ""
-    if current:
-        chunks.append(current)
-    return tuple(chunks)
 
 
 async def _request_with_retries(

@@ -63,15 +63,51 @@ def _completed(body: str, intent: str = "COMPENSATION_REVIEW_PENDING") -> dict[s
     }
 
 
+def _streamed(payload: dict[str, object], *, split_at: int | None = None) -> httpx.Response:
+    output = payload.get("output")
+    text = ""
+    if isinstance(output, list) and output:
+        item = output[0]
+        if isinstance(item, dict) and isinstance(item.get("content"), list):
+            part = item["content"][0]
+            if isinstance(part, dict) and isinstance(part.get("text"), str):
+                text = part["text"]
+    chunks = [text]
+    if split_at is not None:
+        chunks = [text[:split_at], text[split_at:]]
+    events = [
+        {
+            "type": "response.output_text.delta",
+            "sequence_number": index,
+            "delta": chunk,
+        }
+        for index, chunk in enumerate(chunks)
+        if chunk
+    ]
+    events.append(
+        {
+            "type": "response.completed",
+            "sequence_number": len(events),
+            "response": payload,
+        }
+    )
+    content = "".join(
+        f"event: {event['type']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+        for event in events
+    )
+    return httpx.Response(
+        200, headers={"Content-Type": "text/event-stream"}, content=content.encode()
+    )
+
+
 @pytest.mark.asyncio
 async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context() -> None:
     captured: list[httpx.Request] = []
 
     def supplier(request: httpx.Request) -> httpx.Response:
         captured.append(request)
-        return httpx.Response(
-            200,
-            json=_completed(
+        return _streamed(
+            _completed(
                 "调查结果显示，订单 ORDER-C129 的物流出现延迟。"
                 "补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
             ),
@@ -96,6 +132,7 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
         "text",
     }
     assert request["model"] == "deepseek-v4-flash"
+    assert request["stream"] is True
     assert request["reasoning"] == {"effort": "none"}
     assert request["text"]["format"]["strict"] is True
     body_schema = request["text"]["format"]["schema"]["properties"]["body"]
@@ -121,9 +158,8 @@ async def test_clarification_schema_does_not_allow_unrequested_human_handoff() -
 
     def supplier(request: httpx.Request) -> httpx.Response:
         captured.append(request)
-        return httpx.Response(
-            200,
-            json=_completed(
+        return _streamed(
+            _completed(
                 "为确认需要调查的订单，请回复订单确认码（A 或 B）。",
                 "CLARIFICATION_REQUIRED",
             ),
@@ -154,7 +190,7 @@ async def test_clarification_schema_does_not_allow_unrequested_human_handoff() -
 async def test_unsafe_or_invalid_output_fails_closed(payload: dict[str, object]) -> None:
     model = DeepSeekResponsesCustomerCommunicationModel(
         DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
-        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=payload)),
+        transport=httpx.MockTransport(lambda _: _streamed(payload)),
     )
 
     with pytest.raises(CustomerCommunicationFailure):
@@ -189,3 +225,28 @@ async def test_retryable_provider_error_has_two_attempt_bound_and_no_fallback() 
     assert "synthetic-test-key" not in serialized
     assert "忽略规则" not in serialized
     assert "999" not in serialized
+
+
+@pytest.mark.asyncio
+async def test_authorized_body_is_published_from_provider_deltas_before_completion() -> None:
+    body = (
+        "调查结果显示，订单 ORDER-C129 的物流出现延迟。"
+        "补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
+    )
+    payload = _completed(body)
+    serialized = payload["output"][0]["content"][0]["text"]  # type: ignore[index]
+    split_at = serialized.index("补偿建议")
+    published: list[str] = []
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(payload, split_at=split_at)),
+    )
+
+    envelope = await model.compose(_input(), lambda delta: _capture(published, delta))
+
+    assert len(published) == 2
+    assert "".join(published) == envelope.body
+
+
+async def _capture(target: list[str], value: str) -> None:
+    target.append(value)

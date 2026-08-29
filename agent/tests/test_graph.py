@@ -1076,6 +1076,9 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
             if "/capabilities/" in url:
                 assert headers["X-Agent-Operation"] == "USE_INVESTIGATION_CAPABILITY"
                 return Response(_capability_result(url, facts))
+            if url.endswith("/public-reply-events"):
+                assert headers["X-Agent-Operation"] == "PUBLISH_PUBLIC_REPLY_EVENT"
+                return Response({"accepted": True})
             assert headers["X-Agent-Operation"] == "SUBMIT_INVESTIGATION_CONCLUSION"
             assert headers["Idempotency-Key"] == "generation-14:submit-conclusion"
             return Response({"accepted": True, "lifecycleState": "RESOLVED"})
@@ -1155,8 +1158,6 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
         "PROGRESS",
         "STREAM_STARTED",
         "CONTENT_DELTA",
-        "CONTENT_DELTA",
-        "COMPLETED",
     ]
     assert [call[2]["stage"] for call in stream_calls if call[2]["type"] == "PROGRESS"] == [
         "UNDERSTANDING",

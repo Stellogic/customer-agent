@@ -792,7 +792,7 @@ export function App() {
           ...current,
           cursor: event.id,
           messages: duplicate ? current.messages : [...current.messages, message],
-          replyStream: message.author === "AGENT" ? null : current.replyStream,
+          replyStream: current.replyStream,
         };
       }
     } else if (event.type === "AGENT_PROCESSING_TERMINATED") {
@@ -896,6 +896,11 @@ export function App() {
         cursor: event.id,
         ticket: { ...current.ticket, handlingMode: payload.handlingMode },
         clarification: null,
+        replyStream:
+          current.replyStream &&
+          !["COMPLETED", "ABORTED", "FAILED"].includes(current.replyStream.status)
+            ? { status: "FAILED", body: "", progressStage: "COMPOSING_REPLY" }
+            : current.replyStream,
       };
     } else if (
       event.type === "TICKET_RESOLVED" ||
@@ -1289,21 +1294,30 @@ export function App() {
             items={[{ key: snapshot.ticket.id, label: "当前公开沟通" }]}
           />
           <div className="conversation" role="log" aria-live="polite">
-            {snapshot.messages.map((message, index) => (
-              <Bubble
-                key={`${message.sentAt}-${index}`}
-                placement={message.author === "CUSTOMER" ? "end" : "start"}
-                variant={message.author === "AGENT" ? "outlined" : "filled"}
-                content={message.body}
-                header={
-                  message.author === "CUSTOMER"
-                    ? "你"
-                    : message.author === "AGENT"
-                      ? "智能客服"
-                      : "客服"
-                }
-              />
-            ))}
+            {snapshot.messages
+              .filter(
+                (message) =>
+                  !(
+                    message.author === "AGENT" &&
+                    snapshot.replyStream?.status === "COMPLETED" &&
+                    snapshot.replyStream.body === message.body
+                  ),
+              )
+              .map((message, index) => (
+                <Bubble
+                  key={`${message.sentAt}-${index}`}
+                  placement={message.author === "CUSTOMER" ? "end" : "start"}
+                  variant={message.author === "AGENT" ? "outlined" : "filled"}
+                  content={message.body}
+                  header={
+                    message.author === "CUSTOMER"
+                      ? "你"
+                      : message.author === "AGENT"
+                        ? "智能客服"
+                        : "客服"
+                  }
+                />
+              ))}
             {snapshot.replyStream && (
               <>
                 <Bubble

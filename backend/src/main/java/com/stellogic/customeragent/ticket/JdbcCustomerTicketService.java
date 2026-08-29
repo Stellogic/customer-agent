@@ -452,17 +452,6 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                         ticketId);
         CurrentReplyStream currentReplyStream =
                 replyStreams.isEmpty() ? null : replyStreams.getFirst();
-        boolean completedReplyAlreadyPersisted =
-                currentReplyStream != null
-                        && "COMPLETED".equals(currentReplyStream.status())
-                        && messages.stream()
-                                .anyMatch(
-                                        message ->
-                                                "AGENT".equals(message.author())
-                                                        && currentReplyStream
-                                                                .body()
-                                                                .equals(message.body()));
-        CurrentReplyStream replyStream = completedReplyAlreadyPersisted ? null : currentReplyStream;
         return new CustomerPublicSnapshot(
                 ticket.ticketId(),
                 ticket.lifecycleState(),
@@ -474,7 +463,7 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 ticket.agentGeneration(),
                 messages,
                 clarifications.isEmpty() ? null : clarifications.getFirst(),
-                replyStream);
+                currentReplyStream);
     }
 
     @Override

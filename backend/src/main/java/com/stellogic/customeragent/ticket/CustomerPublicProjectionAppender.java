@@ -3,8 +3,10 @@ package com.stellogic.customeragent.ticket;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 
 @Component
 public final class CustomerPublicProjectionAppender {
@@ -59,6 +61,74 @@ public final class CustomerPublicProjectionAppender {
                     "jsonb_build_object('lifecycleState', 'RESOLVED')",
                     now);
         }
+    }
+
+    public void completeAgentReplyStream(
+            UUID ticketId, UUID generationId, String body, Instant now) {
+        java.util.List<ReplyStreamState> streams =
+                jdbc.query(
+                        "select status, body from agent_public_reply_stream where generation_id = ? and ticket_id = ? for update",
+                        (rs, row) -> new ReplyStreamState(rs.getString(1), rs.getString(2)),
+                        generationId,
+                        ticketId);
+        if (streams.isEmpty()) return;
+        ReplyStreamState stream = streams.getFirst();
+        if (!"STREAMING".equals(stream.status()) || !body.equals(stream.body())) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "persisted reply stream does not match the accepted conclusion");
+        }
+        jdbc.update(
+                "update agent_public_reply_stream set status = 'COMPLETED', updated_at = ? where generation_id = ?",
+                Timestamp.from(now),
+                generationId);
+        Long sequence =
+                jdbc.queryForObject(
+                        "select coalesce(max(sequence), 0) + 1 from customer_public_event where ticket_id = ? and epoch = ?",
+                        Long.class,
+                        ticketId,
+                        EPOCH);
+        appendGenerationEvent(
+                ticketId,
+                generationId,
+                sequence,
+                "AGENT_REPLY_COMPLETED",
+                "jsonb_build_object('status', 'COMPLETED')",
+                now);
+    }
+
+    public void terminalizeAgentReplyStream(
+            UUID ticketId, UUID generationId, String status, Instant now) {
+        if (!java.util.Set.of("ABORTED", "FAILED").contains(status)) {
+            throw new IllegalArgumentException("unsupported reply stream terminal status");
+        }
+        java.util.List<String> states =
+                jdbc.query(
+                        "select status from agent_public_reply_stream where generation_id = ? and ticket_id = ? for update",
+                        (rs, row) -> rs.getString(1),
+                        generationId,
+                        ticketId);
+        if (states.isEmpty()
+                || java.util.Set.of("COMPLETED", "ABORTED", "FAILED").contains(states.getFirst()))
+            return;
+        jdbc.update(
+                "update agent_public_reply_stream set status = ?, body = '', next_chunk_index = 0, progress_stage = null, updated_at = ? where generation_id = ?",
+                status,
+                Timestamp.from(now),
+                generationId);
+        Long sequence =
+                jdbc.queryForObject(
+                        "select coalesce(max(sequence), 0) + 1 from customer_public_event where ticket_id = ? and epoch = ?",
+                        Long.class,
+                        ticketId,
+                        EPOCH);
+        appendGenerationEvent(
+                ticketId,
+                generationId,
+                sequence,
+                "ABORTED".equals(status) ? "AGENT_REPLY_ABORTED" : "AGENT_REPLY_FAILED",
+                "jsonb_build_object('status', '" + status + "')",
+                now);
     }
 
     public void appendClarificationMessage(
@@ -255,4 +325,6 @@ public final class CustomerPublicProjectionAppender {
         }
         return generation;
     }
+
+    private record ReplyStreamState(String status, String body) {}
 }
