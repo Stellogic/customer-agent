@@ -160,6 +160,25 @@ class SupportWorkbenchControllerTest {
     }
 
     @Test
+    void nonAssigneeCannotReassignAnActiveTicket() throws Exception {
+        when(service.reassign("support-demo", HANDOFF_TICKET, "internal-demo"))
+                .thenThrow(new SupportTicketNotFoundException());
+
+        mvc.perform(
+                        post(
+                                        "/api/support/workbench/tickets/{ticketId}/reassignments",
+                                        HANDOFF_TICKET)
+                                .principal(support())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","targetSupportId":"internal-demo"}
+                                        """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SUPPORT_TICKET_NOT_FOUND"));
+    }
+
+    @Test
     void claimingAnUnassignedTicketCreatesTheCurrentAssignment() throws Exception {
         when(service.claim("support-demo", HANDOFF_TICKET))
                 .thenReturn(new SupportAssignmentClaim(HANDOFF_TICKET, "support-demo", false));

@@ -236,14 +236,13 @@ class SupportWorkbenchProjectionService {
                         "select support_id from support_assignment where ticket_id = ? and status = 'ACTIVE'",
                         String.class,
                         ticketId);
-        if (!activeAssignees.isEmpty() && targetSupportId.equals(activeAssignees.getFirst())) {
-            return new SupportAssignmentReassignment(
-                    ticketId, targetSupportId, targetSupportId, true);
+        if (activeAssignees.isEmpty() || !actorId.equals(activeAssignees.getFirst())) {
+            throw new SupportTicketNotFoundException();
         }
-        String previousSupportId = activeAssignees.isEmpty() ? null : activeAssignees.getFirst();
-        if (!activeAssignees.isEmpty()) {
-            revokeActiveAssignment(ticketId);
+        if (targetSupportId.equals(actorId)) {
+            return new SupportAssignmentReassignment(ticketId, targetSupportId, actorId, true);
         }
+        revokeActiveAssignment(ticketId);
         jdbc.update(
                 "insert into support_assignment (id, ticket_id, support_id, status, assigned_at) "
                         + "values (?, ?, ?, 'ACTIVE', clock_timestamp())",
@@ -256,8 +255,7 @@ class SupportWorkbenchProjectionService {
                         + "values (?, 'SUPPORT_ASSIGNMENT_REASSIGNED', ?, clock_timestamp())",
                 ticketId,
                 actorId);
-        return new SupportAssignmentReassignment(
-                ticketId, targetSupportId, previousSupportId, false);
+        return new SupportAssignmentReassignment(ticketId, targetSupportId, actorId, false);
     }
 
     @Transactional
