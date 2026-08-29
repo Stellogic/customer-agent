@@ -12,6 +12,7 @@ import {
 } from "react-router-dom";
 import { LoginPage } from "./LoginPage";
 import { SystemState } from "./components/SystemState";
+import { StateGallery } from "./StateGallery";
 import {
   defaultPathFor,
   hasCapability,
@@ -57,6 +58,9 @@ export function RootApplication() {
           <Routes>
             <Route path={ROUTES.customerLogin} element={<LoginRoute audience="customer" />} />
             <Route path={ROUTES.internalLogin} element={<LoginRoute audience="internal" />} />
+            <Route path={ROUTES.states} element={<StateGallery />} />
+            <Route path={ROUTES.forbidden} element={<PublicForbiddenRoute />} />
+            <Route path={ROUTES.notFound} element={<NotFound />} />
             {LEGACY_ROUTE_REDIRECTS.map((route) => (
               <Route key={route.path} path={route.path} element={<LegacyRoute to={route.to} />} />
             ))}
@@ -236,14 +240,86 @@ function RouteError() {
 function Forbidden() {
   const session = CurrentSessionContext.use();
   return (
-    <SystemState
+    <ForbiddenState
       actions={
         <Link className="route-state-action" to={defaultPathFor(session)}>
           返回可访问工作区
         </Link>
       }
-      code="403"
       description="这里没有加载任何受保护内容。你可以返回当前身份可访问的工作区继续操作。"
+    />
+  );
+}
+
+function PublicForbiddenRoute() {
+  const [session, setSession] = useState<CurrentSession>();
+
+  useEffect(() => {
+    let active = true;
+    void loadOptionalCurrentSession()
+      .then((current) => {
+        if (active) setSession(current);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (!session) {
+    return (
+      <ForbiddenState
+        actions={
+          <>
+            <Link className="route-state-action" to={ROUTES.customerLogin}>
+              前往客户登录
+            </Link>
+            <Link
+              className="route-state-action route-state-action-secondary"
+              to={ROUTES.internalLogin}
+            >
+              前往内部登录
+            </Link>
+            <Link className="route-state-action route-state-action-secondary" to={ROUTES.states}>
+              查看状态画廊
+            </Link>
+          </>
+        }
+        description="当前会话无法访问此页面。系统不会加载任何受保护内容，请从安全登录入口重新开始。"
+      />
+    );
+  }
+
+  const customer = session.subjectType === "CUSTOMER";
+  return (
+    <ForbiddenState
+      actions={
+        <>
+          <Link className="route-state-action" to={defaultPathFor(session)}>
+            {customer ? "返回帮助中心" : "返回可访问工作区"}
+          </Link>
+          <Link className="route-state-action route-state-action-secondary" to={ROUTES.states}>
+            查看状态画廊
+          </Link>
+        </>
+      }
+      description={
+        customer
+          ? "当前客户身份不能进入这个内部页面。系统不会加载任何内部工作台数据，请返回帮助中心继续。"
+          : "当前工作人员没有访问此页面的权限。系统不会加载未授权的工单详情、审批证据或内部备注，请返回当前职责允许的工作区。"
+      }
+    />
+  );
+}
+
+function ForbiddenState({ actions, description }: { actions: ReactNode; description: string }) {
+  return (
+    <SystemState
+      actions={actions}
+      announcement="alert"
+      announcementLabel="权限边界说明"
+      code="403"
+      description={description}
       eyebrow="ACCESS BOUNDARY"
       title="当前身份无权访问此页面"
       variant="forbidden"
@@ -265,8 +341,13 @@ function NotFound() {
           >
             前往内部登录
           </Link>
+          <Link className="route-state-action route-state-action-secondary" to={ROUTES.states}>
+            查看状态画廊
+          </Link>
         </>
       }
+      announcement="status"
+      announcementLabel="页面未找到说明"
       code="404"
       description="请检查地址，或从安全登录入口重新开始。"
       eyebrow="WAYFINDING"
