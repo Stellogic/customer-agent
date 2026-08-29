@@ -1,4 +1,6 @@
 $ErrorActionPreference = "Stop"
+. "$PSScriptRoot/test-gate-lock.ps1"
+Assert-TestGateInherited
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $fixture = "$PSScriptRoot/fixtures/gradle-proxy-contract/Dockerfile"
