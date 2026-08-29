@@ -47,6 +47,10 @@ test("Issue #159 真实 Chromium 恢复慢首字节、断线续流、失败与�
   await publish(request, streamingTicket, streamingGeneration, "loading", { type: "LOADING" });
   const context = await newIssue80Context(browser, { viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
+  let disconnectTicketStream = false;
+  await page.route("**/api/customer/v2/tickets/*/events", (route) =>
+    disconnectTicketStream ? route.abort("connectionreset") : route.continue(),
+  );
   await login(page, "customer", "customer-demo");
   await page.goto(`/help?ticket=${streamingTicket}`);
   await expect(page.getByText("等待首个内容片段", { exact: true })).toBeVisible();
@@ -65,7 +69,11 @@ test("Issue #159 真实 Chromium 恢复慢首字节、断线续流、失败与�
   });
   await expect(page.getByText(/经核验，订单 ORDER-DELAY-001/)).toBeVisible();
 
+  disconnectTicketStream = true;
   await page.reload();
+  await expect(page.getByRole("heading", { name: "正在重新同步工单" })).toBeVisible();
+  disconnectTicketStream = false;
+  await page.getByRole("button", { name: "立即重试同步" }).click();
   await expect(page.getByText(/经核验，订单 ORDER-DELAY-001/)).toBeVisible();
   await publish(request, streamingTicket, streamingGeneration, "chunk-1", {
     type: "CONTENT_DELTA",
