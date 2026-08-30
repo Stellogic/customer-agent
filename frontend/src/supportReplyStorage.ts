@@ -25,10 +25,7 @@ export function readPendingReply(ticketId: string): PendingSupportReply | null {
 
 export function storePendingReply(ticketId: string, reply: PendingSupportReply) {
   try {
-    globalThis.sessionStorage.setItem(
-      pendingReplyStorageKey(ticketId),
-      JSON.stringify(reply),
-    );
+    globalThis.sessionStorage.setItem(pendingReplyStorageKey(ticketId), JSON.stringify(reply));
   } catch {
     // Query remains available during this render even if browser storage is unavailable.
   }

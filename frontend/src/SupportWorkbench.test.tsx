@@ -432,14 +432,21 @@ describe("客服共享队列工作台", () => {
     expect(screen.getByText("customer-demo")).toBeInTheDocument();
     expect(screen.getByText("support-demo")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "人工公开回复" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: `领取工单 ${HANDOFF_TICKET}` })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `领取工单 ${HANDOFF_TICKET}` }),
+    ).not.toBeInTheDocument();
   });
 
   it("刷新后恢复同一客服全部 ACTIVE 领取并可切换详情", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path === SNAPSHOT_URL) {
-        return snapshotResponse("support-workbench-v2:5", [], [], [HANDOFF_TICKET, SECOND_HUMAN_TICKET]);
+        return snapshotResponse(
+          "support-workbench-v2:5",
+          [],
+          [],
+          [HANDOFF_TICKET, SECOND_HUMAN_TICKET],
+        );
       }
       if (path === "/api/support/workbench/events") return openStream();
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
@@ -480,7 +487,9 @@ describe("客服共享队列工作台", () => {
     render(<SupportWorkbench />);
 
     expect(await screen.findByText("Agent 处理中")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: `领取工单 ${BREACHED_TICKET}` })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `领取工单 ${BREACHED_TICKET}` }),
+    ).not.toBeInTheDocument();
   });
 
   it("释放领取后清除详情并重新读取权威快照", async () => {

@@ -11,11 +11,7 @@ import { loadCsrfToken } from "./csrf";
 import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import { IntakeAssistancePanel } from "./IntakeAssistancePanel";
-import {
-  clearPendingReply,
-  readPendingReply,
-  storePendingReply,
-} from "./supportReplyStorage";
+import { clearPendingReply, readPendingReply, storePendingReply } from "./supportReplyStorage";
 
 const SUPPORT_SCHEMA = "support-workbench-v2" as const;
 const lifecycleStates = [
@@ -394,8 +390,11 @@ export function SupportWorkbench() {
         "发送结果暂未确认；请查询 Spring 权威结果，不要重复发送。",
       );
     }
-    const result =
-      (await parseReplyResponse(response, ticketId, idempotencyKey)) as SupportPublicReplyResponse;
+    const result = (await parseReplyResponse(
+      response,
+      ticketId,
+      idempotencyKey,
+    )) as SupportPublicReplyResponse;
     void refreshTicketDetails(ticketId);
     return result;
   }
@@ -411,26 +410,21 @@ export function SupportWorkbench() {
       throw new SupportReplyUncertainError("仍无法连接 Spring；请稍后再次查询发送结果。");
     }
     if (response.status === 404) {
-      throw new SupportReplyRejectedError(
-        "Spring 未找到该发送请求，可以安全重试公开回复。",
-      );
+      throw new SupportReplyRejectedError("Spring 未找到该发送请求，可以安全重试公开回复。");
     }
     if (!response.ok) {
-      throw new SupportReplyUncertainError(
-        "Spring 尚未返回可确认结果；请不要重新发送相同内容。",
-      );
+      throw new SupportReplyUncertainError("Spring 尚未返回可确认结果；请不要重新发送相同内容。");
     }
-    const result =
-      (await parseReplyResponse(response, ticketId, idempotencyKey)) as SupportPublicReplyResponse;
+    const result = (await parseReplyResponse(
+      response,
+      ticketId,
+      idempotencyKey,
+    )) as SupportPublicReplyResponse;
     void refreshTicketDetails(ticketId);
     return result;
   }
 
-  async function parseReplyResponse(
-    response: Response,
-    ticketId: string,
-    idempotencyKey: string,
-  ) {
+  async function parseReplyResponse(response: Response, ticketId: string, idempotencyKey: string) {
     try {
       const value = (await response.json()) as unknown;
       if (
@@ -766,16 +760,11 @@ function TicketDetail({
     idempotencyKey: string,
     body: string,
   ) => Promise<SupportPublicReplyResponse>;
-  onQueryReply: (
-    ticketId: string,
-    idempotencyKey: string,
-  ) => Promise<SupportPublicReplyResponse>;
+  onQueryReply: (ticketId: string, idempotencyKey: string) => Promise<SupportPublicReplyResponse>;
   onRelease: () => void;
 }) {
   const storedPendingReply = readPendingReply(details.ticketId);
-  const [draft, setDraft] = useState(
-    () => storedPendingReply?.body ?? "",
-  );
+  const [draft, setDraft] = useState(() => storedPendingReply?.body ?? "");
   const [replyState, setReplyState] = useState<
     "idle" | "sending" | "unknown" | "querying" | "error"
   >(() => (storedPendingReply ? "unknown" : "idle"));
@@ -810,9 +799,7 @@ function TicketDetail({
         clearPendingReply(details.ticketId);
         setPendingIdempotencyKey(null);
         setReplyState("error");
-        setReplyNotice(
-          error instanceof Error ? error.message : "公开回复未被接受，请稍后重试。",
-        );
+        setReplyNotice(error instanceof Error ? error.message : "公开回复未被接受，请稍后重试。");
       }
     }
   }
@@ -928,9 +915,7 @@ function TicketDetail({
           {replyNotice && (
             <p
               className={replyState === "error" ? "error" : "support-reply-notice"}
-              role={
-                replyState === "error" || replyState === "unknown" ? "alert" : "status"
-              }
+              role={replyState === "error" || replyState === "unknown" ? "alert" : "status"}
             >
               {replyNotice}
             </p>
