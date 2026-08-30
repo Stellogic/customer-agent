@@ -1,14 +1,19 @@
 import { Link } from "react-router-dom";
 
 type BrandProps = {
-  audience: "customer" | "internal";
+  audience: "customer" | "internal" | "system";
   to: string;
   tone?: "light" | "dark";
   className?: string;
 };
 
 export function Brand({ audience, to, tone = "light", className = "" }: BrandProps) {
-  const context = audience === "customer" ? "客户帮助中心" : "内部工作台";
+  const context =
+    audience === "customer"
+      ? "客户帮助中心"
+      : audience === "internal"
+        ? "内部工作台"
+        : "系统状态画廊";
   return (
     <Link
       aria-label={"Stellogic " + context}
