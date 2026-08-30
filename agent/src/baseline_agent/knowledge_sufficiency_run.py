@@ -35,6 +35,39 @@ OPT_IN = "issue-190-synthetic-sufficiency-c-once"
 PHASE = "seen_development"
 
 
+def decision_diagnostic(text: str, api_key: str) -> dict[str, Any]:
+    """仅取证已通过envelope检查的合成判定文本,不改变原解析或判定。"""
+    def redact(value: str) -> str:
+        if api_key:
+            value = value.replace(json.dumps(api_key)[1:-1], "[REDACTED]")
+            value = value.replace(api_key, "[REDACTED]")
+        return value
+
+    # 先脱敏再截断,避免凭据跨截断点留下前缀;hash针对完整脱敏文本。
+    sanitized = redact(text)
+    diagnostic: dict[str, Any] = {
+        "output_text": sanitized[:4096],
+        "sanitized_text_sha256": sha256(sanitized.encode("utf-8")),
+        "sanitized_char_count": len(sanitized),
+        "truncated": len(sanitized) > 4096,
+        "top_level_type": None,
+        "fields": [],
+    }
+    try:
+        decision = json.loads(text)
+    except json.JSONDecodeError:
+        diagnostic["json_valid"] = False
+        return diagnostic
+    diagnostic.update(json_valid=True, top_level_type=type(decision).__name__)
+    if isinstance(decision, dict):
+        diagnostic["field_count"] = len(decision)
+        diagnostic["fields"] = [
+            {"name": redact(key)[:64], "type": type(value).__name__}
+            for key, value in list(decision.items())[:16]
+        ]
+    return diagnostic
+
+
 def write_json(path: Path, value: dict[str, Any]) -> None:
     """调用前预留和调用后结算都持久化;异常不清理尚未结算的预留。"""
     temporary = path.with_suffix(".pending-write")
@@ -209,6 +242,14 @@ async def run_development(
                 raise SufficiencyBlocked("SUPPLIER_TIMEOUT_OR_TRANSPORT_ERROR") from None
             except SufficiencyBlocked as error:
                 observation["failure"] = str(error)
+                if str(error) in {
+                    "INVALID_DECISION_JSON", "INVALID_DECISION_SCHEMA", "INVALID_EVIDENCE"
+                }:
+                    # 这些错误仅在固定envelope/单个output_text检查通过后出现。
+                    # 不复制供应商error正文、请求头或整个响应,仍由finally结算并抛原错。
+                    observation["decision_diagnostic"] = decision_diagnostic(
+                        payload["output"][0]["content"][0]["text"], api_key
+                    )
                 raise
             finally:
                 observation["duration_ms"] = round((time.perf_counter() - started) * 1000)

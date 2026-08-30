@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -165,6 +166,90 @@ def test_invalid_citation_and_identity_drift_are_errors_not_abstentions() -> Non
         parse_response(response, row(), expected_identity=None, duration_ms=2)
     with pytest.raises(SufficiencyBlocked, match="INCOMPLETE_REPLAY"):
         replay_metrics([row()], [False])
+
+
+@pytest.mark.asyncio
+async def test_invalid_decision_is_preserved_redacted_settled_and_not_retried(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(runner, "development_rows", lambda: [row(i) for i in range(72)])
+    calls = 0
+    secret = "offline-secret-must-not-leak"
+    invalid = json.dumps({"sufficient": "false", "evidence": [], "extra": secret})
+
+    def handle(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        response = payload()
+        response["output"][0]["content"][0]["text"] = invalid
+        return httpx.Response(200, json=response)
+
+    frozen = contract()
+    path = tmp_path / "cost.json"
+    ledger = ExperimentLedger(path, frozen)
+    report: dict[str, Any] = {"run_id": "invalid-decision-test", "metrics": None}
+    with pytest.raises(SufficiencyBlocked, match="INVALID_DECISION_SCHEMA"):
+        await run_development(
+            report, ledger, frozen, api_key=secret, transport=httpx.MockTransport(handle)
+        )
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    observation = persisted["attempts"][0]["observation"]
+    diagnostic = observation["decision_diagnostic"]
+    assert diagnostic["output_text"] == invalid.replace(secret, "[REDACTED]")
+    assert diagnostic["truncated"] is False
+    assert diagnostic["top_level_type"] == "dict"
+    assert diagnostic["fields"] == [
+        {"name": "sufficient", "type": "str"},
+        {"name": "evidence", "type": "list"},
+        {"name": "extra", "type": "str"},
+    ]
+    assert observation["failure"] == "INVALID_DECISION_SCHEMA"
+    assert secret not in json.dumps([report, persisted])
+    assert calls == 1
+    assert report["rows"] == [] and report["metrics"] is None
+    assert ledger.totals() == {
+        "settled_upper_micro_cny": 480,
+        "unsettled_reserved_micro_cny": 0,
+    }
+
+
+@pytest.mark.asyncio
+async def test_invalid_json_diagnostic_is_bounded_without_changing_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(runner, "development_rows", lambda: [row(i) for i in range(72)])
+    secret = "offline-secret-crossing-cutoff"
+    invalid = "x" * 4090 + secret + "y" * 100
+    calls = 0
+
+    def handle(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        response = payload()
+        response["output"][0]["content"][0]["text"] = invalid
+        return httpx.Response(200, json=response)
+
+    frozen = contract()
+    ledger = ExperimentLedger(tmp_path / "cost.json", frozen)
+    report: dict[str, Any] = {"run_id": "bounded-invalid-json", "metrics": None}
+    with pytest.raises(SufficiencyBlocked, match="INVALID_DECISION_JSON"):
+        await run_development(
+            report, ledger, frozen, api_key=secret, transport=httpx.MockTransport(handle)
+        )
+    diagnostic = ledger.state["attempts"][0]["observation"]["decision_diagnostic"]
+    sanitized = "x" * 4090 + "[REDACTED]" + "y" * 100
+    assert len(diagnostic["output_text"]) == 4096
+    assert diagnostic["output_text"].endswith("[REDAC")
+    assert diagnostic["truncated"] is True
+    assert diagnostic["sanitized_char_count"] == 4200
+    assert diagnostic["sanitized_text_sha256"] == hashlib.sha256(sanitized.encode()).hexdigest()
+    assert diagnostic["json_valid"] is False
+    assert diagnostic["top_level_type"] is None
+    assert "offline-secret" not in json.dumps([report, ledger.state])
+    assert calls == 1 and report["metrics"] is None
+    assert ledger.totals()["unsettled_reserved_micro_cny"] == 0
 
 
 @pytest.mark.asyncio
