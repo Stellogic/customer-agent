@@ -1,0 +1,82 @@
+"""本票隔离数据库的实际硬过滤回归；不读取冻结或留出数据。"""
+import json
+import os
+from pathlib import Path
+
+import httpx
+import psycopg
+
+BASE = "http://backend:8080"
+ENDPOINT = "/api/internal/knowledge/development-candidates"
+report = {"head_sha": os.environ["SOURCE_SHA"], "run_id": os.environ["RUN_ID"], "checks": {}, "observations": []}
+
+
+def login(client, username):
+    csrf = client.get("/api/auth/csrf").json()
+    response = client.post("/api/auth/login", headers={csrf["headerName"]: csrf["token"]}, data={"username": username, "password": "local-demo-password"})
+    assert response.status_code == 204
+
+
+def save(name, response):
+    report["observations"].append({"name": name, "status": response.status_code, "body": response.text})
+
+
+try:
+    with httpx.Client(base_url=BASE, timeout=120) as support, httpx.Client(base_url=BASE, timeout=120) as customer, httpx.Client(base_url=BASE, timeout=120) as anonymous, psycopg.connect("postgresql://postgres:local-postgres-superuser@postgres:5432/customer_agent", autocommit=True) as db:
+        login(support, "support-demo")
+        login(customer, "customer-demo")
+        article = "development-ceramic-a"
+        detail = support.get(f"/api/internal/knowledge/articles/{article}")
+        detail.raise_for_status()
+        chunk = detail.json()["article"]["chunks"][0]
+        query = chunk["content"]
+        target = chunk["chunkId"]
+        params = {"q": query, "scope": "INTERNAL"}
+        baseline = support.get(ENDPOINT, params=params)
+        baseline.raise_for_status()
+        save("legal_before", baseline)
+        for key in ("lexicalCandidates", "vectorCandidates", "fusedCandidates"):
+            assert target in [hit["chunkId"] for hit in baseline.json()[key]], key
+        for name, client, expected in (("anonymous", anonymous, 401), ("customer", customer, 403)):
+            response = client.get(ENDPOINT, params=params)
+            save(name, response)
+            assert response.status_code == expected
+        report["checks"]["authorization"] = "PASS"
+        cases = [
+            ("not_current", "UPDATE knowledge_article SET is_current=false WHERE article_id=%s", "UPDATE knowledge_article SET is_current=true WHERE article_id=%s"),
+            ("retired", "UPDATE knowledge_article SET is_current=false, publication_status='RETIRED' WHERE article_id=%s", "UPDATE knowledge_article SET is_current=true, publication_status='PUBLISHED' WHERE article_id=%s"),
+            ("article_scope", "UPDATE knowledge_article SET applicability=ARRAY['APPROVER'] WHERE article_id=%s", "UPDATE knowledge_article SET applicability=ARRAY['INTERNAL'] WHERE article_id=%s"),
+            ("chunk_scope", "UPDATE knowledge_chunk SET applicability=ARRAY['APPROVER'] WHERE article_id=%s", "UPDATE knowledge_chunk SET applicability=ARRAY['INTERNAL'] WHERE article_id=%s"),
+        ]
+        for name, mutate, restore in cases:
+            try:
+                db.execute(mutate, (article,))
+                response = support.get(ENDPOINT, params=params)
+                response.raise_for_status()
+                save(name, response)
+                for key in ("lexicalCandidates", "vectorCandidates", "fusedCandidates"):
+                    assert article not in [hit["articleId"] for hit in response.json()[key]], (name, key)
+            finally:
+                db.execute(restore, (article,))
+        report["checks"]["current_version"] = "PASS"
+        forbidden = support.get(ENDPOINT, params={"q": query, "scope": "APPROVER"})
+        forbidden.raise_for_status()
+        save("request_forbidden_scope", forbidden)
+        assert all(not forbidden.json()[key] for key in ("lexicalCandidates", "vectorCandidates", "fusedCandidates"))
+        report["checks"]["scope"] = "PASS"
+        after = support.get(ENDPOINT, params=params)
+        after.raise_for_status()
+        save("legal_restored", after)
+        assert after.json() == baseline.json()
+        migrations = db.execute("SELECT version, success FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank").fetchall()
+        report["migrations"] = migrations
+        assert ("42", True) in migrations and all(ok for _, ok in migrations)
+        report["status"] = "PASS"
+except Exception as error:
+    report["status"] = "FAIL"
+    report["error"] = type(error).__name__ + ": " + str(error)
+finally:
+    Path("/run-evidence/safety-db.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+if report["status"] != "PASS":
+    raise SystemExit(1)
+print("SAFETY_DB_PASS")
