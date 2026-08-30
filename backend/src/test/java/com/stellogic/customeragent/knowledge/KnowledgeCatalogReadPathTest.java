@@ -76,8 +76,10 @@ class KnowledgeCatalogReadPathTest {
         assertThat(response.article().articleId()).isEqualTo("logistics-delay");
         assertThat(response.article().version()).isEqualTo("v1");
         assertThat(response.article().current()).isFalse();
-        assertThat(sql.getAllValues().getFirst()).contains("a.version = ?");
-        assertThat(sql.getAllValues().getFirst()).doesNotContain("a.is_current");
+        String articleSql = sql.getAllValues().getFirst();
+        assertThat(articleSql).contains("a.version = ?");
+        assertThat(articleSql).contains("a.is_current");
+        assertThat(articleSql).doesNotContain("a.is_current and a.applicability");
     }
 
     private static JdbcKnowledgeCatalogService service(JdbcTemplate jdbc) {
