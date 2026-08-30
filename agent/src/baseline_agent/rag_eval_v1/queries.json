@@ -1,0 +1,2405 @@
+{
+  "dataset_id": "rag-eval-v1",
+  "queries": [
+    {
+      "id": "ans-logistics-01",
+      "kind": "answered",
+      "query": "物流节点超过承诺时间没有更新时应该怎么处理？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-logistics-02",
+      "kind": "answered",
+      "query": "物流延迟知识条目能否替代 Spring 返回的订单、物流或补偿结果？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-logistics-03",
+      "kind": "answered",
+      "query": "物流延迟事实不足或规则与当前订单冲突时客服应如何处理？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "客服可以引用当前条目的标题、更新时间和具体片段；如果事实不足或规则与当前订单冲突，应保留问题并转人工核验。",
+              "start_line": 14,
+              "end_line": 14
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-logistics-04",
+      "kind": "answered",
+      "query": "快递一直不更新啊，我该先看啥？",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-logistics-05",
+      "kind": "answered",
+      "query": "包裹卡着不动了咋跟客户说",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            },
+            {
+              "text": "客服可以引用当前条目的标题、更新时间和具体片段；如果事实不足或规则与当前订单冲突，应保留问题并转人工核验。",
+              "start_line": 14,
+              "end_line": 14
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-logistics-06",
+      "kind": "answered",
+      "query": "物流超时没动静…下一步？",
+      "query_styles": [
+        "ellipsis"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-logistics-07",
+      "kind": "answered",
+      "query": "节点超了承诺时间…要先核权威状态吗",
+      "query_styles": [
+        "ellipsis"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-logistics-08",
+      "kind": "answered",
+      "query": "物留延迟了怎么处理",
+      "query_styles": [
+        "typo"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-logistics-09",
+      "kind": "answered",
+      "query": "物流延迟SOP是先核订单还是直接解释？",
+      "query_styles": [
+        "abbreviation"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-logistics-10",
+      "kind": "answered",
+      "query": "配送晚点一直没轨迹更新怎么办",
+      "query_styles": [
+        "synonym"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-logistics-11",
+      "kind": "answered",
+      "query": "单子在路上趴窝了，先核啥再解释？",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-logistics-12",
+      "kind": "answered",
+      "query": "运单超期未更新要不要先对一下权威状态",
+      "query_styles": [
+        "synonym"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "ans-refund-01",
+      "kind": "answered",
+      "query": "部分退款的资格、金额和执行结果以什么为准？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-refund-02",
+      "kind": "answered",
+      "query": "待审批的退款提案能不能对客户说已经批准或已经退款？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-refund-03",
+      "kind": "answered",
+      "query": "回复客户时如何区分补偿建议、审批决定和执行结果？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "回复客户时应区分补偿建议、审批决定和执行结果，并在引用本条规则时保留条目标识、版本和具体片段位置。",
+              "start_line": 14,
+              "end_line": 14
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-refund-04",
+      "kind": "answered",
+      "query": "退一部分钱到底批了没，我能直接跟客户说已经退了吗",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-refund-05",
+      "kind": "answered",
+      "query": "退款还在审呢怎么回客户",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-refund-06",
+      "kind": "answered",
+      "query": "部分退…金额谁说了算？",
+      "query_styles": [
+        "ellipsis"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-refund-07",
+      "kind": "answered",
+      "query": "申请还在审批…能不能说已经批准？",
+      "query_styles": [
+        "ellipsis"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-refund-08",
+      "kind": "answered",
+      "query": "部份退款资格看哪",
+      "query_styles": [
+        "typo"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-refund-09",
+      "kind": "answered",
+      "query": "部分退款沟通规范怎么写执行结果",
+      "query_styles": [
+        "abbreviation"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。",
+              "start_line": 12,
+              "end_line": 12
+            },
+            {
+              "text": "回复客户时应区分补偿建议、审批决定和执行结果，并在引用本条规则时保留条目标识、版本和具体片段位置。",
+              "start_line": 14,
+              "end_line": 14
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-refund-10",
+      "kind": "answered",
+      "query": "退一部分货款的金额必须用权威结果吗",
+      "query_styles": [
+        "synonym"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-refund-11",
+      "kind": "answered",
+      "query": "还没批下来就说已经打款了行不行",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-refund-12",
+      "kind": "answered",
+      "query": "引用退款规则时要不要带条目标识和版本",
+      "query_styles": [
+        "synonym"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+          "required_snippets": [
+            {
+              "text": "回复客户时应区分补偿建议、审批决定和执行结果，并在引用本条规则时保留条目标识、版本和具体片段位置。",
+              "start_line": 14,
+              "end_line": 14
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-01",
+      "kind": "answered",
+      "query": "审批人应根据什么作出批准或驳回决定？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-02",
+      "kind": "answered",
+      "query": "知识条目会不会授予额外审批权限？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-03",
+      "kind": "answered",
+      "query": "审批租约、禁止自审和额度核对由谁强制执行？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-04",
+      "kind": "answered",
+      "query": "审批的时候看哪一版提案啊",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-05",
+      "kind": "answered",
+      "query": "知识文章能让我多批一点额度吗",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-06",
+      "kind": "answered",
+      "query": "批准还是驳回…依据啥？",
+      "query_styles": [
+        "ellipsis"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-07",
+      "kind": "answered",
+      "query": "自审行不行…谁卡住的？",
+      "query_styles": [
+        "ellipsis"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-08",
+      "kind": "answered",
+      "query": "补尝审批审查要点看啥",
+      "query_styles": [
+        "typo"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-09",
+      "kind": "answered",
+      "query": "审批SOP禁止自审是谁执行",
+      "query_styles": [
+        "abbreviation"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-10",
+      "kind": "answered",
+      "query": "当前授权提案版本和审批证据够不够做决定",
+      "query_styles": [
+        "synonym"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-11",
+      "kind": "answered",
+      "query": "我能靠这篇知识绕过额度核对吗",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "ans-approval-12",
+      "kind": "answered",
+      "query": "驳回决定是不是只看当前提案版本",
+      "query_styles": [
+        "synonym"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "applicability": [
+            "INTERNAL",
+            "APPROVER"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+          "required_snippets": [
+            {
+              "text": "审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-01",
+      "kind": "unanswered",
+      "query": "周末客服电话是多少？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-02",
+      "kind": "unanswered",
+      "query": "怎么修改收货地址？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-03",
+      "kind": "unanswered",
+      "query": "积分商城兑换规则是什么？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-04",
+      "kind": "unanswered",
+      "query": "发票能开成电子专票吗？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-05",
+      "kind": "unanswered",
+      "query": "会员等级怎么升级？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-06",
+      "kind": "unanswered",
+      "query": "App 闪退怎么修？",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-07",
+      "kind": "unanswered",
+      "query": "密码忘了怎么重置？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-08",
+      "kind": "unanswered",
+      "query": "海外仓发货时效表在哪？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-09",
+      "kind": "unanswered",
+      "query": "优惠券叠加上限是多少？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-10",
+      "kind": "unanswered",
+      "query": "客服排班表怎么查？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-11",
+      "kind": "unanswered",
+      "query": "仓库火灾应急预案是什么？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "none-12",
+      "kind": "unanswered",
+      "query": "如何注销客户账号？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": []
+    },
+    {
+      "id": "trap-wrong-version-01",
+      "kind": "wrong_version",
+      "query": "物流节点长时间没有更新时旧规则怎么说？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "trap-wrong-version-02",
+      "kind": "wrong_version",
+      "query": "旧版本物流延迟规则能不能当当前处理依据？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "trap-wrong-version-03",
+      "kind": "wrong_version",
+      "query": "旧版本规则只用于审计历史回复，那现在还能引用 v1 吗？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            },
+            {
+              "text": "客服可以引用当前条目的标题、更新时间和具体片段；如果事实不足或规则与当前订单冲突，应保留问题并转人工核验。",
+              "start_line": 14,
+              "end_line": 14
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "trap-wrong-version-04",
+      "kind": "wrong_version",
+      "query": "物流延迟 v1 说先解释下一步，当前是不是还按这个来？",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "trap-wrong-version-05",
+      "kind": "wrong_version",
+      "query": "长时间没更新的旧版物流说明还算当前答案吗",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "trap-wrong-version-06",
+      "kind": "wrong_version",
+      "query": "审计历史回复用的物流延迟旧版，检索能不能当现行依据？",
+      "query_styles": [
+        "synonym"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "applicability": [
+            "INTERNAL",
+            "SUPPORT"
+          ],
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+          "required_snippets": [
+            {
+              "text": "物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。",
+              "start_line": 12,
+              "end_line": 12
+            }
+          ]
+        }
+      ],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "trap-out-of-scope-01",
+      "kind": "out_of_scope",
+      "query": "物流超时没更新怎么赔",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "CUSTOMER",
+        "roles": [],
+        "capabilities": [],
+        "scopes": []
+      },
+      "search_context": "CUSTOMER_PUBLIC",
+      "allowed_hits": [],
+      "forbidden_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md"
+        },
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "reason": "out_of_scope",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md"
+        }
+      ]
+    },
+    {
+      "id": "trap-out-of-scope-02",
+      "kind": "out_of_scope",
+      "query": "部分退款已经打到我账上了吗",
+      "query_styles": [
+        "colloquial"
+      ],
+      "principal": {
+        "subject_type": "CUSTOMER",
+        "roles": [],
+        "capabilities": [],
+        "scopes": []
+      },
+      "search_context": "CUSTOMER_PUBLIC",
+      "allowed_hits": [],
+      "forbidden_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md"
+        },
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md"
+        },
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "reason": "out_of_scope",
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "trap-out-of-scope-03",
+      "kind": "out_of_scope",
+      "query": "把审批审查要点发到帮助中心给客户自助用",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "APPROVER"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "APPROVER"
+        ]
+      },
+      "search_context": "CUSTOMER_PUBLIC",
+      "allowed_hits": [],
+      "forbidden_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "reason": "out_of_scope",
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "trap-out-of-scope-04",
+      "kind": "out_of_scope",
+      "query": "客户可见的退款金额表在哪",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "CUSTOMER_PUBLIC",
+      "allowed_hits": [],
+      "forbidden_hits": [
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "reason": "out_of_scope",
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "trap-out-of-scope-05",
+      "kind": "out_of_scope",
+      "query": "公开 FAQ：审批人如何自审自己的提案",
+      "query_styles": [
+        "formal"
+      ],
+      "principal": {
+        "subject_type": "CUSTOMER",
+        "roles": [],
+        "capabilities": [],
+        "scopes": []
+      },
+      "search_context": "CUSTOMER_PUBLIC",
+      "allowed_hits": [],
+      "forbidden_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "wrong_version",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md"
+        },
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md"
+        },
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "reason": "out_of_scope",
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "trap-out-of-scope-06",
+      "kind": "out_of_scope",
+      "query": "帮我按客户自助页口径解释物流延迟补偿资格",
+      "query_styles": [
+        "synonym"
+      ],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": [
+          "SUPPORT"
+        ],
+        "capabilities": [
+          "KNOWLEDGE_READ_ACCESS"
+        ],
+        "scopes": [
+          "INTERNAL",
+          "SUPPORT"
+        ]
+      },
+      "search_context": "CUSTOMER_PUBLIC",
+      "allowed_hits": [],
+      "forbidden_hits": [
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "reason": "out_of_scope",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md"
+        }
+      ]
+    }
+  ]
+}
