@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { StatusNotice } from "./SystemState";
 import { ROUTES } from "../workspaceRegistry";
 
-const UNIMPLEMENTED_HELP_ITEMS = ["服务时间承诺", "安全保障说明全文", "补偿到账明细"] as const;
+const UNIMPLEMENTED_HELP_ITEMS = ["服务时间承诺", "安全保障说明全文"] as const;
 
 export function CustomerTrustStrip() {
   return (
@@ -14,7 +14,7 @@ export function CustomerTrustStrip() {
       </article>
       <article>
         <strong>信息用于处理问题</strong>
-        <span>登录会话保护账号；公开沟通只展示你可以看见的内容。</span>
+        <span>登录会话保护当前身份；公开沟通只展示你可以看见的内容。</span>
       </article>
       <article>
         <strong>不承诺回复时限</strong>
@@ -30,7 +30,7 @@ export function CustomerCapabilityGuide() {
       <div>
         <p className="eyebrow">能力边界</p>
         <h2 id="customer-capability-title">AI、人工与补偿如何分工</h2>
-        <p>这三块说明当前产品边界，不会把建议说成决定，也不会把待审批说成已获赔。</p>
+        <p>这三块说明当前产品边界，不会把建议说成决定，也不会把待审批说成已经获得补偿。</p>
       </div>
       <div className="customer-capability-cards">
         <article aria-labelledby="customer-capability-ai">
@@ -56,9 +56,10 @@ export function CustomerCapabilityGuide() {
         <article aria-labelledby="customer-capability-compensation">
           <p className="eyebrow">补偿</p>
           <h3 id="customer-capability-compensation">补偿审批</h3>
-          <p className="customer-capability-badge">待审批不是已获赔</p>
+          <p className="customer-capability-badge">待审批不是已获补偿</p>
           <p>
-            补偿提案处于待审批时，只说明建议已提交审批人。已批准表示获得执行授权，仍不等于已经执行；已执行才是确认结果。当前订单工单组只会提示「补偿流程中」，不会把待审批说成已获赔。
+            Agent
+            或客服提出的补偿方案只是建议。待审批表示建议已交给审批人，还不是决定。当前订单工单组只会提示「补偿流程中」；在执行结果确认前，都不应理解为已经获得补偿。
           </p>
           <Link to={`${ROUTES.customerDocs}#compensation`}>阅读补偿说明</Link>
         </article>

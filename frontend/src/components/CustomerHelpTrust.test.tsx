@@ -25,7 +25,7 @@ describe("Issue #192 客户帮助信任说明与能力边界", () => {
     expect(screen.getByRole("heading", { name: "人工客服" })).toBeInTheDocument();
     expect(screen.getByText("人工承担责任")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "补偿审批" })).toBeInTheDocument();
-    expect(screen.getByText("待审批不是已获赔")).toBeInTheDocument();
+    expect(screen.getByText("待审批不是已获补偿")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "阅读 AI 说明" })).toHaveAttribute(
       "href",
       "/help/docs#ai",
@@ -48,10 +48,10 @@ describe("Issue #192 客户帮助信任说明与能力边界", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "补偿到账明细（开发中）" }));
+    fireEvent.click(screen.getByRole("button", { name: "安全保障说明全文（开发中）" }));
 
     expect(screen.getByRole("status")).toHaveTextContent(
-      "补偿到账明细入口正在开发中；本次点击不会发送写请求，也不会改变工单或补偿状态。",
+      "安全保障说明全文入口正在开发中；本次点击不会发送写请求，也不会改变工单或补偿状态。",
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });

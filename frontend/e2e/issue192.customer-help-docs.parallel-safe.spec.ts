@@ -24,18 +24,22 @@ test("parallel-safe：客户壳帮助入口、信任说明与开发中无写副�
   await page.screenshot({ path: testInfo.outputPath("desktop-help-home.png"), fullPage: true });
 
   const writesAfterHome = writes.length;
-  await page.getByRole("button", { name: "补偿到账明细（开发中）" }).click();
-  await expect(page.getByRole("status")).toContainText("补偿到账明细入口正在开发中");
+  await page.getByRole("button", { name: "服务时间承诺（开发中）" }).focus();
+  await expect(page.getByRole("button", { name: "服务时间承诺（开发中）" })).toBeFocused();
+  await page.getByRole("button", { name: "服务时间承诺（开发中）" }).click();
+  await expect(page.getByRole("status")).toContainText("服务时间承诺入口正在开发中");
   expect(writes.slice(writesAfterHome)).toEqual([]);
 
-  await page.getByRole("link", { name: "帮助文档" }).click();
-  await expect(page).toHaveURL(/\/help\/docs$/);
+  await page.getByRole("link", { name: "阅读补偿说明" }).click();
+  await expect(page).toHaveURL(/\/help\/docs#compensation$/);
   await expect(page.getByRole("heading", { name: "客户帮助中心信任说明" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "AI 调查只提供建议" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "人工客服承担公开回复责任" })).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "待审批、已批准与已执行不是同一件事" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "待审批还不是已经获得补偿" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "帮助文档" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   await expect(page.getByText("通常 24 小时内回复")).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("desktop-help-docs.png"), fullPage: true });
 
