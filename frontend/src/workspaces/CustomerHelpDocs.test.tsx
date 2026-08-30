@@ -43,4 +43,18 @@ describe("Issue #192 客户帮助文档页", () => {
     expect(screen.getByRole("status")).toHaveTextContent("服务时间承诺入口正在开发中");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["ai", "AI 调查只提供建议"],
+    ["human", "人工客服承担公开回复责任"],
+    ["compensation", "待审批还不是已经获得补偿"],
+  ])("打开 #%s 说明时将焦点移到对应章节", (anchor, name) => {
+    render(
+      <MemoryRouter initialEntries={[`/help/docs#${anchor}`]}>
+        <CustomerHelpDocs />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("region", { name })).toHaveFocus();
+  });
 });

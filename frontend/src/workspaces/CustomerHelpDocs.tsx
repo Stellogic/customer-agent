@@ -1,8 +1,17 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { CustomerTrustStrip, UnimplementedHelpActions } from "../components/CustomerHelpTrust";
 import { ROUTES } from "../workspaceRegistry";
 
 export default function CustomerHelpDocs() {
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (hash) {
+      document.getElementById(hash.slice(1))?.focus();
+    }
+  }, [hash]);
+
   return (
     <main aria-label="帮助文档" className="customer-help-docs">
       <header>
@@ -17,7 +26,7 @@ export default function CustomerHelpDocs() {
 
       <CustomerTrustStrip />
 
-      <section id="ai" aria-labelledby="help-docs-ai">
+      <section id="ai" aria-labelledby="help-docs-ai" tabIndex={-1}>
         <p className="eyebrow">AI</p>
         <h2 id="help-docs-ai">AI 调查只提供建议</h2>
         <p>
@@ -30,7 +39,7 @@ export default function CustomerHelpDocs() {
         </p>
       </section>
 
-      <section id="human" aria-labelledby="help-docs-human">
+      <section id="human" aria-labelledby="help-docs-human" tabIndex={-1}>
         <p className="eyebrow">人工</p>
         <h2 id="help-docs-human">人工客服承担公开回复责任</h2>
         <p>
@@ -42,7 +51,7 @@ export default function CustomerHelpDocs() {
         </p>
       </section>
 
-      <section id="compensation" aria-labelledby="help-docs-compensation">
+      <section id="compensation" aria-labelledby="help-docs-compensation" tabIndex={-1}>
         <p className="eyebrow">补偿</p>
         <h2 id="help-docs-compensation">待审批还不是已经获得补偿</h2>
         <p>

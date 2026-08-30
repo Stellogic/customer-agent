@@ -40,6 +40,8 @@ test("客户壳帮助入口、信任说明与开发中无写副作用", async ({
 
   await page.getByRole("link", { name: "阅读补偿说明" }).click();
   await expect(page).toHaveURL(/\/help\/docs#compensation$/);
+  await expect(page.getByRole("region", { name: "待审批还不是已经获得补偿" })).toBeFocused();
+  await expect(page.getByRole("heading", { name: "待审批还不是已经获得补偿" })).toBeInViewport();
   await expect(page.getByRole("main", { name: "帮助文档" })).toBeVisible();
   await expect(page.getByRole("region", { name: "信任说明" })).toBeVisible();
   await expect(page.getByRole("region", { name: "尚未提供的帮助条目" })).toBeVisible();
