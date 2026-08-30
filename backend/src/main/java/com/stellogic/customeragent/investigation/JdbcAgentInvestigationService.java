@@ -441,6 +441,11 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             InvestigationConclusion conclusion) {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
+        completeGeneration(generationId, databaseTime);
+        publicProjection.completeAgentReplyStream(
+                ticketId, generationId, conclusion.customerReply().body(), now);
+        publicProjection.appendAgentMessage(
+                ticketId, generationId, conclusion.customerReply().body(), now, false);
         int updated =
                 jdbc.update(
                         "update support_ticket set handling_mode = 'HUMAN', human_handoff_reason_code = ? "
@@ -448,11 +453,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         conclusion.reasonCode().name(),
                         ticketId);
         if (updated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
-        completeGeneration(generationId, databaseTime);
-        publicProjection.completeAgentReplyStream(
-                ticketId, generationId, conclusion.customerReply().body(), now);
-        publicProjection.appendAgentMessage(
-                ticketId, generationId, conclusion.customerReply().body(), now, false);
+        publicProjection.appendHandoffMessage(
+                ticketId, generationId, "本次核验结论已给出，此工单已转由客服继续处理。", now);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values "
                         + "(?, 'AGENT_CONCLUSION_ACCEPTED', 'agent-machine', ?), "
