@@ -43,7 +43,7 @@ describe("Issue #162 客户自动解决", () => {
     globalThis.history.replaceState(null, "", "/");
   });
 
-  it("根据服务端截止时间恢复倒计时，归零只等待核验", () => {
+  it("根据服务端截止时间恢复倒计时，归零只等待核验", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-30T10:03:00Z"));
     const props = {
@@ -57,7 +57,7 @@ describe("Issue #162 客户自动解决", () => {
     vi.setSystemTime(new Date("2026-08-30T10:04:00Z"));
     render(<AutoResolutionNotice {...props} />);
     expect(screen.getByRole("timer")).toHaveTextContent("1 分 0 秒");
-    act(() => vi.advanceTimersByTime(60_000));
+    await act(() => vi.advanceTimersByTime(60_000));
     expect(screen.getByRole("status")).toHaveTextContent("正在重新核验");
     expect(screen.queryByText("工单已自动解决")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "仍需帮助，取消自动解决" })).toBeEnabled();

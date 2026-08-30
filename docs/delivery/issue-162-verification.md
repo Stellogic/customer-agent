@@ -30,16 +30,27 @@ PostgreSQL [显式锁](https://www.postgresql.org/docs/17/explicit-locking.html)
 
 ## 验证状态
 
-2026-08-30 在协调明确放行的单次 backend 空档运行
-`pwsh ./scripts/check.ps1 -Component backend -SkipAcceptance -Issue 162`，结果 FAIL（退出码 1）。
-HEAD 为 `dfabf13d9417ce2cbf214c58f47b073c38376f03`，记录的 `origin/main` 为
-`2ca9d097da1f93d4cdf3eeef347c62cf51f0e058`。公共预检发现
-`e2e/issue162.auto-resolution.spec.ts` 未分类，尚未进入 backend 编译或单测。
-已将该含登录与交互的用例加入 Serial 清单；仅静态修复，没有重试。
-运行后一次宿主锁查询确认 FREE，并通知协调任务结束空档。
-本次入口自动生成的 RunId 未捕获，退出时状态文件已删除，不能补造运行标识。
-后端业务测试、格式/类型预检与最终完整门禁仍未完成；后续测试需要重新放行，FREE 不代表获准测试。
-测试源码覆盖白名单/拒绝场景、客户 API 身份与 CSRF、快照/SSE、倒计时与取消失败恢复、桌面与窄屏。
-`scripts/test-auto-resolution.ps1` 已接入隔离完整门禁：固定时钟推进、真实能力 HTTP 与完整回复、
-截止时刻已接受消息优先、到期失效矩阵、重启幂等与七十二小时关闭，最终恢复原时钟。
-源码已完成不等于验收通过。不得将此状态视为正式交付。
+2026-08-30 已同步 `origin/main=4cfd0efd63416c78801c318edc858abeb92c1219`，
+保留 #164 补偿公开投影与事件校验。协调已授予本票独占验证及完整交付窗口。
+
+聚焦迭代中发现并修复了以下实际失败，没有将失败记录为通过：
+
+- 首次旧 backend 空档在 E2E 未分类预检失败，RunId 未捕获，未进入编译。
+- `issue162-backend-20260830-a1` 在伪造身份头负向测试登记检查失败，未进入编译。
+- `issue162-format-backend-20260830-a2`：后端编译、Spotless、Checkstyle 通过，239 项测试中一项失败；
+  原因是本票测试正文被辅助工厂构造成了补偿意图，已修正，保留禁止提前宣称解决的断言。
+- `issue162-components-20260830-a3` 在本票验收脚本的 Ruff 注释标点检查失败，已修复。
+- `issue162-components-20260830-a4`：Agent 类型检查与 233 项测试通过；前端编译通过，
+  测试代码有一处未等待 `act` 的 lint 失败，已修复。
+
+整票 Standards / Spec 静态审查在 `5db5a32` 均为 PASS；后续验证修复继续增量确认。
+`scripts/test-auto-resolution.ps1` 接入真实 PostgreSQL、能力 HTTP 和 Spring 调度：
+固定时钟推进、完整回复后候选、截止时刻已接受消息优先、到期失效矩阵、重启幂等与七十二小时关闭。
+浏览器用例在 Serial 组覆盖桌面与窄屏公开状态、刷新恢复和取消。
+
+`issue162-components-20260830-a6` 三组件聚焦 PASS：backend `check` 通过，Agent 类型与 233 项测试通过，
+frontend 格式/lint/类型/构建通过，164 项测试通过、3 项既有跳过（本票5项全通过）。
+`issue162-acceptance-20260830-a5` 真实持久化全部阶段 PASS；1440px/390px 两项浏览器验收 PASS。
+各次结束后均一次确认锁 FREE 并通知协调；聚焦验收自有容器、卷、网络与镜像清理回读为空。
+
+尚未运行最终完整门禁或合入。聚焦与静态 PASS 不代表正式交付；最终证据以 PR #204 的门禁记录为准。
