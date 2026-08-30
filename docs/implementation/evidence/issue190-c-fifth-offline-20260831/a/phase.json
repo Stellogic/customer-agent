@@ -1,0 +1,35 @@
+{
+  "run_id": "issue190-c-fifth-offline-20260831a",
+  "head_sha": "3c612d9c1cad355f34a01e6a04f206b4faee4599",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "ERROR",
+  "phases": [
+    {
+      "name": "entry-syntax",
+      "exit_code": 0,
+      "elapsed_seconds": 0.7465556
+    },
+    {
+      "name": "focused",
+      "exit_code": 0,
+      "elapsed_seconds": 3.6904578
+    },
+    {
+      "name": "format",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0727661
+    },
+    {
+      "name": "lint",
+      "exit_code": 1,
+      "elapsed_seconds": 0.0780207
+    }
+  ],
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "development_replay_run": false,
+  "holdout_or_frozen_evaluation_run": false,
+  "failure": "lint failed: 1",
+  "elapsed_seconds": 4.6786118,
+  "working_tree_changed": true
+}
