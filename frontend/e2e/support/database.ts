@@ -16,6 +16,17 @@ export function executeFixtureSql(sql: string) {
   });
 }
 
+export function revokeActiveAssignmentsForSupport(supportId: string) {
+  if (!/^[a-z0-9-]+$/.test(supportId)) {
+    throw new Error(`invalid support id: ${supportId}`);
+  }
+  executeFixtureSql(`
+    UPDATE support_assignment
+      SET status = 'REVOKED', revoked_at = clock_timestamp()
+      WHERE support_id = '${supportId}' AND status = 'ACTIVE';
+  `);
+}
+
 export function queryFixtureSql(sql: string) {
   return execFileSync("psql", ["-v", "ON_ERROR_STOP=1", "-At", "-c", sql], {
     encoding: "utf8",

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -82,6 +83,254 @@ class SupportWorkbenchControllerTest {
                 .andExpect(jsonPath("$.sharedQueue[0].customerId").doesNotExist())
                 .andExpect(jsonPath("$.sharedQueue[0].investigationSummary").doesNotExist())
                 .andExpect(jsonPath("$.sharedQueue[0].messages").doesNotExist());
+    }
+
+    @Test
+    void currentAssignmentIsRecoverableFromTheAuthoritativeSnapshot() throws Exception {
+        when(service.snapshot("support-demo", "support-workbench-v2"))
+                .thenReturn(
+                        new SupportWorkbenchSnapshot(
+                                "support-workbench-v2",
+                                8,
+                                List.of(),
+                                List.of(),
+                                List.of(HANDOFF_TICKET, BREACHED_TICKET)));
+
+        mvc.perform(
+                        get("/api/support/workbench/snapshot")
+                                .queryParam("schema", "support-workbench-v2")
+                                .principal(support()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.assignedTicketIds.length()").value(2))
+                .andExpect(jsonPath("$.assignedTicketIds[0]").value(HANDOFF_TICKET.toString()))
+                .andExpect(jsonPath("$.assignedTicketIds[1]").value(BREACHED_TICKET.toString()))
+                .andExpect(jsonPath("$.assignedTicketId").doesNotExist())
+                .andExpect(jsonPath("$.sharedQueue.length()").value(0));
+    }
+
+    @Test
+    void agentModeTicketsCannotBeClaimed() throws Exception {
+        when(service.claim("support-demo", BREACHED_TICKET))
+                .thenThrow(new SupportTicketNotFoundException());
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/claims", BREACHED_TICKET)
+                                .principal(support()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SUPPORT_TICKET_NOT_FOUND"));
+    }
+
+    @Test
+    void currentAssigneeCanReleaseTheAssignmentBackToTheQueue() throws Exception {
+        when(service.release("support-demo", HANDOFF_TICKET))
+                .thenReturn(new SupportAssignmentRelease(HANDOFF_TICKET, "support-demo", false));
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/release", HANDOFF_TICKET)
+                                .principal(support()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ticketId").value(HANDOFF_TICKET.toString()))
+                .andExpect(jsonPath("$.supportId").value("support-demo"))
+                .andExpect(jsonPath("$.replayed").value(false));
+    }
+
+    @Test
+    void reassignmentTerminatesThePreviousAssignee() throws Exception {
+        when(service.reassign("support-demo", HANDOFF_TICKET, "internal-demo"))
+                .thenReturn(
+                        new SupportAssignmentReassignment(
+                                HANDOFF_TICKET, "internal-demo", "support-demo", false));
+
+        mvc.perform(
+                        post(
+                                        "/api/support/workbench/tickets/{ticketId}/reassignments",
+                                        HANDOFF_TICKET)
+                                .principal(support())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","targetSupportId":"internal-demo"}
+                                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ticketId").value(HANDOFF_TICKET.toString()))
+                .andExpect(jsonPath("$.supportId").value("internal-demo"))
+                .andExpect(jsonPath("$.previousSupportId").value("support-demo"))
+                .andExpect(jsonPath("$.replayed").value(false));
+    }
+
+    @Test
+    void nonAssigneeCannotReassignAnActiveTicket() throws Exception {
+        when(service.reassign("support-demo", HANDOFF_TICKET, "internal-demo"))
+                .thenThrow(new SupportTicketNotFoundException());
+
+        mvc.perform(
+                        post(
+                                        "/api/support/workbench/tickets/{ticketId}/reassignments",
+                                        HANDOFF_TICKET)
+                                .principal(support())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","targetSupportId":"internal-demo"}
+                                        """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SUPPORT_TICKET_NOT_FOUND"));
+    }
+
+    @Test
+    void claimingAnUnassignedTicketCreatesTheCurrentAssignment() throws Exception {
+        when(service.claim("support-demo", HANDOFF_TICKET))
+                .thenReturn(new SupportAssignmentClaim(HANDOFF_TICKET, "support-demo", false));
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/claims", HANDOFF_TICKET)
+                                .principal(support()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ticketId").value(HANDOFF_TICKET.toString()))
+                .andExpect(jsonPath("$.supportId").value("support-demo"))
+                .andExpect(jsonPath("$.replayed").value(false));
+    }
+
+    @Test
+    void claimingTheCurrentAssignmentIsAReplay() throws Exception {
+        when(service.claim("support-demo", HANDOFF_TICKET))
+                .thenReturn(new SupportAssignmentClaim(HANDOFF_TICKET, "support-demo", true));
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/claims", HANDOFF_TICKET)
+                                .principal(support()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.replayed").value(true));
+    }
+
+    @Test
+    void anotherSupportCannotSeeOrClaimAnAlreadyAssignedTicket() throws Exception {
+        when(service.claim("support-demo", HANDOFF_TICKET))
+                .thenThrow(new SupportTicketNotFoundException());
+        when(service.details("support-demo", HANDOFF_TICKET))
+                .thenThrow(new SupportTicketNotFoundException());
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/claims", HANDOFF_TICKET)
+                                .principal(support()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SUPPORT_TICKET_NOT_FOUND"));
+        mvc.perform(
+                        get("/api/support/workbench/tickets/{ticketId}", HANDOFF_TICKET)
+                                .principal(support()))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.code").value("SUPPORT_TICKET_NOT_FOUND"));
+    }
+
+    @Test
+    void humanModePublicReplyUsesStableMessageIdentity() throws Exception {
+        UUID publicMessageId = UUID.fromString("26000000-0000-0000-0000-000000000101");
+        when(service.publicReply("support-demo", HANDOFF_TICKET, "reply-163-1", "包裹已在派送中"))
+                .thenReturn(
+                        new SupportPublicReplyResult(
+                                HANDOFF_TICKET, "reply-163-1", publicMessageId, "ACCEPTED", false));
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/messages", HANDOFF_TICKET)
+                                .principal(support())
+                                .header("Idempotency-Key", "reply-163-1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","message":"包裹已在派送中"}
+                                        """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.schema").value("support-workbench-v2"))
+                .andExpect(jsonPath("$.ticketId").value(HANDOFF_TICKET.toString()))
+                .andExpect(jsonPath("$.messageId").value("reply-163-1"))
+                .andExpect(jsonPath("$.publicMessageId").value(publicMessageId.toString()))
+                .andExpect(jsonPath("$.outcome").value("ACCEPTED"))
+                .andExpect(jsonPath("$.accepted").value(true))
+                .andExpect(jsonPath("$.replayed").value(false));
+    }
+
+    @Test
+    void replayingTheSamePublicReplyReturnsTheAuthoritativeResult() throws Exception {
+        UUID publicMessageId = UUID.fromString("26000000-0000-0000-0000-000000000101");
+        when(service.publicReply("support-demo", HANDOFF_TICKET, "reply-163-1", "包裹已在派送中"))
+                .thenReturn(
+                        new SupportPublicReplyResult(
+                                HANDOFF_TICKET, "reply-163-1", publicMessageId, "ACCEPTED", true));
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/messages", HANDOFF_TICKET)
+                                .principal(support())
+                                .header("Idempotency-Key", "reply-163-1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","message":"包裹已在派送中"}
+                                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicMessageId").value(publicMessageId.toString()))
+                .andExpect(jsonPath("$.replayed").value(true));
+    }
+
+    @Test
+    void uncertainClientsCanQueryTheAuthoritativePublicReply() throws Exception {
+        UUID publicMessageId = UUID.fromString("26000000-0000-0000-0000-000000000101");
+        when(service.queryPublicReply("support-demo", HANDOFF_TICKET, "reply-163-1"))
+                .thenReturn(
+                        new SupportPublicReplyResult(
+                                HANDOFF_TICKET, "reply-163-1", publicMessageId, "ACCEPTED", true));
+
+        mvc.perform(
+                        get(
+                                        "/api/support/workbench/tickets/{ticketId}/messages/{messageId}",
+                                        HANDOFF_TICKET,
+                                        "reply-163-1")
+                                .principal(support()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.messageId").value("reply-163-1"))
+                .andExpect(jsonPath("$.publicMessageId").value(publicMessageId.toString()))
+                .andExpect(jsonPath("$.accepted").value(true))
+                .andExpect(jsonPath("$.replayed").value(true));
+    }
+
+    @Test
+    void onlyTheCurrentHumanAssigneeCanSendAPublicReply() throws Exception {
+        when(service.publicReply("support-demo", HANDOFF_TICKET, "reply-163-2", "不能发送"))
+                .thenThrow(new SupportPublicReplyNotAllowedException());
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/messages", HANDOFF_TICKET)
+                                .principal(support())
+                                .header("Idempotency-Key", "reply-163-2")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","message":"不能发送"}
+                                        """))
+                .andExpect(status().isConflict())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.code").value("SUPPORT_REPLY_NOT_ALLOWED"));
+    }
+
+    @Test
+    void conflictingIdempotencyBindingsAreRejected() throws Exception {
+        when(service.publicReply("support-demo", HANDOFF_TICKET, "reply-163-3", "另一段内容"))
+                .thenThrow(new SupportReplyIdentityConflictException());
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/messages", HANDOFF_TICKET)
+                                .principal(support())
+                                .header("Idempotency-Key", "reply-163-3")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","message":"另一段内容"}
+                                        """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SUPPORT_REPLY_IDENTITY_CONFLICT"));
     }
 
     @Test

@@ -154,6 +154,130 @@ class SupportPrincipalSecurityTest {
     }
 
     @Test
+    void supportReleaseRequiresCurrentCsrfAndAlwaysUsesThePrincipal() throws Exception {
+        when(service.release("support-demo", TICKET_ID))
+                .thenReturn(new SupportAssignmentRelease(TICKET_ID, "support-demo", false));
+        MockHttpSession support = login(mvc, json, "support-demo");
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/release", TICKET_ID)
+                                .session(support))
+                .andExpect(status().isForbidden());
+
+        MvcResult csrf =
+                mvc.perform(get("/api/auth/csrf").session(support))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/release", TICKET_ID)
+                                .session(support)
+                                .header("X-CSRF-TOKEN", token(json, csrf))
+                                .header("X-Synthetic-Support-Id", "internal-demo"))
+                .andExpect(status().isCreated());
+
+        verify(service).release("support-demo", TICKET_ID);
+    }
+
+    @Test
+    void supportReassignmentRequiresCurrentCsrfAndAlwaysUsesThePrincipal() throws Exception {
+        when(service.reassign("support-demo", TICKET_ID, "internal-demo"))
+                .thenReturn(
+                        new SupportAssignmentReassignment(
+                                TICKET_ID, "internal-demo", "support-demo", false));
+        MockHttpSession support = login(mvc, json, "support-demo");
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/reassignments", TICKET_ID)
+                                .session(support)
+                                .contentType("application/json")
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","targetSupportId":"internal-demo"}
+                                        """))
+                .andExpect(status().isForbidden());
+
+        MvcResult csrf =
+                mvc.perform(get("/api/auth/csrf").session(support))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/reassignments", TICKET_ID)
+                                .session(support)
+                                .header("X-CSRF-TOKEN", token(json, csrf))
+                                .header("X-Synthetic-Support-Id", "internal-demo")
+                                .contentType("application/json")
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","targetSupportId":"internal-demo"}
+                                        """))
+                .andExpect(status().isCreated());
+
+        verify(service).reassign("support-demo", TICKET_ID, "internal-demo");
+    }
+
+    @Test
+    void publicReplyRequiresCurrentCsrfAndAlwaysUsesThePrincipal() throws Exception {
+        UUID publicMessageId = UUID.fromString("75000000-0000-0000-0000-000000000101");
+        when(service.publicReply("support-demo", TICKET_ID, "reply-163", "已在跟进"))
+                .thenReturn(
+                        new SupportPublicReplyResult(
+                                TICKET_ID, "reply-163", publicMessageId, "ACCEPTED", false));
+        MockHttpSession support = login(mvc, json, "support-demo");
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/messages", TICKET_ID)
+                                .session(support)
+                                .header("Idempotency-Key", "reply-163")
+                                .contentType("application/json")
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","message":"已在跟进"}
+                                        """))
+                .andExpect(status().isForbidden());
+
+        MvcResult csrf =
+                mvc.perform(get("/api/auth/csrf").session(support))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/messages", TICKET_ID)
+                                .session(support)
+                                .header("X-CSRF-TOKEN", token(json, csrf))
+                                .header("X-Synthetic-Support-Id", "internal-demo")
+                                .header("Idempotency-Key", "reply-163")
+                                .contentType("application/json")
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","message":"已在跟进"}
+                                        """))
+                .andExpect(status().isCreated());
+
+        verify(service).publicReply("support-demo", TICKET_ID, "reply-163", "已在跟进");
+    }
+
+    @Test
+    void customerCannotSendASupportPublicReply() throws Exception {
+        MockHttpSession customer = login(mvc, json, "customer-demo");
+        MvcResult csrf =
+                mvc.perform(get("/api/auth/csrf").session(customer))
+                        .andExpect(status().isOk())
+                        .andReturn();
+
+        mvc.perform(
+                        post("/api/support/workbench/tickets/{ticketId}/messages", TICKET_ID)
+                                .session(customer)
+                                .header("X-CSRF-TOKEN", token(json, csrf))
+                                .header("X-Synthetic-Support-Id", "support-demo")
+                                .header("Idempotency-Key", "reply-163")
+                                .contentType("application/json")
+                                .content(
+                                        """
+                                        {"schema":"support-workbench-v2","message":"伪造客服回复"}
+                                        """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void replacingCustomerWithSupportRotatesCsrfAndRejectsTheCustomersOldToken() throws Exception {
         MvcResult anonymousCsrf =
                 mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andReturn();

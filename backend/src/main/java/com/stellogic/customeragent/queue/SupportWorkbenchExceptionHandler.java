@@ -28,4 +28,28 @@ public final class SupportWorkbenchExceptionHandler {
                 .header("Cache-Control", "no-store")
                 .body(Map.of("code", "SUPPORT_TICKET_NOT_FOUND", "message", "客服工单不存在"));
     }
+
+    @ExceptionHandler(SupportPublicReplyNotAllowedException.class)
+    ResponseEntity<Map<String, String>> publicReplyNotAllowed() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .header("Cache-Control", "no-store")
+                .body(
+                        Map.of(
+                                "code",
+                                "SUPPORT_REPLY_NOT_ALLOWED",
+                                "message",
+                                "只有人工处理中的当前负责客服可以发送公开回复"));
+    }
+
+    @ExceptionHandler(SupportReplyIdentityConflictException.class)
+    ResponseEntity<Map<String, String>> replyIdentityConflict() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .header("Cache-Control", "no-store")
+                .body(
+                        Map.of(
+                                "code",
+                                "SUPPORT_REPLY_IDENTITY_CONFLICT",
+                                "message",
+                                "同一幂等键已绑定其他公开回复内容"));
+    }
 }

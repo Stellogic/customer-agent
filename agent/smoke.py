@@ -5100,6 +5100,10 @@ def main() -> None:
 
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
             connection.execute(
+                "update support_ticket set handling_mode = 'HUMAN' where id = %s",
+                (first_warning_ticket_id,),
+            )
+            connection.execute(
                 "insert into shared_support_queue_entry (ticket_id, reason_code, entered_at) "
                 "values (%s, 'SLA_BREACH', clock_timestamp())",
                 (first_warning_ticket_id,),
