@@ -1,0 +1,130 @@
+{
+  "dataset_id": "rag-eval-v1",
+  "model": {
+    "name": "BAAI/bge-small-zh-v1.5",
+    "revision": "7999e1d3359715c523056ef9478215996d62a620",
+    "license": "MIT",
+    "query_instruction": "为这个句子生成表示以用于检索相关文章：",
+    "document_instruction": "",
+    "pooling": "cls",
+    "pooling_source": "1_Pooling/config.json pooling_mode_cls_token=true",
+    "normalize": "l2",
+    "normalize_source": "modules.json sentence_transformers.models.Normalize",
+    "max_seq_length": 512,
+    "tokenizer_do_lower_case": false,
+    "tokenize_chinese_chars": true,
+    "truncation": true,
+    "truncation_strategy": "longest_first",
+    "truncation_side": "right",
+    "padding": true,
+    "output_dimensions": 512,
+    "backend": "cpu_pytorch_safetensors",
+    "weights_not_in_git": true,
+    "offline_load_only": true,
+    "fail_closed_on_missing_or_checksum_mismatch": true,
+    "files": {
+      "model.safetensors": {
+        "sha256": "354763b9b1357bc9c44f62c6be2276321081ed2567773608c0d0785b61d5a026",
+        "size_bytes": 95827648,
+        "required_at_runtime": true
+      },
+      "config.json": {
+        "git_blob_sha1": "f79ec8dfc5812a1d5d7d2e69253eb9054be2246d",
+        "size_bytes": 776,
+        "required_at_runtime": true
+      },
+      "tokenizer.json": {
+        "git_blob_sha1": "cdb3043fc938fc918c06e66cf704c2ba58f88747",
+        "size_bytes": 439125,
+        "required_at_runtime": true
+      },
+      "tokenizer_config.json": {
+        "git_blob_sha1": "3a59388f0fd1bd22dec2ce7902c1be8e1fb84107",
+        "size_bytes": 367,
+        "required_at_runtime": true
+      },
+      "vocab.txt": {
+        "git_blob_sha1": "ca4f9781030019ab9b253c6dcb8c7878b6dc87a5",
+        "size_bytes": 109540,
+        "required_at_runtime": true
+      },
+      "special_tokens_map.json": {
+        "git_blob_sha1": "a8b3208c2884c4efb86e49300fdd3dc877220cdf",
+        "size_bytes": 125,
+        "required_at_runtime": true
+      },
+      "modules.json": {
+        "git_blob_sha1": "952a9b81c0bfd99800fabf352f69c7ccd46c5e43",
+        "size_bytes": 349,
+        "required_at_runtime": true
+      },
+      "1_Pooling/config.json": {
+        "git_blob_sha1": "e25f4f3261cf0c6156611f5b5fdba0825859f4f3",
+        "size_bytes": 190,
+        "required_at_runtime": true
+      },
+      "sentence_bert_config.json": {
+        "git_blob_sha1": "ea85692bff64b0d1917833c31ddbca8ab10f5455",
+        "size_bytes": 52,
+        "required_at_runtime": true
+      },
+      "config_sentence_transformers.json": {
+        "git_blob_sha1": "dcb0c0d97d09b930d13600b1a773ddb27e441aab",
+        "size_bytes": 124,
+        "required_at_runtime": true
+      }
+    }
+  },
+  "thresholds": {
+    "answered_recall_at_5": 0.9,
+    "answered_mrr_at_5": 0.75,
+    "unanswered_precision": 0.9,
+    "unanswered_recall": 0.85,
+    "wrong_version_top5_hit_rate": 0.0,
+    "out_of_scope_top5_hit_rate": 0.0,
+    "unauthorized_top5_hit_rate": 0.0,
+    "k": 5
+  },
+  "corpus_snapshot": [
+    {
+      "article_id": "approval-review",
+      "version": "v1",
+      "status": "PUBLISHED",
+      "current": true,
+      "applicability": ["INTERNAL", "APPROVER"],
+      "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
+      "sha256": "c8bf4fef68f91274a75a1a5aa843ad37ada35a89d9a8224b642680450ccc6818",
+      "body": "# 补偿审批\n\n审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。"
+    },
+    {
+      "article_id": "logistics-delay",
+      "version": "v1",
+      "status": "RETIRED",
+      "current": false,
+      "applicability": ["INTERNAL", "SUPPORT"],
+      "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md",
+      "sha256": "8bfeef1dffa8246d70c1c716d94c852baa2827d1d1bfd077611e7a7c801f90cf",
+      "body": "# 物流延迟\n\n当物流节点长时间没有更新时，客服应先核对订单和物流的当前权威状态，再向客户解释下一步。旧版本规则只用于审计历史回复，不作为当前处理依据。"
+    },
+    {
+      "article_id": "logistics-delay",
+      "version": "v2",
+      "status": "PUBLISHED",
+      "current": true,
+      "applicability": ["INTERNAL", "SUPPORT"],
+      "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
+      "sha256": "510c4b0a98534d07c80a5fc7e1212533db0ca835f898b2119f4e25f407d6104f",
+      "body": "# 物流延迟\n\n物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。\n\n客服可以引用当前条目的标题、更新时间和具体片段；如果事实不足或规则与当前订单冲突，应保留问题并转人工核验。"
+    },
+    {
+      "article_id": "refund-policy",
+      "version": "v1",
+      "status": "PUBLISHED",
+      "current": true,
+      "applicability": ["INTERNAL", "SUPPORT", "APPROVER"],
+      "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
+      "sha256": "97feca3d5ed85a02444fedd762222463afbf955fbb6d7c848daf243a0c237d4e",
+      "body": "# 部分退款\n\n部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。\n\n回复客户时应区分补偿建议、审批决定和执行结果，并在引用本条规则时保留条目标识、版本和具体片段位置。"
+    }
+  ]
+}
