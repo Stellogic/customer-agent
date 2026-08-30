@@ -52,6 +52,8 @@
 
 ## A方案后续记录
 
+**C单次真实诊断完成：** [第5请求独立诊断b](issue-190-c-fifth-diagnostic.md)，受测f77e8a5/base c19a7ebe，RunId issue190-c-fifth-diagnostic-20260831b。经新授权只发1次与原第5次同字节SHA请求，合法结构/引文解析通过；输入467/输出32 token，请求观测1500毫秒、Python阶段2.914815秒。新增费用上界0.001689元、全局累计0.010773元、未结算0，实付账单未采集。DIAGNOSTIC_COMPLETED不等于质量PASS，metrics=null；开发仍5请求/4完成，旧原文NOT_CAPTURED未被补造，全局6次调用不能当作6个质量样本。
+
 **C实际入口传参修复：** [RED/GREEN与双CR](issue-190-c-argv-fix.md)，干净源码366985c/base c19a7ebe，RunId issue190-c-argv-offline-20260831b。显式数组修复PowerShell→uv→Python字符拆分；两个实际无key入口、17聚焦/36相关组件和必要预检PASS，阶段49.1598902秒。双CR PASS，API0、原共享账本hash未变，真实诊断仍未运行；不能据此宣传模型质量或生产性能。
 
 **C单次诊断入口前置中止：** [独立第5请求诊断记录](issue-190-c-fifth-diagnostic.md)，d492341/base c19a7ebe，RunId issue190-c-fifth-diagnostic-20260831a。17聚焦/36相关组件和类型/格式/PowerShell语法通过，但实际入口因PowerShell单元素参数展开为字符而被argparse拒绝；真实API0次、新增费用0、2.2309127秒仅为启动耗时，不能算模型延迟。原5次/4完成/metrics=null及费用上界0.009084元均未变化。这暴露了离线验证未覆盖实际argv接缝，不是模型质量结论；未重试，窗口已归还。
