@@ -1603,19 +1603,11 @@ function isSnapshot(value: unknown): value is Snapshot {
   )
     return false;
   const keys = Object.keys(value);
-  const required = [
-    "view",
-    "schema",
-    "cursor",
-    "ticket",
-    "messages",
-    "clarification",
-  ];
+  const required = ["view", "schema", "cursor", "ticket", "messages", "clarification"];
   if (!required.every((key) => keys.includes(key))) return false;
   if (
     keys.some(
-      (key) =>
-        !required.includes(key) && key !== "replyStream" && key !== "pendingCompensation",
+      (key) => !required.includes(key) && key !== "replyStream" && key !== "pendingCompensation",
     )
   )
     return false;
