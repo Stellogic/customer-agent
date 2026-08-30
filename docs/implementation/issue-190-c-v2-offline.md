@@ -29,4 +29,10 @@
 
 首轮RunId `issue190-c-v2-offline-20260831a`：从79e07a6的工作树修改启动，受锁物化72项、11项聚焦通过；随后lint因新测试import顺序失败，类型/组件/实际入口尚未执行。仅工程预检失败，不是模型/质量FAIL。用静态导入移动修复，不改方法或数据。原日志保留，后续以新RunId复验。
 
+第二轮RunId `issue190-c-v2-offline-20260831b`，受测干净SHA `7c3759ac58c7b140582da7ae4d79e8b5f1f2ad23`：四模式实际PowerShell→uv→Python入口均通过argv解析并在MISSING_API_KEY前置停止；11聚焦、53组件、81文件格式检查、lint及Pyright（0错误/警告）PASS，耗时59.6588206秒。无真实API，账本hash前后相同。该通过覆盖7c3759a，**不覆盖下述静态修复**。
+
+同SHA静态Standards PASS；Spec指出预登记要求分层记录，而原实现只记整体契约PASS。最小修复为在C-v2观察记录中增加 `json_syntax / decision_schema / evidence_fields / cross_fields / authorized_chunks / verbatim_quotes` 的PASS/FAIL/NOT_EVALUATED，逐层快速失败，不改变合法集合、错误码、原文判断或停止行为；未执行层不能误记PASS。v1不输出新字段，仍按旧限制拒绝重复编号。新测试覆盖分层失败及持久化取证；请求构造、全部四项资产hash和质量阈值未改。该修复待增量双CR及另一个获准离线窗口复验，不能复用7c3759a的预检结论。
+
+两轮结束均finally释放自有锁并单次宿主回读FREE，LOCK_RELEASED均已送达协调；b结束已主动归还阶段窗口，当前不运行。原始日志及JUnit见相应[evidence](evidence/) RunId目录。首轮6.6613063秒不含后续修复时间；静态工作耗时未采集。
+
 共享账本SHA前后均 `c11630710263c473fbf938b60e789b33ef93b776021e258976825fdf47206a50`，累计上界0.079923元、未结算0；本阶段真实请求0、费用0。原50次请求、所有失败及STOPPED记录不变。Windows/现有CPython环境，无安装下载；账单实付、峰值内存未采集。代码由Codex按授权实施，不等于用户逐行手写；离线MockTransport不是模型回退或质量证据。

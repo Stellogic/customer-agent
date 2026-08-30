@@ -28,6 +28,14 @@ V2_ASSET_SHA256 = {
     "schema.json": "27ef4d19440b4279ac4b0426eb299e87445a455be5206716ad82c0da6f3733f4",
     "config.json": "3716498d23b0ce1586599d7ad6f7ae28bab913414b28607ea1105899a3167212",
 }
+CONTRACT_CHECK_LAYERS = (
+    "json_syntax",
+    "decision_schema",
+    "evidence_fields",
+    "cross_fields",
+    "authorized_chunks",
+    "verbatim_quotes",
+)
 
 
 class SufficiencyBlocked(ValueError):
@@ -199,6 +207,16 @@ def parse_response(
     model = payload.get("model")
     fingerprint = payload.get("system_fingerprint")
     observation = response_observation(payload, duration_ms)
+    checks = dict.fromkeys(CONTRACT_CHECK_LAYERS, "NOT_EVALUATED")
+    if c_v2:
+        observation["contract_checks"] = checks
+
+    def check_layer(name: str, valid: bool, code: str) -> None:
+        if c_v2:
+            checks[name] = "PASS" if valid else "FAIL"
+        if not valid:
+            raise SufficiencyBlocked(code, observation)
+
     if (
         payload.get("object") != "response"
         or payload.get("status") != "completed"
@@ -242,34 +260,49 @@ def parse_response(
     try:
         decision = json.loads(content[0]["text"])
     except json.JSONDecodeError:
+        if c_v2:
+            checks["json_syntax"] = "FAIL"
         raise SufficiencyBlocked("INVALID_DECISION_JSON", observation) from None
-    if (
-        not isinstance(decision, dict)
-        or set(decision) != {"sufficient", "evidence"}
-        or type(decision["sufficient"]) is not bool
-        or not isinstance(decision["evidence"], list)
-    ):
-        raise SufficiencyBlocked("INVALID_DECISION_SCHEMA", observation)
+    check_layer("json_syntax", True, "INVALID_DECISION_JSON")
+    check_layer(
+        "decision_schema",
+        isinstance(decision, dict)
+        and set(decision) == {"sufficient", "evidence"}
+        and type(decision["sufficient"]) is bool
+        and isinstance(decision["evidence"], list),
+        "INVALID_DECISION_SCHEMA",
+    )
     evidence = decision["evidence"]
-    if bool(evidence) != decision["sufficient"] or len(evidence) > 5:
-        raise SufficiencyBlocked("INVALID_EVIDENCE", observation)
-    seen: set[int] = set()
     hits = row["fusedCandidates"]
-    for item in evidence:
-        if not isinstance(item, dict) or set(item) != {"chunk", "quote"}:
-            raise SufficiencyBlocked("INVALID_EVIDENCE", observation)
-        chunk, quote = item["chunk"], item["quote"]
-        if (
-            type(chunk) is not int
-            or not 1 <= chunk <= len(hits)
-            or (not c_v2 and chunk in seen)
-            or not isinstance(quote, str)
-            or not 1 <= len(quote) <= 24
-            or not quote.strip()
-            or quote not in hits[chunk - 1]["snippet"]
-        ):
-            raise SufficiencyBlocked("INVALID_EVIDENCE", observation)
-        seen.add(chunk)
+    check_layer(
+        "evidence_fields",
+        len(evidence) <= 5
+        and all(
+            isinstance(item, dict)
+            and set(item) == {"chunk", "quote"}
+            and type(item["chunk"]) is int
+            and isinstance(item["quote"], str)
+            and 1 <= len(item["quote"]) <= 24
+            for item in evidence
+        ),
+        "INVALID_EVIDENCE",
+    )
+    check_layer("cross_fields", bool(evidence) == decision["sufficient"], "INVALID_EVIDENCE")
+    check_layer(
+        "authorized_chunks",
+        all(1 <= item["chunk"] <= len(hits) for item in evidence),
+        "INVALID_EVIDENCE",
+    )
+    check_layer(
+        "verbatim_quotes",
+        all(
+            item["quote"].strip() and item["quote"] in hits[item["chunk"] - 1]["snippet"]
+            for item in evidence
+        ),
+        "INVALID_EVIDENCE",
+    )
+    if not c_v2 and len({item["chunk"] for item in evidence}) != len(evidence):
+        raise SufficiencyBlocked("INVALID_EVIDENCE", observation)
     return {"decision": decision, "observation": observation}
 
 

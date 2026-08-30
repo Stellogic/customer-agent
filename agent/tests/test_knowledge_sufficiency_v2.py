@@ -33,6 +33,7 @@ def test_v2_allows_multiple_quotes_without_rewriting_v1_or_response() -> None:
         parse_response(response, row(), expected_identity=None, duration_ms=1)
     result = parse_response(response, row(), expected_identity=None, duration_ms=1, c_v2=True)
     assert result["decision"] == decision
+    assert set(result["observation"]["contract_checks"].values()) == {"PASS"}
     old, new = contract(), contract(c_v2=True)
     assert old["schema"] == new["schema"]
     assert "每个编号只出现一次" in old["prompt"]
@@ -44,21 +45,29 @@ def test_v2_allows_multiple_quotes_without_rewriting_v1_or_response() -> None:
 
 
 @pytest.mark.parametrize(
-    "evidence",
+    "evidence,failed_layer",
     [
-        [{"chunk": 6, "quote": "日落时关闭"}],
-        [{"chunk": 1, "quote": "虚构内容"}],
-        [{"chunk": True, "quote": "日落时关闭"}],
-        [{"chunk": 1, "quote": "日落时关闭"}] * 6,
+        ([{"chunk": 6, "quote": "日落时关闭"}], "authorized_chunks"),
+        ([{"chunk": 1, "quote": "虚构内容"}], "verbatim_quotes"),
+        ([{"chunk": True, "quote": "日落时关闭"}], "evidence_fields"),
+        ([{"chunk": 1, "quote": "日落时关闭"}] * 6, "evidence_fields"),
+        ([], "cross_fields"),
     ],
 )
-def test_v2_still_rejects_invalid_evidence(evidence: list[dict[str, Any]]) -> None:
+def test_v2_still_rejects_invalid_evidence(
+    evidence: list[dict[str, Any]], failed_layer: str
+) -> None:
     response = payload()
     response["output"][0]["content"][0]["text"] = json.dumps(
         {"sufficient": True, "evidence": evidence}
     )
-    with pytest.raises(SufficiencyBlocked, match="INVALID_EVIDENCE"):
+    with pytest.raises(SufficiencyBlocked, match="INVALID_EVIDENCE") as error:
         parse_response(response, row(), expected_identity=None, duration_ms=1, c_v2=True)
+    checks = error.value.observation["contract_checks"]
+    assert checks[failed_layer] == "FAIL"
+    values = list(checks.values())
+    assert set(values[: values.index("FAIL")]) == {"PASS"}
+    assert all(value == "NOT_EVALUATED" for value in values[values.index("FAIL") + 1 :])
 
 
 @pytest.mark.asyncio
@@ -121,6 +130,17 @@ async def test_v2_whole_replay_is_once_and_preserves_original_ledger(
         }
         if failure == "invalid":
             assert "decision_diagnostic" in ledger.state["attempts"][-1]["observation"]
+            assert ledger.state["attempts"][-1]["observation"]["contract_checks"] == {
+                "json_syntax": "PASS",
+                "decision_schema": "FAIL",
+                "evidence_fields": "NOT_EVALUATED",
+                "cross_fields": "NOT_EVALUATED",
+                "authorized_chunks": "NOT_EVALUATED",
+                "verbatim_quotes": "NOT_EVALUATED",
+            }
+        else:
+            checks = ledger.state["attempts"][-1]["observation"]["contract_checks"]
+            assert set(checks.values()) == {"NOT_EVALUATED"}
     else:
         await runner.run_development(report, ledger, frozen, **arguments)
         ledger.finish(report["status"])

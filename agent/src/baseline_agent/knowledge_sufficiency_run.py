@@ -18,6 +18,7 @@ import httpx
 from baseline_agent.knowledge_answerability import QUALITY
 from baseline_agent.knowledge_sufficiency import (
     ARCHIVE_SHA256,
+    CONTRACT_CHECK_LAYERS,
     DATA_SHA256,
     REPO,
     SOURCE_SHA,
@@ -351,6 +352,10 @@ async def run_development(
             entry = ledger.reserve(row["id"], sha256(encoded))
             started = time.perf_counter()
             observation: dict[str, Any] = {"usage_trusted": False}
+            if c_v2_whole_once:
+                observation["contract_checks"] = dict.fromkeys(
+                    CONTRACT_CHECK_LAYERS, "NOT_EVALUATED"
+                )
             try:
                 response = await asyncio.wait_for(
                     client.post(
@@ -387,6 +392,8 @@ async def run_development(
                         c_v2=c_v2_whole_once,
                     )
                 except SufficiencyBlocked as error:
+                    if c_v2_whole_once:
+                        observation["contract_checks"] = error.observation["contract_checks"]
                     if str(error) in {
                         "INVALID_DECISION_JSON",
                         "INVALID_DECISION_SCHEMA",
@@ -398,6 +405,8 @@ async def run_development(
                             payload["output"][0]["content"][0]["text"], api_key
                         )
                     raise
+                if c_v2_whole_once:
+                    observation["contract_checks"] = parsed["observation"]["contract_checks"]
                 if identity is None:
                     ledger.state["identity"] = [
                         observation["response_model"],
