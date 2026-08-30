@@ -62,7 +62,7 @@ test("客户壳帮助入口、信任说明与开发中无写副作用", async ({
   const desktopBrand = page.getByRole("link", { name: "Stellogic 客户帮助中心" });
   await desktopBrand.focus();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "帮助中心" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "帮助中心", exact: true })).toBeFocused();
   await page.keyboard.press("Tab");
   const docsLink = page.getByRole("link", { name: "帮助文档" });
   await expect(docsLink).toBeFocused();
@@ -95,7 +95,7 @@ test("客户壳帮助入口、信任说明与开发中无写副作用", async ({
   const narrowBrand = narrow.getByRole("link", { name: "Stellogic 客户帮助中心" });
   await narrowBrand.focus();
   await narrow.keyboard.press("Tab");
-  await expect(narrow.getByRole("link", { name: "帮助中心" })).toBeFocused();
+  await expect(narrow.getByRole("link", { name: "帮助中心", exact: true })).toBeFocused();
   await narrow.keyboard.press("Tab");
   const narrowDocsLink = narrow.getByRole("link", { name: "帮助文档" });
   await expect(narrowDocsLink).toBeFocused();
