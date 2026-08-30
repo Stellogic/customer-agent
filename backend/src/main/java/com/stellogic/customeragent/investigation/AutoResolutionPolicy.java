@@ -16,6 +16,10 @@ final class AutoResolutionPolicy {
     private static final Pattern RULE_QUESTION = Pattern.compile(
             "(?:请)?(?:说明|解释|介绍)(?:一下)?(?:订单|收货地址修改|地址修改|取消订单)(?:的)?(?:规则|规定|条件)[。？?]?"
                     + "|(?:订单|收货地址修改|地址修改|修改地址|取消订单)(?:的)?(?:规则|规定|条件)(?:是什么|有哪些)[。？?]?");
+    private static final Pattern STATUS_QUESTION = Pattern.compile(
+            "(?:请)?(?:解释|说明|核对|查询|查看|确认)(?:一下)?(?:订单的?)?"
+                    + "(?:物流状态|物流记录|物流延迟|物流信息)[。？?]?"
+                    + "|(?:订单的?)?(?:物流状态|物流进度|物流延迟)(?:是什么|如何|怎么样|多久)[。？?]?");
     // Denial signals supplement authoritative facts, and never grant eligibility.
     private static final Pattern DISPUTE_OR_ACTION = Pattern.compile(
             "签收.{0,8}(没|未|不).{0,4}收到|丢件|丢失|重复.{0,4}(扣款|收费)|退款.{0,8}(异常|没到|未到|不到账)|"
@@ -43,13 +47,18 @@ final class AutoResolutionPolicy {
                     conclusion.sufficiency().riskScenario() == InvestigationRiskScenario.LOGISTICS_DELAY
                             && order.delaySeconds() < Duration.ofHours(24).toSeconds()
                             && !order.fullyRefunded()
+                            && onlyQuestions(customerText, STATUS_QUESTION)
                             ? (order.delaySeconds() == 0 ? "COMPLETED_NON_COMPENSATION_CHECK" : scenario) : null;
             case ORDER_RULE_EXPLAINED ->
                     conclusion.sufficiency().riskScenario() == InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE
                             && !order.fullyRefunded()
-                            && customerText.lines().filter(line -> !line.isBlank())
-                                    .allMatch(line -> RULE_QUESTION.matcher(line.strip()).matches()) ? scenario : null;
+                            && onlyQuestions(customerText, RULE_QUESTION) ? scenario : null;
             default -> null;
         };
+    }
+
+    private static boolean onlyQuestions(String customerText, Pattern question) {
+        return !customerText.isBlank() && customerText.lines().filter(line -> !line.isBlank())
+                .allMatch(line -> question.matcher(line.strip()).matches());
     }
 }

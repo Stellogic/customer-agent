@@ -15,6 +15,7 @@ COPY tests ./tests
 FROM base AS test
 COPY smoke.py ./
 COPY approval_queue_time_smoke.py ./
+COPY auto_resolution_smoke.py ./
 RUN uv run ruff format --check . \
     && uv run ruff check . \
     && uv run pyright \

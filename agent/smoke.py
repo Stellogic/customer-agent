@@ -296,7 +296,7 @@ def run_evidence_sufficiency_path(
             headers={"Idempotency-Key": f"issue-160-{uuid.uuid4()}"},
             json={
                 "orderReference": order_reference,
-                "description": "合成订单物流状态解释",
+                "description": "请解释物流状态",
             },
         )
         expect_status(accepted, 201)
@@ -743,7 +743,7 @@ def main() -> None:
                 "insert into support_ticket "
                 "(id, customer_id, order_reference, description, issue_kind, lifecycle_state, "
                 "handling_mode, created_at, first_responded_at, resolution_running_since) "
-                "values (%s, 'customer-demo', %s, '生成竞态验收', 'LOGISTICS_DELAY', "
+                "values (%s, 'customer-demo', %s, '请解释物流状态', 'LOGISTICS_DELAY', "
                 "'INVESTIGATING', 'AGENT', now(), now(), now())",
                 (race_ticket_id, order_reference),
             )
@@ -756,7 +756,7 @@ def main() -> None:
             connection.execute(
                 "insert into public_message "
                 "(id, ticket_id, message_sequence, author, body, sent_at) values "
-                "(%s, %s, 1, 'CUSTOMER', '生成竞态验收', now()), "
+                "(%s, %s, 1, 'CUSTOMER', '请解释物流状态', now()), "
                 "(%s, %s, 2, 'SUPPORT', '我们正在调查', now())",
                 (uuid.uuid4(), race_ticket_id, uuid.uuid4(), race_ticket_id),
             )
@@ -953,7 +953,7 @@ def main() -> None:
     no_compensation_request = f"issue-14-{uuid.uuid4()}"
     no_compensation_payload = {
         "orderReference": "ORDER-DELAY-UNDER-24",
-        "description": "合成订单物流延迟不足二十四小时",
+        "description": "请解释物流状态",
     }
     no_compensation_headers = {
         "Idempotency-Key": no_compensation_request,
@@ -4012,7 +4012,7 @@ def main() -> None:
                 },
                 json={
                     "orderReference": "ORDER-DELAY-AMBIGUOUS",
-                    "description": f"需要确认订单 {label}",
+                    "description": "请解释物流状态",
                 },
             )
             expect_status(response, 201)

@@ -124,7 +124,7 @@ describe("Issue #162 客户自动解决", () => {
         view: "PUBLIC_CONVERSATION",
         schema: "public-conversation-v2",
         generation: 1,
-        payload: { autoResolution: { status, dueAt: status === "PENDING" ? dueAt : null } },
+        payload: { autoResolution: { status, dueAt: null } },
       });
       await act(async () => {
         stream.enqueue(

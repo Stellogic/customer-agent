@@ -550,7 +550,9 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         if (Boolean.TRUE.equals(hasProposal)) return null;
         return jdbc.queryForObject(
                 "select issue_kind, description || E'\\n' || coalesce((select string_agg(body, E'\\n' order by message_sequence) "
-                        + "from public_message where ticket_id = t.id and author = 'CUSTOMER'), '') "
+                        + "from public_message m where m.ticket_id = t.id and m.author = 'CUSTOMER' "
+                        + "and not exists(select 1 from customer_clarification_request c where c.ticket_id = t.id "
+                        + "and c.status = 'ANSWERED' and c.answered_at = m.sent_at and c.answer_summary = trim(m.body))), '') "
                         + "from support_ticket t where id = ?",
                 (rs, row) -> AutoResolutionPolicy.scenario(conclusion, order, rs.getString(1), rs.getString(2)), ticketId);
     }

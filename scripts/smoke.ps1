@@ -252,6 +252,10 @@ docker run --rm --entrypoint sh "customer-agent/frontend:$imageTag" -c "
     grep -R -q '/approver' /usr/share/nginx/html &&
     ! grep -R -E '$frontendSensitivePattern' /usr/share/nginx/html"
 
+if ($Reset) {
+    & "$PSScriptRoot/test-auto-resolution.ps1"
+}
+
 $runtimeLogs = docker compose logs --no-color
 & "$PSScriptRoot/assert-runtime-log-policy.ps1" -LogLines $runtimeLogs
 Write-Host '运行日志应用正文敏感内容扫描通过（Compose 元数据已剥离）'

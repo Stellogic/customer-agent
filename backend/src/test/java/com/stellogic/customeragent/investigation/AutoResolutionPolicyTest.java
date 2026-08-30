@@ -20,7 +20,7 @@ class AutoResolutionPolicyTest {
                 order(false, false, false, 0, "IN_TRANSIT"), "请说明订单规则"))
                 .isEqualTo("RULE_EXPLANATION");
         assertThat(scenario(DecisionReasonCode.DELAY_UNDER_24_HOURS, InvestigationRiskScenario.LOGISTICS_DELAY,
-                order(false, false, false, 0, "IN_TRANSIT"), "核对已完成的状态"))
+                order(false, false, false, 0, "IN_TRANSIT"), "请核对物流记录"))
                 .isEqualTo("COMPLETED_NON_COMPENSATION_CHECK");
         assertThat(scenario(DecisionReasonCode.REFUND_STATUS_EXPLAINED, InvestigationRiskScenario.REFUND_STATUS,
                 order(false, false, false, 0, "IN_TRANSIT"), "核对退款"))
@@ -39,6 +39,9 @@ class AutoResolutionPolicyTest {
         assertThat(scenario(DecisionReasonCode.ORDER_RULE_EXPLAINED,
                 InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE, order,
                 "取消订单的规则是什么？\n请立即取消订单")).isNull();
+        assertThat(scenario(DecisionReasonCode.DELAY_UNDER_24_HOURS,
+                InvestigationRiskScenario.LOGISTICS_DELAY, order,
+                "请解释物流状态\n订单地址填错了，需要修改收货地址")).isNull();
     }
 
     @Test
