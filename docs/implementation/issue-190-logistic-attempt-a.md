@@ -26,3 +26,17 @@ PostgreSQL明确 `ts_rank_cd` 返回float4；pgJDBC默认在达到prepareThresho
 [原始安全探针、阶段记录、数值契约日志/XML及SHA索引](evidence/issue190-logistic-fit-20260831a/index.json)。实际运行计划快照见提交 `73d9aeb` 下 `evidence/issue190-logistic-run-plan/`。模型revision `7999e1d3359715c523056ef9478215996d62a620`，seal文件SHA256 `0fc933afdb217763d51bfe3989482cf2c512c0a0d9829852ba9508190768189a`；后者是元数据文件哈希，不是72题内容哈希。
 
 环境：宿主Windows/CPython3.13.13，Docker Linux/CPython3.13.14、Gradle9.3.1/JDK25、PostgreSQL18/pgvector0.8.6镜像；细节和包版本见日志。真实运行只针对本地合成开发资料，不是生产规模、线上收益或用户逐行手写代码的证据。
+
+## 修复的双轴静态审查
+
+目标 `ff824ba9c81c9b7aab88900a11e8a2ee9dd58ac0`，固定比较 `1c7b8a8...ff824ba`。
+
+### Standards
+
+PASS，0项阻塞发现。仅全文分数按float4位精确比较，其余字段不变；无epsilon或权限放宽，原始HTTP记录保持。文档没有追认原运行PASS，传输切换明确标为推断。仅静态阅读。
+
+### Spec
+
+PASS，0项新增阻塞发现。runner只更换RunId/探针路径，产品、方法、数据、质量门槛不变；未运行脚本或测试，未读取留出/冻结题。静态PASS不构成重新运行许可或质量通过。
+
+两轴未解决发现均0，最严重项均无。修正快照在 `evidence/issue190-logistic-run-plan-b/`，尚未执行；需要协调另授予受锁复验及剩余拟合阶段窗口。
