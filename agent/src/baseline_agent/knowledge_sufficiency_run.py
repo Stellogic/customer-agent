@@ -37,6 +37,7 @@ PHASE = "seen_development"
 
 def decision_diagnostic(text: str, api_key: str) -> dict[str, Any]:
     """仅取证已通过envelope检查的合成判定文本,不改变原解析或判定。"""
+
     def redact(value: str) -> str:
         if api_key:
             value = value.replace(json.dumps(api_key)[1:-1], "[REDACTED]")
@@ -213,12 +214,25 @@ async def run_development(
                 observation = response_observation(payload, elapsed)
                 observation["http_status"] = response.status_code
                 identity = ledger.state["identity"]
-                parsed = parse_response(
-                    payload,
-                    row,
-                    expected_identity=(identity[0], identity[1]) if identity is not None else None,
-                    duration_ms=elapsed,
-                )
+                try:
+                    parsed = parse_response(
+                        payload,
+                        row,
+                        expected_identity=(identity[0], identity[1]) if identity is not None else None,
+                        duration_ms=elapsed,
+                    )
+                except SufficiencyBlocked as error:
+                    if str(error) in {
+                        "INVALID_DECISION_JSON",
+                        "INVALID_DECISION_SCHEMA",
+                        "INVALID_EVIDENCE",
+                    }:
+                        # 仅在固定envelope/单个output_text检查通过后取证。
+                        # 不复制error正文/请求头,仍由外层finally结算并抛原错。
+                        observation["decision_diagnostic"] = decision_diagnostic(
+                            payload["output"][0]["content"][0]["text"], api_key
+                        )
+                    raise
                 if identity is None:
                     ledger.state["identity"] = [
                         observation["response_model"],
@@ -242,14 +256,6 @@ async def run_development(
                 raise SufficiencyBlocked("SUPPLIER_TIMEOUT_OR_TRANSPORT_ERROR") from None
             except SufficiencyBlocked as error:
                 observation["failure"] = str(error)
-                if str(error) in {
-                    "INVALID_DECISION_JSON", "INVALID_DECISION_SCHEMA", "INVALID_EVIDENCE"
-                }:
-                    # 这些错误仅在固定envelope/单个output_text检查通过后出现。
-                    # 不复制供应商error正文、请求头或整个响应,仍由finally结算并抛原错。
-                    observation["decision_diagnostic"] = decision_diagnostic(
-                        payload["output"][0]["content"][0]["text"], api_key
-                    )
                 raise
             finally:
                 observation["duration_ms"] = round((time.perf_counter() - started) * 1000)
