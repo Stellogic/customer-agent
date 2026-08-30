@@ -28,6 +28,10 @@
 
 已收到的外部 [P2 意见](https://github.com/Stellogic/customer-agent/pull/207#discussion_r3889985357) 指出自动解决候选查询仍按订单检查提案，会被同订单其他工单的待审批建议阻止。将这一存在性检查改为当前工单，保留订单级已补偿、有效预占等禁入事实和 #162 问句白名单。新增第 6 个合成订单覆盖此接缝：首跑使用任意测试描述，不符合原有问句白名单，因此没有候选；修正为“请解释物流状态”，未放宽政策。`issue165-focus-e31a5bf0` 复测通过，当前工单形成五分钟候选且兄弟工单提案仍待审批。
 
+首次完整门禁 `issue165-final-20260831-a01` 在 HEAD `d15e59a588fb982a0c69731e9656c3938279a2cb` 上失败：新增六订单验收通过，但既有 `smoke.py` 另有一项断言仍要求同订单不同工单的提案被旧唯一索引拒绝。将该断言改为验证同一工单的第二个有效提案被 `one_active_ticket_compensation_intent` 拒绝，没有删掉唯一性验证。先前已覆盖跨工单并发两提案成功。产品实现未因此改变。该失败说明聚焦覆盖和首轮静态审查漏掉了一项旧测试假设，不能声称完整门禁一次通过。
+
+随后扩展聚焦范围到完整 `integration-smoke`。第一次临时运行脚本未设置规范 smoke 的离线 shadow 模式，因缺少 `shadow_comparison` 字段停止（`issue165-focus-9b6363a6`，94.432 秒）；修正临时脚本环境后，`issue165-focus-b5ed7b87` 通过六订单验收及完整 `integration-smoke`（94.469 秒，含清理）。没有改模型行为或调用真实供应商。断言修复保存为 `9e473ee845161c027fb59dab6c9535f53b34e570`；该提交对应上述已受测工作树代码，并非宣称运行时 HEAD 已是此 SHA。
+
 ## 验证接缝与环境
 
 沿用已授权的客服标准提案 HTTP、审批租约/决定 HTTP、执行器/模拟供应商 HTTP，以及 Issue 明确要求的真实 PostgreSQL 额度约束接缝。新增 `agent/order_allowance_smoke.py`，由最终 `scripts/check.ps1 -Issue 165` 的 smoke 阶段执行。环境使用仓库锁、独立 Compose project/tag/端口；初版 4 个合成订单，锁序修复后 5 个，#162 接缝补充后 6 个；不是负载或生产规模测试。
@@ -39,10 +43,10 @@
 | 字段 | 记录 |
 | --- | --- |
 | 基线 SHA | 开始实施：`0a9ee031ca5c5febcd0c6fb11a660c5eee83046f`；已同步并用于最新双轴审查：`efbdb8348dc9c12f259c69d9e8c16de5e4d3994c`（仅增加过程数据记录要求） |
-| 受测 SHA / RunId | 最终聚焦 `issue165-focus-e31a5bf0` 对应干净 HEAD `3193ebed7e1ecd211b42e8c67bb57035d2ab7ddc`，之后仅补充证据文档。此前工作树未提交的中间构建不能只凭 SHA 标识；固定旧 SHA 的两次 RED 见正文。 |
+| 受测 SHA / RunId | 六订单聚焦 `issue165-focus-e31a5bf0` 对应干净 HEAD `3193ebed7e1ecd211b42e8c67bb57035d2ab7ddc`。完整门禁 a01 的受测 HEAD 与后续旧断言修复的受测工作树/提交对应关系见正文。固定旧 SHA 的两次锁序 RED 见正文。 |
 | 聚焦测试结果 / 失败对照 | 最终聚焦：15 项 Java 测试通过（0 失败、0 错误）；Ruff/Pyright 通过（0 错误、0 警告）；6 个合成订单 HTTP/PostgreSQL 验收 PASS。此前 `issue165-focus-1c677b9f` 前 5 场景通过，第 6 场景因 fixture 不符合白名单而整轮 FAIL；修正后复测通过。过程中修复 3 项 RUF002/RUF003 标点 lint、1 项 SIM117 写法 lint；业务并发失败对照见固定 SHA 的两类锁序 RED。 |
 | Standards / Spec | 对 `efbdb834` → `0eb80024` 的最新独立静态复审：Standards PASS（0 项有效违反）、Spec PASS（0 项剩余缺陷）。此前两轮 Spec P1 均有修复和真实 PostgreSQL 失败对照；最新 PASS 不替代未完成的测试。 |
-| 最终完整门禁 | 本文在门禁前冻结，不能提前声明 PASS。计划 RunId `issue165-final-20260831-a01`；实际受测最终 HEAD、base、RunId、完整门禁结果及阶段耗时，以 PR #207 交付回读和本地 `last-full-gate.json` 为准。门禁后不改受测文件。 |
+| 最终完整门禁 | a01 明确 FAIL（旧 smoke 假设），后端 Gradle check 通过、Agent 233 项测试通过、新增六订单通过，尚未执行浏览器阶段；失败总耗时未采集。本文在修复后的门禁前冻结，计划 RunId `issue165-final-20260831-a02`，不能提前声明 PASS。实际最终 HEAD、base、RunId、完整门禁结果及阶段耗时，以 PR #207 交付回读和本地 `last-full-gate.json` 为准。成功门禁后不改受测文件。 |
 | 耗时 | 首轮 `issue165-focus-3d2576e3` 219.531 秒；第二轮静态失败 `issue165-focus-36477ea6` 46.634 秒；第三轮 `issue165-focus-d2f7426a` 133.209 秒；锁序回归静态失败 `issue165-focus-1dbbf447` 37.497 秒；5 订单 GREEN `issue165-focus-41f02a95` 135.342 秒；6 订单候选断言失败 `issue165-focus-1c677b9f` 145.380 秒；最终 6 订单 GREEN `issue165-focus-e31a5bf0` 96.531 秒。均含环境准备/清理，不是单请求延迟；缓存状态与改动不同，不构成性能提升对照。 |
 | 模型调用 / 外部费用 | 本票不需调用真实模型；外部费用未采集，不能等同全部开发成本为零 |
 | 生产指标 / 线上收益 | 未采集，不适用 |

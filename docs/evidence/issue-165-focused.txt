@@ -65,3 +65,27 @@ FOCUS_PASS issue=165 run=issue165-focus-e31a5bf0 seconds=91.9832854
 LOCK_RELEASED issue=165 run=issue165-focus-e31a5bf0 seconds=96.5309994
 JUnit: CompensationProposalExpiryTest=1, JdbcApprovalServiceTest=1, CompensationExecutionControllerTest=5, JdbcCompensationProposalStoreTest=2, SupportCompensationControllerTest=6; total=15, failures=0, errors=0.
 Full gate is a separate required run; this focused PASS does not establish full-gate completion.
+
+Full-gate a01 FAILURE: HEAD d15e59a588fb982a0c69731e9656c3938279a2cb, base efbdb8348dc9c12f259c69d9e8c16de5e4d3994c.
+RunId: issue165-final-20260831-a01. No passing full-gate evidence was created.
+#11 99.07 BUILD SUCCESSFUL in 1m 38s
+#17 55.30 ============================= 233 passed in 11.90s =============================
+Issue #165 订单额度仲裁验收 PASS：6 个合成订单，无模型调用
+smoke failed: active intent unique constraint unexpectedly accepted a duplicate
+AssertionError: active intent unique constraint unexpectedly accepted a duplicate
+Browser stage was not reached. Full failed-run elapsed time was not collected.
+
+Expanded focused harness FAILURE (missing canonical offline shadow environment):
+RunId: issue165-focus-9b6363a6. Java15/static/six-order checks passed first.
+smoke failed: 'shadow_comparison'
+KeyError: 'shadow_comparison'
+LOCK_RELEASED issue=165 run=issue165-focus-9b6363a6 seconds=94.4316366
+
+Expanded focused GREEN after matching canonical offline environment:
+RunId: issue165-focus-b5ed7b87. Tested working-source assertion fix committed afterward as 9e473ee845161c027fb59dab6c9535f53b34e570.
+Issue #165 订单额度仲裁验收 PASS：6 个合成订单，无模型调用
+Selected fields from the integration-smoke JSON output (random fixture IDs omitted):
+{"status":"UP","checkpoint_count":264,"concurrent_reservation_results":["compensation_reservation_capacity","accepted"],"concurrent_replays":7,"concurrent_proposal_intent_results":["accepted","accepted"],"approve_reject_statuses":[200,409]}
+These counters belong to the existing synthetic integration suite, not new production impact or throughput from Issue #165.
+FOCUS_PASS issue=165 run=issue165-focus-b5ed7b87 seconds=89.7417778
+LOCK_RELEASED issue=165 run=issue165-focus-b5ed7b87 seconds=94.4691511
