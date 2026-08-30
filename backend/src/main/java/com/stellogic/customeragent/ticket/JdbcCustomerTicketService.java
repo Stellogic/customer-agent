@@ -411,6 +411,7 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                                 + "coalesce((select max(generation_number) from agent_processing_generation g where g.ticket_id = t.id), 0), "
                                 + "a.status, case when a.status = 'PENDING' then a.due_at else null end "
                                 + "from support_ticket t left join ticket_auto_resolution a on a.ticket_id = t.id "
+                                + "and (a.status <> 'RESOLVED' or t.lifecycle_state in ('RESOLVED', 'CLOSED')) "
                                 + "where t.id = ? and t.customer_id = ?",
                         (rs, row) ->
                                 new CustomerPublicSnapshot(

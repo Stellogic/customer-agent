@@ -1010,6 +1010,7 @@ export function App() {
         cursor: event.id,
         ticket: { ...current.ticket, lifecycleState: payload.lifecycleState },
         pendingCompensation: null,
+        autoResolution: event.type === "TICKET_REOPENED" ? null : current.autoResolution,
       };
     } else {
       return false;

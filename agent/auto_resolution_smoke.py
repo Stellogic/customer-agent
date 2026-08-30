@@ -397,6 +397,33 @@ class Acceptance:
         assert self.row("success")[0] == "RESOLVED"
         assert self.row("success")[5] == DUE + datetime.timedelta(hours=72)
         self.assert_unique_resolution()
+        case = "completed-check"
+        with httpx.Client(timeout=20) as client:
+            login_human(client, self.spring, "customer-demo", ["CUSTOMER_HELP_ACCESS"])
+            response = client.post(
+                f"{self.spring}/api/customer/tickets/{self.ticket(case)}/replies",
+                headers={"Idempotency-Key": f"auto162:{self.namespace}:reopen"},
+                json={
+                    "orderReference": self.order(case),
+                    "issueKind": "LOGISTICS_DELAY",
+                    "message": "仍需帮助，请人工继续处理",
+                },
+            )
+            expect_status(response, 200)
+            assert response.json()["outcome"] == "REOPENED"
+            snapshot = client.get(f"{self.spring}/api/customer/v2/tickets/{self.ticket(case)}")
+            expect_status(snapshot, 200)
+            assert snapshot.json()["ticket"]["lifecycleState"] == "INVESTIGATING"
+            assert snapshot.json()["autoResolution"] is None
+        assert self.row(case)[:2] == ("INVESTIGATING", "RESOLVED")
+        self.assert_unique_resolution(case)
+        with psycopg.connect(self.database) as connection:
+            assert connection.execute(
+                "select count(*) from customer_public_event where ticket_id = %s "
+                "and event_type = 'AUTO_RESOLUTION_CHANGED' "
+                "and payload->'autoResolution'->>'status' = 'CANCELLED'",
+                (self.ticket(case),),
+            ).fetchone() == (0,)
 
     def closed(self) -> None:
         deadline = time.monotonic() + 20

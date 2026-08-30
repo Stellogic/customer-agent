@@ -263,7 +263,7 @@ public final class CustomerPublicProjectionAppender {
         if ("CUSTOMER".equals(author)) {
             jdbc.update(
                     "update ticket_auto_resolution set status = 'CANCELLED', updated_at = ? "
-                            + "where ticket_id = ? and status in ('PENDING', 'RESOLVED')",
+                            + "where ticket_id = ? and status = 'PENDING'",
                     at,
                     ticketId);
         }
