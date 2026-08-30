@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { announceHumanSessionChange } from "./humanSessionLifecycle";
 import { RootApplication } from "./RootApplication";
@@ -429,8 +429,9 @@ describe("客服共享队列工作台", () => {
     render(<SupportWorkbench />);
 
     expect(await screen.findByRole("heading", { name: "授权工单详情" })).toBeInTheDocument();
-    expect(screen.getByText("customer-demo")).toBeInTheDocument();
-    expect(screen.getByText("support-demo")).toBeInTheDocument();
+    const summary = screen.getByLabelText("工单基本信息");
+    expect(within(summary).getByText("customer-demo")).toBeInTheDocument();
+    expect(within(summary).getByText("support-demo")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "人工公开回复" })).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: `领取工单 ${HANDOFF_TICKET}` }),
