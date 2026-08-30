@@ -33,7 +33,7 @@ CREATE TABLE knowledge_chunk (
     applicability text[] NOT NULL CHECK (cardinality(applicability) > 0),
     content text NOT NULL CHECK (length(btrim(content)) > 0),
     indexed_at timestamptz NOT NULL,
-    search_vector tsvector GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED,
+    search_vector tsvector GENERATED ALWAYS AS (to_tsvector('simple'::regconfig, content)) STORED,
     FOREIGN KEY (article_id, version)
         REFERENCES knowledge_article (article_id, version)
         ON DELETE CASCADE,
