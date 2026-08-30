@@ -54,9 +54,7 @@ class SupportCompensationService {
         DelayCompensationPolicy.Plan plan =
                 policy.currentPlan(Duration.ofSeconds(order.delaySeconds()), order.paidAmount());
         List<SupportCompensationPlan> plans =
-                plan.eligible() && eligibleOrderState(order)
-                        ? List.of(toPublicPlan(plan))
-                        : List.of();
+                currentlyAllowed(order, plan) ? List.of(toPublicPlan(plan)) : List.of();
         return new SupportCompensationOptions(SCHEMA, DelayCompensationPolicy.VERSION, plans);
     }
 
@@ -71,7 +69,6 @@ class SupportCompensationService {
         String digest = StableParameterDigest.sha256(ticketId.toString(), planCode, reasonCode);
         ticketLock.acquire(ticketId);
         lockRequest(supportId, "SUPPORT_COMPENSATION_PROPOSAL", idempotencyKey);
-        AssignedTicket ticket = requireAssignedHumanTicket(supportId, ticketId);
         List<ProposalReceipt> existing = findProposalReceipt(supportId, idempotencyKey);
         if (!existing.isEmpty()) {
             ProposalReceipt record = existing.getFirst();
@@ -80,6 +77,7 @@ class SupportCompensationService {
             }
             return toProposalResult(record, idempotencyKey, true);
         }
+        AssignedTicket ticket = requireAssignedHumanTicket(supportId, ticketId);
         requireCompensationLifecycle(ticket);
         if (!STANDARD_REASON.equals(reasonCode)) {
             throw new SupportCompensationInvalidRequestException("PLAN_NOT_ALLOWED");
@@ -206,7 +204,6 @@ class SupportCompensationService {
         String digest = StableParameterDigest.sha256(ticketId.toString(), reasonCode, normalized);
         ticketLock.acquire(ticketId);
         lockRequest(supportId, "SUPPORT_EXCEPTIONAL_COMPENSATION", idempotencyKey);
-        AssignedTicket ticket = requireAssignedHumanTicket(supportId, ticketId);
         List<ExceptionReceipt> existing = findExceptionReceipt(supportId, idempotencyKey);
         if (!existing.isEmpty()) {
             ExceptionReceipt record = existing.getFirst();
@@ -215,6 +212,7 @@ class SupportCompensationService {
             }
             return toExceptionResult(record, idempotencyKey, true);
         }
+        AssignedTicket ticket = requireAssignedHumanTicket(supportId, ticketId);
         requireCompensationLifecycle(ticket);
         if (!EXCEPTION_REASON.equals(reasonCode)) {
             throw new SupportCompensationInvalidRequestException("PLAN_NOT_ALLOWED");
@@ -429,6 +427,21 @@ class SupportCompensationService {
                 plan.capAmount(),
                 CURRENCY,
                 List.of(STANDARD_REASON));
+    }
+
+    private static boolean currentlyAllowed(OrderFacts order, DelayCompensationPolicy.Plan plan) {
+        if (!plan.eligible() || !eligibleOrderState(order)) {
+            return false;
+        }
+        if (order.existingCompensation()
+                || order.pendingActionCount() != 0
+                || !DelayCompensationPolicy.VERSION.equals(order.policyVersion())) {
+            return false;
+        }
+        return order.totalAvailableAmount()
+                        .subtract(order.activeReservationAmount())
+                        .compareTo(plan.amount())
+                >= 0;
     }
 
     private static boolean eligibleOrderState(OrderFacts order) {
