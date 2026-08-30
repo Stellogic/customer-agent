@@ -921,7 +921,7 @@
     {
       "id": "ans-refund-09",
       "kind": "answered",
-      "query": "部分退款沟通规范怎么写执行结果",
+      "query": "部退SOP怎么写执行结果",
       "query_styles": [
         "abbreviation"
       ],
@@ -2398,6 +2398,166 @@
           "version": "v2",
           "reason": "out_of_scope",
           "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md"
+        }
+      ]
+    },
+    {
+      "id": "unauth-01",
+      "kind": "unauthorized",
+      "query": "物流节点超过承诺时间没有更新时应该怎么处理？",
+      "query_styles": ["formal"],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": ["SUPPORT"],
+        "capabilities": [],
+        "scopes": []
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md"
+        },
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "unauth-02",
+      "kind": "unauthorized",
+      "query": "审批人应根据什么作出批准或驳回决定？",
+      "query_styles": ["formal"],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": ["APPROVER"],
+        "capabilities": [],
+        "scopes": []
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md"
+        },
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "unauth-03",
+      "kind": "unauthorized",
+      "query": "部分退款的资格、金额和执行结果以什么为准？",
+      "query_styles": ["formal"],
+      "principal": {
+        "subject_type": "INTERNAL",
+        "roles": ["SUPPORT"],
+        "capabilities": [],
+        "scopes": []
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md"
+        },
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md"
+        }
+      ]
+    },
+    {
+      "id": "unauth-04",
+      "kind": "unauthorized",
+      "query": "物流延迟SOP是先核订单还是直接解释？",
+      "query_styles": ["abbreviation"],
+      "principal": {
+        "subject_type": "CUSTOMER",
+        "roles": [],
+        "capabilities": [],
+        "scopes": []
+      },
+      "search_context": "INTERNAL_RETRIEVAL",
+      "allowed_hits": [],
+      "forbidden_hits": [
+        {
+          "article_id": "approval-review",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md"
+        },
+        {
+          "article_id": "logistics-delay",
+          "version": "v2",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md"
+        },
+        {
+          "article_id": "refund-policy",
+          "version": "v1",
+          "reason": "unauthorized",
+          "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md"
         }
       ]
     }

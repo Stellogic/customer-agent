@@ -14,7 +14,7 @@
 
 当前冻结值：
 
-- `content_sha256` = `44c1945d44b842df4b0d43f5db537a8e67fe4ce64019af2239bd92392ee566de`
+- `content_sha256` = `d2d5efdae565395c1dc722e14f66077558575152e23c5c8fbea58b7ebcfd2fe5`
 - `original_content_sha256` 与上值相同，表示尚未发生纠错。
 
 ## 查询覆盖
@@ -22,9 +22,10 @@
 - 36 条有答案查询，覆盖 3 个当前发布知识条目（`approval-review` v1、`logistics-delay` v2、`refund-policy` v1）各 12 条。
 - 有答案查询含口语/省略与错别字/简称/同义表达；每条记录允许命中的条目、版本、适用范围和必要片段。
 - 12 条无答案查询：当前语料中没有可引用的发布知识。
-- 12 条负面查询：6 条错误版本（退役的 `logistics-delay` v1 不得进入合格 Top-5）、6 条不适用范围（客户公开语境或客户身份不得把内部知识当答案）。越权条目通过客户身份与空 capability 同时冻结为 Top-5 命中率 0%。
+- 12 条负面查询：6 条错误版本（退役的 `logistics-delay` v1 不得进入合格 Top-5）、6 条不适用范围（客户公开语境或客户身份不得把内部知识当答案）。
+- 另有 4 条独立越权查询：内部身份缺少 `KNOWLEDGE_READ_ACCESS`，或客户身份走内部检索；任何知识条目进入合格 Top-5 都计为越权命中。
 
-语料快照哈希写在 `protocol.json` 的 `corpus_snapshot`，对应 `backend/src/main/resources/knowledge/` 在冻结时的文件内容。知识正文变更后必须另开审查，不能 silently 改评测题。
+语料快照哈希和正文写在 `protocol.json` 的 `corpus_snapshot`，对应 `backend/src/main/resources/knowledge/` 在冻结时的文件内容。必要片段必须是该快照正文的子串。知识正文变更后必须另开审查，不能悄悄改评测题。
 
 ## 预先冻结门槛
 

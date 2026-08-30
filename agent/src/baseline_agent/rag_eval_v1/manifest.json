@@ -1,7 +1,7 @@
 {
   "dataset_id": "rag-eval-v1",
-  "content_sha256": "44c1945d44b842df4b0d43f5db537a8e67fe4ce64019af2239bd92392ee566de",
-  "original_content_sha256": "44c1945d44b842df4b0d43f5db537a8e67fe4ce64019af2239bd92392ee566de",
+  "content_sha256": "d2d5efdae565395c1dc722e14f66077558575152e23c5c8fbea58b7ebcfd2fe5",
+  "original_content_sha256": "d2d5efdae565395c1dc722e14f66077558575152e23c5c8fbea58b7ebcfd2fe5",
   "hashed_files": ["protocol.json", "queries.json"],
   "review_source": "GitHub Issue #189; 查询与期望结果由仓库内当前发布知识条目人工编写，未根据检索系统输出改题。协议字段取自 Hugging Face 模型卡、config、modules.json、1_Pooling/config.json 与 tokenizer_config.json，revision 为 7999e1d3359715c523056ef9478215996d62a620。",
   "repeatable_execution": "offline: 独立审查只读取本目录 JSON 与 docs/eval/rag-eval-v1.md，不联网、不读取生产数据、不调用 DeepSeek。后续 #190 按 protocol.json 从本地路径离线加载固定 revision 权重，在权限、发布状态、版本和适用范围硬过滤后对 queries.json 计算 Recall@5、MRR@5、无答案 precision/recall 以及错误版本、不适用范围、越权 Top-5 命中率，并与已冻结门槛比较。纠错必须保留 original_content_sha256 与本清单中的变更理由，不得因未达标而改题。",

@@ -81,8 +81,21 @@ class EmbeddingProtocol:
 
 
 @dataclass(frozen=True)
+class CorpusArticle:
+    article_id: str
+    version: str
+    status: str
+    current: bool
+    applicability: tuple[str, ...]
+    source_file: str
+    sha256: str
+    body: str
+
+
+@dataclass(frozen=True)
 class EvalProtocol:
     model: EmbeddingProtocol
+    corpus_snapshot: tuple[CorpusArticle, ...]
 
 
 @dataclass(frozen=True)
@@ -227,7 +240,20 @@ def _protocol(raw: dict[str, Any]) -> tuple[EvalProtocol, RetrievalThresholds]:
         unauthorized_top5_hit_rate=float(threshold_raw["unauthorized_top5_hit_rate"]),
         k=int(threshold_raw["k"]),
     )
-    return EvalProtocol(model=model), thresholds
+    corpus = tuple(
+        CorpusArticle(
+            article_id=str(item["article_id"]),
+            version=str(item["version"]),
+            status=str(item["status"]),
+            current=bool(item["current"]),
+            applicability=tuple(str(scope) for scope in cast(list[str], item["applicability"])),
+            source_file=str(item["source_file"]),
+            sha256=str(item["sha256"]),
+            body=str(item["body"]),
+        )
+        for item in cast(list[dict[str, Any]], raw["corpus_snapshot"])
+    )
+    return EvalProtocol(model=model, corpus_snapshot=corpus), thresholds
 
 
 def _manifest(raw: dict[str, Any]) -> EvalManifest:

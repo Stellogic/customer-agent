@@ -87,6 +87,17 @@ def test_negative_queries_forbid_wrong_version_out_of_scope_and_unauthorized_hit
     assert any(
         any(hit.reason == "unauthorized" for hit in query.forbidden_hits)
         for query in dataset.queries
+        if query.kind == "unauthorized"
+    )
+    unauthorized = [query for query in dataset.queries if query.kind == "unauthorized"]
+    assert len(unauthorized) >= 4
+    assert all(not query.allowed_hits for query in unauthorized)
+    assert all(
+        "KNOWLEDGE_READ_ACCESS" not in query.principal.capabilities for query in unauthorized
+    )
+    assert all(
+        query.forbidden_hits and all(hit.reason == "unauthorized" for hit in query.forbidden_hits)
+        for query in unauthorized
     )
 
 
@@ -125,6 +136,22 @@ def test_thresholds_are_frozen_before_any_retrieval_result() -> None:
     assert thresholds.wrong_version_top5_hit_rate == 0.0
     assert thresholds.out_of_scope_top5_hit_rate == 0.0
     assert thresholds.unauthorized_top5_hit_rate == 0.0
+
+
+def test_required_snippets_are_substrings_of_frozen_corpus_bodies() -> None:
+    dataset = load_rag_eval_v1()
+    bodies = {
+        (article.article_id, article.version): article.body
+        for article in dataset.protocol.corpus_snapshot
+    }
+    assert {("approval-review", "v1"), ("logistics-delay", "v2"), ("refund-policy", "v1")} <= set(
+        bodies
+    )
+    for query in dataset.queries:
+        for hit in query.allowed_hits:
+            body = bodies[(hit.article_id, hit.version)]
+            for snippet in hit.required_snippets:
+                assert snippet.text in body, query.id
 
 
 def test_content_hash_matches_frozen_manifest_and_original_hash_is_retained() -> None:

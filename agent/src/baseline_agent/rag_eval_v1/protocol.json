@@ -93,7 +93,8 @@
       "current": true,
       "applicability": ["INTERNAL", "APPROVER"],
       "source_file": "backend/src/main/resources/knowledge/approval-review-v1.md",
-      "sha256": "c8bf4fef68f91274a75a1a5aa843ad37ada35a89d9a8224b642680450ccc6818"
+      "sha256": "c8bf4fef68f91274a75a1a5aa843ad37ada35a89d9a8224b642680450ccc6818",
+      "body": "# 补偿审批\n\n审批人只根据当前授权的提案版本和审批证据作出批准或驳回决定。审批租约、禁止自审和额度核对由 Spring 强制执行，知识条目不授予额外业务权限。"
     },
     {
       "article_id": "logistics-delay",
@@ -102,7 +103,8 @@
       "current": false,
       "applicability": ["INTERNAL", "SUPPORT"],
       "source_file": "backend/src/main/resources/knowledge/logistics-delay-v1.md",
-      "sha256": "8bfeef1dffa8246d70c1c716d94c852baa2827d1d1bfd077611e7a7c801f90cf"
+      "sha256": "8bfeef1dffa8246d70c1c716d94c852baa2827d1d1bfd077611e7a7c801f90cf",
+      "body": "# 物流延迟\n\n当物流节点长时间没有更新时，客服应先核对订单和物流的当前权威状态，再向客户解释下一步。旧版本规则只用于审计历史回复，不作为当前处理依据。"
     },
     {
       "article_id": "logistics-delay",
@@ -111,7 +113,8 @@
       "current": true,
       "applicability": ["INTERNAL", "SUPPORT"],
       "source_file": "backend/src/main/resources/knowledge/logistics-delay-v2.md",
-      "sha256": "510c4b0a98534d07c80a5fc7e1212533db0ca835f898b2119f4e25f407d6104f"
+      "sha256": "510c4b0a98534d07c80a5fc7e1212533db0ca835f898b2119f4e25f407d6104f",
+      "body": "# 物流延迟\n\n物流节点超过承诺时间没有更新时，先核对订单与物流的当前权威状态，再向客户说明已确认的个案事实。知识条目只解释一般处理原则，不替代 Spring 返回的订单、物流或补偿结果。\n\n客服可以引用当前条目的标题、更新时间和具体片段；如果事实不足或规则与当前订单冲突，应保留问题并转人工核验。"
     },
     {
       "article_id": "refund-policy",
@@ -120,7 +123,8 @@
       "current": true,
       "applicability": ["INTERNAL", "SUPPORT", "APPROVER"],
       "source_file": "backend/src/main/resources/knowledge/refund-policy-v1.md",
-      "sha256": "97feca3d5ed85a02444fedd762222463afbf955fbb6d7c848daf243a0c237d4e"
+      "sha256": "97feca3d5ed85a02444fedd762222463afbf955fbb6d7c848daf243a0c237d4e",
+      "body": "# 部分退款\n\n部分退款的资格、金额和执行结果必须以 Spring 的权威结构化结果为准。客服可以说明申请正在审批，但不能把待审批提案表述为已经批准或已经退款。\n\n回复客户时应区分补偿建议、审批决定和执行结果，并在引用本条规则时保留条目标识、版本和具体片段位置。"
     }
   ]
 }
