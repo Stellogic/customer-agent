@@ -17,6 +17,7 @@ services:
       - ./agent/approval_queue_time_setup.sql:/smoke/approval_queue_time_setup.sql:ro
       - ./agent/approval_queue_time_cleanup.sql:/smoke/approval_queue_time_cleanup.sql:ro
       - ./scripts/fixtures/issue80-browser.sql:/acceptance/issue80-browser.sql:ro
+      - ./scripts/fixtures/issue165-order-allowance.sql:/smoke/issue165-order-allowance.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 2s
@@ -165,6 +166,7 @@ services:
     entrypoint: ["python", "/smoke/smoke.py"]
     volumes:
       - ./agent/smoke.py:/smoke/smoke.py:ro
+      - ./agent/order_allowance_smoke.py:/smoke/order_allowance_smoke.py:ro
     environment:
       AGENT_SERVER_URL: http://agent-server:2024
       SPRING_INTERNAL_URL: http://backend:8080
