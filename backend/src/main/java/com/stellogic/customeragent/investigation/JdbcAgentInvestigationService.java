@@ -3,9 +3,7 @@ package com.stellogic.customeragent.investigation;
 import com.stellogic.customeragent.compensation.DelayCompensationPolicy;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
-import com.stellogic.customeragent.sla.SlaService;
 import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
-import com.stellogic.customeragent.ticket.TicketResolutionTransition;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -21,6 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 class JdbcAgentInvestigationService implements AgentInvestigationService {
@@ -28,10 +27,9 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private final AgentAccessAudit accessAudit;
     private final Clock clock;
     private final JdbcCompensationProposalStore proposalStore;
-    private final SlaService slaService;
     private final TicketAuthorityLock authorityLock;
     private final CustomerPublicProjectionAppender publicProjection;
-    private final TicketResolutionTransition ticketResolution;
+    private final ObjectMapper json;
     private final DelayCompensationPolicy policy = new DelayCompensationPolicy();
 
     @Autowired
@@ -40,18 +38,16 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             AgentAccessAudit accessAudit,
             Clock clock,
             JdbcCompensationProposalStore proposalStore,
-            SlaService slaService,
             TicketAuthorityLock authorityLock,
             CustomerPublicProjectionAppender publicProjection,
-            TicketResolutionTransition ticketResolution) {
+            ObjectMapper json) {
         this.jdbc = jdbc;
         this.accessAudit = accessAudit;
         this.clock = clock;
         this.proposalStore = proposalStore;
-        this.slaService = slaService;
         this.authorityLock = authorityLock;
         this.publicProjection = publicProjection;
-        this.ticketResolution = ticketResolution;
+        this.json = json;
     }
 
     @Override
@@ -483,34 +479,37 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             String parameterDigest,
             InvestigationConclusion conclusion,
             ScopedOrder order) {
-        boolean delayUnderThreshold =
-                conclusion.reasonCode() == DecisionReasonCode.DELAY_UNDER_24_HOURS
-                        && order.delaySeconds() < Duration.ofHours(24).toSeconds()
-                        && eligibleOrderState(order)
-                        && order.pendingActionCount() == 0;
-        boolean informational =
-                (conclusion.reasonCode() == DecisionReasonCode.ORDER_RULE_EXPLAINED
-                                || conclusion.reasonCode()
-                                        == DecisionReasonCode.REFUND_STATUS_EXPLAINED)
-                        && eligibleOrderState(order)
-                        && order.pendingActionCount() == 0;
-        if (!delayUnderThreshold && !informational) {
-            reject(ticketId, "DETERMINISTIC_REVIEW_FAILED");
-        }
-
         Instant now = clock.instant();
+        String scenario = autoResolutionScenario(ticketId, conclusion, order);
+        if (scenario == null) {
+            return acceptGroundedReplyThenHandoff(
+                    ticketId, generationId, requestId, parameterDigest, conclusion);
+        }
         Timestamp databaseTime = Timestamp.from(now);
-        slaService.evaluateTicket(ticketId, now);
-        int ticketUpdated = ticketResolution.fromAgentInvestigation(ticketId, now);
-        if (ticketUpdated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
         completeGeneration(generationId, databaseTime);
         publicProjection.completeAgentReplyStream(
                 ticketId, generationId, conclusion.customerReply().body(), now);
         publicProjection.appendAgentMessage(
-                ticketId, generationId, conclusion.customerReply().body(), now, true);
+                ticketId, generationId, conclusion.customerReply().body(), now, false);
+        Instant candidateCreatedAt = clock.instant();
+        jdbc.update(
+                "insert into ticket_auto_resolution (ticket_id, generation_id, policy_version, scenario, conclusion, "
+                        + "reply_message_id, customer_message_sequence, status, due_at, created_at, updated_at) "
+                        + "values (?, ?, ?, ?, ?::jsonb, "
+                        + "(select id from public_message where ticket_id = ? and author = 'AGENT' order by message_sequence desc limit 1), "
+                        + "(select coalesce(max(message_sequence), 0) from public_message where ticket_id = ? and author = 'CUSTOMER'), "
+                        + "'PENDING', ?, ?, ?) on conflict (ticket_id) do update set "
+                        + "generation_id = excluded.generation_id, policy_version = excluded.policy_version, scenario = excluded.scenario, "
+                        + "conclusion = excluded.conclusion, reply_message_id = excluded.reply_message_id, "
+                        + "customer_message_sequence = excluded.customer_message_sequence, status = 'PENDING', "
+                        + "due_at = excluded.due_at, created_at = excluded.created_at, updated_at = excluded.updated_at",
+                ticketId, generationId, AutoResolutionPolicy.VERSION, scenario,
+                json.writeValueAsString(conclusion), ticketId, ticketId,
+                Timestamp.from(candidateCreatedAt.plus(AutoResolutionPolicy.WAIT)),
+                Timestamp.from(candidateCreatedAt), Timestamp.from(candidateCreatedAt));
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values "
-                        + "(?, 'AGENT_CONCLUSION_ACCEPTED', 'agent-machine', ?), (?, 'TICKET_RESOLVED', 'spring-system', ?)",
+                        + "(?, 'AGENT_CONCLUSION_ACCEPTED', 'agent-machine', ?), (?, 'AUTO_RESOLUTION_CANDIDATE_CREATED', 'spring-system', ?)",
                 ticketId,
                 databaseTime,
                 ticketId,
@@ -518,12 +517,36 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         jdbc.update(
                 "insert into agent_command_request (generation_id, request_id, operation, parameter_digest, response_payload, created_at) "
                         + "values (?, ?, 'SUBMIT_INVESTIGATION_CONCLUSION', ?, "
-                        + "jsonb_build_object('accepted', true, 'lifecycleState', 'RESOLVED'), ?)",
+                        + "jsonb_build_object('accepted', true, 'lifecycleState', 'INVESTIGATING'), ?)",
                 generationId,
                 requestId,
                 parameterDigest,
                 databaseTime);
-        return new ConclusionAcceptance(true, TicketLifecycleState.RESOLVED, null, null, null);
+        return new ConclusionAcceptance(true, TicketLifecycleState.INVESTIGATING, null, null, null);
+    }
+
+    String revalidateAutoResolution(UUID ticketId, UUID generationId,
+            InvestigationConclusion conclusion, Instant now) {
+        ScopedOrder order = currentOrder(ticketId, conclusion.orderReference());
+        List<PersistedInvestigationFact> facts = persistedFacts(ticketId, generationId);
+        if (EvidenceSufficiencyPolicy.validate(conclusion, facts, now) != null
+                || !factsStillMatchCurrentOrder(facts, order)
+                || CustomerReplySafetyPolicy.rejectionReason(conclusion, order.orderReference(), order.evidenceRefs()) != null)
+            return null;
+        return autoResolutionScenario(ticketId, conclusion, order);
+    }
+
+    private String autoResolutionScenario(UUID ticketId, InvestigationConclusion conclusion, ScopedOrder order) {
+        Boolean hasProposal = jdbc.queryForObject(
+                "select exists(select 1 from compensation_proposal_revision where order_reference = ?) "
+                        + "or exists(select 1 from customer_clarification_request where ticket_id = ? and status = 'OPEN')",
+                Boolean.class, order.orderReference(), ticketId);
+        if (Boolean.TRUE.equals(hasProposal)) return null;
+        return jdbc.queryForObject(
+                "select issue_kind, description || E'\\n' || coalesce((select string_agg(body, E'\\n' order by message_sequence) "
+                        + "from public_message where ticket_id = t.id and author = 'CUSTOMER'), '') "
+                        + "from support_ticket t where id = ?",
+                (rs, row) -> AutoResolutionPolicy.scenario(conclusion, order, rs.getString(1), rs.getString(2)), ticketId);
     }
 
     private ConclusionAcceptance acceptCompensationProposal(
@@ -839,7 +862,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 "select f.fact_type, f.fact_value, f.evidence_reference, f.source_authority, "
                         + "f.recorded_at, f.valid_until, f.conflict_status "
                         + "from investigation_fact f join agent_processing_generation g "
-                        + "on g.id = f.generation_id where f.generation_id = ? and g.ticket_id = ?",
+                        + "on g.id = f.generation_id where f.generation_id = ? and g.ticket_id = ? for share of f",
                 (rs, row) ->
                         new PersistedInvestigationFact(
                                 rs.getString(1),
@@ -890,7 +913,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         }
     }
 
-    private record ScopedOrder(
+    record ScopedOrder(
             String orderReference,
             int delayHours,
             long delaySeconds,

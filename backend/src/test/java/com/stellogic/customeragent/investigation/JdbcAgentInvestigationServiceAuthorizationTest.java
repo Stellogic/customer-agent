@@ -10,9 +10,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
-import com.stellogic.customeragent.sla.SlaService;
 import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
-import com.stellogic.customeragent.ticket.TicketResolutionTransition;
+import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -44,10 +43,9 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                         mock(AgentAccessAudit.class),
                         Clock.fixed(Instant.parse("2026-08-25T00:00:00Z"), ZoneOffset.UTC),
                         mock(JdbcCompensationProposalStore.class),
-                        mock(SlaService.class),
                         mock(TicketAuthorityLock.class),
                         mock(CustomerPublicProjectionAppender.class),
-                        mock(TicketResolutionTransition.class));
+                        mock(ObjectMapper.class));
 
         service.customerCommunicationContext(UUID.randomUUID(), UUID.randomUUID());
 
@@ -78,10 +76,9 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                         mock(AgentAccessAudit.class),
                         Clock.fixed(Instant.parse("2026-08-25T00:00:00Z"), ZoneOffset.UTC),
                         mock(JdbcCompensationProposalStore.class),
-                        mock(SlaService.class),
                         mock(TicketAuthorityLock.class),
                         mock(CustomerPublicProjectionAppender.class),
-                        mock(TicketResolutionTransition.class));
+                        mock(ObjectMapper.class));
 
         assertThat(service.siblingTicketSummary(UUID.randomUUID(), UUID.randomUUID()).tickets())
                 .isEmpty();
@@ -114,10 +111,9 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                         mock(AgentAccessAudit.class),
                         Clock.fixed(Instant.parse("2026-08-25T00:00:00Z"), ZoneOffset.UTC),
                         mock(JdbcCompensationProposalStore.class),
-                        mock(SlaService.class),
                         mock(TicketAuthorityLock.class),
                         publicProjection,
-                        mock(TicketResolutionTransition.class));
+                        mock(ObjectMapper.class));
 
         assertThatThrownBy(
                         () ->

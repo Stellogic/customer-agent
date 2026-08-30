@@ -21,6 +21,8 @@ record PublicMessage(String author, String body, Instant sentAt) {}
 
 record CurrentClarification(UUID id, String promptCode, String question) {}
 
+record CurrentAutoResolution(String status, Instant dueAt) {}
+
 record CustomerPublicSnapshot(
         UUID ticketId,
         String lifecycleState,
@@ -32,7 +34,8 @@ record CustomerPublicSnapshot(
         long agentGeneration,
         List<PublicMessage> messages,
         CurrentClarification clarification,
-        CurrentReplyStream replyStream) {}
+        CurrentReplyStream replyStream,
+        CurrentAutoResolution autoResolution) {}
 
 record CustomerPublicEvent(
         String epoch, long sequence, long agentGeneration, String type, String jsonPayload) {
