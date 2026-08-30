@@ -81,16 +81,20 @@ test("parallel-safe：状态画廊与错误页键盘焦点可作为独立验收�
 
   const forbidden = await context.newPage();
   await forbidden.goto("/403");
+  await expect(forbidden.getByRole("heading", { name: "当前身份无权访问此页面" })).toBeVisible();
+  const forbiddenLink = forbidden.getByRole("link", { name: "前往客户登录" });
+  await expect(forbiddenLink).toBeVisible();
   await forbidden.keyboard.press("Tab");
-  const forbiddenLink = forbidden.getByRole("link").first();
   await expect(forbiddenLink).toBeFocused();
   await expect(forbiddenLink).toHaveCSS("outline-style", "solid");
   await forbidden.screenshot({ path: testInfo.outputPath("keyboard-focus-403.png") });
 
   const notFound = await context.newPage();
   await notFound.goto("/404");
+  await expect(notFound.getByRole("heading", { name: "没有找到这个页面" })).toBeVisible();
+  const notFoundLink = notFound.getByRole("link", { name: "前往客户登录" });
+  await expect(notFoundLink).toBeVisible();
   await notFound.keyboard.press("Tab");
-  const notFoundLink = notFound.getByRole("link").first();
   await expect(notFoundLink).toBeFocused();
   await expect(notFoundLink).toHaveCSS("outline-style", "solid");
   await notFound.screenshot({ path: testInfo.outputPath("keyboard-focus-404.png") });
