@@ -386,7 +386,8 @@ def main() -> None:
             "archive_sha256": ARCHIVE_SHA256,
             "dataset_sha256": DATA_SHA256,
             "partition": "fifth_request_diagnostic_not_quality"
-            if args.diagnose_fifth_once else "seen_development_not_unseen",
+            if args.diagnose_fifth_once
+            else "seen_development_not_unseen",
             "query_count": 1 if args.diagnose_fifth_once else 72,
             "diagnose_fifth_once": args.diagnose_fifth_once,
             "contract": frozen,
@@ -402,10 +403,15 @@ def main() -> None:
                 raise SufficiencyBlocked("DIAGNOSTIC_REQUIRES_EXISTING_LEDGER")
             ledger = ExperimentLedger(ledger_path, frozen)
             report["cost_totals_before"] = ledger.totals()
-            asyncio.run(run_development(
-                report, ledger, frozen, api_key=api_key,
-                diagnose_fifth_once=args.diagnose_fifth_once,
-            ))
+            asyncio.run(
+                run_development(
+                    report,
+                    ledger,
+                    frozen,
+                    api_key=api_key,
+                    diagnose_fifth_once=args.diagnose_fifth_once,
+                )
+            )
         except SufficiencyBlocked as error:
             report.update(status="STOPPED", stopped_reason=str(error))
         except Exception as error:
