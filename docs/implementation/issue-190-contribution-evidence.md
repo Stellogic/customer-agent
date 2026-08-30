@@ -52,6 +52,8 @@
 
 ## A方案后续记录
 
+**C实际入口传参修复：** [RED/GREEN与双CR](issue-190-c-argv-fix.md)，干净源码366985c/base c19a7ebe，RunId issue190-c-argv-offline-20260831b。显式数组修复PowerShell→uv→Python字符拆分；两个实际无key入口、17聚焦/36相关组件和必要预检PASS，阶段49.1598902秒。双CR PASS，API0、原共享账本hash未变，真实诊断仍未运行；不能据此宣传模型质量或生产性能。
+
 **C单次诊断入口前置中止：** [独立第5请求诊断记录](issue-190-c-fifth-diagnostic.md)，d492341/base c19a7ebe，RunId issue190-c-fifth-diagnostic-20260831a。17聚焦/36相关组件和类型/格式/PowerShell语法通过，但实际入口因PowerShell单元素参数展开为字符而被argparse拒绝；真实API0次、新增费用0、2.2309127秒仅为启动耗时，不能算模型延迟。原5次/4完成/metrics=null及费用上界0.009084元均未变化。这暴露了离线验证未覆盖实际argv接缝，不是模型质量结论；未重试，窗口已归还。
 
 **C失败取证修复：** [工程修复与离线证据](issue-190-c-diagnostics-fix.md)保存RED缺失日志复现、一次类型预检失败与最终通过。最终源码9301bc5/base c19a7ebe，RunId issue190-c-diagnostics-20260831c，12项聚焦及31项相关离线组件、Agent格式/lint/类型通过，阶段38.7290216秒；31项已包含12项，不重复计数。双轴静态CR PASS。仅增加有界脱敏诊断，未改变判定/预算/产品，真实调用0次、付费API新增0元；原第5次NOT_CAPTURED与4/72、metrics=null保留。此项工程修复不证明模型质量，也不是生产收益。
