@@ -47,7 +47,7 @@ SELECT 'ORDER-AUTO162-$namespaceHex-' || upper(scenario), 'customer-demo', 268.0
        CASE WHEN scenario = 'completed-check' THEN 0 ELSE 82800 END,
        true, false, false, false, 'delay-policy-v1', 268.00
 FROM unnest(ARRAY['success', 'reply', 'cancel', 'pending', 'compensation', 'proposal', 'human',
-                 'facts', 'generation', 'stream', 'partial', 'exact-race', 'completed-check']) AS scenario;
+                 'facts', 'generation', 'stream', 'partial', 'exact-race', 'completed-check', 'history']) AS scenario;
 "@
     $seed | docker compose exec -T postgres psql -U postgres -d customer_agent -v ON_ERROR_STOP=1
     Invoke-AutoResolutionPhase 'prepare'

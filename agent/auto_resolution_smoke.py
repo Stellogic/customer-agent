@@ -28,6 +28,7 @@ CASES = (
     "stream",
     "exact-race",
     "completed-check",
+    "history",
 )
 BLOCKED = ("pending", "compensation", "proposal", "human", "facts", "generation", "stream")
 
@@ -101,6 +102,8 @@ class Acceptance:
                     "values (%s, %s, 1, 'CUSTOMER', '请解释物流状态', %s)",
                     (uuid.uuid4(), ticket_id, START),
                 )
+                if case == "history":
+                    self.insert_proposal(connection, case, "REJECTED")
             with httpx.Client(timeout=20) as client:
                 facts = collect_investigation_facts(
                     client,
@@ -190,6 +193,27 @@ class Acceptance:
                 )
         self.invalidate_candidates()
 
+    def insert_proposal(self, connection: psycopg.Connection, case: str, status: str) -> None:
+        connection.execute(
+            "insert into compensation_proposal_revision (id, proposal_id, revision_number, "
+            "ticket_id, order_reference, generation_id, delay_hours, delay_seconds, "
+            "compensation_method, amount, reason_code, evidence_references, policy_version, "
+            "content_digest, status, created_at, expires_at) "
+            "values (%s, %s, 1, %s, %s, %s, 80, 288000, 'COUPON', 1.00, 'LOGISTICS_DELAY', "
+            "'[]'::jsonb, 'delay-policy-v1', %s, %s, %s, %s)",
+            (
+                uuid.uuid4(),
+                uuid.uuid4(),
+                self.ticket(case),
+                self.order(case),
+                self.generation(case) if status == "PENDING_APPROVAL" else None,
+                "a" * 64,
+                status,
+                START,
+                START + datetime.timedelta(hours=24),
+            ),
+        )
+
     def invalidate_candidates(self) -> None:
         with psycopg.connect(self.fixture_database) as connection:
             connection.execute(
@@ -207,24 +231,7 @@ class Acceptance:
                 "values (%s, %s, 1.00, 'ACTIVE', %s)",
                 (uuid.uuid4(), self.order("compensation"), START),
             )
-            connection.execute(
-                "insert into compensation_proposal_revision (id, proposal_id, revision_number, "
-                "ticket_id, order_reference, generation_id, delay_hours, delay_seconds, "
-                "compensation_method, amount, reason_code, evidence_references, policy_version, "
-                "content_digest, status, created_at, expires_at) "
-                "values (%s, %s, 1, %s, %s, %s, 80, 288000, 'COUPON', 1.00, 'LOGISTICS_DELAY', "
-                "'[]'::jsonb, 'delay-policy-v1', %s, 'PENDING_APPROVAL', %s, %s)",
-                (
-                    uuid.uuid4(),
-                    uuid.uuid4(),
-                    self.ticket("proposal"),
-                    self.order("proposal"),
-                    self.generation("proposal"),
-                    "a" * 64,
-                    START,
-                    START + datetime.timedelta(hours=24),
-                ),
-            )
+            self.insert_proposal(connection, "proposal", "PENDING_APPROVAL")
             connection.execute(
                 "update support_ticket set handling_mode = 'HUMAN' where id = %s",
                 (self.ticket("human"),),
@@ -347,7 +354,7 @@ class Acceptance:
         (markers / "done").write_text("exact-deadline-reply-accepted", encoding="utf-8")
 
     def expired(self) -> None:
-        for case in ("success", "completed-check"):
+        for case in ("success", "completed-check", "history"):
             self.wait_status(case, "RESOLVED")
             assert self.row(case) == (
                 "RESOLVED",

@@ -553,7 +553,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             UUID ticketId, InvestigationConclusion conclusion, ScopedOrder order) {
         Boolean hasProposal =
                 jdbc.queryForObject(
-                        "select exists(select 1 from compensation_proposal_revision where order_reference = ?) "
+                        "select exists(select 1 from compensation_proposal_revision where order_reference = ? and status in ('PENDING_APPROVAL', 'APPROVED')) "
                                 + "or exists(select 1 from customer_clarification_request where ticket_id = ? and status = 'OPEN')",
                         Boolean.class,
                         order.orderReference(),
