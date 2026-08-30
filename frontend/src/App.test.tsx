@@ -1409,6 +1409,300 @@ describe("客户帮助中心", () => {
     expect(screen.queryByText("旧代次消息")).not.toBeInTheDocument();
   });
 
+  it("快照中的待审批补偿只展示安全类型、金额和待审批", async () => {
+    const ticketId = "16400000-0000-0000-0000-000000000001";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:4",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "HUMAN",
+              agentGeneration: 1,
+            },
+            messages: [
+              {
+                author: "SUPPORT",
+                body: "补偿建议正在等待人工审批。建议类型：优惠券，金额：10.00 CNY。最终结果将在处理完成后通知你。",
+                sentAt: "2026-08-30T00:00:00Z",
+              },
+            ],
+            clarification: null,
+            replyStream: null,
+            pendingCompensation: {
+              compensationMethod: "COUPON",
+              amount: "10.00",
+              currency: "CNY",
+              status: "PENDING_REVIEW",
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(openEventResponse());
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "待审批" })).toBeInTheDocument();
+    const pending = screen.getByRole("heading", { name: "待审批" }).closest("aside");
+    expect(pending).toHaveTextContent("优惠券");
+    expect(pending).toHaveTextContent("10.00 CNY");
+    expect(pending).toHaveTextContent("最终结果将在处理完成后通知你。现在还没有批准或执行补偿。");
+    expect(screen.queryByText("已批准")).not.toBeInTheDocument();
+    expect(screen.queryByText("已执行")).not.toBeInTheDocument();
+  });
+
+  it("COMPENSATION_REVIEW_PENDING 事件把客户投影更新为待审批", async () => {
+    const ticketId = "16400000-0000-0000-0000-000000000002";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:2",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "HUMAN",
+              agentGeneration: 1,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: null,
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        eventResponse([
+          publicEvent("public-conversation-v2:3", "PUBLIC_MESSAGE_APPENDED", {
+            author: "SUPPORT",
+            body: "补偿建议正在等待人工审批。建议类型：优惠券，金额：10.00 CNY。最终结果将在处理完成后通知你。",
+            sentAt: "2026-08-30T00:01:00Z",
+          }),
+          publicEvent("public-conversation-v2:4", "COMPENSATION_REVIEW_PENDING", {
+            compensationMethod: "COUPON",
+            amount: "10.00",
+            status: "PENDING_REVIEW",
+          }),
+        ]),
+      );
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "待审批" })).toBeInTheDocument();
+    const pending = screen.getByRole("heading", { name: "待审批" }).closest("aside");
+    expect(pending).toHaveTextContent("优惠券");
+    expect(pending).toHaveTextContent("10.00 CNY");
+    expect(screen.queryByText("已批准")).not.toBeInTheDocument();
+    expect(screen.queryByText("已执行")).not.toBeInTheDocument();
+  });
+
+  it("审批公开消息到达后从 Spring 权威快照移除旧待审批投影", async () => {
+    const ticketId = "16400000-0000-0000-0000-000000000003";
+    let resolveRefresh: ((response: Response) => void) | undefined;
+    const pendingRefresh = new Promise<Response>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:4",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "HUMAN",
+              agentGeneration: 1,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: null,
+            pendingCompensation: {
+              compensationMethod: "COUPON",
+              amount: "10.00",
+              currency: "CNY",
+              status: "PENDING_REVIEW",
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        eventResponse([
+          publicEvent("public-conversation-v2:5", "PUBLIC_MESSAGE_APPENDED", {
+            author: "SUPPORT",
+            body: "补偿方案已获批准，正在等待补偿处理。",
+            sentAt: "2026-08-30T00:02:00Z",
+          }),
+        ]),
+      )
+      .mockReturnValueOnce(pendingRefresh);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "待审批" })).toBeInTheDocument();
+    resolveRefresh?.(
+      new Response(
+        JSON.stringify({
+          view: "PUBLIC_CONVERSATION",
+          schema: "public-conversation-v2",
+          cursor: "public-conversation-v2:5",
+          ticket: {
+            id: ticketId,
+            lifecycleState: "INVESTIGATING",
+            handlingMode: "HUMAN",
+            agentGeneration: 1,
+          },
+          messages: [
+            {
+              author: "SUPPORT",
+              body: "补偿方案已获批准，正在等待补偿处理。",
+              sentAt: "2026-08-30T00:02:00Z",
+            },
+          ],
+          clarification: null,
+          replyStream: null,
+        }),
+        { status: 200 },
+      ),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "待审批" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("驳回状态事件直接清除客户待审批投影", async () => {
+    const ticketId = "16400000-0000-0000-0000-000000000004";
+    let resolveEvents: ((response: Response) => void) | undefined;
+    const pendingEvents = new Promise<Response>((resolve) => {
+      resolveEvents = resolve;
+    });
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:4",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "HUMAN",
+              agentGeneration: 1,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: null,
+            pendingCompensation: {
+              compensationMethod: "COUPON",
+              amount: "10.00",
+              currency: "CNY",
+              status: "PENDING_REVIEW",
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockReturnValueOnce(pendingEvents);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "待审批" })).toBeInTheDocument();
+    resolveEvents?.(
+      eventResponse([
+        publicEvent("public-conversation-v2:5", "COMPENSATION_REVIEW_CLEARED", {
+          status: "REJECTED",
+        }),
+      ]),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "待审批" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("拒绝落后 cursor 的补偿刷新快照", async () => {
+    const ticketId = "16400000-0000-0000-0000-000000000005";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:4",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "HUMAN",
+              agentGeneration: 1,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: null,
+            pendingCompensation: {
+              compensationMethod: "COUPON",
+              amount: "10.00",
+              currency: "CNY",
+              status: "PENDING_REVIEW",
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        eventResponse([
+          publicEvent("public-conversation-v2:5", "PUBLIC_MESSAGE_APPENDED", {
+            author: "SUPPORT",
+            body: "补偿方案已获批准，正在等待补偿处理。",
+            sentAt: "2026-08-30T00:03:00Z",
+          }),
+        ]),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:4",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "HUMAN",
+              agentGeneration: 1,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: null,
+            pendingCompensation: {
+              compensationMethod: "COUPON",
+              amount: "10.00",
+              currency: "CNY",
+              status: "PENDING_REVIEW",
+            },
+          }),
+          { status: 200 },
+        ),
+      );
+
+    render(<App />);
+
+    expect(await screen.findByText("补偿方案已获批准，正在等待补偿处理。")).toBeInTheDocument();
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(3));
+    expect(screen.getByRole("heading", { name: "待审批" })).toBeInTheDocument();
+  });
+
   it("在首个内容片段到达前持续显示可读的等待状态", async () => {
     const ticketId = "15900000-0000-0000-0000-000000000002";
     globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
