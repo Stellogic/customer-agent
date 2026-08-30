@@ -981,7 +981,9 @@ def main() -> None:
                 break
             time.sleep(0.5)
         assert resolved_projection is not None
-        assert resolved_projection["ticket"]["lifecycleState"] == "INVESTIGATING", resolved_projection
+        assert resolved_projection["ticket"]["lifecycleState"] == "INVESTIGATING", (
+            resolved_projection
+        )
         candidate = client.get(f"{spring_url}/api/customer/v2/tickets/{resolved_ticket_id}")
         expect_status(candidate, 200)
         assert candidate.json()["autoResolution"]["status"] == "PENDING"

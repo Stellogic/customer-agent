@@ -25,9 +25,10 @@ public final class CustomerReplySafetyPolicy {
                     "(?i)(系统提示词|prompt|reasoning|checkpoint|thread_id|api[_\\s-]?key|bearer\\s+[a-z0-9._-]+)");
     private static final Pattern PERSON_NAME_CLAIM_PATTERN =
             Pattern.compile("(?:由|被)\\s*[\\u4e00-\\u9fff]{2,4}\\s*签收");
-    private static final Pattern PREMATURE_RESOLUTION_PATTERN = Pattern.compile(
-            "工单.{0,5}已.{0,3}(解决|关闭)|关闭等待期|(?:ticket|case).{0,12}(?:resolved|closed)",
-            Pattern.CASE_INSENSITIVE);
+    private static final Pattern PREMATURE_RESOLUTION_PATTERN =
+            Pattern.compile(
+                    "工单.{0,5}已.{0,3}(解决|关闭)|关闭等待期|(?:ticket|case).{0,12}(?:resolved|closed)",
+                    Pattern.CASE_INSENSITIVE);
 
     private static final Map<InvestigationRiskScenario, Set<String>> SCENARIO_CLAIM_TOKENS =
             Map.of(

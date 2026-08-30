@@ -1662,7 +1662,11 @@ function isSnapshot(value: unknown): value is Snapshot {
   if (!required.every((key) => keys.includes(key))) return false;
   if (
     keys.some(
-      (key) => !required.includes(key) && key !== "replyStream" && key !== "pendingCompensation" && key !== "autoResolution",
+      (key) =>
+        !required.includes(key) &&
+        key !== "replyStream" &&
+        key !== "pendingCompensation" &&
+        key !== "autoResolution",
     )
   )
     return false;

@@ -11,7 +11,7 @@ class CustomerReplySafetyPolicyTest {
 
     @Test
     void neitherStreamingNorCompleteRepliesCanDeclareResolutionBeforeSpringDecides() {
-        String body = "经核验，订单 ORDER-122 的物流延迟不足 24 小时，工单已解决。";
+        String body = "经核验，订单 ORDER-122 的物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。";
         assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(body, ORDER, false)).isFalse();
         assertThat(rejection(reply(body, EVIDENCE, ORDER), false))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");

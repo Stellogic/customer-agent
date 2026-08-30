@@ -28,7 +28,11 @@ public final class CustomerAutoResolutionController {
         if (request.candidateDueAt() == null || request.candidateGeneration() < 1) {
             throw new InvalidCustomerRequestException("缺少待取消的自动解决截止时间或版本");
         }
-        service.cancel(authentication.getName(), ticketId, request.candidateDueAt(), request.candidateGeneration());
+        service.cancel(
+                authentication.getName(),
+                ticketId,
+                request.candidateDueAt(),
+                request.candidateGeneration());
         return ResponseEntity.noContent().build();
     }
 

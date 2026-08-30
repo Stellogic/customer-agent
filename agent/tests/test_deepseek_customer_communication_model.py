@@ -158,13 +158,10 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
 async def test_flash_no_compensation_reply_preserves_spring_ticket_authority(
     premature_resolution: bool,
 ) -> None:
-    body = (
-        "经核验，订单 ORDER-C129 的本次物流延迟不足 24 小时，当前不符合补偿条件。"
-        + (
-            "工单已解决。如有异议，您可在关闭等待期内回复。"
-            if premature_resolution
-            else "本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。"
-        )
+    body = "经核验，订单 ORDER-C129 的本次物流延迟不足 24 小时，当前不符合补偿条件。" + (
+        "工单已解决。如有异议，您可在关闭等待期内回复。"
+        if premature_resolution
+        else "本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。"
     )
     captured: list[dict] = []
 

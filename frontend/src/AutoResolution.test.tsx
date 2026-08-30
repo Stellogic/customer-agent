@@ -76,12 +76,17 @@ describe("Issue #162 客户自动解决", () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "仍需帮助，取消自动解决" }));
     expect(await screen.findByText("已取消自动解决")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "仍需帮助，取消自动解决" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "仍需帮助，取消自动解决" }),
+    ).not.toBeInTheDocument();
     const request = fetchMock.mock.calls[2];
     expect(request[0]).toBe(`/api/customer/tickets/${ticketId}/auto-resolution/cancel`);
     expect(request[1]?.method).toBe("POST");
     expect(new Headers(request[1]?.headers).get("X-CSRF-TOKEN")).toBe("customer-csrf");
-    expect(JSON.parse(String(request[1]?.body))).toEqual({ candidateDueAt: dueAt, candidateGeneration: 1 });
+    expect(JSON.parse(String(request[1]?.body))).toEqual({
+      candidateDueAt: dueAt,
+      candidateGeneration: 1,
+    });
     expect(fetchMock.mock.calls[3][0]).toBe(`/api/customer/v2/tickets/${ticketId}`);
   });
 

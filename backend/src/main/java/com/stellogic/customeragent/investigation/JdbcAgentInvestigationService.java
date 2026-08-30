@@ -503,10 +503,16 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         + "conclusion = excluded.conclusion, reply_message_id = excluded.reply_message_id, "
                         + "customer_message_sequence = excluded.customer_message_sequence, status = 'PENDING', "
                         + "due_at = excluded.due_at, created_at = excluded.created_at, updated_at = excluded.updated_at",
-                ticketId, generationId, AutoResolutionPolicy.VERSION, scenario,
-                json.writeValueAsString(conclusion), ticketId, ticketId,
+                ticketId,
+                generationId,
+                AutoResolutionPolicy.VERSION,
+                scenario,
+                json.writeValueAsString(conclusion),
+                ticketId,
+                ticketId,
                 Timestamp.from(candidateCreatedAt.plus(AutoResolutionPolicy.WAIT)),
-                Timestamp.from(candidateCreatedAt), Timestamp.from(candidateCreatedAt));
+                Timestamp.from(candidateCreatedAt),
+                Timestamp.from(candidateCreatedAt));
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values "
                         + "(?, 'AGENT_CONCLUSION_ACCEPTED', 'agent-machine', ?), (?, 'AUTO_RESOLUTION_CANDIDATE_CREATED', 'spring-system', ?)",
@@ -525,8 +531,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         return new ConclusionAcceptance(true, TicketLifecycleState.INVESTIGATING, null, null, null);
     }
 
-    String revalidateAutoResolution(UUID ticketId, UUID generationId,
-            InvestigationConclusion conclusion) {
+    String revalidateAutoResolution(
+            UUID ticketId, UUID generationId, InvestigationConclusion conclusion) {
         ScopedOrder order;
         try {
             order = currentOrder(ticketId, conclusion.orderReference());
@@ -537,16 +543,21 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         List<PersistedInvestigationFact> facts = persistedFacts(ticketId, generationId);
         if (EvidenceSufficiencyPolicy.validate(conclusion, facts, clock.instant()) != null
                 || !factsStillMatchCurrentOrder(facts, order)
-                || CustomerReplySafetyPolicy.rejectionReason(conclusion, order.orderReference(), order.evidenceRefs()) != null)
-            return null;
+                || CustomerReplySafetyPolicy.rejectionReason(
+                                conclusion, order.orderReference(), order.evidenceRefs())
+                        != null) return null;
         return autoResolutionScenario(ticketId, conclusion, order);
     }
 
-    private String autoResolutionScenario(UUID ticketId, InvestigationConclusion conclusion, ScopedOrder order) {
-        Boolean hasProposal = jdbc.queryForObject(
-                "select exists(select 1 from compensation_proposal_revision where order_reference = ?) "
-                        + "or exists(select 1 from customer_clarification_request where ticket_id = ? and status = 'OPEN')",
-                Boolean.class, order.orderReference(), ticketId);
+    private String autoResolutionScenario(
+            UUID ticketId, InvestigationConclusion conclusion, ScopedOrder order) {
+        Boolean hasProposal =
+                jdbc.queryForObject(
+                        "select exists(select 1 from compensation_proposal_revision where order_reference = ?) "
+                                + "or exists(select 1 from customer_clarification_request where ticket_id = ? and status = 'OPEN')",
+                        Boolean.class,
+                        order.orderReference(),
+                        ticketId);
         if (Boolean.TRUE.equals(hasProposal)) return null;
         return jdbc.queryForObject(
                 "select issue_kind, description || E'\\n' || coalesce((select string_agg(body, E'\\n' order by message_sequence) "
@@ -554,7 +565,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         + "and not exists(select 1 from customer_clarification_request c where c.ticket_id = t.id "
                         + "and c.status = 'ANSWERED' and c.answered_at = m.sent_at and c.answer_summary = trim(m.body))), '') "
                         + "from support_ticket t where id = ?",
-                (rs, row) -> AutoResolutionPolicy.scenario(conclusion, order, rs.getString(1), rs.getString(2)), ticketId);
+                (rs, row) ->
+                        AutoResolutionPolicy.scenario(
+                                conclusion, order, rs.getString(1), rs.getString(2)),
+                ticketId);
     }
 
     private ConclusionAcceptance acceptCompensationProposal(

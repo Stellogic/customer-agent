@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
-import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -22,6 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 class JdbcAgentInvestigationServiceAuthorizationTest {
     @Test

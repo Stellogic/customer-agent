@@ -1,5 +1,5 @@
 # pyright: reportOptionalSubscript=false
-"""#162：真实 HTTP、PostgreSQL 与 Spring 调度；时钟由外层重建后端推进。"""
+"""#162: 真实 HTTP、PostgreSQL 与 Spring 调度; 时钟由外层重建后端推进。"""
 
 import argparse
 import datetime
@@ -16,8 +16,18 @@ from smoke import collect_investigation_facts, evidence_sufficiency, expect_stat
 START = datetime.datetime(2026, 8, 9, 14, tzinfo=datetime.UTC)
 DUE = START + datetime.timedelta(minutes=5)
 CASES = (
-    "success", "reply", "cancel", "pending", "compensation", "proposal",
-    "human", "facts", "generation", "stream", "exact-race", "completed-check",
+    "success",
+    "reply",
+    "cancel",
+    "pending",
+    "compensation",
+    "proposal",
+    "human",
+    "facts",
+    "generation",
+    "stream",
+    "exact-race",
+    "completed-check",
 )
 BLOCKED = ("pending", "compensation", "proposal", "human", "facts", "generation", "stream")
 
@@ -30,7 +40,7 @@ class Acceptance:
         self.fixture_database = os.environ["SPRING_FIXTURE_DATABASE_URI"]
 
     def ticket(self, case: str) -> uuid.UUID:
-        # 相同截止时刻按 UUID 排序：屏障票先于精确截止回复票。
+        # 相同截止时刻按 UUID 排序: 屏障票先于精确截止回复票。
         if case == "success":
             return uuid.UUID(f"00000000-0000-0000-0000-{self.namespace.hex[:12]}")
         if case == "exact-race":
@@ -93,23 +103,34 @@ class Acceptance:
                 )
             with httpx.Client(timeout=20) as client:
                 facts = collect_investigation_facts(
-                    client, self.spring, ticket_id, generation_id,
+                    client,
+                    self.spring,
+                    ticket_id,
+                    generation_id,
                     self.agent_headers(case, "USE_INVESTIGATION_CAPABILITY", "facts"),
                 )
                 body = (
-                    f"经核验，订单 {self.order(case)} 的物流延迟不足 24 小时，"
-                    "当前不符合补偿条件。"
+                    f"经核验，订单 {self.order(case)} 的物流延迟不足 24 小时，当前不符合补偿条件。"
                 )
-                base = f"{self.spring}/internal/agent/tickets/{ticket_id}/generations/{generation_id}"
-                for index, payload in enumerate((
-                    {"type": "STREAM_STARTED"},
-                    {"type": "CONTENT_DELTA", "chunkIndex": 0, "delta": body},
-                )):
-                    expect_status(client.post(
-                        f"{base}/public-reply-events",
-                        headers=self.agent_headers(case, "PUBLISH_PUBLIC_REPLY_EVENT", f"stream:{index}"),
-                        json=payload,
-                    ), 202)
+                base = (
+                    f"{self.spring}/internal/agent/tickets/{ticket_id}/generations/{generation_id}"
+                )
+                for index, payload in enumerate(
+                    (
+                        {"type": "STREAM_STARTED"},
+                        {"type": "CONTENT_DELTA", "chunkIndex": 0, "delta": body},
+                    )
+                ):
+                    expect_status(
+                        client.post(
+                            f"{base}/public-reply-events",
+                            headers=self.agent_headers(
+                                case, "PUBLISH_PUBLIC_REPLY_EVENT", f"stream:{index}"
+                            ),
+                            json=payload,
+                        ),
+                        202,
+                    )
                 assert self.row(case)[1] is None, "streamed text alone must not create a candidate"
                 if case == "partial":
                     continue
@@ -122,17 +143,24 @@ class Acceptance:
                     "evidenceRefs": facts["evidenceRefs"],
                     **evidence_sufficiency(self.order(case)),
                     "customerReply": {
-                        "schemaVersion": "customer-reply-v1", "body": body,
+                        "schemaVersion": "customer-reply-v1",
+                        "body": body,
                         "intent": "NO_COMPENSATION_RESOLUTION",
-                        "evidenceRefs": facts["evidenceRefs"], "escalationRequired": False,
+                        "evidenceRefs": facts["evidenceRefs"],
+                        "escalationRequired": False,
                         "referencedOrder": self.order(case),
                     },
                 }
-                expect_status(client.post(
-                    f"{base}/conclusions",
-                    headers=self.agent_headers(case, "SUBMIT_INVESTIGATION_CONCLUSION", "conclusion"),
-                    json=conclusion,
-                ), 200)
+                expect_status(
+                    client.post(
+                        f"{base}/conclusions",
+                        headers=self.agent_headers(
+                            case, "SUBMIT_INVESTIGATION_CONCLUSION", "conclusion"
+                        ),
+                        json=conclusion,
+                    ),
+                    200,
+                )
                 assert self.row(case)[:4] == ("INVESTIGATING", "PENDING", START, DUE)
             with psycopg.connect(self.database) as connection:
                 assert connection.execute(
@@ -147,10 +175,14 @@ class Acceptance:
                         "select scenario from ticket_auto_resolution where ticket_id = %s",
                         (ticket_id,),
                     ).fetchone() == ("COMPLETED_NON_COMPENSATION_CHECK",)
-                events = [row[0] for row in connection.execute(
-                    "select event_type from customer_public_event "
-                    "where ticket_id = %s order by sequence", (ticket_id,),
-                ).fetchall()]
+                events = [
+                    row[0]
+                    for row in connection.execute(
+                        "select event_type from customer_public_event "
+                        "where ticket_id = %s order by sequence",
+                        (ticket_id,),
+                    ).fetchall()
+                ]
                 assert (
                     events.index("AGENT_REPLY_COMPLETED")
                     < events.index("PUBLIC_MESSAGE_APPENDED")
@@ -182,8 +214,16 @@ class Acceptance:
                 "content_digest, status, created_at, expires_at) "
                 "values (%s, %s, 1, %s, %s, %s, 80, 288000, 'COUPON', 1.00, 'LOGISTICS_DELAY', "
                 "'[]'::jsonb, 'delay-policy-v1', %s, 'PENDING_APPROVAL', %s, %s)",
-                (uuid.uuid4(), uuid.uuid4(), self.ticket("proposal"), self.order("proposal"),
-                 self.generation("proposal"), "a" * 64, START, START + datetime.timedelta(hours=24)),
+                (
+                    uuid.uuid4(),
+                    uuid.uuid4(),
+                    self.ticket("proposal"),
+                    self.order("proposal"),
+                    self.generation("proposal"),
+                    "a" * 64,
+                    START,
+                    START + datetime.timedelta(hours=24),
+                ),
             )
             connection.execute(
                 "update support_ticket set handling_mode = 'HUMAN' where id = %s",
@@ -210,21 +250,33 @@ class Acceptance:
             public = snapshot.json()["autoResolution"]
             assert public["status"] == "PENDING"
             assert datetime.datetime.fromisoformat(public["dueAt"]) == DUE
-            expect_status(client.post(
-                f"{self.spring}/api/customer/v2/tickets/{self.ticket('reply')}/messages",
-                headers={"Idempotency-Key": f"auto162:{self.namespace}:reply"},
-                json={"schema": "public-conversation-v2", "message": "不同意本次结论，仍需帮助"},
-            ), 202)
-            expect_status(client.post(
-                f"{self.spring}/api/customer/tickets/{self.ticket('cancel')}/auto-resolution/cancel",
-                json={"candidateDueAt": DUE.isoformat(), "candidateGeneration": 2},
-            ), 409)
+            expect_status(
+                client.post(
+                    f"{self.spring}/api/customer/v2/tickets/{self.ticket('reply')}/messages",
+                    headers={"Idempotency-Key": f"auto162:{self.namespace}:reply"},
+                    json={
+                        "schema": "public-conversation-v2",
+                        "message": "不同意本次结论，仍需帮助",
+                    },
+                ),
+                202,
+            )
+            expect_status(
+                client.post(
+                    f"{self.spring}/api/customer/tickets/{self.ticket('cancel')}/auto-resolution/cancel",
+                    json={"candidateDueAt": DUE.isoformat(), "candidateGeneration": 2},
+                ),
+                409,
+            )
             assert self.row("cancel")[1] == "PENDING"
             for _ in range(2):
-                expect_status(client.post(
-                    f"{self.spring}/api/customer/tickets/{self.ticket('cancel')}/auto-resolution/cancel",
-                    json={"candidateDueAt": DUE.isoformat(), "candidateGeneration": 1},
-                ), 204)
+                expect_status(
+                    client.post(
+                        f"{self.spring}/api/customer/tickets/{self.ticket('cancel')}/auto-resolution/cancel",
+                        json={"candidateDueAt": DUE.isoformat(), "candidateGeneration": 1},
+                    ),
+                    204,
+                )
         assert self.row("reply")[1] == "CANCELLED"
         assert self.row("cancel")[1] == "CANCELLED"
         with psycopg.connect(self.database) as connection:
@@ -255,7 +307,7 @@ class Acceptance:
             while not (markers / "due").exists() and time.monotonic() < deadline:
                 time.sleep(0.1)
             assert (markers / "due").exists(), "backend did not reach the exact deadline"
-            # 先证明调度已选择到期列表并在首票等待，再提交客户消息。
+            # 先证明调度已选择到期列表并在首票等待, 再提交客户消息。
             deadline = time.monotonic() + 20
             scheduler_waiting = False
             while time.monotonic() < deadline:
@@ -271,11 +323,17 @@ class Acceptance:
             assert scheduler_waiting, "deadline scheduler never waited on the barrier ticket"
             with httpx.Client(timeout=20) as client:
                 login_human(client, self.spring, "customer-demo", ["CUSTOMER_HELP_ACCESS"])
-                expect_status(client.post(
-                    f"{self.spring}/api/customer/v2/tickets/{self.ticket('exact-race')}/messages",
-                    headers={"Idempotency-Key": f"auto162:{self.namespace}:exact-race"},
-                    json={"schema": "public-conversation-v2", "message": "不同意本次结论，仍需帮助"},
-                ), 202)
+                expect_status(
+                    client.post(
+                        f"{self.spring}/api/customer/v2/tickets/{self.ticket('exact-race')}/messages",
+                        headers={"Idempotency-Key": f"auto162:{self.namespace}:exact-race"},
+                        json={
+                            "schema": "public-conversation-v2",
+                            "message": "不同意本次结论，仍需帮助",
+                        },
+                    ),
+                    202,
+                )
             assert self.row("exact-race")[1] == "CANCELLED"
             with psycopg.connect(self.database) as observation:
                 assert observation.execute(
@@ -283,7 +341,7 @@ class Acceptance:
                     "where ticket_id = %s and author = 'CUSTOMER'",
                     (self.ticket("exact-race"),),
                 ).fetchone() == (DUE,)
-        # 退出事务后释放屏障，让同一份已选取列表继续处理。
+        # 退出事务后释放屏障, 让同一份已选取列表继续处理。
         self.wait_status("success", "RESOLVED")
         assert self.row("exact-race")[:2] == ("INVESTIGATING", "CANCELLED")
         (markers / "done").write_text("exact-deadline-reply-accepted", encoding="utf-8")
@@ -292,7 +350,12 @@ class Acceptance:
         for case in ("success", "completed-check"):
             self.wait_status(case, "RESOLVED")
             assert self.row(case) == (
-                "RESOLVED", "RESOLVED", START, DUE, DUE, DUE + datetime.timedelta(hours=72),
+                "RESOLVED",
+                "RESOLVED",
+                START,
+                DUE,
+                DUE,
+                DUE + datetime.timedelta(hours=72),
             )
             self.assert_unique_resolution(case)
         for case in BLOCKED:
@@ -344,7 +407,10 @@ class Acceptance:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("phase", choices=("prepare", "before_due", "exact_race", "expired", "before_close", "closed"))
+    parser.add_argument(
+        "phase",
+        choices=("prepare", "before_due", "exact_race", "expired", "before_close", "closed"),
+    )
     parser.add_argument("--namespace", required=True)
     parser.add_argument("--marker-directory")
     args = parser.parse_args()

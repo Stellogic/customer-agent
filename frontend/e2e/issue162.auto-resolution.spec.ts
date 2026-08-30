@@ -32,7 +32,10 @@ for (const width of [1440, 390]) {
     // Keep the stream request pending so the fixture does not simulate an EOF/disconnection.
     await page.route(`**/api/customer/v2/tickets/${ticketId}/events`, () => {});
     await page.route(`**/api/customer/tickets/${ticketId}/auto-resolution/cancel`, (route) => {
-      expect(route.request().postDataJSON()).toEqual({ candidateDueAt: dueAt, candidateGeneration: 1 });
+      expect(route.request().postDataJSON()).toEqual({
+        candidateDueAt: dueAt,
+        candidateGeneration: 1,
+      });
       status = "CANCELLED";
       return route.fulfill({ json: {} });
     });
@@ -61,7 +64,10 @@ for (const width of [1440, 390]) {
     status = "REEVALUATING";
     await page.reload();
     await expect(notice.getByText("正在重新评估", { exact: true })).toBeVisible();
-    await page.screenshot({ path: `/artifacts/issue162-reevaluating-${width}.png`, fullPage: true });
+    await page.screenshot({
+      path: `/artifacts/issue162-reevaluating-${width}.png`,
+      fullPage: true,
+    });
     status = "RESOLVED";
     await page.reload();
     await expect(notice.getByText("工单已自动解决", { exact: true })).toBeVisible();

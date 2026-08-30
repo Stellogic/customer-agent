@@ -261,9 +261,11 @@ public final class CustomerPublicProjectionAppender {
             Instant now) {
         Timestamp at = Timestamp.from(now);
         if ("CUSTOMER".equals(author)) {
-            jdbc.update("update ticket_auto_resolution set status = 'CANCELLED', updated_at = ? "
+            jdbc.update(
+                    "update ticket_auto_resolution set status = 'CANCELLED', updated_at = ? "
                             + "where ticket_id = ? and status in ('PENDING', 'RESOLVED')",
-                    at, ticketId);
+                    at,
+                    ticketId);
         }
         Long messageSequence =
                 jdbc.queryForObject(
