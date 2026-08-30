@@ -1,6 +1,6 @@
 # Issue #190 A方案静态实现与待运行清单
 
-关联 #190 / PR203；预登记方法提交 `963ee0fe99ccfc7c855ec16be5420d99056a54e6`。用户接受的是一次有限可行性验证，不是A必然通过的承诺。本阶段只编辑源码、数据、测试源码与文档；#165持有窗口，未运行依赖安装/锁生成、格式、lint、类型检查、测试、构建、特征、模型、拟合或任何评测，也未查询锁。
+关联 #190 / PR203；预登记方法提交 `963ee0fe99ccfc7c855ec16be5420d99056a54e6`。用户接受的是一次有限可行性验证，不是A必然通过的承诺。下文保留最初静态阶段记录；最新依赖/组件预检结果见文末，不能将历史“未运行”当作当前状态。
 
 ## 实现边界
 
@@ -13,7 +13,7 @@
 
 ## 数据与独立交接
 
-训练144题/6主题、校准72题/3主题已人工编写到 `agent/src/baseline_agent/knowledge_answerability_v1/`，36篇原始文档的事实段落定义随JSON保存。每主题6直接+6改写+6缺失+6前提不匹配，标注理由不进入特征。manifest记录原文件SHA256，文件级Git属性保留这些JSON原字节；实际目录分块数和模型质量未运行。
+训练144题/6主题、校准72题/3主题由Codex编写到 `agent/src/baseline_agent/knowledge_answerability_v1/`，36篇原始文档的事实段落定义随JSON保存。每主题6直接+6改写+6缺失+6前提不匹配，标注理由不进入特征。manifest记录原文件SHA256，文件级Git属性保留这些JSON原字节；实际目录分块数和模型质量未运行。
 
 负例要针对所在分区的全部合并语料核对，不把跨实体或新条件外推当成有来源答案；这也是静态Spec数据审查范围。主题隔离、来源以及新72题的schema/seal交接见[独立留出交接](issue-190-holdout-handoff.md)。协调另行安排无历史作者及独立审阅，本任务不制作、不查找或阅读其内容。当前尚未收到有效seal；封存成立前不申请运行。
 
@@ -54,3 +54,32 @@ PASS，0项新增缺陷。三项发现均闭环；训练144题/校准72题已全
 两轴各0项未解决发现；最严重项均无。此后提交仅记录审查和manifest审阅状态。阶段状态CODE_READY_NO_TESTS，源码/数据/测试源码不是运行证据。协调现另授予依赖/格式/类型/聚焦与组件窗口：须先同步main、核对迁移并守锁；拟合、校准、留出、189评测、最终完整门禁与合入仍未授权。
 
 2026-08-31阶段验证前已同步main c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472；main已应用V41__order_compensation_allowance.sql，本票尚未发布的向量迁移因此顺延为V42。只重命名本票迁移，已应用V41及所有主线迁移不改；历史阶段所记V41是当时基线状态。
+
+## 2026-08-31 依赖及组件预检实测
+
+RunId `issue190-logistic-preflight-20260831a`；开始HEAD `218091b552d84923fe4626a9a60f8dafcddae9c1`，base `c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`。运行内生成依赖锁、规范格式，然后验证工作树；归档源码提交 `c1a33d018d4dc23a19219e90cc1e6923002e504e`。不是在该归档提交后重跑的干净HEAD证据。
+
+| 项目 | 实际结果与边界 |
+| --- | --- |
+| uv lock / frozen sync | PASS；新增scikit-learn 1.7.2、joblib 1.5.3、scipy 1.18.1、threadpoolctl 3.6.0，仅calibration/dev |
+| Python | Ruff格式/检查PASS；3个聚焦文件9项测试PASS，0.15秒；Pyright 0错误/警告 |
+| 后端 | SpotlessApply、bootJar及Gradle check实际执行成功；check 1分38秒。JUnit计数/XML未采集，不推测数量 |
+| 前端 | 3个指定文件Prettier无改动；Docker build/test成功但npm build/check命中缓存，本次未重新执行；未跑浏览器 |
+| 总阶段耗时 | 177.6977645秒（含依赖和清理；不是请求延迟或模型训练耗时） |
+| 模型/费用 | 未下载模型权重、未调用付费API，费用0元；仅依赖安装，无特征计算/拟合/校准/留出/冻结评测 |
+| 环境 | Windows/CPython 3.13.13、uv 0.8.22；Docker desktop-linux，Gradle 9.3.1/JDK25；前端Node 24.19.0镜像缓存 |
+| 资源 | 自有容器/3个镜像tag清理，锁释放后单次FREE回读；已发LOCK_RELEASED并归还阶段窗口 |
+
+[脱敏日志、实际runner快照、阶段JSON和SHA索引](evidence/issue190-logistic-preflight-20260831a/index.json)。下载输出仅记录scikit-learn 8.3MiB、scipy 34.9MiB的包尺寸，不当作总流量；峰值内存和机器成本未采集。未启动数据库栈，因此V42真实迁移及故意越权/旧版本/范围负向回归未验证；本轮不构成fit要求的safety-report。
+
+### Standards
+
+`218091b...c1a33d0`：PASS，0项阻塞发现。源码格式无语义漂移，新增依赖仅calibration/dev，产品runtime保留no-dev。仅静态。
+
+### Spec
+
+`218091b...c1a33d0`：PASS，0项新增缺陷。四特征/L2/停止条件/封存不变；数据、产品参数、冻结标准未改。仅静态。
+
+两轴各0项未解决发现，最严重项均无。不是GATE_READY；新策略仍PENDING_CALIBRATION，历史冻结质量FAIL保留。
+
+协调随后提供有效seal元数据并授权一次训练/校准阶段；先固定源码、manifest、方法和seal，再按预登记完成真实负向回归、特征采集、一次拟合及唯一选择。无可行门槛、不收敛或质量失败即停，不改数据/方法重选。成功也只提交报告/唯一参数/产品一致性证据后报告冻结SHA，由独立运行者另行测试留出。本任务不得读取留出内容或路径；未授权留出、189、最终完整门禁或合入。
