@@ -207,7 +207,7 @@ def parse_response(
     model = payload.get("model")
     fingerprint = payload.get("system_fingerprint")
     observation = response_observation(payload, duration_ms)
-    checks = dict.fromkeys(CONTRACT_CHECK_LAYERS, "NOT_EVALUATED")
+    checks: dict[str, str] = dict.fromkeys(CONTRACT_CHECK_LAYERS, "NOT_EVALUATED")
     if c_v2:
         observation["contract_checks"] = checks
 
