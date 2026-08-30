@@ -69,11 +69,7 @@ final class KnowledgeChunker {
     }
 
     private static void addBlock(
-            List<LineBlock> blocks,
-            StringBuilder content,
-            int start,
-            int end,
-            int bodyStartLine) {
+            List<LineBlock> blocks, StringBuilder content, int start, int end, int bodyStartLine) {
         if (start >= 0 && !content.toString().isBlank()) {
             blocks.add(
                     new LineBlock(
@@ -95,7 +91,8 @@ final class KnowledgeChunker {
             String part = content.substring(offset, end).trim();
             if (!part.isBlank()) parts.add(part);
             offset = end;
-            while (offset < content.length() && Character.isWhitespace(content.charAt(offset))) offset++;
+            while (offset < content.length() && Character.isWhitespace(content.charAt(offset)))
+                offset++;
         }
         return parts;
     }

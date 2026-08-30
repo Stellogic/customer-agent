@@ -97,7 +97,8 @@ final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
                         ? new Object[] {articleId, scopeArray}
                         : new Object[] {articleId, version, scopeArray};
         KnowledgeArticleDetail detail =
-                jdbc.query(
+                jdbc
+                        .query(
                                 "select a.article_id, a.title, a.version, a.updated_at, a.applicability, "
                                         + "a.publication_status, a.is_current, a.source_file, a.content_hash, a.body "
                                         + "from knowledge_article a where "

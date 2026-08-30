@@ -29,7 +29,18 @@ class KnowledgeCatalogReadPathTest {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         stubReadyIndex(jdbc);
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        when(jdbc.query(sql.capture(), any(RowMapper.class), any(), any(), any(), any(), any(), any(), any(), any(), anyInt()))
+        when(jdbc.query(
+                        sql.capture(),
+                        any(RowMapper.class),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        anyInt()))
                 .thenReturn(List.of());
 
         KnowledgeCatalogResponse response = service(jdbc).search("support-demo", "物流延迟", 20);

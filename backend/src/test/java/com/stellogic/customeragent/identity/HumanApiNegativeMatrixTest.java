@@ -105,7 +105,8 @@ class HumanApiNegativeMatrixTest {
     }
 
     private static List<ApiRequest> allApis() {
-        return java.util.stream.Stream.of(CUSTOMER_APIS, SUPPORT_APIS, APPROVAL_APIS, KNOWLEDGE_APIS)
+        return java.util.stream.Stream.of(
+                        CUSTOMER_APIS, SUPPORT_APIS, APPROVAL_APIS, KNOWLEDGE_APIS)
                 .flatMap(List::stream)
                 .toList();
     }

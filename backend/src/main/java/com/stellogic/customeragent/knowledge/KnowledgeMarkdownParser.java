@@ -42,7 +42,8 @@ final class KnowledgeMarkdownParser {
                 throw invalid(sourceFile, index + 1, "元数据区域不允许空行");
             }
             int separator = line.indexOf(':');
-            if (separator < 1 || !METADATA_KEY.matcher(line.substring(0, separator).trim()).matches()) {
+            if (separator < 1
+                    || !METADATA_KEY.matcher(line.substring(0, separator).trim()).matches()) {
                 throw invalid(sourceFile, index + 1, "元数据必须使用 key: value 格式");
             }
             String key = line.substring(0, separator).trim();
@@ -77,8 +78,7 @@ final class KnowledgeMarkdownParser {
             throw invalid(sourceFile, 1, "current 条目必须是 PUBLISHED");
         }
 
-        List<String> bodyLines =
-                Arrays.stream(lines, closingBoundary + 1, lines.length).toList();
+        List<String> bodyLines = Arrays.stream(lines, closingBoundary + 1, lines.length).toList();
         String body = String.join("\n", bodyLines).trim();
         if (body.isBlank()) {
             throw invalid(sourceFile, closingBoundary + 1, "正文不能为空");
@@ -209,5 +209,4 @@ final class KnowledgeMarkdownParser {
         return new KnowledgeCatalogValidationException(
                 "INVALID_KNOWLEDGE_ARTICLE", sourceFile + ":" + line + " " + message);
     }
-
 }

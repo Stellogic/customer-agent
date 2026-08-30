@@ -44,5 +44,4 @@ public final class KnowledgeCatalogController {
                 .cacheControl(CacheControl.noStore())
                 .body(service.article(authentication.getName(), articleId, version));
     }
-
 }

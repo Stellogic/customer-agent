@@ -125,10 +125,7 @@ record KnowledgeCatalogResponse(
 }
 
 record KnowledgeArticleResponse(
-        String view,
-        String schema,
-        KnowledgeIndexState index,
-        KnowledgeArticleDetail article) {}
+        String view, String schema, KnowledgeIndexState index, KnowledgeArticleDetail article) {}
 
 enum KnowledgePublicationStatus {
     DRAFT,

@@ -73,8 +73,7 @@ final class KnowledgeCatalogIndexer {
             return markFailure(failureCode(exception), exception.getMessage(), baseState);
         } catch (RuntimeException exception) {
             LOG.warn("knowledge index rebuild failed code=INDEX_REBUILD_FAILED");
-            return markFailure(
-                    "INDEX_REBUILD_FAILED", "知识索引重建失败，请检查数据库与索引状态", baseState);
+            return markFailure("INDEX_REBUILD_FAILED", "知识索引重建失败，请检查数据库与索引状态", baseState);
         }
     }
 
@@ -82,8 +81,7 @@ final class KnowledgeCatalogIndexer {
             throws IOException, KnowledgeCatalogValidationException {
         Resource[] resolved = resources.getResources(resourcePattern);
         Arrays.sort(resolved, Comparator.comparing(this::stableSourceFile));
-        List<KnowledgeArticleDocument> articles =
-                Arrays.stream(resolved).map(this::parse).toList();
+        List<KnowledgeArticleDocument> articles = Arrays.stream(resolved).map(this::parse).toList();
 
         Set<String> sourceFiles = new HashSet<>();
         Set<String> articleVersions = new HashSet<>();
@@ -118,8 +116,7 @@ final class KnowledgeCatalogIndexer {
         for (KnowledgeArticleDocument article : articles) {
             if (!article.current() && !currentByArticle.containsKey(article.articleId())) {
                 throw new KnowledgeCatalogValidationException(
-                        "MISSING_CURRENT_KNOWLEDGE",
-                        "知识条目没有 current 版本: " + article.articleId());
+                        "MISSING_CURRENT_KNOWLEDGE", "知识条目没有 current 版本: " + article.articleId());
             }
         }
         return articles;
@@ -152,7 +149,8 @@ final class KnowledgeCatalogIndexer {
                                     : KnowledgeIndexStatus.READY;
                     jdbc.update("delete from knowledge_chunk");
                     jdbc.update("delete from knowledge_article");
-                    for (KnowledgeArticleDocument article : articles) insertArticle(article, indexedAt);
+                    for (KnowledgeArticleDocument article : articles)
+                        insertArticle(article, indexedAt);
                     for (KnowledgeArticleDocument article : articles) {
                         for (KnowledgeChunkDocument chunk : article.chunks()) {
                             insertChunk(chunk, indexedAt);
@@ -206,10 +204,7 @@ final class KnowledgeCatalogIndexer {
                             || !previous.sourceFile().equals(article.sourceFile()))) {
                 throw new KnowledgeCatalogValidationException(
                         "IMMUTABLE_KNOWLEDGE_VERSION",
-                        "知识条目版本不可原地修改，请创建新版本: "
-                                + article.articleId()
-                                + "@"
-                                + article.version());
+                        "知识条目版本不可原地修改，请创建新版本: " + article.articleId() + "@" + article.version());
             }
         }
     }
@@ -323,7 +318,9 @@ final class KnowledgeCatalogIndexer {
     private String sourceDigest(List<KnowledgeArticleDocument> articles) {
         String value =
                 articles.stream()
-                        .sorted(Comparator.comparing(KnowledgeArticleDocument::articleId).thenComparing(KnowledgeArticleDocument::version))
+                        .sorted(
+                                Comparator.comparing(KnowledgeArticleDocument::articleId)
+                                        .thenComparing(KnowledgeArticleDocument::version))
                         .map(
                                 article ->
                                         article.articleId()

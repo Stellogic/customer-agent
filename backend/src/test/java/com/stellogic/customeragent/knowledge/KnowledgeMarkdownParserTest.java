@@ -70,17 +70,23 @@ class KnowledgeMarkdownParserTest {
         assertThat(retired.chunks().getFirst().chunkId())
                 .isNotEqualTo(current.chunks().getFirst().chunkId());
         assertThat(retired.chunks().getFirst().version()).isEqualTo("v1");
-        assertThat(retired.chunks().getFirst().applicability()).containsExactly("INTERNAL", "SUPPORT");
-        assertThat(current.chunks().getFirst().applicability()).containsExactly("INTERNAL", "SUPPORT");
+        assertThat(retired.chunks().getFirst().applicability())
+                .containsExactly("INTERNAL", "SUPPORT");
+        assertThat(current.chunks().getFirst().applicability())
+                .containsExactly("INTERNAL", "SUPPORT");
     }
 
     @Test
     void sameMarkdownProducesIdenticalChunkIds() throws Exception {
         Resource source = markdown("stable-chunk.md", validArticle());
         List<String> first =
-                parser.parse(source).chunks().stream().map(KnowledgeChunkDocument::chunkId).toList();
+                parser.parse(source).chunks().stream()
+                        .map(KnowledgeChunkDocument::chunkId)
+                        .toList();
         List<String> second =
-                parser.parse(source).chunks().stream().map(KnowledgeChunkDocument::chunkId).toList();
+                parser.parse(source).chunks().stream()
+                        .map(KnowledgeChunkDocument::chunkId)
+                        .toList();
 
         assertThat(first).isNotEmpty().isEqualTo(second);
     }
@@ -193,7 +199,8 @@ class KnowledgeMarkdownParserTest {
     }
 
     private static boolean ordinarySearchAdmits(KnowledgeArticleDocument article) {
-        return article.current() && article.publicationStatus() == KnowledgePublicationStatus.PUBLISHED;
+        return article.current()
+                && article.publicationStatus() == KnowledgePublicationStatus.PUBLISHED;
     }
 
     private static String validArticle() {
