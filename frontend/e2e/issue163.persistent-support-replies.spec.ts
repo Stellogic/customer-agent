@@ -62,7 +62,9 @@ test("Issue #163 持久化领取、人工公开回复与刷新恢复", async ({ 
   await expect(support.getByText(replyBody, { exact: true })).toBeVisible();
 
   await expect(customer.getByText(replyBody, { exact: true })).toBeVisible();
-  await expect(customer.getByText("客服")).toBeVisible();
+  await expect(
+    customer.locator(".ant-bubble").filter({ hasText: replyBody }).locator(".ant-bubble-header"),
+  ).toHaveText("客服");
 
   await support.reload();
   await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
