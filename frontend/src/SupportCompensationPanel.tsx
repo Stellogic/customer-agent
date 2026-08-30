@@ -81,7 +81,7 @@ export function SupportCompensationPanel({
 
   const selected = options?.plans.find((plan) => plan.planCode === planCode) ?? null;
   const busy = submitState === "submitting" || submitState === "unknown";
-  const canSubmitException = optionsState === "ready" && options?.plans.length === 0;
+  const canSubmitException = optionsState === "ready";
 
   async function submitProposal() {
     if (!selected) return;
@@ -414,6 +414,11 @@ async function postCompensation(
       body: JSON.stringify(body),
     });
   } catch {
+    throw new CompensationUncertainError(
+      "提交结果暂未确认；请查询 Spring 权威结果，不要重复提交。",
+    );
+  }
+  if (response.status === 403) {
     throw new CompensationUncertainError(
       "提交结果暂未确认；请查询 Spring 权威结果，不要重复提交。",
     );

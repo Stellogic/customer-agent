@@ -217,12 +217,7 @@ class SupportCompensationService {
         if (!EXCEPTION_REASON.equals(reasonCode)) {
             throw new SupportCompensationInvalidRequestException("PLAN_NOT_ALLOWED");
         }
-        OrderFacts order = lockAndLoadOrder(ticket.orderReference(), ticketId);
-        DelayCompensationPolicy.Plan plan =
-                policy.currentPlan(Duration.ofSeconds(order.delaySeconds()), order.paidAmount());
-        if (currentlyAllowed(order, plan)) {
-            throw new SupportCompensationConflictException("STANDARD_COMPENSATION_AVAILABLE");
-        }
+        lockAndLoadOrder(ticket.orderReference(), ticketId);
         Timestamp databaseTime = jdbc.queryForObject("select clock_timestamp()", Timestamp.class);
         UUID exceptionalId = UUID.randomUUID();
         jdbc.update(

@@ -72,12 +72,13 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'invalid public message payload';
     END IF;
-    IF NEW.event_type = 'COMPENSATION_REVIEW_PENDING' AND NOT (
-        NEW.payload ?& ARRAY['compensationMethod', 'amount', 'status']
-        AND NEW.payload->>'compensationMethod' IN ('COUPON', 'SIMULATED_PARTIAL_REFUND')
-        AND jsonb_typeof(NEW.payload->'amount') = 'string'
-        AND NEW.payload->>'amount' ~ '^[0-9]+\.[0-9]{2}$'
-        AND NEW.payload->>'status' = 'PENDING_REVIEW'
+    IF NEW.event_type = 'COMPENSATION_REVIEW_PENDING' AND (
+        jsonb_typeof(NEW.payload->'compensationMethod') IS DISTINCT FROM 'string'
+        OR NEW.payload->>'compensationMethod' NOT IN ('COUPON', 'SIMULATED_PARTIAL_REFUND')
+        OR jsonb_typeof(NEW.payload->'amount') IS DISTINCT FROM 'string'
+        OR NEW.payload->>'amount' !~ '^[0-9]+\.[0-9]{2}$'
+        OR jsonb_typeof(NEW.payload->'status') IS DISTINCT FROM 'string'
+        OR NEW.payload->>'status' <> 'PENDING_REVIEW'
     ) THEN
         RAISE EXCEPTION 'invalid compensation review payload';
     END IF;

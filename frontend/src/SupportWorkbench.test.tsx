@@ -825,9 +825,7 @@ describe("客服共享队列工作台", () => {
     const panel = await screen.findByRole("region", { name: "标准补偿" });
     expect(await within(panel).findAllByText("10.00 CNY")).toHaveLength(2);
     expect(within(panel).getByText("delay-policy-v1")).toBeInTheDocument();
-    expect(
-      within(panel).queryByRole("button", { name: "提交例外补偿申请" }),
-    ).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "提交例外补偿申请" })).toBeInTheDocument();
     fireEvent.click(await within(panel).findByRole("button", { name: "提交审批" }));
     expect(
       await screen.findByText("标准补偿提案已提交审批。客户只会看到类型、金额和待审批。"),
