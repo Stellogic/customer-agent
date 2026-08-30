@@ -26,7 +26,10 @@ describe("Issue #192 客户帮助文档页", () => {
     expect(document.getElementById("compensation")).toHaveTextContent("已批准");
     expect(document.getElementById("compensation")).toHaveTextContent("已执行");
     expect(document.getElementById("compensation")).toHaveTextContent(
-      "不会在客户帮助中心显示为已经获得补偿",
+      "已批准是内部执行授权，不代表补偿已经完成",
+    );
+    expect(document.getElementById("compensation")).toHaveTextContent(
+      "已执行的确认结果会在工单公开回复中展示",
     );
     expect(screen.queryByText("通常 24 小时内回复")).not.toBeInTheDocument();
   });
