@@ -21,10 +21,12 @@ final class KnowledgeDevelopmentController {
     }
 
     @GetMapping("/api/internal/knowledge/development-candidates")
-    ResponseEntity<KnowledgeDevelopmentResponse> candidates(Authentication authentication,
+    ResponseEntity<KnowledgeDevelopmentResponse> candidates(
+            Authentication authentication,
             @RequestParam("q") String query,
             @RequestParam(value = "scope", required = false) String scope) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
                 .body(service.developmentCandidates(authentication.getName(), query, scope));
     }
 }

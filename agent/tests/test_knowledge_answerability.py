@@ -7,8 +7,12 @@ from baseline_agent.knowledge_answerability_v1 import ROOT, articles, file_sha, 
 
 
 def row(answerable, recalled=True):
-    return {"answerable": answerable, "recall": float(answerable and recalled),
-        "reciprocal_rank": float(answerable and recalled), "vectorCandidates": [{"chunkId": "example"}]}
+    return {
+        "answerable": answerable,
+        "recall": float(answerable and recalled),
+        "reciprocal_rank": float(answerable and recalled),
+        "vectorCandidates": [{"chunkId": "example"}],
+    }
 
 
 def test_no_feasible_threshold_means_stop_not_best_effort_policy():
@@ -26,11 +30,18 @@ def test_threshold_uses_post_refusal_recall_and_does_not_hide_retrieval_misses()
 
 
 def test_linear_export_matches_java_hand_calculated_contract():
-    policy = {"featureNames": FEATURE_NAMES, "mean": [0.5, 0.1, 0.5, 0.25],
-        "scale": [0.5, 0.1, 0.5, 0.25], "coefficients": [2, -1, 0.5, 3], "intercept": -0.5}
+    policy = {
+        "featureNames": FEATURE_NAMES,
+        "mean": [0.5, 0.1, 0.5, 0.25],
+        "scale": [0.5, 0.1, 0.5, 0.25],
+        "coefficients": [2, -1, 0.5, 3],
+        "intercept": -0.5,
+    }
     assert linear_score([0.75, 0.2, 1.0, 0.5], policy) == 3.0
     with pytest.raises(ValueError, match="契约"):
-        linear_score([0.75, 0.2, 1.0, 0.5], {**policy, "featureNames": list(reversed(FEATURE_NAMES))})
+        linear_score(
+            [0.75, 0.2, 1.0, 0.5], {**policy, "featureNames": list(reversed(FEATURE_NAMES))}
+        )
 
 
 def test_only_committed_training_and_calibration_data_follow_the_registered_counts():
@@ -55,8 +66,14 @@ def test_holdout_guard_rejects_pending_product_even_with_successful_fit(monkeypa
     fitted_path = tmp_path / "fit.json"
     policy = {"status": "CALIBRATED", "holdoutSealSha256": "a" * 64}
     monkeypatch.setattr(runner, "file_sha", lambda _: "a" * 64)
-    monkeypatch.setattr(runner, "read_json", lambda path:
-        {"status": "CALIBRATED", "proposed_policy": policy} if path == fitted_path
-        else {"status": "PENDING_CALIBRATION"})
+    monkeypatch.setattr(
+        runner,
+        "read_json",
+        lambda path: (
+            {"status": "CALIBRATED", "proposed_policy": policy}
+            if path == fitted_path
+            else {"status": "PENDING_CALIBRATION"}
+        ),
+    )
     with pytest.raises(ValueError, match="尚未原样应用"):
         runner.applied_holdout_policy(fitted_path, tmp_path / "seal.json")

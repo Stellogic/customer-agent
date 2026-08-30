@@ -12,7 +12,8 @@ final class KnowledgeAnswerabilityPolicy {
     private final JsonNode configuration;
 
     KnowledgeAnswerabilityPolicy(ObjectMapper json) throws IOException {
-        try (var input = new ClassPathResource("knowledge-answerability-logistic.json").getInputStream()) {
+        try (var input =
+                new ClassPathResource("knowledge-answerability-logistic.json").getInputStream()) {
             configuration = json.readTree(input);
         }
     }
@@ -20,8 +21,12 @@ final class KnowledgeAnswerabilityPolicy {
     KnowledgeRetrievalPolicy requireCalibrated() {
         if (!"CALIBRATED".equals(configuration.path("status").asText())
                 || !"retrieval-logistic-v1".equals(configuration.path("id").asText())
-                || !KnowledgeEmbeddingGateway.REVISION.equals(configuration.path("modelRevision").asText())
-                || !configuration.path("calibrationDatasetSha256").asText("").matches("[0-9a-f]{64}")
+                || !KnowledgeEmbeddingGateway.REVISION.equals(
+                        configuration.path("modelRevision").asText())
+                || !configuration
+                        .path("calibrationDatasetSha256")
+                        .asText("")
+                        .matches("[0-9a-f]{64}")
                 || !configuration.path("trainingDatasetSha256").asText("").matches("[0-9a-f]{64}")
                 || !configuration.path("sourceSha").asText("").matches("[0-9a-f]{40}")
                 || !finite(configuration.path("threshold"))
@@ -34,7 +39,8 @@ final class KnowledgeAnswerabilityPolicy {
             }
         }
         for (int index = 0; index < 4; index++) {
-            if (!KnowledgeAnswerabilityFeatures.NAMES.get(index)
+            if (!KnowledgeAnswerabilityFeatures.NAMES
+                            .get(index)
                             .equals(configuration.path("featureNames").get(index).asText())
                     || !finite(configuration.path("mean").get(index))
                     || !finite(configuration.path("coefficients").get(index))
@@ -43,7 +49,8 @@ final class KnowledgeAnswerabilityPolicy {
                 throw new KnowledgeRetrievalUnavailableException("CALIBRATION_REQUIRED");
             }
         }
-        return new KnowledgeRetrievalPolicy(configuration.path("id").asText(),
+        return new KnowledgeRetrievalPolicy(
+                configuration.path("id").asText(),
                 configuration.path("calibrationDatasetSha256").asText(),
                 configuration.path("threshold").asDouble());
     }
@@ -55,8 +62,9 @@ final class KnowledgeAnswerabilityPolicy {
         }
         double result = configuration.path("intercept").asDouble();
         for (int index = 0; index < 4; index++) {
-            double normalized = (features.get(index) - configuration.path("mean").get(index).asDouble())
-                    / configuration.path("scale").get(index).asDouble();
+            double normalized =
+                    (features.get(index) - configuration.path("mean").get(index).asDouble())
+                            / configuration.path("scale").get(index).asDouble();
             result += normalized * configuration.path("coefficients").get(index).asDouble();
         }
         if (!Double.isFinite(result)) {

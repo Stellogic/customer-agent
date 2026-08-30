@@ -45,16 +45,25 @@ class KnowledgeRetrievalService {
         access.requireScopes(principal);
         KnowledgeRetrievalPolicy policy = answerability.requireCalibrated();
         var candidates = retrieve(principal, query, scope);
-        List<KnowledgeRetrievalHit> results = candidates.vectorCandidates().isEmpty()
-                || !answerability.accepts(candidates.features())
-                ? List.of() : candidates.fusedCandidates();
-        return new KnowledgeRetrievalResponse("knowledge-hybrid-v1", query.trim(),
-                candidates.generation(), candidates.revision(), policy,
-                candidates.lexicalCandidates(), candidates.vectorCandidates(), results);
+        List<KnowledgeRetrievalHit> results =
+                candidates.vectorCandidates().isEmpty()
+                                || !answerability.accepts(candidates.features())
+                        ? List.of()
+                        : candidates.fusedCandidates();
+        return new KnowledgeRetrievalResponse(
+                "knowledge-hybrid-v1",
+                query.trim(),
+                candidates.generation(),
+                candidates.revision(),
+                policy,
+                candidates.lexicalCandidates(),
+                candidates.vectorCandidates(),
+                results);
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public KnowledgeDevelopmentResponse developmentCandidates(String principal, String query, String scope) {
+    public KnowledgeDevelopmentResponse developmentCandidates(
+            String principal, String query, String scope) {
         return retrieve(principal, query, scope);
     }
 
@@ -119,10 +128,15 @@ class KnowledgeRetrievalService {
                             vector,
                             vector);
             List<KnowledgeRetrievalHit> fused = fuse(lexical, dense);
-            return new KnowledgeDevelopmentResponse("knowledge-development-v1", generation,
-                    KnowledgeEmbeddingGateway.REVISION, KnowledgeAnswerabilityFeatures.NAMES,
+            return new KnowledgeDevelopmentResponse(
+                    "knowledge-development-v1",
+                    generation,
+                    KnowledgeEmbeddingGateway.REVISION,
+                    KnowledgeAnswerabilityFeatures.NAMES,
                     KnowledgeAnswerabilityFeatures.extract(query.trim(), lexical, dense, fused),
-                    lexical, dense, fused);
+                    lexical,
+                    dense,
+                    fused);
         } catch (KnowledgeRetrievalUnavailableException exception) {
             throw exception;
         } catch (org.springframework.dao.EmptyResultDataAccessException exception) {
