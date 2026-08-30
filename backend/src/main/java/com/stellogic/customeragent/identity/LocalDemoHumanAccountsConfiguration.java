@@ -29,13 +29,17 @@ public class LocalDemoHumanAccountsConfiguration {
                             "演示客服",
                             SubjectType.INTERNAL,
                             List.of(HumanRole.SUPPORT),
-                            List.of(HumanCapability.SUPPORT_WORKBENCH_ACCESS)),
+                            List.of(
+                                    HumanCapability.SUPPORT_WORKBENCH_ACCESS,
+                                    HumanCapability.KNOWLEDGE_READ_ACCESS)),
                     new DemoHumanAccount(
                             "approver-demo",
                             "演示审批人",
                             SubjectType.INTERNAL,
                             List.of(HumanRole.APPROVER),
-                            List.of(HumanCapability.APPROVAL_WORKBENCH_ACCESS)),
+                            List.of(
+                                    HumanCapability.APPROVAL_WORKBENCH_ACCESS,
+                                    HumanCapability.KNOWLEDGE_READ_ACCESS)),
                     new DemoHumanAccount(
                             "internal-demo",
                             "演示双角色工作人员",
@@ -43,7 +47,8 @@ public class LocalDemoHumanAccountsConfiguration {
                             List.of(HumanRole.SUPPORT, HumanRole.APPROVER),
                             List.of(
                                     HumanCapability.SUPPORT_WORKBENCH_ACCESS,
-                                    HumanCapability.APPROVAL_WORKBENCH_ACCESS)));
+                                    HumanCapability.APPROVAL_WORKBENCH_ACCESS,
+                                    HumanCapability.KNOWLEDGE_READ_ACCESS)));
 
     @Bean
     UserDetailsService localDemoHumanUsers(

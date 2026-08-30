@@ -231,7 +231,12 @@ def customer_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
 @cache
 def support_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
     with httpx.Client(timeout=20.0) as client:
-        csrf_header = login_human(client, spring_url, "support-demo", ["SUPPORT_WORKBENCH_ACCESS"])
+        csrf_header = login_human(
+            client,
+            spring_url,
+            "support-demo",
+            ["SUPPORT_WORKBENCH_ACCESS", "KNOWLEDGE_READ_ACCESS"],
+        )
         session_id = client.cookies.get("JSESSIONID")
         assert session_id is not None
         return csrf_header, ("Cookie", f"JSESSIONID={session_id}")
@@ -241,7 +246,10 @@ def support_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
 def approver_session_headers(spring_url: str) -> tuple[tuple[str, str], ...]:
     with httpx.Client(timeout=20.0) as client:
         csrf_header = login_human(
-            client, spring_url, "approver-demo", ["APPROVAL_WORKBENCH_ACCESS"]
+            client,
+            spring_url,
+            "approver-demo",
+            ["APPROVAL_WORKBENCH_ACCESS", "KNOWLEDGE_READ_ACCESS"],
         )
         session_id = client.cookies.get("JSESSIONID")
         assert session_id is not None
@@ -2479,7 +2487,7 @@ def main() -> None:
             dual_client,
             spring_url,
             "internal-demo",
-            ["SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS"],
+            ["SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS", "KNOWLEDGE_READ_ACCESS"],
         )
         dual_queue = dual_client.get(f"{spring_url}/api/approver/compensation-proposals")
         expect_status(dual_queue, 200)
@@ -2549,7 +2557,7 @@ def main() -> None:
                 dual_client,
                 spring_url,
                 "internal-demo",
-                ["SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS"],
+                ["SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS", "KNOWLEDGE_READ_ACCESS"],
             )
             claim_request_id = f"pre-participation-{uuid.uuid4()}"
             claim_url = (
@@ -2623,7 +2631,7 @@ def main() -> None:
                 dual_client,
                 spring_url,
                 "internal-demo",
-                ["SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS"],
+                ["SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS", "KNOWLEDGE_READ_ACCESS"],
             )
             participant_claim_barrier.wait()
             return dual_client.post(

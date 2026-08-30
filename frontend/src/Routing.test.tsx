@@ -13,8 +13,18 @@ type Session = {
   subjectType: "CUSTOMER" | "INTERNAL";
   roles: Array<"CUSTOMER" | "SUPPORT" | "APPROVER">;
   capabilities: Array<
-    "CUSTOMER_HELP_ACCESS" | "SUPPORT_WORKBENCH_ACCESS" | "APPROVAL_WORKBENCH_ACCESS"
+    | "CUSTOMER_HELP_ACCESS"
+    | "SUPPORT_WORKBENCH_ACCESS"
+    | "APPROVAL_WORKBENCH_ACCESS"
+    | "KNOWLEDGE_READ_ACCESS"
   >;
+};
+const supportWithKnowledge: Session = {
+  id: "support-knowledge",
+  displayName: "演示知识客服",
+  subjectType: "INTERNAL",
+  roles: ["SUPPORT"],
+  capabilities: ["SUPPORT_WORKBENCH_ACCESS", "KNOWLEDGE_READ_ACCESS"],
 };
 
 const customer: Session = {
@@ -111,9 +121,10 @@ describe("Issue #73 静态路由与两个界面壳", () => {
   });
 
   it.each([
-    [support, ["客服工作区"], ["审批工作区"]],
-    [approver, ["审批工作区"], ["客服工作区"]],
-    [dualRole, ["客服工作区", "审批工作区"], []],
+    [support, ["客服工作区"], ["审批工作区", "知识目录"]],
+    [approver, ["审批工作区"], ["客服工作区", "知识目录"]],
+    [dualRole, ["客服工作区", "审批工作区"], ["知识目录"]],
+    [supportWithKnowledge, ["客服工作区", "知识目录"], ["审批工作区"]],
   ])("内部菜单只投影 %s 当前拥有的 capability", async (session, visibleLabels, hiddenLabels) => {
     mockSession(session);
 
@@ -175,6 +186,23 @@ describe("Issue #73 静态路由与两个界面壳", () => {
       "/internal/support",
     );
     expect(globalThis.location.pathname).toBe("/internal/approvals");
+  });
+
+  it("缺少知识 capability 时直接访问知识路由显示 403", async () => {
+    globalThis.history.replaceState(null, "", "/internal/knowledge");
+    mockSession(support);
+
+    render(<RootApplication />);
+
+    const heading = await screen.findByRole("heading", { name: "当前身份无权访问此页面" });
+    const boundary = heading.closest("main");
+    expect(boundary).not.toBeNull();
+    expect(within(boundary!).getByText("403")).toBeInTheDocument();
+    expect(within(boundary!).queryByText(/capability|知识目录/i)).not.toBeInTheDocument();
+    expect(within(boundary!).getByRole("link", { name: "返回可访问工作区" })).toHaveAttribute(
+      "href",
+      "/internal/support",
+    );
   });
 
   it("未知路由只说明页面未找到且不增加业务资源线索", async () => {

@@ -16,7 +16,7 @@ export default function InternalShell() {
     label: (
       <Link to={workspace.path}>
         <span aria-hidden="true" className="internal-menu-mark">
-          {workspace.id === "support" ? "服" : "审"}
+          {workspace.icon}
         </span>
         {workspace.menuLabel}
       </Link>

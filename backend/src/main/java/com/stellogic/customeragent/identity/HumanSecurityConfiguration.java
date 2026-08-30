@@ -37,7 +37,11 @@ public class HumanSecurityConfiguration {
     SecurityFilterChain humanSessionSecurity(HttpSecurity http, HumanSecurityEvents securityEvents)
             throws Exception {
         http.securityMatcher(
-                        "/api/auth/**", "/api/customer/**", "/api/support/**", "/api/approver/**")
+                        "/api/auth/**",
+                        "/api/customer/**",
+                        "/api/support/**",
+                        "/api/approver/**",
+                        "/api/internal/**")
                 .authorizeHttpRequests(
                         requests ->
                                 requests.requestMatchers(
@@ -51,6 +55,8 @@ public class HumanSecurityConfiguration {
                                         .hasRole("SUPPORT")
                                         .requestMatchers("/api/approver/**")
                                         .hasRole("APPROVER")
+                                        .requestMatchers("/api/internal/**")
+                                        .hasAnyRole("SUPPORT", "APPROVER")
                                         .anyRequest()
                                         .authenticated())
                 .formLogin(

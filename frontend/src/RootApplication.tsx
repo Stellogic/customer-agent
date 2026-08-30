@@ -31,9 +31,11 @@ const CustomerWorkspace = lazy(() => import("./workspaces/CustomerWorkspace"));
 const InternalLanding = lazy(() => import("./workspaces/InternalLanding"));
 const SupportWorkspace = lazy(() => import("./workspaces/SupportWorkspace"));
 const ApprovalWorkspace = lazy(() => import("./workspaces/ApprovalWorkspace"));
+const KnowledgeWorkspace = lazy(() => import("./workspaces/KnowledgeWorkspace"));
 const INTERNAL_WORKSPACE_COMPONENTS = {
   support: SupportWorkspace,
   approvals: ApprovalWorkspace,
+  knowledge: KnowledgeWorkspace,
 } as const;
 
 export function RootApplication() {

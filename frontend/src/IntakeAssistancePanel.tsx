@@ -5,6 +5,7 @@ import { humanSessionFetch } from "./humanSessionLifecycle";
 import { consumeSseEvents, hasOnlyKeys, isRecord, parseViewCursor } from "./streamProtocol";
 
 const SCHEMA = "intake-assistance-v1" as const;
+const AUTHORITY_REVOKED_ERROR = "受理协助权限已撤销；旧详情已移除，请重新同步队列。";
 const statuses = ["QUEUED", "CLAIMED", "WAITING_FOR_CUSTOMER"] as const;
 const issueKinds = [
   "LOGISTICS_DELAY",
@@ -73,7 +74,7 @@ export function IntakeAssistancePanel() {
   async function loadSnapshot() {
     stream.current?.abort();
     setConnection("loading");
-    setError("");
+    setError((current) => (current === AUTHORITY_REVOKED_ERROR ? current : ""));
     try {
       const response = await humanSessionFetch("/api/support/intake-assistance/snapshot", {
         credentials: "same-origin",
@@ -88,7 +89,11 @@ export function IntakeAssistancePanel() {
     } catch {
       setSnapshot(null);
       setConnection("stale");
-      setError("受理协助队列加载失败；未沿用可能过期的本地数据。");
+      setError((current) =>
+        current === AUTHORITY_REVOKED_ERROR
+          ? current
+          : "受理协助队列加载失败；未沿用可能过期的本地数据。",
+      );
     }
   }
 
@@ -118,7 +123,11 @@ export function IntakeAssistancePanel() {
     if (controller.signal.aborted || stream.current !== controller) return;
     setSnapshot(null);
     setConnection("stale");
-    setError("受理协助实时连接已断开；正在重新读取权威状态。");
+    setError((current) =>
+      current === AUTHORITY_REVOKED_ERROR
+        ? current
+        : "受理协助实时连接已断开；正在重新读取权威状态。",
+    );
     reconnect.current = globalThis.setTimeout(() => void loadSnapshot(), 250);
   }
 
@@ -186,7 +195,7 @@ export function IntakeAssistancePanel() {
       await loadDetails(requestId);
     } catch {
       setDetails(null);
-      setError("受理协助权限已撤销；旧详情已移除，请重新同步队列。");
+      setError(AUTHORITY_REVOKED_ERROR);
     }
   }
 

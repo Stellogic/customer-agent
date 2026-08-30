@@ -15,6 +15,16 @@ export function hasCapability(session: CurrentSession, capability: HumanCapabili
 
 export function defaultPathFor(session: CurrentSession) {
   if (session.subjectType === "CUSTOMER") return ROUTES.customerHome;
+  const canUseSupport =
+    session.roles.includes("SUPPORT") && hasCapability(session, "SUPPORT_WORKBENCH_ACCESS");
+  const canUseApprovals =
+    session.roles.includes("APPROVER") && hasCapability(session, "APPROVAL_WORKBENCH_ACCESS");
+  if (canUseSupport && !canUseApprovals) {
+    return "/internal/support";
+  }
+  if (canUseApprovals && !canUseSupport) {
+    return "/internal/approvals";
+  }
   const available = INTERNAL_WORKSPACES.filter((workspace) =>
     hasCapability(session, workspace.capability),
   );

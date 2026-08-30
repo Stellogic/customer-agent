@@ -39,19 +39,30 @@ if ($SkipBuild) {
     Assert-GateImages -RunId $env:CUSTOMER_AGENT_GATE_RUN_ID -SourceFingerprint $env:CUSTOMER_AGENT_GATE_SOURCE_FINGERPRINT
 }
 
+function Invoke-SmokeComposeUp {
+    param([Parameter(Mandatory)][string[]]$ComposeArgs)
+    try {
+        docker compose @ComposeArgs
+    } catch {
+        Write-Host 'spring-migrate 容器日志：'
+        docker compose logs --tail 300 spring-migrate 2>&1 | Out-Host
+        throw
+    }
+}
+
 if (-not $SkipBuild) {
     docker build --build-arg "GRADLE_OPTS=$($env:CUSTOMER_AGENT_GRADLE_OPTS)" --target test --tag "customer-agent/backend-test:$imageTag" backend
     docker build --target test --tag "customer-agent/agent-test:$imageTag" agent
     docker build --target test --tag "customer-agent/frontend-test:$imageTag" frontend
-    docker compose up --detach --build --force-recreate --wait
+    Invoke-SmokeComposeUp -ComposeArgs @('up', '--detach', '--build', '--force-recreate', '--wait')
 } else {
-    docker compose up --detach --force-recreate --wait
+    Invoke-SmokeComposeUp -ComposeArgs @('up', '--detach', '--force-recreate', '--wait')
 }
 docker compose exec -T agent-server sh -c 'test -z "${EXECUTOR_MACHINE_TOKEN+x}"'
 docker compose exec -T compensation-executor sh -c 'test -z "${AGENT_MACHINE_TOKEN+x}"'
 
 $migrationHistory = docker compose exec -T postgres psql -U postgres -d customer_agent -Atc "select version || ':' || success from flyway_schema_history order by installed_rank"
-if (($migrationHistory -join ',') -ne '1:true,2:true,3:true,4:true,5:true,6:true,7:true,8:true,9:true,10:true,11:true,12:true,13:true,14:true,15:true,16:true,17:true,18:true,19:true,20:true,21:true,22:true,23:true,24:true,25:true,26:true,27:true,28:true,29:true,30:true,31:true,32:true,33:true,34:true') {
+if (($migrationHistory -join ',') -ne '1:true,2:true,3:true,4:true,5:true,6:true,7:true,8:true,9:true,10:true,11:true,12:true,13:true,14:true,15:true,16:true,17:true,18:true,19:true,20:true,21:true,22:true,23:true,24:true,25:true,26:true,27:true,28:true,29:true,30:true,31:true,32:true,33:true,34:true,35:true') {
     throw "Spring Flyway 迁移历史不完整: $($migrationHistory -join ',')"
 }
 

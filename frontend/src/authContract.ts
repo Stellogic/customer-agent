@@ -1,6 +1,9 @@
 export type HumanRole = "CUSTOMER" | "SUPPORT" | "APPROVER";
 export type HumanCapability =
-  "CUSTOMER_HELP_ACCESS" | "SUPPORT_WORKBENCH_ACCESS" | "APPROVAL_WORKBENCH_ACCESS";
+  | "CUSTOMER_HELP_ACCESS"
+  | "SUPPORT_WORKBENCH_ACCESS"
+  | "APPROVAL_WORKBENCH_ACCESS"
+  | "KNOWLEDGE_READ_ACCESS";
 
 export type CurrentSession = {
   id: string;
@@ -23,9 +26,12 @@ export function parseCurrentSession(value: unknown): CurrentSession | undefined 
     !value.roles.every((entry) => ["CUSTOMER", "SUPPORT", "APPROVER"].includes(String(entry))) ||
     !Array.isArray(value.capabilities) ||
     !value.capabilities.every((entry) =>
-      ["CUSTOMER_HELP_ACCESS", "SUPPORT_WORKBENCH_ACCESS", "APPROVAL_WORKBENCH_ACCESS"].includes(
-        String(entry),
-      ),
+      [
+        "CUSTOMER_HELP_ACCESS",
+        "SUPPORT_WORKBENCH_ACCESS",
+        "APPROVAL_WORKBENCH_ACCESS",
+        "KNOWLEDGE_READ_ACCESS",
+      ].includes(String(entry)),
     )
   )
     return undefined;

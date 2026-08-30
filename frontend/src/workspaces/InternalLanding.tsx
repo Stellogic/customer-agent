@@ -25,7 +25,7 @@ export default function InternalLanding() {
           >
             <article>
               <span aria-hidden="true" className="workspace-choice-icon">
-                {workspace.id === "support" ? "服" : "审"}
+                {workspace.icon}
               </span>
               <p className="workspace-choice-eyebrow">{workspace.eyebrow}</p>
               <h2>{workspace.cardLabel}</h2>
