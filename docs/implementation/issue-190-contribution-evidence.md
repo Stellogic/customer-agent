@@ -52,6 +52,8 @@
 
 ## A方案后续记录
 
+**C失败取证修复：** [工程修复与离线证据](issue-190-c-diagnostics-fix.md)保存RED缺失日志复现、一次类型预检失败与最终通过。最终源码9301bc5/base c19a7ebe，RunId issue190-c-diagnostics-20260831c，12项聚焦及31项相关离线组件、Agent格式/lint/类型通过，阶段38.7290216秒；31项已包含12项，不重复计数。双轴静态CR PASS。仅增加有界脱敏诊断，未改变判定/预算/产品，真实调用0次、付费API新增0元；原第5次NOT_CAPTURED与4/72、metrics=null保留。此项工程修复不证明模型质量，也不是生产收益。
+
 **C真实阶段后续：** [唯一开发回放中止记录](issue-190-c-development-attempt-a.md)：受测526b7d0/base c19a7ebe，RunId issue190-c-development-20260831a，5次真实DeepSeek合成调用、4/72合法完成；第5次INVALID_DECISION_SCHEMA即停，不重试。输入2338/输出230 token，阶段7.73089秒，累计高峰无缓存费用上界0.009084元（账单实付未采集），metrics=null。原非法响应正文未捕获，不能补造具体失败字段或宣传模型质量已通过。
 
 后续C记录：[静态实现及预算](issue-190-sufficiency-c-static.md)、[离线预检与失败对照](issue-190-c-offline-preflight.md)。C只实现合成充分性实验，不改默认检索策略；最终受测b9c46a93/base c19a7ebe，RunId issue190-c-offline-20260831d，10项C离线契约和29项离线组件通过，格式/lint/类型通过，41.0488482秒、真实API0次/0元。保留首轮类型失败和宿主代理初始化导致旧超时测试失败的原始记录；这些是工程预检，不是真模型质量或生产收益。
