@@ -1,0 +1,38 @@
+{
+  "schema": "issue190-independent-development-review-archive-v1",
+  "archived_at": "2026-08-31T07:03:13.3580999+08:00",
+  "source_directory": "D:/customer-agent/.scratch/coordination/development72-review",
+  "source_authority": "coordinator task 01a043aa-d724-7353-b6c5-9266277846d6",
+  "archive_base_head": "64b5e322477b2fea6cb80dfae52aca37e5ad2403",
+  "scope": "sealed static review of existing development72; not holdout or new model evaluation",
+  "files": [
+    {
+      "file": "packet.json",
+      "source_path": "D:\\customer-agent\\.scratch\\coordination\\development72-review\\packet.json",
+      "bytes": 64976,
+      "sha256": "5c40383d56b15c239ed3172c656bd99b432a527e0bb19378ff2515ba666f0eae",
+      "byte_identical": true
+    },
+    {
+      "file": "coordinator-mapping.json",
+      "source_path": "D:\\customer-agent\\.scratch\\coordination\\development72-review\\coordinator-mapping.json",
+      "bytes": 5628,
+      "sha256": "dffce9ad34bcc5debe6def02b49ff10523473f58a1befcdfea70af18e4ee4f55",
+      "byte_identical": true
+    },
+    {
+      "file": "independent-review.md",
+      "source_path": "D:\\customer-agent\\.scratch\\coordination\\development72-review\\independent-review.md",
+      "bytes": 18884,
+      "sha256": "8b79152a55139a72cfd567be7452297832537dd295a2a0ecfa621cc31d82acb6",
+      "byte_identical": true
+    },
+    {
+      "file": "comparison.md",
+      "source_path": "D:\\customer-agent\\.scratch\\coordination\\development72-review\\comparison.md",
+      "bytes": 2428,
+      "sha256": "8c97a3d0246a7b69e6d7e60f8b70fcabec1b3acc56825585e373fcdc689f5f12",
+      "byte_identical": true
+    }
+  ]
+}
