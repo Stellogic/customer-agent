@@ -512,6 +512,7 @@ class JdbcApprovalService implements ApprovalService {
                         Long.toString(command.leaseVersion()),
                         command.internalReason());
         lockRequest(command.approverId(), command.requestId(), "PROPOSAL_DECISION");
+        lockTicketAuthority(command.revisionId());
         lockParticipantPolicy(command.revisionId());
         requireNotSupportParticipant(command.revisionId(), command.approverId());
         List<DecisionReplay> existing =
@@ -665,6 +666,7 @@ class JdbcApprovalService implements ApprovalService {
                         Long.toString(command.leaseVersion()),
                         normalizedNote);
         lockRequest(command.approverId(), command.requestId(), "PROPOSAL_DECISION");
+        lockTicketAuthority(command.revisionId());
         lockParticipantPolicy(command.revisionId());
         requireNotSupportParticipant(command.revisionId(), command.approverId());
         List<ApprovalReplay> existing =
@@ -722,6 +724,12 @@ class JdbcApprovalService implements ApprovalService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "ticket is no longer current");
         }
 
+        String orderReference =
+                jdbc.queryForObject(
+                        "select order_reference from compensation_proposal_revision where id = ?",
+                        String.class,
+                        command.revisionId());
+        lockAllowance(orderReference);
         List<ApprovalProposal> proposals =
                 jdbc.query(
                         "select p.ticket_id, p.revision_number, p.content_digest, p.status, p.expires_at, "
@@ -792,7 +800,6 @@ class JdbcApprovalService implements ApprovalService {
                     HttpStatus.CONFLICT, "proposal revision content mismatch");
         }
 
-        lockAllowance(proposal.orderReference());
         List<AuthoritativeOrderFacts> orders =
                 jdbc.query(
                         "select paid_amount, available_compensation_amount, delay_hours, delay_seconds, paid, cancelled, "
@@ -934,6 +941,18 @@ class JdbcApprovalService implements ApprovalService {
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
                 revisionId + "\nPROPOSAL_REVISION_SUPPORT_PARTICIPANT");
+    }
+
+    private void lockTicketAuthority(UUID revisionId) {
+        List<UUID> ticketIds =
+                jdbc.query(
+                        "select ticket_id from compensation_proposal_revision where id = ?",
+                        (rs, row) -> rs.getObject(1, UUID.class),
+                        revisionId);
+        if (ticketIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
+        }
+        authorityLock.acquire(ticketIds.getFirst());
     }
 
     private void requireNotSupportParticipant(UUID revisionId, String approverId) {

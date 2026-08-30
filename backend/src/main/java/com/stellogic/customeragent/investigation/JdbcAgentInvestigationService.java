@@ -811,12 +811,14 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         List<ScopedOrder> orders =
                 jdbc.query(
                         "select o.order_reference, o.delay_hours, o.delay_seconds, o.paid, o.cancelled, o.fully_refunded, "
-                                + "o.existing_compensation, o.policy_version, o.paid_amount, o.available_compensation_amount, "
+                                + "allowance.unquantified_existing_compensation, o.policy_version, o.paid_amount, allowance.total_available_compensation_amount, "
                                 + "(select count(*) from synthetic_pending_action a where a.order_reference = o.order_reference), "
-                                + "coalesce((select sum(r.amount) from compensation_reservation r where r.order_reference = o.order_reference and r.status = 'ACTIVE'), 0), "
+                                + "allowance.active_reservation_amount, "
                                 + "o.logistics_status, o.order_rule_summary, o.duplicate_charge_suspected "
                                 + "from support_ticket t join synthetic_order o on o.order_reference = t.order_reference "
-                                + "and o.customer_id = t.customer_id where t.id = ? and o.order_reference = ?",
+                                + "and o.customer_id = t.customer_id "
+                                + "join order_compensation_allowance allowance on allowance.order_reference = o.order_reference "
+                                + "where t.id = ? and o.order_reference = ?",
                         (rs, row) ->
                                 new ScopedOrder(
                                         rs.getString(1),

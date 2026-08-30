@@ -28,17 +28,17 @@ public final class CompensationProposalExpiry {
         revisionIds.forEach(revisionId -> expireLocked(revisionId, now));
     }
 
-    public Instant expireDueForOrder(String orderReference) {
+    public Instant expireDueForTicket(UUID ticketId) {
         List<PendingRevision> revisions =
                 jdbc.query(
-                        "select id, expires_at from compensation_proposal_revision where order_reference = ? "
+                        "select id, expires_at from compensation_proposal_revision where ticket_id = ? "
                                 + "and reason_code = 'LOGISTICS_DELAY' and status = 'PENDING_APPROVAL' "
                                 + "for update",
                         (rs, row) ->
                                 new PendingRevision(
                                         rs.getObject(1, UUID.class),
                                         rs.getTimestamp(2).toInstant()),
-                        orderReference);
+                        ticketId);
         Instant now = clock.instant();
         revisions.stream()
                 .filter(revision -> !revision.expiresAt().isAfter(now))

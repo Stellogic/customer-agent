@@ -1,0 +1,23 @@
+Issue #165 - local synthetic evidence excerpts
+Base: 0a9ee031ca5c5febcd0c6fb11a660c5eee83046f
+Tested implementation: uncommitted worktree changes; SHA alone does not identify these intermediate builds.
+Runtime: PostgreSQL 18.4, Spring Boot 4.1.0, Gradle 9.3.1/JDK25, Python3.13.14; isolated Docker Compose.
+No real model calls.
+#165 并发提案=2成功；并发审批=1成功/1冲突；响应丢失及重放后副作用=1，已消费=26.80/30.00
+#165 确认失败释放=26.80；驳回不占额；合法组合=2×26.80，成功后剩余=6.40/60.00
+#165 PostgreSQL 并发预占=1成功/1约束冲突；已消费不恢复额度
+Issue #165 订单额度仲裁验收 PASS：4 个合成订单，无模型调用
+FOCUS_PASS issue=165 run=issue165-focus-3d2576e3 seconds=215.0196093
+LOCK_RELEASED issue=165 run=issue165-focus-3d2576e3 seconds=219.5305165
+#17 1.419 RUF002 Docstring contains ambiguous `：` (FULLWIDTH COLON). Did you mean `:` (COLON)?
+#17 1.419 RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+#17 1.419 RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+LOCK_RELEASED issue=165 run=issue165-focus-36477ea6 seconds=46.6337452
+JUnit second run: JdbcApprovalServiceTest=1, CompensationExecutionControllerTest=5, JdbcCompensationProposalStoreTest=2, SupportCompensationControllerTest=6; 14 tests, 0 failures, 0 errors.
+#17 44.10 0 errors, 0 warnings, 0 informations
+#165 并发提案=2成功；并发审批=1成功/1冲突；响应丢失及重放后副作用=1，已消费=26.80/30.00
+#165 确认失败释放=26.80；驳回不占额；合法组合=2×26.80，成功后剩余=6.40/60.00
+#165 PostgreSQL 并发预占=1成功/1约束冲突；已消费不恢复额度
+Issue #165 订单额度仲裁验收 PASS：4 个合成订单，无模型调用
+FOCUS_PASS issue=165 run=issue165-focus-d2f7426a seconds=128.6575548
+LOCK_RELEASED issue=165 run=issue165-focus-d2f7426a seconds=133.2093118

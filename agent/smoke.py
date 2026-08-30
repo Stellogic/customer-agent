@@ -3641,7 +3641,7 @@ def main() -> None:
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         proposal_race_results = list(executor.map(create_competing_proposal, proposal_race_scopes))
-    assert sorted(proposal_race_results) == ["accepted", "one_active_logistics_compensation_intent"]
+    assert sorted(proposal_race_results) == ["accepted", "accepted"]
 
     race_digest = "7" * 64
     _, _, race_revision_id = seed_pending_decision_fixture(
