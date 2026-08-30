@@ -40,4 +40,18 @@ PASS（静态）@6911549，0项缺陷。发送前核对原账本、冻结合同�
 
 ## 单次真实记录
 
-本次入口与离线证据提交时尚未执行真实诊断；运行完成后在本节追加独立RunId、SHA/base、实际请求数、响应/脱敏失败、token/耗时和累计预算。无论结果如何停止归档并归还窗口，不继续72题、留出/#189、完整门禁或合入。
+入口与离线证据提交后启动一次，但在Python参数解析阶段中止：**PRECONDITION_FAIL / ARGPARSE_MODE_ARGUMENT_SPLIT，实际API请求0次**，不是模型结构失败或质量FAIL。
+
+- RunId：`issue190-c-fifth-diagnostic-20260831a`；干净受测HEAD `d4923417dde2f25d16df7bd95a082294419c8040`，base `c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`。源码与已预检/双CR的6911549相同，期间只提交离线证据和本文。
+- 时间：2026-08-31T04:56:54.2713973+08:00至04:56:56.5068636+08:00；wrapper记录2.2309127秒。只代表失败启动耗时，不是模型延迟。
+- 原始错误为 `unrecognized arguments: - - d i a g n o s e - f i f t h - o n c e`。没有模型响应、token或新取证文本；Python主报告未创建，不能伪造为模型运行报告。
+- 新增费用0；共享账本仍为原字节SHA `5cd9e0ef8ee6977f0897db31d4c00bfee498194b9456bc437ffe0776b79e8507`，累计已结算上界0.009084元、未结算0；未新增诊断phase或第6次请求。原开发STOPPED、5次请求、4/72、metrics=null与NOT_CAPTURED不变。
+- [原始launch日志与索引](evidence/issue190-c-fifth-diagnostic-20260831a/index.json)保留非零退出、时间/受测SHA及未变账本副本。索引的PRECONDITION_FAIL为归档分类，不冒称是Python生成的运行状态。
+
+**静态原因**：PowerShell入口以 `$modeArgs = if (...) { @('--diagnose-fifth-once') } ...` 赋值，单元素分支输出被解包为字符串；对该字符串 `@modeArgs` 原生命令splat时按字符展开。实际错误记录与这条调用链吻合。Python的 `argparse.parse_args()` 位于锁断言、key读取、账本构造和HTTP调用之前，因此入口没有消耗这次API额度。问题在调用参数封送，不在冻结prompt/schema/模型、数据或判定契约。
+
+**验证缺口**：已通过的PowerShell检查只解析语法，Python MockTransport测试直接调用协程；二者未覆盖PowerShell→uv→Python的实际argv，因此未发现此工程缺陷。此前双轴PASS证据保留，但不能拿它否定本次入口失败。
+
+最小建议（本轮未实施）：将模式参数显式保持为 `[string[]]`，补离线argv接缝验证“诊断开关是一个完整token、普通模式不传该token”，再按协调重新给定边界决定是否进行剩余的一次真实诊断。不改prompt/解析或账本，不把未调用当作自动重试授权。
+
+本次失败后未再启动运行。脚本finally释放自有锁，结束后单次宿主回读FREE并已成功发送LOCK_RELEASED，窗口归还。后续只有静态归档，无真实续验、72题回放、留出/#189、产品切换、完整门禁或合入。
