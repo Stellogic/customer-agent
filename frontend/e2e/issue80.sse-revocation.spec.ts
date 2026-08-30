@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { login } from "./support/auth";
-import { executeFixtureSql } from "./support/database";
+import { executeFixtureSql, revokeActiveAssignmentsForSupport } from "./support/database";
 
 const assignmentTicketId = "80000000-0000-0000-0000-000000000009";
 const revisionId = "80000000-0000-0000-0000-000000000008";
@@ -46,6 +46,7 @@ function resetApprovalFixture() {
 }
 
 test("客服 assignment 撤销后 60 秒内断流、移除旧详情并重读权威资源", async ({ page }) => {
+  revokeActiveAssignmentsForSupport("support-demo");
   await login(page, "internal", "support-demo");
   await expect(
     page.getByRole("button", { name: `领取工单 ${assignmentTicketId}` }).first(),

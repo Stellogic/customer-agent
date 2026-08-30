@@ -14,7 +14,7 @@ INSERT INTO support_ticket (
     created_at, first_responded_at
 ) VALUES (
     '80000000-0000-0000-0000-000000000009', 'other-customer', 'ORDER-DELAY-OTHER',
-    'Issue #80 其他客户不可见工单', 'NEW', 'AGENT',
+    'Issue #80 其他客户不可见工单', 'NEW', 'HUMAN',
     '2026-08-09T13:56:00Z', NULL
 );
 
