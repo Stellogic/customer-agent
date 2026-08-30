@@ -1,0 +1,11 @@
+{
+  "status": "FAIL",
+  "run_id": "issue190-logistic-fit-20260831b",
+  "last_phase": "one-fit-one-selection",
+  "holdout_read": false,
+  "paid_model_cost_cny": 0,
+  "head_sha": "98b49949d6d835d510c4959d787b443fa95bc794",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "elapsed_seconds": 327.2918648,
+  "frozen_evaluation_run": false
+}
