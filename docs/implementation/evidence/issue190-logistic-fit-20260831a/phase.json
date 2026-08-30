@@ -1,0 +1,11 @@
+{
+  "paid_model_cost_cny": 0,
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "head_sha": "1c7b8a8a584ee919c52de52d2ddf73c2b7474768",
+  "status": "FAIL",
+  "frozen_evaluation_run": false,
+  "run_id": "issue190-logistic-fit-20260831a",
+  "last_phase": "real-db-safety",
+  "holdout_read": false,
+  "elapsed_seconds": 251.339985
+}
