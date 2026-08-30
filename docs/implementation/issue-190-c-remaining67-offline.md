@@ -2,6 +2,8 @@
 
 2026-08-31；[Issue #190](https://github.com/Stellogic/customer-agent/issues/190) / [Draft PR203](https://github.com/Stellogic/customer-agent/pull/203)。**本阶段离线PASS；真实67题仍未运行或获准，非质量PASS/正式交付。**
 
+后续另获授权的[真实诊断记录](issue-190-c-remaining67-attempt-a.md)在第44次证据契约失败时停止；本页保留当时离线阶段的状态与证据，不覆盖真实中止结果。
+
 ## 运行身份和验证覆盖
 
 RunId：`issue190-c-remaining-offline-20260831a`。开始前fetch的main/base为 `c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`，已合入迁移最高V41，本分支未发布V42无新编号冲突，未改迁移。起始干净HEAD `1a9dac4455193cf32b4ae8a997dcb68a639a449a`。

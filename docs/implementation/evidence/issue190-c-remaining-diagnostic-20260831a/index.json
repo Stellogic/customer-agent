@@ -1,0 +1,45 @@
+{
+  "schema": "issue190-remaining67-diagnostic-evidence-v1",
+  "run_id": "issue190-c-remaining-diagnostic-20260831a",
+  "head_sha": "62b2c570901f9ad93b57a58a878e300beae973fb",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "STOPPED",
+  "stopped_reason": "INVALID_EVIDENCE",
+  "actual_api_requests": 44,
+  "valid_completed": 43,
+  "planned": 67,
+  "unrequested": 23,
+  "metrics": null,
+  "original_development_unchanged": true,
+  "original_single_diagnostic_unchanged": true,
+  "original_six_attempts_unchanged": true,
+  "all_67_request_hashes_match_frozen_list": true,
+  "emitted_44_hashes_match_ordered_prefix": true,
+  "input_tokens": 20602,
+  "output_tokens": 816,
+  "total_tokens": 21418,
+  "new_cost_upper_micro_cny": 69150,
+  "settled_upper_micro_cny": 79923,
+  "unsettled_reserved_micro_cny": 0,
+  "ledger_sha256": "c11630710263c473fbf938b60e789b33ef93b776021e258976825fdf47206a50",
+  "evidence": [
+    {
+      "path": "launch.json",
+      "source_sha256": "693204b92f5a3ea04981bebf1f974a4cc7293b3ae8461eb3ee1e688f803da290",
+      "archived_sha256": "693204b92f5a3ea04981bebf1f974a4cc7293b3ae8461eb3ee1e688f803da290",
+      "redaction": "none; original bytes"
+    },
+    {
+      "path": "launch.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redaction": "none; original bytes"
+    },
+    {
+      "path": "sufficiency-remaining-diagnostic.json",
+      "source_sha256": "83678484d74f3ab9a2e00ee2c06aa27480e11291d58f40850c98efd891e8f57f",
+      "archived_sha256": "83678484d74f3ab9a2e00ee2c06aa27480e11291d58f40850c98efd891e8f57f",
+      "redaction": "none; original bytes"
+    }
+  ]
+}

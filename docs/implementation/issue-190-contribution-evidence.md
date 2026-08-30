@@ -52,6 +52,8 @@
 
 ## A方案后续记录
 
+**剩余67题真实诊断中止：** [原文/费用/停止证据](issue-190-c-remaining67-attempt-a.md)，受测62b2c57/base c19a7ebe，RunId issue190-c-remaining-diagnostic-20260831a。44请求、43/67结构合法完成，第44次同一chunk编号重复而INVALID_EVIDENCE停止；余23项未发，metrics=null、不评分。输入20602/输出816 token，Python阶段45.420778秒；新增费用上界0.069150元、全局0.079923元、未结算0，账单实付未采集。43条合法结构不等于43题正确；历史未覆盖，无续跑/解阻。
+
 **剩余67题离线预检：** [日志与请求清单](issue-190-c-remaining67-offline.md)，RunId issue190-c-remaining-offline-20260831a，起始1a9dac4/base c19a7ebe，期间仅Ruff排版保存为e449982。三模式实际入口、23聚焦/42相关组件、格式/类型PASS，55.7541624秒；冻结构造器物化67项请求hash，清单SHA cfe20b1d…，无HTTP/模型调用、原费用账本不变。不是67题真实结果或质量提升。
 
 **剩余67题静态准备：** [独立补充诊断边界](issue-190-c-remaining67-static.md)，源码1252495；固定原第6–72题ID/顺序和来源hash，独立不可重开phase，保持原两phase、费用及metrics=null。静态双CR PASS；新增代码/测试源码尚未运行，未生成逐请求字节hash或新增真实结果，不可当作已验证正确性或质量提升。
