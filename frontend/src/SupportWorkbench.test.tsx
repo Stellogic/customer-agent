@@ -482,7 +482,9 @@ describe("客服共享队列工作台", () => {
     expect(screen.getByRole("navigation", { name: "已领取工单" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: `打开已领取工单 ${SECOND_HUMAN_TICKET}` }));
     expect(await screen.findByText("第二张已领取工单")).toBeInTheDocument();
-    expect(screen.queryByText("物流延迟")).not.toBeInTheDocument();
+    const description = screen.getByRole("heading", { name: "问题描述" }).parentElement;
+    expect(description).not.toBeNull();
+    expect(within(description!).queryByText("物流延迟")).not.toBeInTheDocument();
   });
 
   it("AGENT 处理模式的队列条目不能领取", async () => {
@@ -725,7 +727,7 @@ describe("客服共享队列工作台", () => {
     render(<SupportWorkbench />);
     expect(await screen.findByText("正在读取当前允许的标准补偿方案…")).toBeInTheDocument();
     resolveOptions?.(couponOptions());
-    expect(await screen.findByText("10.00 CNY")).toBeInTheDocument();
+    expect(await screen.findAllByText("10.00 CNY")).toHaveLength(2);
   });
 
   it("重新登录后不会沿用上一主体未确认发送请求", async () => {
@@ -820,10 +822,13 @@ describe("客服共享队列工作台", () => {
 
     render(<SupportWorkbench />);
 
-    expect(await screen.findByRole("heading", { name: "标准补偿" })).toBeInTheDocument();
-    expect(screen.getByText("10.00 CNY")).toBeInTheDocument();
-    expect(screen.getByText("delay-policy-v1")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "提交审批" }));
+    const panel = await screen.findByRole("region", { name: "标准补偿" });
+    expect(await within(panel).findAllByText("10.00 CNY")).toHaveLength(2);
+    expect(within(panel).getByText("delay-policy-v1")).toBeInTheDocument();
+    expect(
+      within(panel).queryByRole("button", { name: "提交例外补偿申请" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(await within(panel).findByRole("button", { name: "提交审批" }));
     expect(
       await screen.findByText("标准补偿提案已提交审批。客户只会看到类型、金额和待审批。"),
     ).toBeInTheDocument();
@@ -831,6 +836,7 @@ describe("客服共享队列工作台", () => {
 
   it("标准补偿提交结果未知时查询 Spring 权威结果", async () => {
     const idempotencyKey = "16400000-0000-4000-8000-000000000002";
+    let queryCount = 0;
     vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(idempotencyKey);
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const path = String(input);
@@ -856,6 +862,10 @@ describe("客服共享队列工作台", () => {
         `/api/support/workbench/tickets/${HANDOFF_TICKET}/compensation-proposals/${idempotencyKey}`
       ) {
         expect(init?.method ?? "GET").toBe("GET");
+        queryCount += 1;
+        if (queryCount === 1) {
+          return Response.json({ schema: "support-workbench-v2", ticketId: HANDOFF_TICKET });
+        }
         return Response.json({
           schema: "support-workbench-v2",
           ticketId: HANDOFF_TICKET,
@@ -874,10 +884,15 @@ describe("客服共享队列工作台", () => {
     });
 
     render(<SupportWorkbench />);
-    expect(await screen.findByRole("heading", { name: "标准补偿" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "提交审批" }));
-    expect(await screen.findByRole("button", { name: "查询提交结果" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "查询提交结果" }));
+    const panel = await screen.findByRole("region", { name: "标准补偿" });
+    fireEvent.click(await within(panel).findByRole("button", { name: "提交审批" }));
+    expect(await within(panel).findByRole("button", { name: "查询提交结果" })).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: "查询提交结果" }));
+    expect(
+      await screen.findByText("提交结果仍未确认；请继续查询 Spring 权威结果，不要重复提交。"),
+    ).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "查询提交结果" })).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: "查询提交结果" }));
     expect(
       await screen.findByText("已从 Spring 权威结果确认标准补偿提案已提交审批。"),
     ).toBeInTheDocument();

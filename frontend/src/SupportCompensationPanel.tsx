@@ -77,6 +77,7 @@ export function SupportCompensationPanel({
 
   const selected = options?.plans.find((plan) => plan.planCode === planCode) ?? null;
   const busy = submitState === "submitting" || submitState === "unknown";
+  const canSubmitException = optionsState === "ready" && options?.plans.length === 0;
 
   async function submitProposal() {
     if (!selected) return;
@@ -165,6 +166,12 @@ export function SupportCompensationPanel({
         return;
       }
       if (!response.ok) throw new Error("query failed");
+      const value = (await response.json()) as unknown;
+      const valid =
+        pendingKind === "proposal"
+          ? isConfirmedProposalResult(value, ticketId, pendingKey)
+          : isConfirmedExceptionResult(value, ticketId, pendingKey);
+      if (!valid) throw new Error("invalid query result");
       clearPendingCompensationSubmit(ticketId);
       setSubmitState("idle");
       setNotice(
@@ -264,33 +271,35 @@ export function SupportCompensationPanel({
           </button>
         </form>
       )}
-      <form
-        className="support-exception-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void submitException();
-        }}
-      >
-        <p className="eyebrow">例外补偿申请</p>
-        <p>超出标准方案时走独立审查，不能改写普通提案金额。</p>
-        <label>
-          申请说明
-          <textarea
-            aria-label="例外补偿说明"
-            value={justification}
-            maxLength={2000}
-            disabled={busy}
-            onChange={(event) => setJustification(event.target.value)}
-            placeholder="说明标准方案为何不足…"
-            rows={3}
-          />
-        </label>
-        <button type="submit" disabled={busy || !justification.trim()}>
-          {submitState === "submitting" && pendingKind === "exception"
-            ? "正在提交例外申请…"
-            : "提交例外补偿申请"}
-        </button>
-      </form>
+      {canSubmitException && (
+        <form
+          className="support-exception-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submitException();
+          }}
+        >
+          <p className="eyebrow">例外补偿申请</p>
+          <p>超出标准方案时走独立审查，不能改写普通提案金额。</p>
+          <label>
+            申请说明
+            <textarea
+              aria-label="例外补偿说明"
+              value={justification}
+              maxLength={2000}
+              disabled={busy}
+              onChange={(event) => setJustification(event.target.value)}
+              placeholder="说明标准方案为何不足…"
+              rows={3}
+            />
+          </label>
+          <button type="submit" disabled={busy || !justification.trim()}>
+            {submitState === "submitting" && pendingKind === "exception"
+              ? "正在提交例外申请…"
+              : "提交例外补偿申请"}
+          </button>
+        </form>
+      )}
       {submitState === "unknown" && pendingKey && (
         <button type="button" className="support-reply-query" onClick={() => void queryResult()}>
           查询提交结果
@@ -378,6 +387,71 @@ function isOptions(value: unknown): value is CompensationOptions {
   if (plans.some((plan) => plan === null)) return false;
   value.plans = plans.filter((plan): plan is CompensationPlan => plan !== null);
   return true;
+}
+
+function isConfirmedProposalResult(value: unknown, ticketId: string, requestId: string) {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "schema",
+      "ticketId",
+      "requestId",
+      "proposalRevisionId",
+      "proposalRevision",
+      "compensationMethod",
+      "amount",
+      "currency",
+      "status",
+      "outcome",
+      "replayed",
+    ]) &&
+    value.schema === SUPPORT_SCHEMA &&
+    value.ticketId === ticketId &&
+    value.requestId === requestId &&
+    isUuid(value.proposalRevisionId) &&
+    typeof value.proposalRevision === "number" &&
+    Number.isInteger(value.proposalRevision) &&
+    value.proposalRevision > 0 &&
+    typeof value.compensationMethod === "string" &&
+    typeof value.amount === "number" &&
+    Number.isFinite(value.amount) &&
+    value.amount >= 0 &&
+    value.currency === "CNY" &&
+    value.status === "PENDING_APPROVAL" &&
+    value.outcome === "ACCEPTED" &&
+    value.replayed === true
+  );
+}
+
+function isConfirmedExceptionResult(value: unknown, ticketId: string, requestId: string) {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "schema",
+      "ticketId",
+      "requestId",
+      "exceptionalRequestId",
+      "reasonCode",
+      "status",
+      "outcome",
+      "replayed",
+    ]) &&
+    value.schema === SUPPORT_SCHEMA &&
+    value.ticketId === ticketId &&
+    value.requestId === requestId &&
+    isUuid(value.exceptionalRequestId) &&
+    value.reasonCode === "STANDARD_PLAN_INSUFFICIENT" &&
+    value.status === "SUBMITTED" &&
+    value.outcome === "ACCEPTED" &&
+    value.replayed === true
+  );
+}
+
+function isUuid(value: unknown) {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  );
 }
 
 function normalizePlan(value: unknown): CompensationPlan | null {

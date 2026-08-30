@@ -106,6 +106,7 @@ public final class SupportWorkbenchExceptionHandler {
             case "COMPENSATION_ALLOWANCE_INSUFFICIENT" -> "剩余可补偿额度不足";
             case "STALE_COMPENSATION_FACTS" -> "订单事实或方案已变化，请重新读取标准补偿方案";
             case "COMPENSATION_PROPOSAL_INELIGIBLE" -> "当前订单不符合标准补偿资格";
+            case "STANDARD_COMPENSATION_AVAILABLE" -> "当前仍有可用的标准补偿方案，请先选择标准方案";
             default -> "标准补偿提交未被接受，请根据权威结果恢复";
         };
     }
