@@ -12,6 +12,7 @@ import {
 } from "react-router-dom";
 import { LoginPage } from "./LoginPage";
 import { SystemState } from "./components/SystemState";
+import { StateGallery } from "./StateGallery";
 import {
   defaultPathFor,
   hasCapability,
@@ -59,6 +60,9 @@ export function RootApplication() {
           <Routes>
             <Route path={ROUTES.customerLogin} element={<LoginRoute audience="customer" />} />
             <Route path={ROUTES.internalLogin} element={<LoginRoute audience="internal" />} />
+            <Route path={ROUTES.states} element={<StateGallery />} />
+            <Route path={ROUTES.forbidden} element={<PublicForbiddenRoute />} />
+            <Route path={ROUTES.notFound} element={<PublicNotFoundRoute />} />
             {LEGACY_ROUTE_REDIRECTS.map((route) => (
               <Route key={route.path} path={route.path} element={<LegacyRoute to={route.to} />} />
             ))}
@@ -101,7 +105,7 @@ export function RootApplication() {
                 })}
               </Route>
             </Route>
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={<PublicNotFoundRoute />} />
           </Routes>
         </Suspense>
       </BrowserRouter>
@@ -238,14 +242,157 @@ function RouteError() {
 function Forbidden() {
   const session = CurrentSessionContext.use();
   return (
-    <SystemState
+    <ForbiddenState
       actions={
         <Link className="route-state-action" to={defaultPathFor(session)}>
           返回可访问工作区
         </Link>
       }
-      code="403"
       description="这里没有加载任何受保护内容。你可以返回当前身份可访问的工作区继续操作。"
+    />
+  );
+}
+
+function PublicForbiddenRoute() {
+  return (
+    <PublicIdentityErrorRoute
+      Page={ForbiddenState}
+      copy={{
+        loading: "正在确认当前身份。系统不会加载任何受保护内容，请稍候。",
+        unavailable: "当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+        anonymous:
+          "当前未登录或没有访问此页面的权限。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+        customer:
+          "当前客户身份不能进入这个内部页面。系统不会加载任何内部工作台数据，请返回帮助中心继续。",
+        internal:
+          "当前工作人员没有访问此页面的权限。系统不会加载未授权的工单详情、审批证据或内部备注，请返回当前职责允许的工作区。",
+      }}
+    />
+  );
+}
+
+function PublicNotFoundRoute() {
+  return (
+    <PublicIdentityErrorRoute
+      Page={NotFound}
+      copy={{
+        loading: "正在确认当前身份，以提供安全返回入口。系统不会加载任何受保护内容。",
+        unavailable: "当前身份暂时无法确认。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+        anonymous:
+          "当前未登录，无法确定适合你的工作区。系统不会加载任何受保护内容，请从安全登录入口重新开始。",
+        customer: "当前客户身份找不到这个页面。系统没有加载受保护内容，请返回帮助中心继续。",
+        internal:
+          "当前工作人员找不到这个页面。系统没有加载受保护工单或审批内容，请返回当前职责允许的工作区。",
+      }}
+    />
+  );
+}
+
+function PublicIdentityErrorRoute({
+  Page,
+  copy,
+}: {
+  Page: typeof ForbiddenState | typeof NotFound;
+  copy: {
+    loading: string;
+    unavailable: string;
+    anonymous: string;
+    customer: string;
+    internal: string;
+  };
+}) {
+  const state = usePublicSessionState();
+
+  if (state.status === "loading") {
+    return <Page actions={<StateGalleryAction />} description={copy.loading} />;
+  }
+
+  if (state.status === "unavailable" || state.status === "anonymous") {
+    return (
+      <Page
+        actions={
+          <>
+            <PublicLoginActions />
+            <StateGalleryAction />
+          </>
+        }
+        description={state.status === "unavailable" ? copy.unavailable : copy.anonymous}
+      />
+    );
+  }
+
+  const isCustomer = state.session.subjectType === "CUSTOMER";
+  return (
+    <Page
+      actions={
+        <>
+          <Link className="route-state-action" to={defaultPathFor(state.session)}>
+            {isCustomer ? "返回帮助中心" : "返回可访问工作区"}
+          </Link>
+          <StateGalleryAction />
+        </>
+      }
+      description={isCustomer ? copy.customer : copy.internal}
+    />
+  );
+}
+
+type PublicSessionState =
+  | { status: "loading" }
+  | { status: "anonymous" }
+  | { status: "authenticated"; session: CurrentSession }
+  | { status: "unavailable" };
+
+function usePublicSessionState(): PublicSessionState {
+  const [state, setState] = useState<PublicSessionState>({ status: "loading" });
+
+  useEffect(() => {
+    let active = true;
+    void loadOptionalCurrentSession()
+      .then((session) => {
+        if (!active) return;
+        setState(session ? { status: "authenticated", session } : { status: "anonymous" });
+      })
+      .catch(() => {
+        if (active) setState({ status: "unavailable" });
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return state;
+}
+
+function PublicLoginActions() {
+  return (
+    <>
+      <Link className="route-state-action" to={ROUTES.customerLogin}>
+        前往客户登录
+      </Link>
+      <Link className="route-state-action route-state-action-secondary" to={ROUTES.internalLogin}>
+        前往内部登录
+      </Link>
+    </>
+  );
+}
+
+function StateGalleryAction() {
+  return (
+    <Link className="route-state-action route-state-action-secondary" to={ROUTES.states}>
+      查看状态画廊
+    </Link>
+  );
+}
+
+function ForbiddenState({ actions, description }: { actions: ReactNode; description: string }) {
+  return (
+    <SystemState
+      actions={actions}
+      announcement="alert"
+      announcementLabel="权限边界说明"
+      code="403"
+      description={description}
       eyebrow="ACCESS BOUNDARY"
       title="当前身份无权访问此页面"
       variant="forbidden"
@@ -253,24 +400,14 @@ function Forbidden() {
   );
 }
 
-function NotFound() {
+function NotFound({ actions, description }: { actions: ReactNode; description: string }) {
   return (
     <SystemState
-      actions={
-        <>
-          <Link className="route-state-action" to={ROUTES.customerLogin}>
-            前往客户登录
-          </Link>
-          <Link
-            className="route-state-action route-state-action-secondary"
-            to={ROUTES.internalLogin}
-          >
-            前往内部登录
-          </Link>
-        </>
-      }
+      actions={actions}
+      announcement="status"
+      announcementLabel="页面未找到说明"
       code="404"
-      description="请检查地址，或从安全登录入口重新开始。"
+      description={description}
       eyebrow="WAYFINDING"
       title="没有找到这个页面"
       variant="not-found"

@@ -5,6 +5,9 @@ export const ROUTES = {
   customerLogin: "/help/login",
   internalHome: "/internal",
   internalLogin: "/internal/login",
+  states: "/states",
+  forbidden: "/403",
+  notFound: "/404",
 } as const;
 
 const INTERNAL_ROUTE_PATHS = {

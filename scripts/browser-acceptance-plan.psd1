@@ -2,6 +2,7 @@
     ParallelSafe = @(
         'e2e/issue80.static-states.parallel-safe.spec.ts'
         'e2e/issue80.unauthenticated-routes.parallel-safe.spec.ts'
+        'e2e/issue191.state-gallery.parallel-safe.spec.ts'
     )
     Serial = @(
         'e2e/issue80.identity-shells.spec.ts'
