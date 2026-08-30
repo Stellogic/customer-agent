@@ -1610,10 +1610,15 @@ function isSnapshot(value: unknown): value is Snapshot {
     "ticket",
     "messages",
     "clarification",
-    "replyStream",
   ];
   if (!required.every((key) => keys.includes(key))) return false;
-  if (keys.some((key) => !required.includes(key) && key !== "pendingCompensation")) return false;
+  if (
+    keys.some(
+      (key) =>
+        !required.includes(key) && key !== "replyStream" && key !== "pendingCompensation",
+    )
+  )
+    return false;
   const cursor = typeof value.cursor === "string" ? parseCursor(value.cursor) : null;
   return (
     cursor?.epoch === value.schema &&
