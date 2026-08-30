@@ -79,6 +79,7 @@ test("Issue #163 持久化领取、人工公开回复与刷新恢复", async ({ 
   });
   const other = await otherContext.newPage();
   await login(other, "internal", "internal-demo");
+  await other.goto("/internal/support");
   await expect(other.getByRole("heading", { name: "客服共享队列" })).toBeVisible();
   await expect(other.getByText(description, { exact: true })).toHaveCount(0);
   await expect(other.getByRole("heading", { name: "授权工单详情" })).toHaveCount(0);
