@@ -237,11 +237,9 @@ class ExperimentLedger:
         if self.state != json.loads(original):
             raise SufficiencyBlocked("REMAINING_LEDGER_PRECONDITION_CHANGED")
         manifest = remaining_manifest()
-        if (
-            assets != manifest["asset_sha256"]
-            or [request["query_id"] for request in requests]
-            != [request["query_id"] for request in manifest["requests"]]
-        ):
+        if assets != manifest["asset_sha256"] or [request["query_id"] for request in requests] != [
+            request["query_id"] for request in manifest["requests"]
+        ]:
             raise SufficiencyBlocked("REMAINING_REQUEST_MANIFEST_MISMATCH")
         self.phase = REMAINING_PHASE
         self.state["phases"][self.phase] = {
@@ -465,7 +463,9 @@ def main() -> None:
             "metrics": None,
         }
         if args.diagnose_remaining_once:
-            report.update(partition="remaining67_development_diagnostic_not_quality", query_count=67)
+            report.update(
+                partition="remaining67_development_diagnostic_not_quality", query_count=67
+            )
         ledger: ExperimentLedger | None = None
         try:
             if is_diagnostic and not ledger_path.exists():

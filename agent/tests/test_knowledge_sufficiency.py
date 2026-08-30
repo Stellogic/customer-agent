@@ -57,8 +57,12 @@ async def test_remaining_diagnostic_preserves_67_order_history_and_null_metrics(
 
     report: dict[str, Any] = {"run_id": "remaining-complete-offline", "metrics": None}
     await run_development(
-        report, ledger, frozen, api_key="offline-only",
-        transport=httpx.MockTransport(handle), diagnose_remaining_once=True,
+        report,
+        ledger,
+        frozen,
+        api_key="offline-only",
+        transport=httpx.MockTransport(handle),
+        diagnose_remaining_once=True,
     )
     ledger.finish(report["status"])
     assert calls == 67
@@ -77,8 +81,12 @@ async def test_remaining_diagnostic_preserves_67_order_history_and_null_metrics(
     resumed = ExperimentLedger(path, frozen)
     with pytest.raises(SufficiencyBlocked, match="REMAINING_ALREADY_STARTED_NO_RETRY"):
         await run_development(
-            {"run_id": "must-not-replay"}, resumed, frozen, api_key="offline-only",
-            transport=httpx.MockTransport(handle), diagnose_remaining_once=True,
+            {"run_id": "must-not-replay"},
+            resumed,
+            frozen,
+            api_key="offline-only",
+            transport=httpx.MockTransport(handle),
+            diagnose_remaining_once=True,
         )
     assert calls == 67
 
@@ -86,7 +94,8 @@ async def test_remaining_diagnostic_preserves_67_order_history_and_null_metrics(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure", ["invalid", "drift", "unknown_usage", "supplier"])
 async def test_remaining_diagnostic_stops_on_first_error_without_retry_or_quality(
-    tmp_path: Path, failure: str,
+    tmp_path: Path,
+    failure: str,
 ) -> None:
     path = tmp_path / "cost.json"
     path.write_bytes(runner.REMAINING_LEDGER.read_bytes())
@@ -113,14 +122,20 @@ async def test_remaining_diagnostic_stops_on_first_error_without_retry_or_qualit
         return httpx.Response(200, json=response)
 
     expected_error = {
-        "invalid": "INVALID_DECISION_SCHEMA", "drift": "PROVIDER_IDENTITY_DRIFT",
-        "unknown_usage": "USAGE_UNTRUSTED", "supplier": "INSUFFICIENT_BALANCE",
+        "invalid": "INVALID_DECISION_SCHEMA",
+        "drift": "PROVIDER_IDENTITY_DRIFT",
+        "unknown_usage": "USAGE_UNTRUSTED",
+        "supplier": "INSUFFICIENT_BALANCE",
     }[failure]
     report: dict[str, Any] = {"run_id": "remaining-stop-offline", "metrics": None}
     with pytest.raises(SufficiencyBlocked, match=expected_error):
         await run_development(
-            report, ledger, frozen, api_key="offline-only",
-            transport=httpx.MockTransport(handle), diagnose_remaining_once=True,
+            report,
+            ledger,
+            frozen,
+            api_key="offline-only",
+            transport=httpx.MockTransport(handle),
+            diagnose_remaining_once=True,
         )
     ledger.finish("STOPPED")
     assert calls == 3 and len(report["rows"]) == 2 and report["metrics"] is None
@@ -137,8 +152,12 @@ async def test_remaining_diagnostic_stops_on_first_error_without_retry_or_qualit
     before = path.read_bytes()
     with pytest.raises(SufficiencyBlocked, match="REMAINING_ALREADY_STARTED_NO_RETRY"):
         await run_development(
-            {"run_id": "new-id-not-allowed"}, resumed, frozen, api_key="offline-only",
-            transport=httpx.MockTransport(handle), diagnose_remaining_once=True,
+            {"run_id": "new-id-not-allowed"},
+            resumed,
+            frozen,
+            api_key="offline-only",
+            transport=httpx.MockTransport(handle),
+            diagnose_remaining_once=True,
         )
     assert calls == 3 and path.read_bytes() == before
 
