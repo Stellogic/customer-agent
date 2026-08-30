@@ -3,6 +3,7 @@
 
 import os
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
@@ -297,6 +298,87 @@ class Acceptance:
         self.allowance(order, "10.00", "0.00", "20.00")
         print("#165 PostgreSQL 并发预占=1成功/1约束冲突；已消费不恢复额度")
 
+    def expiry_lock_order(self) -> None:
+        order = "ORDER-ALLOW165-EXPIRY"
+        tickets = self.tickets(order)
+        revision = uuid.uuid4()
+        with psycopg.connect(self.database) as connection:
+            connection.execute(
+                "insert into compensation_proposal_revision "
+                "(id, proposal_id, revision_number, ticket_id, order_reference, delay_hours, "
+                "delay_seconds, compensation_method, amount, reason_code, evidence_references, "
+                "policy_version, content_digest, status, created_at, expires_at) "
+                "values (%s, %s, 1, %s, %s, 80, 288000, 'SIMULATED_PARTIAL_REFUND', 26.80, "
+                "'LOGISTICS_DELAY', '[]', 'delay-policy-v1', %s, 'PENDING_APPROVAL', "
+                "'2026-08-08T13:00Z', '2026-08-09T13:00Z')",
+                (revision, uuid.uuid4(), tickets[0], order, revision.hex * 2),
+            )
+        # 在订单锁被持有时, 到期 claim 必须等在订单锁前, 不能先持有提案行。
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with psycopg.connect(self.database) as connection:
+                connection.execute(
+                    "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (order + "\nCOMPENSATION_ALLOWANCE",),
+                )
+                claim = pool.submit(
+                    self.approver.post,
+                    f"{self.spring}/api/approver/compensation-proposals/{revision}/claims",
+                    headers={"Idempotency-Key": str(uuid.uuid4())},
+                    json={"requestedLeaseSeconds": 900},
+                )
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    waiting = connection.execute(
+                        "select count(*) from pg_locks held join pg_locks waiting "
+                        "on held.locktype = waiting.locktype and held.classid = waiting.classid "
+                        "and held.objid = waiting.objid and held.objsubid = waiting.objsubid "
+                        "where held.pid = pg_backend_pid() and held.locktype = 'advisory' "
+                        "and held.granted and not waiting.granted"
+                    ).fetchone()[0]
+                    if waiting:
+                        break
+                    time.sleep(0.02)
+                else:
+                    raise AssertionError("到期 claim 未到达订单锁屏障")
+                connection.execute(
+                    "select id from compensation_proposal_revision where id = %s for update nowait",
+                    (revision,),
+                )
+            expect_status(claim.result(timeout=10), 410)
+        # 队列清理遇到忙订单跳过; 释放订单后下次查询完成到期状态更新。
+        second = uuid.uuid4()
+        with psycopg.connect(self.database) as connection:
+            connection.execute(
+                "insert into compensation_proposal_revision "
+                "select %s, %s, 1, %s, order_reference, null, delay_hours, delay_seconds, "
+                "compensation_method, amount, reason_code, evidence_references, policy_version, "
+                "content_digest, 'PENDING_APPROVAL', created_at, expires_at "
+                "from compensation_proposal_revision where id = %s",
+                (second, uuid.uuid4(), tickets[1], revision),
+            )
+        with (
+            ThreadPoolExecutor(max_workers=1) as pool,
+            psycopg.connect(self.database) as connection,
+        ):
+            connection.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (order + "\nCOMPENSATION_ALLOWANCE",),
+            )
+            queue = pool.submit(
+                self.approver.get, f"{self.spring}/api/approver/compensation-proposals"
+            )
+            expect_status(queue.result(timeout=5), 200)
+            assert connection.execute(
+                "select status from compensation_proposal_revision where id = %s for update nowait",
+                (second,),
+            ).fetchone() == ("PENDING_APPROVAL",)
+        expect_status(self.approver.get(f"{self.spring}/api/approver/compensation-proposals"), 200)
+        with psycopg.connect(self.database) as connection:
+            assert connection.execute(
+                "select status from compensation_proposal_revision where id = %s", (second,)
+            ).fetchone() == ("EXPIRED",)
+        print("#165 到期 claim 在订单锁前等待；队列跳过忙订单且下次完成过期；无提案行/订单锁反序")
+
 
 def main() -> None:
     with httpx.Client(timeout=30) as support, httpx.Client(timeout=30) as approver:
@@ -314,7 +396,8 @@ def main() -> None:
         acceptance.race_and_response_loss()
         acceptance.failure_and_combination()
         acceptance.storage_race()
-    print("Issue #165 订单额度仲裁验收 PASS：4 个合成订单，无模型调用")
+        acceptance.expiry_lock_order()
+    print("Issue #165 订单额度仲裁验收 PASS：5 个合成订单，无模型调用")
 
 
 if __name__ == "__main__":

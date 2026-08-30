@@ -1,6 +1,6 @@
 # #165 订单补偿额度仲裁与交付证据
 
-关联：[Issue #165](https://github.com/Stellogic/customer-agent/issues/165)。PR 与最终验证信息在交付前补齐；尚未填写不代表通过。
+关联：[Issue #165](https://github.com/Stellogic/customer-agent/issues/165)、[PR #207](https://github.com/Stellogic/customer-agent/pull/207)。最终完整门禁的 SHA/RunId/结果见该 PR 的交付回读；尚未填写不代表通过。
 
 ## 实现与贡献边界
 
@@ -18,9 +18,13 @@
 - 执行 READY/PROCESSING/UNKNOWN 都保持 ACTIVE 预占；成功转 CONSUMED；确认未发生转 RELEASED。驳回、失效、过期的未批准提案不占额度；批准不可撤销的既有语义不变。
 - 提案只锁本工单的有效版本与过期版本，避免持有订单锁时去等待其他工单。批准在锁提案前取得订单额度锁；执行在锁执行行前取得同一锁。未添加跨工单对话查询或对外订单账本接口。
 
+本地首轮审查：Standards PASS，Spec 找到 1 项 P1——#162 的提案状态触发器隐式取订单锁，而过期清理/到期 claim 原先已持有提案行锁，与批准的顺序相反。修复统一 claim/view/release/决定的订单锁先行，并使批量过期清理先尝试订单锁，忙订单跳过，后续查询再处理。保留 #162 状态触发器，没有移除它对权威事实变动的保护。
+
+新增锁序回归在修复前 SHA `97b2e3c7087f0deeb5d5f18b24c5a08f454adfc0` 的隔离后端上真实失败：持有订单锁并发起到期 claim 后，提案行 NOWAIT 检查得到 `psycopg.errors.LockNotAvailable`。RunId `issue165-focus-1623b95a`，含清理 41.086 秒。这证明等待订单锁时提案行仍被另一事务持有，不把静态推测冒充已发生的生产死锁。
+
 ## 验证接缝与环境
 
-沿用已授权的客服标准提案 HTTP、审批租约/决定 HTTP、执行器/模拟供应商 HTTP，以及 Issue 明确要求的真实 PostgreSQL 额度约束接缝。新增 `agent/order_allowance_smoke.py`，由最终 `scripts/check.ps1 -Issue 165` 的 smoke 阶段执行。环境使用仓库锁、独立 Compose project/tag/端口与 4 个合成订单；不是负载或生产规模测试。
+沿用已授权的客服标准提案 HTTP、审批租约/决定 HTTP、执行器/模拟供应商 HTTP，以及 Issue 明确要求的真实 PostgreSQL 额度约束接缝。新增 `agent/order_allowance_smoke.py`，由最终 `scripts/check.ps1 -Issue 165` 的 smoke 阶段执行。环境使用仓库锁、独立 Compose project/tag/端口；初版 4 个合成订单，锁序修复后 5 个；不是负载或生产规模测试。
 
 预期样本：两个工单同时提案、两个审批同时竞争 30 元额度；两个 20 元数据库预占竞争 30 元额度；响应丢失后查询与重放；确认失败释放；60 元额度内两笔 26.80 元的合法组合。既有全套验收继续检查 #164/#162、失效、租约、角色和客户投影。
 
@@ -30,12 +34,14 @@
 | --- | --- |
 | 基线 SHA | `0a9ee031ca5c5febcd0c6fb11a660c5eee83046f` |
 | 受测 SHA / RunId | 聚焦阶段工作树未提交；最终门禁未验证 |
-| 聚焦测试结果 / 失败对照 | 14 项 Java 测试通过；第三轮 Ruff/Pyright 通过（0 错误、0 警告）；4 个合成订单 HTTP/PostgreSQL 验收通过。第二轮发现 3 项 RUF002/RUF003 中文标点 lint，修复后通过；不是业务失败样本。 |
-| Standards / Spec | 未验证 |
+| 聚焦测试结果 / 失败对照 | 最后修复回归 15 项 Java 测试通过；Ruff/Pyright 通过（0 错误、0 警告）；5 个合成订单 HTTP/PostgreSQL 验收通过。过程中修复 3 项 RUF002/RUF003 标点 lint、1 项 SIM117 写法 lint；业务并发失败对照见上方固定 SHA 的锁序 RED。 |
+| Standards / Spec | 首轮 Standards PASS、Spec FAIL（上述锁序）；修复后等待复审，不沿用首轮结果 |
 | 最终完整门禁 | 未验证 |
-| 耗时 | 首轮 `issue165-focus-3d2576e3` 219.531 秒；第二轮静态失败 `issue165-focus-36477ea6` 46.634 秒；第三轮 `issue165-focus-d2f7426a` 133.209 秒。均含环境准备/清理，不是单请求延迟；缓存状态与改动不同，不构成性能提升对照。 |
+| 耗时 | 首轮 `issue165-focus-3d2576e3` 219.531 秒；第二轮静态失败 `issue165-focus-36477ea6` 46.634 秒；第三轮 `issue165-focus-d2f7426a` 133.209 秒；锁序回归静态失败 `issue165-focus-1dbbf447` 37.497 秒；最终聚焦 GREEN `issue165-focus-41f02a95` 135.342 秒。均含环境准备/清理，不是单请求延迟；缓存状态与改动不同，不构成性能提升对照。 |
 | 模型调用 / 外部费用 | 本票不需调用真实模型；外部费用未采集，不能等同全部开发成本为零 |
 | 生产指标 / 线上收益 | 未采集，不适用 |
+
+PR 仅由 Draft 转 Ready 一次。外部 Security Review [返回额度限制](https://github.com/Stellogic/customer-agent/pull/207#issuecomment-5470046529)，没有审查结果；外部 Code Review 异步运行。按用户后续明确指令，外部审查不作为交付前置，不等待、不重触发；已收到的真实缺陷仍修复。本地双轴审查和完整门禁必须 PASS，不将外部额度限制记录为安全审查通过。
 
 原始输出保存在当前 worktree 的 `.local/` 中；交付时只摘录不含凭据、个人信息和完整对话的关键结果进入仓库。门禁之后不能修改受版本控制内容以免使门禁证据失效，最终 SHA/RunId 可通过 PR/Issue 交付记录与仓库日志互相定位。
 

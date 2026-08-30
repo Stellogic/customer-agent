@@ -724,12 +724,6 @@ class JdbcApprovalService implements ApprovalService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "ticket is no longer current");
         }
 
-        String orderReference =
-                jdbc.queryForObject(
-                        "select order_reference from compensation_proposal_revision where id = ?",
-                        String.class,
-                        command.revisionId());
-        lockAllowance(orderReference);
         List<ApprovalProposal> proposals =
                 jdbc.query(
                         "select p.ticket_id, p.revision_number, p.content_digest, p.status, p.expires_at, "
@@ -930,6 +924,7 @@ class JdbcApprovalService implements ApprovalService {
     }
 
     private void lockProposal(UUID revisionId) {
+        lockOrderForProposal(revisionId);
         jdbc.query(
                 "select id from compensation_proposal_revision where id = ? for update",
                 (rs, row) -> rs.getObject(1, UUID.class),
@@ -937,6 +932,7 @@ class JdbcApprovalService implements ApprovalService {
     }
 
     private void lockParticipantPolicy(UUID revisionId) {
+        lockOrderForProposal(revisionId);
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
@@ -989,11 +985,12 @@ class JdbcApprovalService implements ApprovalService {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "current approval lease required");
     }
 
-    private void lockAllowance(String orderReference) {
+    private void lockOrderForProposal(UUID revisionId) {
         jdbc.query(
-                "select pg_advisory_xact_lock(hashtextextended(?, 0))",
+                "select pg_advisory_xact_lock(hashtextextended(order_reference || E'\\nCOMPENSATION_ALLOWANCE', 0)) "
+                        + "from compensation_proposal_revision where id = ?",
                 rs -> null,
-                orderReference + "\nCOMPENSATION_ALLOWANCE");
+                revisionId);
     }
 
     private static boolean matchesAuthoritativeFacts(

@@ -21,3 +21,17 @@ JUnit second run: JdbcApprovalServiceTest=1, CompensationExecutionControllerTest
 Issue #165 订单额度仲裁验收 PASS：4 个合成订单，无模型调用
 FOCUS_PASS issue=165 run=issue165-focus-d2f7426a seconds=128.6575548
 LOCK_RELEASED issue=165 run=issue165-focus-d2f7426a seconds=133.2093118
+psycopg.errors.LockNotAvailable: could not obtain lock on row in relation "compensation_proposal_revision"
+LOCK_RELEASED issue=165 run=issue165-focus-1623b95a seconds=41.0857926
+Expiry lock-order RED target: 97b2e3c7087f0deeb5d5f18b24c5a08f454adfc0. A held order lock and concurrent expired claim reproduced a proposal row lock held while waiting for the order lock.
+#17 2.211 SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+LOCK_RELEASED issue=165 run=issue165-focus-1dbbf447 seconds=37.4969834
+#17 67.37 0 errors, 0 warnings, 0 informations
+#165 并发提案=2成功；并发审批=1成功/1冲突；响应丢失及重放后副作用=1，已消费=26.80/30.00
+#165 确认失败释放=26.80；驳回不占额；合法组合=2×26.80，成功后剩余=6.40/60.00
+#165 PostgreSQL 并发预占=1成功/1约束冲突；已消费不恢复额度
+#165 到期 claim 在订单锁前等待；队列跳过忙订单且下次完成过期；无提案行/订单锁反序
+Issue #165 订单额度仲裁验收 PASS：5 个合成订单，无模型调用
+FOCUS_PASS issue=165 run=issue165-focus-41f02a95 seconds=131.0323216
+LOCK_RELEASED issue=165 run=issue165-focus-41f02a95 seconds=135.3416215
+JUnit fix run: 15 tests (adds CompensationProposalExpiryTest=1), 0 failures, 0 errors. Five synthetic orders; no real model calls.
