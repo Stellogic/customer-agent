@@ -25,6 +25,7 @@
         'e2e/issue159.public-reply-stream.spec.ts'
         'e2e/issue163.persistent-support-replies.spec.ts'
         'e2e/issue166.knowledge-catalog.spec.ts'
+        'e2e/issue190.hybrid-retrieval.spec.ts'
     )
     Excluded = @{
         'e2e/issue129.flash-customer-communication.spec.ts' = '仅由显式授权的真实模型验收脚本运行，不属于离线完整门禁。'

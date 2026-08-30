@@ -2,11 +2,11 @@ package com.stellogic.customeragent.identity;
 
 import static com.stellogic.customeragent.identity.HumanSessionTestClient.login;
 import static com.stellogic.customeragent.identity.HumanSessionTestClient.token;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -16,7 +16,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+
 import tools.jackson.databind.ObjectMapper;
+
+import java.util.List;
 
 @WebMvcTest({AuthSessionController.class, DemoAccountController.class})
 @Import({HumanSecurityConfiguration.class, LocalDemoHumanAccountsConfiguration.class})
@@ -62,6 +65,7 @@ class HumanApiNegativeMatrixTest {
     private static final List<ApiRequest> KNOWLEDGE_APIS =
             List.of(
                     getApi("/api/internal/knowledge"),
+                    getApi("/api/internal/knowledge/search?q=logistics"),
                     getApi("/api/internal/knowledge/index"),
                     getApi("/api/internal/knowledge/articles/refund-policy"),
                     postApi("/api/internal/knowledge/index/rebuild"));

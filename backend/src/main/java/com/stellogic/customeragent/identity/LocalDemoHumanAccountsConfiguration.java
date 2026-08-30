@@ -3,7 +3,7 @@ package com.stellogic.customeragent.identity;
 import com.stellogic.customeragent.identity.HumanIdentityDirectory.HumanCapability;
 import com.stellogic.customeragent.identity.HumanIdentityDirectory.HumanRole;
 import com.stellogic.customeragent.identity.HumanIdentityDirectory.SubjectType;
-import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -11,6 +11,8 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+
+import java.util.List;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("local-demo")
@@ -55,7 +57,7 @@ public class LocalDemoHumanAccountsConfiguration {
             org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         String password = passwordEncoder.encode(DEMO_PASSWORD);
         UserDetails[] users =
-                ACCOUNTS.stream()
+                authenticationAccounts().stream()
                         .map(
                                 account ->
                                         User.withUsername(account.username())
@@ -72,7 +74,7 @@ public class LocalDemoHumanAccountsConfiguration {
     @Bean
     HumanIdentityDirectory localDemoHumanIdentities() {
         return new HumanIdentityDirectory(
-                ACCOUNTS.stream()
+                authenticationAccounts().stream()
                         .map(
                                 account ->
                                         new HumanIdentityDirectory.HumanIdentity(
@@ -86,6 +88,26 @@ public class LocalDemoHumanAccountsConfiguration {
 
     static List<DemoHumanAccount> accounts() {
         return ACCOUNTS;
+    }
+
+    // 仅 local-demo 启用的拒绝访问夹具；不在演示账号选择页中展示。
+    private static List<DemoHumanAccount> authenticationAccounts() {
+        var accounts = new java.util.ArrayList<>(ACCOUNTS);
+        accounts.add(
+                new DemoHumanAccount(
+                        "support-no-knowledge",
+                        "无知识读权限客服",
+                        SubjectType.INTERNAL,
+                        List.of(HumanRole.SUPPORT),
+                        List.of(HumanCapability.SUPPORT_WORKBENCH_ACCESS)));
+        accounts.add(
+                new DemoHumanAccount(
+                        "approver-no-knowledge",
+                        "无知识读权限审批人",
+                        SubjectType.INTERNAL,
+                        List.of(HumanRole.APPROVER),
+                        List.of(HumanCapability.APPROVAL_WORKBENCH_ACCESS)));
+        return List.copyOf(accounts);
     }
 
     record DemoHumanAccount(
