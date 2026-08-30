@@ -1,0 +1,41 @@
+{
+  "schema": "issue-168-evidence-v1",
+  "status": "NOT_RUN",
+  "note": "模板，不是实测报告；所有 null 均表示尚无证据。",
+  "source": {
+    "head_sha": null,
+    "main_sha": null,
+    "reference_pr": 203,
+    "reference_sha": "4317fd35897d2b2665dff0d21219a16cd23ad5d6",
+    "integrated_issue190_sha": null
+  },
+  "baseline": {
+    "issue190_quality": "NOT_ESTABLISHED",
+    "issue190_gate": "NOT_ESTABLISHED",
+    "issue190_merged_and_closed": null
+  },
+  "dataset": {
+    "id": "rag-eval-v1",
+    "sha256": "d2d5efdae565395c1dc722e14f66077558575152e23c5c8fbea58b7ebcfd2fe5",
+    "model_revision": "7999e1d3359715c523056ef9478215996d62a620"
+  },
+  "environment": null,
+  "parameters": null,
+  "ablation_runs": null,
+  "reproducible_hybrid_benefit": null,
+  "lexical_alternatives_if_needed": null,
+  "onnx_export_manifest": null,
+  "approved_consistency_tolerance": null,
+  "consistency": null,
+  "paired_resource_runs": null,
+  "same_hardware_and_workload_verified": null,
+  "resource_benefit": null,
+  "decision": {
+    "parameter_freeze": "PENDING_EVIDENCE",
+    "default_change": "NOT_AUTHORIZED",
+    "retain_pytorch": true,
+    "reason": "未运行；不声称 PyTorch 基线已合格，也不以 ONNX 取代当前默认。"
+  },
+  "final_gate": "NOT_RUN",
+  "formal_delivery": false
+}
