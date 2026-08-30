@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
 
-test("parallel-safe：客户壳帮助入口、信任说明与开发中无写副作用", async ({ browser }, testInfo) => {
+test("客户壳帮助入口、信任说明与开发中无写副作用", async ({ browser }, testInfo) => {
   const context = await newAcceptanceContext(browser, { viewport: { width: 1440, height: 900 } });
   const writes: string[] = [];
   await context.route("**/api/**", (route) => {
