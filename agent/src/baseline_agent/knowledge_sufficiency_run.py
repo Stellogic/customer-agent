@@ -102,7 +102,9 @@ class ExperimentLedger:
         if totals["settled_upper_micro_cny"] + reserved > self.plan["total_budget_micro_cny"]:
             raise SufficiencyBlocked("BUDGET_INCOMPLETE")
         phase_attempts = [entry for entry in self.state["attempts"] if entry["phase"] == PHASE]
-        if len(phase_attempts) >= 72 or any(entry["query_id"] == query_id for entry in phase_attempts):
+        if len(phase_attempts) >= 72 or any(
+            entry["query_id"] == query_id for entry in phase_attempts
+        ):
             raise SufficiencyBlocked("CALL_LIMIT_NO_RETRY")
         entry = {
             "phase": PHASE,
@@ -156,7 +158,8 @@ async def run_development(
             try:
                 response = await asyncio.wait_for(
                     client.post(
-                        config["endpoint"], content=encoded,
+                        config["endpoint"],
+                        content=encoded,
                         headers={"Content-Type": "application/json"},
                     ),
                     timeout=config["call_deadline_seconds"],
@@ -178,24 +181,29 @@ async def run_development(
                 observation["http_status"] = response.status_code
                 identity = ledger.state["identity"]
                 parsed = parse_response(
-                    payload, row,
+                    payload,
+                    row,
                     expected_identity=(identity[0], identity[1]) if identity is not None else None,
                     duration_ms=elapsed,
                 )
                 if identity is None:
                     ledger.state["identity"] = [
-                        observation["response_model"], observation["system_fingerprint"]
+                        observation["response_model"],
+                        observation["system_fingerprint"],
                     ]
-                report["rows"].append({
-                    "query_id": row["id"],
-                    "topic": row["topic"],
-                    "kind": row["kind"],
-                    "request_sha256": sha256(encoded),
-                    "decision": parsed["decision"],
-                    "observation": observation,
-                    "accepted_chunk_ids": [hit["chunkId"] for hit in row["fusedCandidates"]]
-                    if parsed["decision"]["sufficient"] else [],
-                })
+                report["rows"].append(
+                    {
+                        "query_id": row["id"],
+                        "topic": row["topic"],
+                        "kind": row["kind"],
+                        "request_sha256": sha256(encoded),
+                        "decision": parsed["decision"],
+                        "observation": observation,
+                        "accepted_chunk_ids": [hit["chunkId"] for hit in row["fusedCandidates"]]
+                        if parsed["decision"]["sufficient"]
+                        else [],
+                    }
+                )
             except (TimeoutError, httpx.TransportError):
                 observation["failure"] = "SUPPLIER_TIMEOUT_OR_TRANSPORT_ERROR"
                 raise SufficiencyBlocked("SUPPLIER_TIMEOUT_OR_TRANSPORT_ERROR") from None
@@ -211,7 +219,8 @@ async def run_development(
         topic: {
             "count": sum(row["topic"] == topic for row in rows),
             "accepted": sum(
-                accepted for row, accepted in zip(rows, decisions, strict=True)
+                accepted
+                for row, accepted in zip(rows, decisions, strict=True)
                 if row["topic"] == topic
             ),
         }
@@ -229,8 +238,15 @@ def main() -> None:
     if os.environ.get("CUSTOMER_AGENT_TEST_GATE_IDENTITY"):
         raise SufficiencyBlocked("CUSTOM_LOCK_IDENTITY_NOT_ALLOWED")
     locked = subprocess.run(
-        ["pwsh", "-NoProfile", "-File", str(REPO / "scripts/test-gate-lock.ps1"), "-AssertInherited"],
-        capture_output=True, check=False,
+        [
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            str(REPO / "scripts/test-gate-lock.ps1"),
+            "-AssertInherited",
+        ],
+        capture_output=True,
+        check=False,
     )
     if locked.returncode != 0:
         raise SufficiencyBlocked("TEST_GATE_LOCK_REQUIRED")
@@ -243,7 +259,9 @@ def main() -> None:
         raise SufficiencyBlocked("MISSING_API_KEY")
     git_dir = subprocess.run(
         ["git", "-C", str(REPO), "rev-parse", "--path-format=absolute", "--git-common-dir"],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.strip()
     ledger_path = Path(git_dir).parent / ".local/issue190-sufficiency/cost-ledger.json"
     frozen = contract()

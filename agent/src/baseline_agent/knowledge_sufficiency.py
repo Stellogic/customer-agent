@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from baseline_agent.knowledge_answerability import QUALITY, measure
 
@@ -86,8 +86,7 @@ def request_body(row: dict[str, Any], frozen: dict[str, Any]) -> dict[str, Any]:
             {
                 "question": row["text"],
                 "chunks": [
-                    {"chunk": index, "text": hit["snippet"]}
-                    for index, hit in enumerate(hits, 1)
+                    {"chunk": index, "text": hit["snippet"]} for index, hit in enumerate(hits, 1)
                 ],
             },
             ensure_ascii=False,
@@ -155,12 +154,11 @@ def response_observation(payload: dict[str, Any], duration_ms: int) -> dict[str,
         return observation
     keys = ("input_tokens", "output_tokens", "total_tokens")
     counts = [usage.get(key) for key in keys]
-    observation["usage"] = {
-        key: usage[key] for key in keys if type(usage.get(key)) is int
-    }
+    observation["usage"] = {key: usage[key] for key in keys if type(usage.get(key)) is int}
     if any(type(value) is not int or value < 0 for value in counts):
         return observation
-    inputs, outputs, total = counts
+    # 上面已逐项验证整数和非负;显式收窄,不改变usage准入条件。
+    inputs, outputs, total = (cast(int, value) for value in counts)
     if total != inputs + outputs or inputs > 1_048_576 or outputs > 256:
         return observation
     details = usage.get("output_tokens_details")

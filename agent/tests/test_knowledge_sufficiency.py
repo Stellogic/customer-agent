@@ -56,18 +56,28 @@ def payload(*, fingerprint: str | None = "test-fingerprint") -> dict[str, Any]:
         "status": "completed",
         "model": "deepseek-v4-flash-20260831",
         "system_fingerprint": fingerprint,
-        "output": [{
-            "type": "message", "role": "assistant", "status": "completed",
-            "content": [{
-                "type": "output_text",
-                "text": json.dumps({
-                    "sufficient": True,
-                    "evidence": [{"chunk": 1, "quote": "日落时关闭"}],
-                }),
-            }],
-        }],
+        "output": [
+            {
+                "type": "message",
+                "role": "assistant",
+                "status": "completed",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": json.dumps(
+                            {
+                                "sufficient": True,
+                                "evidence": [{"chunk": 1, "quote": "日落时关闭"}],
+                            }
+                        ),
+                    }
+                ],
+            }
+        ],
         "usage": {
-            "input_tokens": 100, "output_tokens": 20, "total_tokens": 120,
+            "input_tokens": 100,
+            "output_tokens": 20,
+            "total_tokens": 120,
             "input_tokens_details": {"cached_tokens": 10},
             "output_tokens_details": {"reasoning_tokens": 0},
         },
@@ -145,9 +155,12 @@ def test_invalid_citation_and_identity_drift_are_errors_not_abstentions() -> Non
     with pytest.raises(SufficiencyBlocked, match="PROVIDER_IDENTITY_DRIFT") as error:
         parse_response(response, row(), expected_identity=expected, duration_ms=2)
     assert error.value.observation["usage_trusted"] is True
-    response["output"][0]["content"][0]["text"] = json.dumps({
-        "sufficient": True, "evidence": [{"chunk": 1, "quote": "未在原文中出现"}],
-    })
+    response["output"][0]["content"][0]["text"] = json.dumps(
+        {
+            "sufficient": True,
+            "evidence": [{"chunk": 1, "quote": "未在原文中出现"}],
+        }
+    )
     with pytest.raises(SufficiencyBlocked, match="INVALID_EVIDENCE"):
         parse_response(response, row(), expected_identity=None, duration_ms=2)
     with pytest.raises(SufficiencyBlocked, match="INCOMPLETE_REPLAY"):
@@ -156,7 +169,8 @@ def test_invalid_citation_and_identity_drift_are_errors_not_abstentions() -> Non
 
 @pytest.mark.asyncio
 async def test_balance_failure_sends_once_keeps_reserve_and_no_secret(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(runner, "development_rows", lambda: [row(i) for i in range(72)])
     calls = 0
@@ -171,7 +185,10 @@ async def test_balance_failure_sends_once_keeps_reserve_and_no_secret(
     report: dict[str, Any] = {"run_id": "balance-test", "metrics": None}
     with pytest.raises(SufficiencyBlocked, match="INSUFFICIENT_BALANCE"):
         await run_development(
-            report, ledger, frozen, api_key="test-secret-must-not-leak",
+            report,
+            ledger,
+            frozen,
+            api_key="test-secret-must-not-leak",
             transport=httpx.MockTransport(handle),
         )
     assert calls == 1
@@ -182,7 +199,8 @@ async def test_balance_failure_sends_once_keeps_reserve_and_no_secret(
 
 @pytest.mark.asyncio
 async def test_provider_drift_stops_second_call_but_settles_valid_usage(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(runner, "development_rows", lambda: [row(i) for i in range(72)])
     calls = 0
@@ -197,12 +215,17 @@ async def test_provider_drift_stops_second_call_but_settles_valid_usage(
     report: dict[str, Any] = {"run_id": "drift-test", "metrics": None}
     with pytest.raises(SufficiencyBlocked, match="PROVIDER_IDENTITY_DRIFT"):
         await run_development(
-            report, ledger, frozen, api_key="offline-test-only", transport=httpx.MockTransport(handle)
+            report,
+            ledger,
+            frozen,
+            api_key="offline-test-only",
+            transport=httpx.MockTransport(handle),
         )
     assert calls == 2
     assert len(report["rows"]) == 1
     assert ledger.totals() == {
-        "settled_upper_micro_cny": 960, "unsettled_reserved_micro_cny": 0,
+        "settled_upper_micro_cny": 960,
+        "unsettled_reserved_micro_cny": 0,
     }
     with pytest.raises(SufficiencyBlocked, match="ALREADY_STARTED"):
         ledger.begin("retry-forbidden", frozen["asset_sha256"])
@@ -210,7 +233,8 @@ async def test_provider_drift_stops_second_call_but_settles_valid_usage(
 
 @pytest.mark.asyncio
 async def test_timeout_keeps_unknown_charge_without_retry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(runner, "development_rows", lambda: [row(i) for i in range(72)])
     calls = 0
@@ -227,7 +251,11 @@ async def test_timeout_keeps_unknown_charge_without_retry(
     report: dict[str, Any] = {"run_id": "timeout-test"}
     with pytest.raises(SufficiencyBlocked, match="TIMEOUT_OR_TRANSPORT_ERROR"):
         await run_development(
-            report, ledger, frozen, api_key="offline-test-only", transport=httpx.MockTransport(handle)
+            report,
+            ledger,
+            frozen,
+            api_key="offline-test-only",
+            transport=httpx.MockTransport(handle),
         )
     assert calls == 1
     assert ledger.totals()["unsettled_reserved_micro_cny"] == 3_148_032
@@ -235,7 +263,8 @@ async def test_timeout_keeps_unknown_charge_without_retry(
 
 @pytest.mark.asyncio
 async def test_complete_mock_replay_preserves_order_and_reports_quality_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(runner, "development_rows", lambda: [row(i) for i in range(72)])
     calls = 0
