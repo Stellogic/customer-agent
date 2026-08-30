@@ -12,6 +12,7 @@ import { loadCsrfToken } from "./csrf";
 import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import { OrderTicketGroups } from "./OrderTicketGroups";
+import { CustomerCapabilityGuide, CustomerTrustStrip } from "./components/CustomerHelpTrust";
 
 const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
 const PUBLIC_CONVERSATION_BASE = "/api/customer/v2/tickets";
@@ -926,6 +927,9 @@ export function App() {
     return true;
   }
 
+  const showingHelpHome =
+    !snapshot && !intake && recoveringTicketId === null && intakeRecoveryState === "idle";
+
   return (
     <main className="help-center">
       <div className="help-center-intro">
@@ -941,7 +945,8 @@ export function App() {
           </p>
         </header>
 
-        {!snapshot && !intake && !recoveringTicketId && intakeRecoveryState === "idle" && (
+        {showingHelpHome && <CustomerTrustStrip />}
+        {showingHelpHome && (
           <OrderTicketGroups autoLoad onOpenTicket={(ticketId) => void loadTicket(ticketId)} />
         )}
       </div>
@@ -1509,6 +1514,7 @@ export function App() {
           )}
         </section>
       )}
+      {showingHelpHome && <CustomerCapabilityGuide />}
     </main>
   );
 }

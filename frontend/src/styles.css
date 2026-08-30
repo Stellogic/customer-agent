@@ -95,6 +95,119 @@ body {
   display: grid;
   gap: 24px;
 }
+.customer-trust-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 760px;
+  overflow: hidden;
+  border: 1px solid #e6e2d7;
+  border-radius: 14px;
+  background: rgb(255 252 244 / 76%);
+}
+.customer-trust-strip article {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px 18px;
+}
+.customer-trust-strip article + article {
+  border-left: 1px solid #e7e3d8;
+}
+.customer-trust-strip strong {
+  color: var(--forest-900);
+  font-size: 0.82rem;
+}
+.customer-trust-strip span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+.customer-capability-guide,
+.customer-help-docs {
+  display: grid;
+  gap: 22px;
+}
+.help-center > .customer-capability-guide {
+  grid-column: 1 / -1;
+}
+.customer-capability-guide > div:first-child h2,
+.customer-help-docs h1,
+.customer-help-docs h2 {
+  max-width: none;
+  margin: 4px 0 8px;
+  font-family: var(--font-display);
+}
+.customer-capability-guide > div:first-child p:last-child,
+.customer-help-docs header > p,
+.customer-help-docs section > p,
+.customer-help-unimplemented > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+.customer-capability-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.customer-capability-cards article,
+.customer-help-docs section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid #e6e1d5;
+  border-radius: 16px;
+  background: rgb(255 252 244 / 72%);
+  padding: 22px;
+}
+.customer-capability-cards h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.customer-capability-badge {
+  justify-self: start;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--forest-50);
+  padding: 3px 8px;
+  color: var(--forest-800);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.customer-capability-cards p,
+.customer-help-docs section p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+.customer-capability-cards a,
+.customer-help-docs header a {
+  color: var(--forest-800);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.customer-help-docs {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: clamp(36px, 6vh, 72px) 28px 72px;
+}
+.customer-help-unimplemented {
+  display: grid;
+  gap: 12px;
+}
+.customer-help-unimplemented-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.customer-help-unimplemented-actions button {
+  min-height: 38px;
+  border: 1px solid var(--forest-200);
+  background: white;
+  color: var(--forest-800);
+}
 .order-overview-trigger {
   justify-self: start;
   border: 1px solid var(--forest-300);
@@ -795,6 +908,14 @@ h2 {
   .help-center {
     grid-template-columns: 1fr;
     padding-top: 7vh;
+  }
+  .customer-trust-strip,
+  .customer-capability-cards {
+    grid-template-columns: 1fr;
+  }
+  .customer-trust-strip article + article {
+    border-top: 1px solid #e7e3d8;
+    border-left: 0;
   }
   h1 {
     font-size: clamp(2.6rem, 13vw, 4.4rem);
@@ -2714,6 +2835,7 @@ select:focus-visible {
   display: flex;
   align-self: stretch;
   align-items: stretch;
+  gap: 26px;
 }
 .customer-shell-nav a {
   position: relative;
@@ -2723,7 +2845,10 @@ select:focus-visible {
   font-weight: 750;
   text-decoration: none;
 }
-.customer-shell-nav a::after {
+.customer-shell-nav a[aria-current="page"] {
+  color: var(--ink);
+}
+.customer-shell-nav a[aria-current="page"]::after {
   position: absolute;
   right: 8%;
   bottom: 0;
@@ -2962,7 +3087,9 @@ select:focus-visible {
     display: none;
   }
   .customer-shell-nav {
-    display: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
   }
   .customer-shell-header .shell-session {
     width: 100%;
