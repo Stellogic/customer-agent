@@ -141,7 +141,8 @@ export default function KnowledgeWorkspace() {
         { credentials: "same-origin", cache: "no-store" },
       );
       const value = (await response.json().catch(() => undefined)) as unknown;
-      if (!response.ok) throw new Error(response.status === 404 ? "知识条目不存在。" : "知识条目读取失败。");
+      if (!response.ok)
+        throw new Error(response.status === 404 ? "知识条目不存在。" : "知识条目读取失败。");
       const parsed = parseArticleResponse(value);
       if (!parsed) throw new Error("知识条目返回了不兼容的数据。");
       setDetail(parsed.article);
@@ -205,7 +206,11 @@ export default function KnowledgeWorkspace() {
         </p>
       </section>
 
-      {developmentNotice && <p className="knowledge-development-note" role="status">{developmentNotice}</p>}
+      {developmentNotice && (
+        <p className="knowledge-development-note" role="status">
+          {developmentNotice}
+        </p>
+      )}
       {catalogState === "error" && (
         <StatusNotice role="alert" tone="danger" className="knowledge-status-notice">
           {catalogError || "知识目录暂时无法读取。"}
@@ -219,11 +224,17 @@ export default function KnowledgeWorkspace() {
       )}
 
       <div className="knowledge-layout">
-        <section className="knowledge-results" aria-labelledby="knowledge-results-title" aria-busy={catalogState === "loading"}>
+        <section
+          className="knowledge-results"
+          aria-labelledby="knowledge-results-title"
+          aria-busy={catalogState === "loading"}
+        >
           <header className="knowledge-section-header">
             <div>
               <p className="eyebrow">SEARCH RESULTS</p>
-              <h2 id="knowledge-results-title">{query ? `“${query}”的当前结果` : "当前知识条目"}</h2>
+              <h2 id="knowledge-results-title">
+                {query ? `“${query}”的当前结果` : "当前知识条目"}
+              </h2>
             </div>
             <span>{catalogState === "ready" ? `${results.length} 条引用` : "—"}</span>
           </header>
@@ -237,7 +248,11 @@ export default function KnowledgeWorkspace() {
             <div className="knowledge-empty" role="status">
               <span aria-hidden="true">⌕</span>
               <h3>{query ? "没有匹配的当前知识条目" : "知识目录为空"}</h3>
-              <p>{query ? "换一个关键词，或确认当前身份的适用范围。" : "当前没有可检索的已发布版本。"}</p>
+              <p>
+                {query
+                  ? "换一个关键词，或确认当前身份的适用范围。"
+                  : "当前没有可检索的已发布版本。"}
+              </p>
             </div>
           ) : (
             <ol className="knowledge-result-list">
@@ -253,11 +268,13 @@ export default function KnowledgeWorkspace() {
                       <span>{result.version}</span>
                     </span>
                     <span className="knowledge-result-meta">
-                      {result.articleId} · {result.applicability.join("、")} · 更新于 {formatDate(result.updatedAt)}
+                      {result.articleId} · {result.applicability.join("、")} · 更新于{" "}
+                      {formatDate(result.updatedAt)}
                     </span>
                     <span className="knowledge-result-snippet">{result.snippet}</span>
                     <span className="knowledge-result-citation">
-                      {result.sourceFile} · 第 {result.startLine}–{result.endLine} 行 · {result.matchType === "KEYWORD" ? "关键词命中" : "全文命中"}
+                      {result.sourceFile} · 第 {result.startLine}–{result.endLine} 行 ·{" "}
+                      {result.matchType === "KEYWORD" ? "关键词命中" : "全文命中"}
                     </span>
                   </button>
                 </li>
@@ -294,7 +311,10 @@ export default function KnowledgeWorkspace() {
         </aside>
       </div>
 
-      <section className="knowledge-development-panel" aria-labelledby="knowledge-development-title">
+      <section
+        className="knowledge-development-panel"
+        aria-labelledby="knowledge-development-title"
+      >
         <div>
           <p className="eyebrow">OPERATIONS ROADMAP</p>
           <h2 id="knowledge-development-title">内容运营入口</h2>
@@ -314,27 +334,57 @@ export default function KnowledgeWorkspace() {
 
 function IndexBadge({ index }: { index: IndexStatus | null }) {
   if (!index) return <span className="knowledge-index-badge busy">正在确认索引…</span>;
-  const label = index.status === "READY" ? `索引就绪 · ${index.articleCount} 条目` : index.status === "EMPTY" ? "索引为空" : "索引需要修复";
+  const label =
+    index.status === "READY"
+      ? `索引就绪 · ${index.articleCount} 条目`
+      : index.status === "EMPTY"
+        ? "索引为空"
+        : "索引需要修复";
   return <span className={`knowledge-index-badge ${index.status.toLowerCase()}`}>{label}</span>;
 }
 
-function ArticleDetail({ article, onVersion }: { article: ArticleDetail; onVersion: (articleId: string, version: string) => Promise<void> | void }) {
+function ArticleDetail({
+  article,
+  onVersion,
+}: {
+  article: ArticleDetail;
+  onVersion: (articleId: string, version: string) => Promise<void> | void;
+}) {
   return (
     <article className="knowledge-article" aria-labelledby="knowledge-article-title">
       <header className="knowledge-article-header">
         <p className="eyebrow">{article.current ? "CURRENT PUBLISHED" : "AUDIT VERSION"}</p>
         <h2 id="knowledge-article-title">{article.title}</h2>
-        <p>{article.articleId} · {article.version} · 更新于 {formatDate(article.updatedAt)}</p>
-        {!article.current && <span className="knowledge-old-version">旧版本，仅供审计，不进入普通检索</span>}
+        <p>
+          {article.articleId} · {article.version} · 更新于 {formatDate(article.updatedAt)}
+        </p>
+        {!article.current && (
+          <span className="knowledge-old-version">旧版本，仅供审计，不进入普通检索</span>
+        )}
       </header>
       <dl className="knowledge-article-facts">
-        <div><dt>适用范围</dt><dd>{article.applicability.join("、")}</dd></div>
-        <div><dt>发布状态</dt><dd>{article.publicationStatus}</dd></div>
-        <div><dt>源文件</dt><dd>{article.sourceFile}</dd></div>
-        <div><dt>内容校验</dt><dd>{article.contentHash.slice(0, 12)}…</dd></div>
+        <div>
+          <dt>适用范围</dt>
+          <dd>{article.applicability.join("、")}</dd>
+        </div>
+        <div>
+          <dt>发布状态</dt>
+          <dd>{article.publicationStatus}</dd>
+        </div>
+        <div>
+          <dt>源文件</dt>
+          <dd>{article.sourceFile}</dd>
+        </div>
+        <div>
+          <dt>内容校验</dt>
+          <dd>{article.contentHash.slice(0, 12)}…</dd>
+        </div>
       </dl>
       <section className="knowledge-version-section" aria-labelledby="knowledge-version-title">
-        <header><p className="eyebrow">VERSION HISTORY</p><h3 id="knowledge-version-title">版本审计</h3></header>
+        <header>
+          <p className="eyebrow">VERSION HISTORY</p>
+          <h3 id="knowledge-version-title">版本审计</h3>
+        </header>
         <div className="knowledge-version-list">
           {article.versions.map((version) => (
             <button
@@ -344,22 +394,39 @@ function ArticleDetail({ article, onVersion }: { article: ArticleDetail; onVersi
               onClick={() => void onVersion(version.articleId, version.version)}
             >
               <strong>{version.version}</strong>
-              <span>{version.current ? "当前" : "历史"} · {version.publicationStatus}</span>
+              <span>
+                {version.current ? "当前" : "历史"} · {version.publicationStatus}
+              </span>
               <small>{formatDate(version.updatedAt)}</small>
             </button>
           ))}
         </div>
       </section>
       <section className="knowledge-body-section" aria-labelledby="knowledge-body-title">
-        <header><p className="eyebrow">SOURCE CONTENT</p><h3 id="knowledge-body-title">正文</h3></header>
-        <div className="knowledge-markdown">{article.body.split("\n").map((line, index) => <p key={`${index}-${line}`}>{line || " "}</p>)}</div>
+        <header>
+          <p className="eyebrow">SOURCE CONTENT</p>
+          <h3 id="knowledge-body-title">正文</h3>
+        </header>
+        <div className="knowledge-markdown">
+          {article.body.split("\n").map((line, index) => (
+            <p key={`${index}-${line}`}>{line || " "}</p>
+          ))}
+        </div>
       </section>
       <section className="knowledge-citation-section" aria-labelledby="knowledge-citation-title">
-        <header><p className="eyebrow">TRACEABLE CITATIONS</p><h3 id="knowledge-citation-title">引用分段</h3></header>
+        <header>
+          <p className="eyebrow">TRACEABLE CITATIONS</p>
+          <h3 id="knowledge-citation-title">引用分段</h3>
+        </header>
         <ol className="knowledge-citation-list">
           {article.chunks.map((chunk) => (
             <li key={chunk.chunkId}>
-              <div><strong>{chunk.sourceFile}</strong><span>第 {chunk.startLine}–{chunk.endLine} 行 · {chunk.applicability.join("、")}</span></div>
+              <div>
+                <strong>{chunk.sourceFile}</strong>
+                <span>
+                  第 {chunk.startLine}–{chunk.endLine} 行 · {chunk.applicability.join("、")}
+                </span>
+              </div>
               <p>{chunk.content}</p>
               <small>{chunk.chunkId}</small>
             </li>
@@ -371,14 +438,29 @@ function ArticleDetail({ article, onVersion }: { article: ArticleDetail; onVersi
 }
 
 function parseCatalog(value: unknown): CatalogResponse | null {
-  if (!isRecord(value) || !hasOnlyKeys(value, ["view", "schema", "index", "query", "results"])) return null;
-  if (value.view !== "KNOWLEDGE_CATALOG" || value.schema !== SCHEMA || typeof value.query !== "string" || !isIndexStatus(value.index) || !Array.isArray(value.results) || !value.results.every(isSearchResult)) return null;
+  if (!isRecord(value) || !hasOnlyKeys(value, ["view", "schema", "index", "query", "results"]))
+    return null;
+  if (
+    value.view !== "KNOWLEDGE_CATALOG" ||
+    value.schema !== SCHEMA ||
+    typeof value.query !== "string" ||
+    !isIndexStatus(value.index) ||
+    !Array.isArray(value.results) ||
+    !value.results.every(isSearchResult)
+  )
+    return null;
   return value as unknown as CatalogResponse;
 }
 
 function parseArticleResponse(value: unknown): ArticleResponse | null {
   if (!isRecord(value) || !hasOnlyKeys(value, ["view", "schema", "index", "article"])) return null;
-  if (value.view !== "KNOWLEDGE_CATALOG" || value.schema !== SCHEMA || !isIndexStatus(value.index) || !isArticleDetail(value.article)) return null;
+  if (
+    value.view !== "KNOWLEDGE_CATALOG" ||
+    value.schema !== SCHEMA ||
+    !isIndexStatus(value.index) ||
+    !isArticleDetail(value.article)
+  )
+    return null;
   return value as unknown as ArticleResponse;
 }
 
@@ -412,19 +494,121 @@ function isIndexStatus(value: unknown): value is IndexStatus {
 }
 
 function isSearchResult(value: unknown): value is SearchResult {
-  return isRecord(value) && hasOnlyKeys(value, ["chunkId", "articleId", "version", "title", "updatedAt", "applicability", "sourceFile", "startLine", "endLine", "snippet", "matchType", "lexicalScore"]) && typeof value.chunkId === "string" && typeof value.articleId === "string" && typeof value.version === "string" && typeof value.title === "string" && typeof value.updatedAt === "string" && Array.isArray(value.applicability) && value.applicability.every((entry) => typeof entry === "string") && typeof value.sourceFile === "string" && Number.isSafeInteger(value.startLine) && Number.isSafeInteger(value.endLine) && typeof value.snippet === "string" && ["FULL_TEXT", "KEYWORD"].includes(String(value.matchType)) && typeof value.lexicalScore === "number";
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "chunkId",
+      "articleId",
+      "version",
+      "title",
+      "updatedAt",
+      "applicability",
+      "sourceFile",
+      "startLine",
+      "endLine",
+      "snippet",
+      "matchType",
+      "lexicalScore",
+    ]) &&
+    typeof value.chunkId === "string" &&
+    typeof value.articleId === "string" &&
+    typeof value.version === "string" &&
+    typeof value.title === "string" &&
+    typeof value.updatedAt === "string" &&
+    Array.isArray(value.applicability) &&
+    value.applicability.every((entry) => typeof entry === "string") &&
+    typeof value.sourceFile === "string" &&
+    Number.isSafeInteger(value.startLine) &&
+    Number.isSafeInteger(value.endLine) &&
+    typeof value.snippet === "string" &&
+    ["FULL_TEXT", "KEYWORD"].includes(String(value.matchType)) &&
+    typeof value.lexicalScore === "number"
+  );
 }
 
 function isArticleDetail(value: unknown): value is ArticleDetail {
-  return isRecord(value) && hasOnlyKeys(value, ["articleId", "title", "version", "updatedAt", "applicability", "publicationStatus", "current", "sourceFile", "contentHash", "body", "versions", "chunks"]) && typeof value.articleId === "string" && typeof value.title === "string" && typeof value.version === "string" && typeof value.updatedAt === "string" && Array.isArray(value.applicability) && value.applicability.every((entry) => typeof entry === "string") && ["DRAFT", "PUBLISHED", "RETIRED"].includes(String(value.publicationStatus)) && typeof value.current === "boolean" && typeof value.sourceFile === "string" && typeof value.contentHash === "string" && typeof value.body === "string" && Array.isArray(value.versions) && value.versions.every(isArticleVersion) && Array.isArray(value.chunks) && value.chunks.every(isCitation);
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "articleId",
+      "title",
+      "version",
+      "updatedAt",
+      "applicability",
+      "publicationStatus",
+      "current",
+      "sourceFile",
+      "contentHash",
+      "body",
+      "versions",
+      "chunks",
+    ]) &&
+    typeof value.articleId === "string" &&
+    typeof value.title === "string" &&
+    typeof value.version === "string" &&
+    typeof value.updatedAt === "string" &&
+    Array.isArray(value.applicability) &&
+    value.applicability.every((entry) => typeof entry === "string") &&
+    ["DRAFT", "PUBLISHED", "RETIRED"].includes(String(value.publicationStatus)) &&
+    typeof value.current === "boolean" &&
+    typeof value.sourceFile === "string" &&
+    typeof value.contentHash === "string" &&
+    typeof value.body === "string" &&
+    Array.isArray(value.versions) &&
+    value.versions.every(isArticleVersion) &&
+    Array.isArray(value.chunks) &&
+    value.chunks.every(isCitation)
+  );
 }
 
 function isArticleVersion(value: unknown): value is ArticleVersion {
-  return isRecord(value) && hasOnlyKeys(value, ["articleId", "title", "version", "updatedAt", "applicability", "publicationStatus", "current", "sourceFile"]) && typeof value.articleId === "string" && typeof value.title === "string" && typeof value.version === "string" && typeof value.updatedAt === "string" && Array.isArray(value.applicability) && value.applicability.every((entry) => typeof entry === "string") && ["DRAFT", "PUBLISHED", "RETIRED"].includes(String(value.publicationStatus)) && typeof value.current === "boolean" && typeof value.sourceFile === "string";
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "articleId",
+      "title",
+      "version",
+      "updatedAt",
+      "applicability",
+      "publicationStatus",
+      "current",
+      "sourceFile",
+    ]) &&
+    typeof value.articleId === "string" &&
+    typeof value.title === "string" &&
+    typeof value.version === "string" &&
+    typeof value.updatedAt === "string" &&
+    Array.isArray(value.applicability) &&
+    value.applicability.every((entry) => typeof entry === "string") &&
+    ["DRAFT", "PUBLISHED", "RETIRED"].includes(String(value.publicationStatus)) &&
+    typeof value.current === "boolean" &&
+    typeof value.sourceFile === "string"
+  );
 }
 
 function isCitation(value: unknown): value is Citation {
-  return isRecord(value) && hasOnlyKeys(value, ["chunkId", "articleId", "version", "sourceFile", "startLine", "endLine", "applicability", "content"]) && typeof value.chunkId === "string" && typeof value.articleId === "string" && typeof value.version === "string" && typeof value.sourceFile === "string" && Number.isSafeInteger(value.startLine) && Number.isSafeInteger(value.endLine) && Array.isArray(value.applicability) && value.applicability.every((entry) => typeof entry === "string") && typeof value.content === "string";
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, [
+      "chunkId",
+      "articleId",
+      "version",
+      "sourceFile",
+      "startLine",
+      "endLine",
+      "applicability",
+      "content",
+    ]) &&
+    typeof value.chunkId === "string" &&
+    typeof value.articleId === "string" &&
+    typeof value.version === "string" &&
+    typeof value.sourceFile === "string" &&
+    Number.isSafeInteger(value.startLine) &&
+    Number.isSafeInteger(value.endLine) &&
+    Array.isArray(value.applicability) &&
+    value.applicability.every((entry) => typeof entry === "string") &&
+    typeof value.content === "string"
+  );
 }
 
 function hasOnlyKeys(value: Record<string, unknown>, keys: string[]) {
@@ -437,5 +621,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function formatDate(value: string) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" }).format(date);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" }).format(date);
 }

@@ -3069,7 +3069,9 @@ select:focus-visible {
   padding: 14px;
   color: inherit;
   text-align: left;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
 }
 .knowledge-result-card:hover,
 .knowledge-result-card.selected {

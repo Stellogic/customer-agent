@@ -111,7 +111,9 @@ describe("版本化知识目录工作区", () => {
 
     expect(screen.getByRole("region", { name: "正在读取知识目录" })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /物流延迟处理说明/ })).toBeInTheDocument();
-    expect(screen.getByText("knowledge/logistics-delay-v2.md · 第 10–14 行 · 关键词命中")).toBeInTheDocument();
+    expect(
+      screen.getByText("knowledge/logistics-delay-v2.md · 第 10–14 行 · 关键词命中"),
+    ).toBeInTheDocument();
   });
 
   it("空目录显示明确空状态", async () => {
@@ -153,7 +155,9 @@ describe("版本化知识目录工作区", () => {
     render(<KnowledgeWorkspace />);
     fireEvent.change(await screen.findByLabelText("关键词"), { target: { value: "不存在的词" } });
     fireEvent.submit(screen.getByRole("search"));
-    expect(await screen.findByRole("heading", { name: "没有匹配的当前知识条目" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "没有匹配的当前知识条目" }),
+    ).toBeInTheDocument();
   });
 
   it("索引不可用时显示错误状态", async () => {
