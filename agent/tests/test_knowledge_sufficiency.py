@@ -28,6 +28,146 @@ from baseline_agent.knowledge_sufficiency_run import ExperimentLedger, run_devel
 
 
 @pytest.mark.asyncio
+async def test_remaining_diagnostic_preserves_67_order_history_and_null_metrics(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "cost.json"
+    path.write_bytes(runner.REMAINING_LEDGER.read_bytes())
+    frozen = contract()
+    ledger = ExperimentLedger(path, frozen)
+    original = copy.deepcopy(ledger.state)
+    source = development_rows()
+    expected = [item["query_id"] for item in runner.remaining_manifest()["requests"]]
+    assert expected == [item["id"] for item in source[5:]] and len(expected) == 67
+    assert not set(expected) & {item["query_id"] for item in original["attempts"]}
+    calls = 0
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        stored = json.loads(path.read_text(encoding="utf-8"))
+        entry = stored["attempts"][-1]
+        assert entry["query_id"] == expected[calls]
+        assert entry["request_sha256"] == hashlib.sha256(request.content).hexdigest()
+        assert entry["status"] == "PENDING"
+        calls += 1
+        response = payload(fingerprint=None)
+        response["model"] = "deepseek-v4-flash"
+        response["output"][0]["content"][0]["text"] = '{"sufficient":false,"evidence":[]}'
+        return httpx.Response(200, json=response)
+
+    report: dict[str, Any] = {"run_id": "remaining-complete-offline", "metrics": None}
+    await run_development(
+        report, ledger, frozen, api_key="offline-only",
+        transport=httpx.MockTransport(handle), diagnose_remaining_once=True,
+    )
+    ledger.finish(report["status"])
+    assert calls == 67
+    assert report["status"] == "DIAGNOSTIC_COMPLETED" and report["metrics"] is None
+    assert "quality_thresholds" not in report
+    assert [item["query_id"] for item in report["rows"]] == expected
+    assert ledger.state["attempts"][:6] == original["attempts"]
+    for phase, record in original["phases"].items():
+        assert ledger.state["phases"][phase] == record
+    assert ledger.totals() == {
+        "settled_upper_micro_cny": 42933,
+        "unsettled_reserved_micro_cny": 0,
+    }
+    with pytest.raises(SufficiencyBlocked, match="CALL_LIMIT_NO_RETRY"):
+        ledger.reserve(expected[0], report["request_manifest"][0]["request_sha256"])
+    resumed = ExperimentLedger(path, frozen)
+    with pytest.raises(SufficiencyBlocked, match="REMAINING_ALREADY_STARTED_NO_RETRY"):
+        await run_development(
+            {"run_id": "must-not-replay"}, resumed, frozen, api_key="offline-only",
+            transport=httpx.MockTransport(handle), diagnose_remaining_once=True,
+        )
+    assert calls == 67
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["invalid", "drift", "unknown_usage", "supplier"])
+async def test_remaining_diagnostic_stops_on_first_error_without_retry_or_quality(
+    tmp_path: Path, failure: str,
+) -> None:
+    path = tmp_path / "cost.json"
+    path.write_bytes(runner.REMAINING_LEDGER.read_bytes())
+    frozen = contract()
+    ledger = ExperimentLedger(path, frozen)
+    original = copy.deepcopy(ledger.state)
+    calls = 0
+
+    def handle(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        response = payload(fingerprint=None)
+        response["model"] = "deepseek-v4-flash"
+        response["output"][0]["content"][0]["text"] = '{"sufficient":false,"evidence":[]}'
+        if calls == 3:
+            if failure == "supplier":
+                return httpx.Response(402, json={"error": "offline-only"})
+            if failure == "unknown_usage":
+                del response["usage"]
+            elif failure == "drift":
+                response["system_fingerprint"] = "changed-offline"
+            else:
+                response["output"][0]["content"][0]["text"] = '{"sufficient":"false"}'
+        return httpx.Response(200, json=response)
+
+    expected_error = {
+        "invalid": "INVALID_DECISION_SCHEMA", "drift": "PROVIDER_IDENTITY_DRIFT",
+        "unknown_usage": "USAGE_UNTRUSTED", "supplier": "INSUFFICIENT_BALANCE",
+    }[failure]
+    report: dict[str, Any] = {"run_id": "remaining-stop-offline", "metrics": None}
+    with pytest.raises(SufficiencyBlocked, match=expected_error):
+        await run_development(
+            report, ledger, frozen, api_key="offline-only",
+            transport=httpx.MockTransport(handle), diagnose_remaining_once=True,
+        )
+    ledger.finish("STOPPED")
+    assert calls == 3 and len(report["rows"]) == 2 and report["metrics"] is None
+    assert ledger.state["attempts"][:6] == original["attempts"]
+    for phase, record in original["phases"].items():
+        assert ledger.state["phases"][phase] == record
+    assert ledger.totals() == {
+        "settled_upper_micro_cny": 11733 if failure in {"unknown_usage", "supplier"} else 12213,
+        "unsettled_reserved_micro_cny": 3148032 if failure in {"unknown_usage", "supplier"} else 0,
+    }
+    if failure == "invalid":
+        assert "decision_diagnostic" in ledger.state["attempts"][-1]["observation"]
+    resumed = ExperimentLedger(path, frozen)
+    before = path.read_bytes()
+    with pytest.raises(SufficiencyBlocked, match="REMAINING_ALREADY_STARTED_NO_RETRY"):
+        await run_development(
+            {"run_id": "new-id-not-allowed"}, resumed, frozen, api_key="offline-only",
+            transport=httpx.MockTransport(handle), diagnose_remaining_once=True,
+        )
+    assert calls == 3 and path.read_bytes() == before
+
+
+def test_remaining_manifest_rejects_reordering_and_reserve_outside_fixed_sequence(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "cost.json"
+    path.write_bytes(runner.REMAINING_LEDGER.read_bytes())
+    frozen = contract()
+    ledger = ExperimentLedger(path, frozen)
+    requests = [
+        {"query_id": item["query_id"], "request_sha256": "offline-sha"}
+        for item in runner.remaining_manifest()["requests"]
+    ]
+    before = path.read_bytes()
+    with pytest.raises(SufficiencyBlocked, match="REMAINING_REQUEST_MANIFEST_MISMATCH"):
+        ledger.begin_remaining_diagnostic("reorder-offline", frozen["asset_sha256"], requests[::-1])
+    assert path.read_bytes() == before
+    ledger.begin_remaining_diagnostic("order-offline", frozen["asset_sha256"], requests)
+    with pytest.raises(SufficiencyBlocked, match="REMAINING_REQUEST_ORDER_MISMATCH"):
+        ledger.reserve(runner.FIFTH_QUERY_ID, runner.FIFTH_REQUEST_SHA)
+    ledger.plan["total_budget_micro_cny"] = 10773 + 3148032 - 1
+    with pytest.raises(SufficiencyBlocked, match="BUDGET_INCOMPLETE"):
+        ledger.reserve(requests[0]["query_id"], "offline-sha")
+    assert len(ledger.state["attempts"]) == 6
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("result", ["valid", "invalid", "unknown_usage"])
 async def test_fifth_diagnostic_is_once_exact_request_and_keeps_original_stopped(
     tmp_path: Path,

@@ -41,6 +41,21 @@ ORIGINAL_LEDGER = (
     REPO / "docs/implementation/evidence/issue190-c-development-20260831a/cost-ledger.json"
 )
 ORIGINAL_LEDGER_SHA = "5cd9e0ef8ee6977f0897db31d4c00bfee498194b9456bc437ffe0776b79e8507"
+REMAINING_OPT_IN = "issue-190-remaining67-diagnostic-once"
+REMAINING_PHASE = "remaining67_diagnostic_once"
+REMAINING_LEDGER = (
+    REPO / "docs/implementation/evidence/issue190-c-fifth-diagnostic-20260831b/cost-ledger.json"
+)
+REMAINING_LEDGER_SHA = "0bd04be15c1c6e1eeb96f96cdadf994aa14b5a0f2d894e38c3426193896b40f8"
+REMAINING_MANIFEST = Path(__file__).with_name("knowledge_sufficiency_remaining_v1.json")
+REMAINING_MANIFEST_SHA = "d9e11464642afb0de4fe2b4cf170f62b298284f681f2f7843e5e53c349e13bf1"
+
+
+def remaining_manifest() -> dict[str, Any]:
+    content = REMAINING_MANIFEST.read_bytes()
+    if sha256(content) != REMAINING_MANIFEST_SHA:
+        raise SufficiencyBlocked("REMAINING_MANIFEST_CHANGED")
+    return json.loads(content)
 
 
 def decision_diagnostic(text: str, api_key: str) -> dict[str, Any]:
@@ -145,7 +160,7 @@ class ExperimentLedger:
         if totals["settled_upper_micro_cny"] + reserved > self.plan["total_budget_micro_cny"]:
             raise SufficiencyBlocked("BUDGET_INCOMPLETE")
         phase_attempts = [entry for entry in self.state["attempts"] if entry["phase"] == self.phase]
-        limit = 1 if self.phase == DIAGNOSTIC_PHASE else 72
+        limit = {DIAGNOSTIC_PHASE: 1, REMAINING_PHASE: 67}.get(self.phase, 72)
         if self.phase == DIAGNOSTIC_PHASE and (
             query_id != FIFTH_QUERY_ID or request_sha != FIFTH_REQUEST_SHA
         ):
@@ -154,6 +169,10 @@ class ExperimentLedger:
             entry["query_id"] == query_id for entry in phase_attempts
         ):
             raise SufficiencyBlocked("CALL_LIMIT_NO_RETRY")
+        if self.phase == REMAINING_PHASE:
+            expected = self.state["phases"][self.phase]["requests"][len(phase_attempts)]
+            if expected != {"query_id": query_id, "request_sha256": request_sha}:
+                raise SufficiencyBlocked("REMAINING_REQUEST_ORDER_MISMATCH")
         entry = {
             "phase": self.phase,
             "query_id": query_id,
@@ -207,6 +226,35 @@ class ExperimentLedger:
         }
         write_json(self.path, self.state)
 
+    def begin_remaining_diagnostic(
+        self, run_id: str, assets: dict[str, str], requests: list[dict[str, str]]
+    ) -> None:
+        if REMAINING_PHASE in self.state["phases"]:
+            raise SufficiencyBlocked("REMAINING_ALREADY_STARTED_NO_RETRY")
+        original = REMAINING_LEDGER.read_bytes()
+        if sha256(original) != REMAINING_LEDGER_SHA:
+            raise SufficiencyBlocked("REMAINING_LEDGER_ARCHIVE_CHANGED")
+        if self.state != json.loads(original):
+            raise SufficiencyBlocked("REMAINING_LEDGER_PRECONDITION_CHANGED")
+        manifest = remaining_manifest()
+        if (
+            assets != manifest["asset_sha256"]
+            or [request["query_id"] for request in requests]
+            != [request["query_id"] for request in manifest["requests"]]
+        ):
+            raise SufficiencyBlocked("REMAINING_REQUEST_MANIFEST_MISMATCH")
+        self.phase = REMAINING_PHASE
+        self.state["phases"][self.phase] = {
+            "run_id": run_id,
+            "status": "RUNNING",
+            "assets": assets,
+            "manifest_sha256": REMAINING_MANIFEST_SHA,
+            "requests": requests,
+            "maximum_requests": 67,
+            "quality_evaluation": False,
+        }
+        write_json(self.path, self.state)
+
 
 async def run_development(
     report: dict[str, Any],
@@ -216,16 +264,29 @@ async def run_development(
     api_key: str,
     transport: httpx.AsyncBaseTransport | None = None,
     diagnose_fifth_once: bool = False,
+    diagnose_remaining_once: bool = False,
 ) -> None:
+    if diagnose_fifth_once and diagnose_remaining_once:
+        raise SufficiencyBlocked("DIAGNOSTIC_MODES_ARE_EXCLUSIVE")
     rows = development_rows()
     if diagnose_fifth_once:
         rows = [rows[4]]
+    elif diagnose_remaining_once:
+        rows = rows[5:]
     bodies = [request_body(row, frozen) for row in rows]
     encoded_bodies = [
         json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         for body in bodies
     ]
-    if diagnose_fifth_once:
+    if diagnose_remaining_once:
+        requests = [
+            {"query_id": row["id"], "request_sha256": sha256(encoded)}
+            for row, encoded in zip(rows, encoded_bodies, strict=True)
+        ]
+        ledger.begin_remaining_diagnostic(report["run_id"], frozen["asset_sha256"], requests)
+        report["request_manifest"] = requests
+        report["source_manifest_sha256"] = REMAINING_MANIFEST_SHA
+    elif diagnose_fifth_once:
         ledger.begin_fifth_diagnostic(
             report["run_id"], frozen["asset_sha256"], rows[0]["id"], sha256(encoded_bodies[0])
         )
@@ -316,7 +377,7 @@ async def run_development(
             finally:
                 observation["duration_ms"] = round((time.perf_counter() - started) * 1000)
                 ledger.settle(entry, observation)
-    if diagnose_fifth_once:
+    if diagnose_fifth_once or diagnose_remaining_once:
         report.update(status="DIAGNOSTIC_COMPLETED", metrics=None)
         return
     decisions = [entry["decision"]["sufficient"] for entry in report["rows"]]
@@ -339,7 +400,9 @@ def main() -> None:
     for name in ("run-id", "head-sha", "base-sha", "pricing-and-context-verified-date"):
         parser.add_argument(f"--{name}", required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--diagnose-fifth-once", action="store_true")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--diagnose-fifth-once", action="store_true")
+    modes.add_argument("--diagnose-remaining-once", action="store_true")
     args = parser.parse_args()
     # 正式入口必须验证活的共享锁;没有任何自建锁身份或无锁付费模式。
     if os.environ.get("CUSTOMER_AGENT_TEST_GATE_IDENTITY"):
@@ -358,6 +421,8 @@ def main() -> None:
     if locked.returncode != 0:
         raise SufficiencyBlocked("TEST_GATE_LOCK_REQUIRED")
     expected_opt_in = DIAGNOSTIC_OPT_IN if args.diagnose_fifth_once else OPT_IN
+    if args.diagnose_remaining_once:
+        expected_opt_in = REMAINING_OPT_IN
     if os.environ.get("KNOWLEDGE_SUFFICIENCY_EXPERIMENT") != expected_opt_in:
         raise SufficiencyBlocked("EXPERIMENT_OPT_IN_REQUIRED")
     if args.pricing_and_context_verified_date != datetime.now(UTC).date().isoformat():
@@ -373,6 +438,7 @@ def main() -> None:
     ).stdout.strip()
     ledger_path = Path(git_dir).parent / ".local/issue190-sufficiency/cost-ledger.json"
     frozen = contract()
+    is_diagnostic = args.diagnose_fifth_once or args.diagnose_remaining_once
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x", encoding="utf-8", newline="\n") as output:
         started = time.perf_counter()
@@ -390,6 +456,7 @@ def main() -> None:
             else "seen_development_not_unseen",
             "query_count": 1 if args.diagnose_fifth_once else 72,
             "diagnose_fifth_once": args.diagnose_fifth_once,
+            "diagnose_remaining_once": args.diagnose_remaining_once,
             "contract": frozen,
             "budget_plan": budget_plan(frozen),
             "pricing_and_context_verified_date": args.pricing_and_context_verified_date,
@@ -397,9 +464,11 @@ def main() -> None:
             "rows": [],
             "metrics": None,
         }
+        if args.diagnose_remaining_once:
+            report.update(partition="remaining67_development_diagnostic_not_quality", query_count=67)
         ledger: ExperimentLedger | None = None
         try:
-            if args.diagnose_fifth_once and not ledger_path.exists():
+            if is_diagnostic and not ledger_path.exists():
                 raise SufficiencyBlocked("DIAGNOSTIC_REQUIRES_EXISTING_LEDGER")
             ledger = ExperimentLedger(ledger_path, frozen)
             report["cost_totals_before"] = ledger.totals()
@@ -410,6 +479,7 @@ def main() -> None:
                     frozen,
                     api_key=api_key,
                     diagnose_fifth_once=args.diagnose_fifth_once,
+                    diagnose_remaining_once=args.diagnose_remaining_once,
                 )
             )
         except SufficiencyBlocked as error:

@@ -2,13 +2,16 @@ param(
     [Parameter(Mandatory)][string]$RunId,
     [Parameter(Mandatory)][string]$PricingAndContextVerifiedDate,
     [string]$Uv = 'uv',
-    [switch]$DiagnoseFifthOnce
+    [switch]$DiagnoseFifthOnce,
+    [switch]$DiagnoseRemainingOnce
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/test-gate-lock.ps1"
+if ($DiagnoseFifthOnce -and $DiagnoseRemainingOnce) { throw '两个诊断阶段互斥，不能合并运行。' }
 if ($RunId -notmatch '^[a-z0-9][a-z0-9-]{7,}$') { throw '需要唯一RunId。' }
 if ($env:CUSTOMER_AGENT_TEST_GATE_IDENTITY) { throw '真实合成实验不能使用自定义锁身份。' }
 $expectedOptIn = if ($DiagnoseFifthOnce) { 'issue-190-fifth-request-diagnostic-once' } else { 'issue-190-synthetic-sufficiency-c-once' }
+if ($DiagnoseRemainingOnce) { $expectedOptIn = 'issue-190-remaining67-diagnostic-once' }
 if ($env:KNOWLEDGE_SUFFICIENCY_EXPERIMENT -ne $expectedOptIn) {
     throw '需要明确实验opt-in；本脚本不代表协调已放行运行窗口。'
 }
@@ -23,12 +26,15 @@ $baseSha = git -C $root rev-parse origin/main
 if ($LASTEXITCODE -ne 0) { throw '无法读取main基线。' }
 if (git -C $root status --porcelain) { throw 'C回放要求先提交唯一合同及源码。' }
 $commandType = if ($DiagnoseFifthOnce) { 'sufficiency-c-fifth-diagnostic' } else { 'sufficiency-c-development' }
+if ($DiagnoseRemainingOnce) { $commandType = 'sufficiency-c-remaining67-diagnostic' }
 $holder = Enter-TestGateLock -Issue 190 -RunId $RunId -CommandType $commandType -HeadSha $headSha -BaseSha $baseSha
 try {
     $reportName = if ($DiagnoseFifthOnce) { 'sufficiency-fifth-diagnostic.json' } else { 'sufficiency-development.json' }
+    if ($DiagnoseRemainingOnce) { $reportName = 'sufficiency-remaining-diagnostic.json' }
     $output = Join-Path $root ".local/gate-evidence/$RunId/$reportName"
     [string[]]$modeArgs = @()
     if ($DiagnoseFifthOnce) { $modeArgs += '--diagnose-fifth-once' }
+    if ($DiagnoseRemainingOnce) { $modeArgs += '--diagnose-remaining-once' }
     Push-Location (Join-Path $root 'agent')
     try {
         # 不在实验入口隐式安装/生成依赖;准备依赖需另外受锁且获运行授权。
