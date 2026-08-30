@@ -68,7 +68,9 @@ test("Issue #163 持久化领取、人工公开回复与刷新恢复", async ({ 
 
   await support.reload();
   await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
-  await expect(support.getByText(description, { exact: true })).toBeVisible();
+  await expect(
+    support.getByRole("region", { name: "问题描述" }).getByText(description, { exact: true }),
+  ).toBeVisible();
   await expect(support.getByText(replyBody, { exact: true })).toBeVisible();
   await expect(support.getByRole("heading", { name: "人工公开回复" })).toBeVisible();
 
