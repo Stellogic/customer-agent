@@ -218,7 +218,9 @@ async def run_development(
                     parsed = parse_response(
                         payload,
                         row,
-                        expected_identity=(identity[0], identity[1]) if identity is not None else None,
+                        expected_identity=(identity[0], identity[1])
+                        if identity is not None
+                        else None,
                         duration_ms=elapsed,
                     )
                 except SufficiencyBlocked as error:
