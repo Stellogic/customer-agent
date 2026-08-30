@@ -200,6 +200,13 @@ def main() -> None:
             raise ValueError("编码归一化契约失败")
         if first == encoder.encode(texts, query=False):
             raise ValueError("查询指令契约失败")
+        instructed = [dataset.protocol.model.query_instruction + text for text in texts]
+        if first != encoder.encode(instructed, query=False):
+            raise ValueError("查询/文档指令边界不符")
+        prefix = "物" * 600
+        truncated = encoder.encode([prefix + "甲", prefix + "乙"], query=False)
+        if truncated[0] != truncated[1]:
+            raise ValueError("512 token 右截断契约失败")
         report["embedding_contract"] = "PASS"
         for query in dataset.queries:
             report["rows"].append(run_query(os.environ["SPRING_INTERNAL_URL"], query))

@@ -61,8 +61,12 @@ class OfflineBgeEncoder:
         self._lock = threading.Lock()
 
     def encode(self, texts: list[str], *, query: bool) -> list[list[float]]:
-        if not 1 <= len(texts) <= 32 or any(
-            not isinstance(text, str) or not text.strip() or len(text) > 16000 for text in texts
+        if (
+            not isinstance(texts, list)
+            or not 1 <= len(texts) <= 32
+            or any(
+                not isinstance(text, str) or not text.strip() or len(text) > 16000 for text in texts
+            )
         ):
             raise ValueError("编码批次必须包含 1-32 条非空且长度不超过 16000 的文本")
         instruction = self._protocol.query_instruction if query else ""
