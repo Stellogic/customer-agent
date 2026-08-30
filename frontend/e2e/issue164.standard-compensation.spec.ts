@@ -79,12 +79,15 @@ test("Issue #164 选择标准补偿并提交审批", async ({ browser }) => {
       return value.split(" ").length;
     })
     .toBe(1);
-  const submitButton = support.getByRole("button", { name: "提交审批" });
-  const submitBox = await submitButton.boundingBox();
-  const formBox = await support.locator(".support-compensation-form").boundingBox();
-  expect(submitBox).not.toBeNull();
-  expect(formBox).not.toBeNull();
-  expect(submitBox!.width).toBeGreaterThan(formBox!.width * 0.9);
+  await expect
+    .poll(() =>
+      support.getByRole("button", { name: "提交审批" }).evaluate((button) => {
+        const form = button.closest("form");
+        if (!form) throw new Error("提交审批按钮必须属于补偿表单");
+        return button.getBoundingClientRect().width / form.getBoundingClientRect().width;
+      }),
+    )
+    .toBeGreaterThan(0.9);
   await support.setViewportSize({ width: 1440, height: 960 });
 
   await support.getByRole("button", { name: "提交审批" }).click();

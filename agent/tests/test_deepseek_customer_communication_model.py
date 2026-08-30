@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 
 import httpx
 import pytest
@@ -150,6 +151,38 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
     record = model.audit_sink.records[0]
     assert record.total_tokens == 110
     assert record.failure_classification is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("premature_resolution", [False, True])
+async def test_flash_no_compensation_reply_preserves_spring_ticket_authority(
+    premature_resolution: bool,
+) -> None:
+    body = "经核验，订单 ORDER-C129 的本次物流延迟不足 24 小时，当前不符合补偿条件。" + (
+        "工单已解决。如有异议，您可在关闭等待期内回复。"
+        if premature_resolution
+        else "本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。"
+    )
+    captured: list[dict] = []
+
+    def supplier(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        return _streamed(_completed(body, "NO_COMPENSATION_RESOLUTION"))
+
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(supplier),
+    )
+    model_input = replace(_input(review_required=False), delay_seconds=23 * 60 * 60)
+    if premature_resolution:
+        with pytest.raises(CustomerCommunicationFailure):
+            await model.compose(model_input)
+    else:
+        envelope = await model.compose(model_input)
+        assert envelope.body == body
+        assert envelope.intent is CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
+    assert "Only Spring decides" in captured[0]["instructions"]
+    assert "not a resolved or closed ticket" in captured[0]["instructions"]
 
 
 @pytest.mark.asyncio

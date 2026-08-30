@@ -23,6 +23,7 @@
         'e2e/issue156.intake-assistance.spec.ts'
         'e2e/issue157.order-ticket-groups.spec.ts'
         'e2e/issue159.public-reply-stream.spec.ts'
+        'e2e/issue162.auto-resolution.spec.ts'
         'e2e/issue163.persistent-support-replies.spec.ts'
         'e2e/issue164.standard-compensation.spec.ts'
         'e2e/issue166.knowledge-catalog.spec.ts'

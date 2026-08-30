@@ -260,6 +260,13 @@ public final class CustomerPublicProjectionAppender {
             String body,
             Instant now) {
         Timestamp at = Timestamp.from(now);
+        if ("CUSTOMER".equals(author)) {
+            jdbc.update(
+                    "update ticket_auto_resolution set status = 'CANCELLED', updated_at = ? "
+                            + "where ticket_id = ? and status = 'PENDING'",
+                    at,
+                    ticketId);
+        }
         Long messageSequence =
                 jdbc.queryForObject(
                         "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?",

@@ -771,6 +771,44 @@ h2 {
   background: #eef0ef;
   color: #53605a;
 }
+.auto-resolution-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid #ccdccc;
+  border-radius: 12px;
+  background: #f4f8f2;
+  overflow-wrap: anywhere;
+}
+
+.auto-resolution-notice > div {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.auto-resolution-notice p {
+  margin: 8px 0 0;
+  line-height: 1.6;
+}
+
+.auto-resolution-notice [role="timer"] {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.auto-resolution-deadline {
+  font-size: 0.85rem;
+}
+
+.auto-resolution-notice button {
+  flex: 0 1 auto;
+  max-width: 100%;
+  white-space: normal;
+}
+
 .state-guidance {
   display: flex;
   gap: 13px;

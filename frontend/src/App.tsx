@@ -12,6 +12,7 @@ import { loadCsrfToken } from "./csrf";
 import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import { OrderTicketGroups } from "./OrderTicketGroups";
+import { AutoResolutionNotice, type AutoResolution } from "./AutoResolutionNotice";
 import { CustomerCapabilityGuide, CustomerTrustStrip } from "./components/CustomerHelpTrust";
 
 const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
@@ -32,6 +33,7 @@ type Snapshot = {
   };
   messages: Array<{ author: string; body: string; sentAt: string }>;
   clarification: { id: string; promptCode: string; question: string } | null;
+  autoResolution?: AutoResolution | null;
   replyStream?: {
     status: "LOADING" | "STREAMING" | "COMPLETED" | "ABORTED" | "FAILED";
     body: string;
@@ -136,6 +138,7 @@ export function App() {
   const [intakeMessages, setIntakeMessages] = useState<RecoverableIntake["messages"]>([]);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [cancellingAutoResolution, setCancellingAutoResolution] = useState(false);
   const [clarificationAnswer, setClarificationAnswer] = useState("");
   const [ticketReplyOrderReference, setTicketReplyOrderReference] = useState("");
   const [ticketReplyIssueKind, setTicketReplyIssueKind] = useState("LOGISTICS_DELAY");
@@ -418,6 +421,36 @@ export function App() {
     setError("");
     globalThis.history.replaceState(null, "", `?ticket=${ticketId}`);
     void consumeEvents(ticketId, authoritative.cursor);
+  }
+
+  async function cancelAutoResolution() {
+    if (snapshot?.autoResolution?.status !== "PENDING" || cancellingAutoResolution) return;
+    const ticketId = snapshot.ticket.id;
+    const candidateDueAt = snapshot.autoResolution.dueAt;
+    const candidateGeneration = snapshot.ticket.agentGeneration;
+    setCancellingAutoResolution(true);
+    setError("");
+    try {
+      const csrf = await loadCsrfToken();
+      const response = await humanSessionFetch(
+        `/api/customer/tickets/${ticketId}/auto-resolution/cancel`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { [csrf.headerName]: csrf.token, "Content-Type": "application/json" },
+          body: JSON.stringify({ candidateDueAt, candidateGeneration }),
+        },
+      );
+      if (!response.ok && response.status !== 409) throw new Error("auto resolution cancel failed");
+      await loadTicket(ticketId);
+      if (response.status === 409) {
+        setError("自动解决状态已经变化，已同步最新状态；请确认后再操作。");
+      }
+    } catch {
+      setError("取消结果尚未确认，请重试或刷新读取最新状态；本页不会自行标记已取消。");
+    } finally {
+      setCancellingAutoResolution(false);
+    }
   }
 
   async function refreshPendingCompensationSnapshot(ticketId: string, minimumCursor: string) {
@@ -923,6 +956,14 @@ export function App() {
           },
         };
       }
+    } else if (event.type === "AUTO_RESOLUTION_CHANGED") {
+      if (
+        !isRecord(payload) ||
+        !hasOnlyKeys(payload, ["autoResolution"]) ||
+        !isAutoResolution(payload.autoResolution)
+      )
+        return false;
+      next = { ...current, cursor: event.id, autoResolution: payload.autoResolution };
     } else if (event.type === "TICKET_ACCEPTED") {
       if (!isTicketTransition(payload)) return false;
       next = { ...current, cursor: event.id, ticket: { ...current.ticket, ...payload } };
@@ -969,6 +1010,7 @@ export function App() {
         cursor: event.id,
         ticket: { ...current.ticket, lifecycleState: payload.lifecycleState },
         pendingCompensation: null,
+        autoResolution: event.type === "TICKET_REOPENED" ? null : current.autoResolution,
       };
     } else {
       return false;
@@ -1344,6 +1386,14 @@ export function App() {
               <p>{currentLifecyclePresentation.description}</p>
             </div>
           </div>
+          {snapshot.autoResolution && (
+            <AutoResolutionNotice
+              key={`${snapshot.ticket.id}:${snapshot.autoResolution.status}:${snapshot.autoResolution.dueAt}`}
+              resolution={snapshot.autoResolution}
+              cancelling={cancellingAutoResolution}
+              onCancel={() => void cancelAutoResolution()}
+            />
+          )}
           {snapshot.pendingCompensation && (
             <aside
               className="pending-compensation-card"
@@ -1613,7 +1663,11 @@ function isSnapshot(value: unknown): value is Snapshot {
   if (!required.every((key) => keys.includes(key))) return false;
   if (
     keys.some(
-      (key) => !required.includes(key) && key !== "replyStream" && key !== "pendingCompensation",
+      (key) =>
+        !required.includes(key) &&
+        key !== "replyStream" &&
+        key !== "pendingCompensation" &&
+        key !== "autoResolution",
     )
   )
     return false;
@@ -1631,9 +1685,22 @@ function isSnapshot(value: unknown): value is Snapshot {
     value.messages.every(isPublicMessage) &&
     isClarification(value.clarification) &&
     (value.replyStream === undefined || isReplyStream(value.replyStream)) &&
+    (value.autoResolution === undefined || isAutoResolution(value.autoResolution)) &&
     (value.pendingCompensation === undefined ||
       value.pendingCompensation === null ||
       parsePendingCompensation(value.pendingCompensation) !== null)
+  );
+}
+
+function isAutoResolution(value: unknown): value is AutoResolution | null {
+  return (
+    value === null ||
+    (isRecord(value) &&
+      hasOnlyKeys(value, ["status", "dueAt"]) &&
+      ["PENDING", "CANCELLED", "REEVALUATING", "RESOLVED"].includes(String(value.status)) &&
+      (value.status === "PENDING"
+        ? typeof value.dueAt === "string" && Number.isFinite(Date.parse(value.dueAt))
+        : value.dueAt === null))
   );
 }
 

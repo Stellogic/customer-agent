@@ -25,6 +25,10 @@ public final class CustomerReplySafetyPolicy {
                     "(?i)(系统提示词|prompt|reasoning|checkpoint|thread_id|api[_\\s-]?key|bearer\\s+[a-z0-9._-]+)");
     private static final Pattern PERSON_NAME_CLAIM_PATTERN =
             Pattern.compile("(?:由|被)\\s*[\\u4e00-\\u9fff]{2,4}\\s*签收");
+    private static final Pattern PREMATURE_RESOLUTION_PATTERN =
+            Pattern.compile(
+                    "工单.{0,5}已.{0,3}(解决|关闭)|关闭等待期|(?:ticket|case).{0,12}(?:resolved|closed)",
+                    Pattern.CASE_INSENSITIVE);
 
     private static final Map<InvestigationRiskScenario, Set<String>> SCENARIO_CLAIM_TOKENS =
             Map.of(
@@ -72,6 +76,7 @@ public final class CustomerReplySafetyPolicy {
         if (RESPONSE_TIME_PROMISE_PATTERN.matcher(body).find()) return false;
         if (SENSITIVE_LEAK_PATTERN.matcher(body).find()) return false;
         if (PERSON_NAME_CLAIM_PATTERN.matcher(body).find()) return false;
+        if (PREMATURE_RESOLUTION_PATTERN.matcher(body).find()) return false;
         Matcher referencedOrders = ORDER_REFERENCE_PATTERN.matcher(body);
         boolean sawScopedOrder = false;
         while (referencedOrders.find()) {
@@ -111,6 +116,9 @@ public final class CustomerReplySafetyPolicy {
                         && scopedEvidence.equals(reply.evidenceRefs())
                         && reply.body().contains(scopedOrderReference);
         if (!basicShapeValid) return "UNSAFE_CUSTOMER_REPLY";
+        if (PREMATURE_RESOLUTION_PATTERN.matcher(reply.body()).find()) {
+            return "CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE";
+        }
         if (MONEY_PATTERN.matcher(reply.body()).find()) {
             return "CUSTOMER_REPLY_CONTAINS_AMOUNT";
         }

@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.ticket;
 
 import static com.stellogic.customeragent.identity.HumanTestPrincipals.session;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -148,6 +149,34 @@ class CustomerTicketV2ApiTest {
     }
 
     @Test
+    void exposesOnlyPublicAutoResolutionStateAndAcceptsItsEvent() throws Exception {
+        Instant dueAt = Instant.parse("2026-08-28T01:00:00Z");
+        when(service.snapshot("customer-demo", TICKET_ID))
+                .thenReturn(snapshot(new CurrentAutoResolution("PENDING", dueAt)));
+
+        mvc.perform(
+                        get("/api/customer/v2/tickets/{ticketId}", TICKET_ID)
+                                .principal(customer("customer-demo")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.autoResolution.status").value("PENDING"))
+                .andExpect(jsonPath("$.autoResolution.dueAt").value("2026-08-28T01:00:00Z"))
+                .andExpect(jsonPath("$.autoResolution.generationId").doesNotExist())
+                .andExpect(jsonPath("$.autoResolution.evidence").doesNotExist());
+
+        var event =
+                CustomerTicketV2Controller.V2Event.from(
+                        new CustomerPublicEvent(
+                                "customer-public-v1",
+                                3,
+                                1,
+                                "AUTO_RESOLUTION_CHANGED",
+                                "{\"autoResolution\":{\"status\":\"CANCELLED\",\"dueAt\":null}}"));
+        assertThat(event.cursor()).isEqualTo("public-conversation-v2:3");
+        assertThat(event.publicData())
+                .contains("\"schema\":\"public-conversation-v2\"", "\"status\":\"CANCELLED\"");
+    }
+
+    @Test
     void pendingCompensationProjectionOnlyExposesSafeTypeAmountAndReviewStatus() throws Exception {
         when(service.snapshot("customer-demo", TICKET_ID))
                 .thenReturn(
@@ -161,6 +190,7 @@ class CustomerTicketV2ApiTest {
                                 3,
                                 1,
                                 List.of(),
+                                null,
                                 null,
                                 null,
                                 new PendingCompensationProjection(
@@ -239,6 +269,10 @@ class CustomerTicketV2ApiTest {
     }
 
     private CustomerPublicSnapshot snapshot() {
+        return snapshot(null);
+    }
+
+    private CustomerPublicSnapshot snapshot(CurrentAutoResolution autoResolution) {
         return new CustomerPublicSnapshot(
                 TICKET_ID,
                 "INVESTIGATING",
@@ -253,7 +287,8 @@ class CustomerTicketV2ApiTest {
                                 "CUSTOMER", "物流已经延迟多日", Instant.parse("2026-08-28T00:00:00Z")),
                         new PublicMessage("SUPPORT", "已受理", Instant.parse("2026-08-28T00:00:00Z"))),
                 null,
-                null);
+                null,
+                autoResolution);
     }
 
     private UsernamePasswordAuthenticationToken customer(String id) {

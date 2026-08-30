@@ -1198,6 +1198,7 @@ describe("客户帮助中心", () => {
             },
             messages: [],
             clarification: null,
+            autoResolution: { status: "RESOLVED", dueAt: null },
           }),
           { status: 200 },
         ),
@@ -1213,6 +1214,7 @@ describe("客户帮助中心", () => {
     render(<App />);
 
     expect(await screen.findByText("调查中")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "自动解决状态" })).not.toBeInTheDocument();
   });
 
   it("已解决工单可从客户界面重开或进入关联新工单", async () => {

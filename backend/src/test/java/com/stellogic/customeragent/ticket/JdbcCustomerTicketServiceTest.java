@@ -41,6 +41,7 @@ class JdbcCustomerTicketServiceTest {
                         1,
                         List.of(),
                         null,
+                        null,
                         null);
         doReturn(snapshot).when(service).snapshot("customer-demo", TICKET_ID);
         when(jdbc.queryForObject(
