@@ -33,6 +33,10 @@ public final class DelayCompensationPolicy {
         return new Decision(true, Method.SIMULATED_PARTIAL_REFUND, amount);
     }
 
+    public Plan currentPlan(Duration delay, BigDecimal paidAmount) {
+        return Plan.from(evaluate(delay, paidAmount));
+    }
+
     public enum Method {
         NONE,
         COUPON,
@@ -40,4 +44,29 @@ public final class DelayCompensationPolicy {
     }
 
     public record Decision(boolean eligible, Method method, BigDecimal amount) {}
+
+    public record Plan(
+            String planCode,
+            boolean eligible,
+            Method method,
+            BigDecimal amount,
+            BigDecimal capAmount,
+            String policyVersion) {
+        static Plan from(Decision decision) {
+            BigDecimal capAmount =
+                    switch (decision.method()) {
+                        case NONE -> new BigDecimal("0.00");
+                        case COUPON -> decision.amount();
+                        case SIMULATED_PARTIAL_REFUND -> REFUND_CAP;
+                    };
+            String planCode = decision.method() == Method.NONE ? "NONE" : decision.method().name();
+            return new Plan(
+                    planCode,
+                    decision.eligible(),
+                    decision.method(),
+                    decision.amount(),
+                    capAmount,
+                    VERSION);
+        }
+    }
 }

@@ -11,16 +11,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-class JdbcCompensationProposalStore {
+public class JdbcCompensationProposalStore {
     private final JdbcTemplate jdbc;
     private final CompensationProposalExpiry expiry;
 
-    JdbcCompensationProposalStore(JdbcTemplate jdbc, CompensationProposalExpiry expiry) {
+    public JdbcCompensationProposalStore(JdbcTemplate jdbc, CompensationProposalExpiry expiry) {
         this.jdbc = jdbc;
         this.expiry = expiry;
     }
 
-    StoredProposal save(ProposalContent content) {
+    public StoredProposal save(ProposalContent content) {
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
@@ -146,7 +146,7 @@ class JdbcCompensationProposalStore {
         return new StoredProposal(revisionId, revisionNumber, true);
     }
 
-    record ProposalContent(
+    public record ProposalContent(
             UUID ticketId,
             UUID generationId,
             String orderReference,
@@ -164,7 +164,7 @@ class JdbcCompensationProposalStore {
             boolean cancelled,
             boolean fullyRefunded,
             boolean existingCompensation) {
-        String digest() {
+        public String digest() {
             return StableParameterDigest.sha256(
                     ticketId.toString(),
                     orderReference,
@@ -186,16 +186,16 @@ class JdbcCompensationProposalStore {
         }
     }
 
-    record StoredProposal(UUID revisionId, int revisionNumber, boolean created) {}
+    public record StoredProposal(UUID revisionId, int revisionNumber, boolean created) {}
 
-    static final class ActiveIntentException extends RuntimeException {
+    public static final class ActiveIntentException extends RuntimeException {
         private final String reason;
 
-        ActiveIntentException(String reason) {
+        public ActiveIntentException(String reason) {
             this.reason = reason;
         }
 
-        String reason() {
+        public String reason() {
             return reason;
         }
     }

@@ -11,6 +11,7 @@ import { loadCsrfToken } from "./csrf";
 import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import { IntakeAssistancePanel } from "./IntakeAssistancePanel";
+import { SupportCompensationPanel } from "./SupportCompensationPanel";
 import { clearPendingReply, readPendingReply, storePendingReply } from "./supportReplyStorage";
 
 const SUPPORT_SCHEMA = "support-workbench-v2" as const;
@@ -576,6 +577,7 @@ export function SupportWorkbench() {
                   onCopyError={setActionError}
                   onSendReply={sendPublicReply}
                   onQueryReply={queryPublicReply}
+                  onCompensationSubmitted={() => void refreshTicketDetails(details.ticketId)}
                   onRelease={() => void releaseTicket(details.ticketId)}
                 />
               </div>
@@ -743,6 +745,7 @@ function TicketDetail({
   onCopyError,
   onSendReply,
   onQueryReply,
+  onCompensationSubmitted,
   onRelease,
 }: {
   details: TicketDetails;
@@ -753,6 +756,7 @@ function TicketDetail({
     body: string,
   ) => Promise<SupportPublicReplyResponse>;
   onQueryReply: (ticketId: string, idempotencyKey: string) => Promise<SupportPublicReplyResponse>;
+  onCompensationSubmitted: () => void;
   onRelease: () => void;
 }) {
   const storedPendingReply = readPendingReply(details.ticketId);
@@ -913,6 +917,15 @@ function TicketDetail({
             </p>
           )}
         </section>
+      )}
+
+      {details.handlingMode === "HUMAN" && (
+        <SupportCompensationPanel
+          key={details.ticketId}
+          ticketId={details.ticketId}
+          handlingMode={details.handlingMode}
+          onSubmitted={onCompensationSubmitted}
+        />
       )}
 
       <div className="support-detail-sections">
