@@ -184,7 +184,7 @@ describe("受理协助队列", () => {
     });
 
     render(<IntakeAssistancePanel />);
-    fireEvent.click(await screen.findByRole("button", { name: `领取受理协助 ${REQUEST_ID}` }));
+    fireEvent.click(await screen.findByRole("button", { name: `继续受理协助 ${REQUEST_ID}` }));
     expect(await screen.findByRole("heading", { name: "协助确认受理" })).toBeInTheDocument();
 
     authorityStream.close();
