@@ -1,19 +1,21 @@
 import { Layout } from "antd";
-import { Link, Outlet } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { Brand } from "../components/Brand";
 import { SessionLogoutButton } from "../SessionLogoutButton";
 import { CurrentSessionContext } from "../session";
+import { ROUTES } from "../workspaceRegistry";
 
 export default function CustomerShell() {
   const session = CurrentSessionContext.use();
   return (
     <Layout className="customer-shell">
       <Layout.Header aria-label="客户帮助中心" className="customer-shell-header">
-        <Brand audience="customer" to="/help" />
+        <Brand audience="customer" to={ROUTES.customerHome} />
         <nav aria-label="客户导航" className="customer-shell-nav">
-          <Link aria-current="page" to="/help">
+          <NavLink end to={ROUTES.customerHome}>
             帮助中心
-          </Link>
+          </NavLink>
+          <NavLink to={ROUTES.customerDocs}>帮助文档</NavLink>
         </nav>
         <div className="shell-session">
           <span>当前客户：{session.displayName}</span>

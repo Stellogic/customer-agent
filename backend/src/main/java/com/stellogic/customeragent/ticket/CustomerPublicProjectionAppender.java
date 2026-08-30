@@ -55,6 +55,25 @@ public final class CustomerPublicProjectionAppender {
                 Timestamp.from(now));
     }
 
+    public void appendCompensationReviewCleared(UUID ticketId, String status, Instant now) {
+        Long sequence =
+                jdbc.queryForObject(
+                        "select coalesce(max(sequence), 0) + 1 from customer_public_event where ticket_id = ? and epoch = ?",
+                        Long.class,
+                        ticketId,
+                        EPOCH);
+        jdbc.update(
+                "insert into customer_public_event "
+                        + "(ticket_id, epoch, sequence, event_type, payload, occurred_at) "
+                        + "values (?, ?, ?, 'COMPENSATION_REVIEW_CLEARED', "
+                        + "jsonb_build_object('status', ?), ?)",
+                ticketId,
+                EPOCH,
+                sequence,
+                status,
+                Timestamp.from(now));
+    }
+
     public void appendAgentMessage(
             UUID ticketId, UUID generationId, String body, Instant now, boolean resolved) {
         long nextEventSequence = appendMessage(ticketId, generationId, "AGENT", body, now);
@@ -294,6 +313,27 @@ public final class CustomerPublicProjectionAppender {
                     at);
         }
         return eventSequence + 1;
+    }
+
+    public void appendSupportCompensationReview(
+            UUID ticketId,
+            UUID publicMessageId,
+            String body,
+            String compensationMethod,
+            String amount,
+            Instant now) {
+        long nextSequence = appendMessage(ticketId, publicMessageId, null, "SUPPORT", body, now);
+        jdbc.update(
+                "insert into customer_public_event "
+                        + "(ticket_id, epoch, sequence, event_type, payload, occurred_at) "
+                        + "values (?, ?, ?, 'COMPENSATION_REVIEW_PENDING', "
+                        + "jsonb_build_object('compensationMethod', ?, 'amount', ?, 'status', 'PENDING_REVIEW'), ?)",
+                ticketId,
+                EPOCH,
+                nextSequence,
+                compensationMethod,
+                amount,
+                Timestamp.from(now));
     }
 
     private void appendGenerationEvent(

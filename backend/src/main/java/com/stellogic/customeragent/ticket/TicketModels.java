@@ -35,7 +35,68 @@ record CustomerPublicSnapshot(
         List<PublicMessage> messages,
         CurrentClarification clarification,
         CurrentReplyStream replyStream,
-        CurrentAutoResolution autoResolution) {}
+        CurrentAutoResolution autoResolution,
+        PendingCompensationProjection pendingCompensation) {
+    CustomerPublicSnapshot(
+            UUID ticketId,
+            String lifecycleState,
+            String handlingMode,
+            Instant createdAt,
+            Instant firstRespondedAt,
+            String epoch,
+            long sequence,
+            long agentGeneration,
+            List<PublicMessage> messages,
+            CurrentClarification clarification,
+            CurrentReplyStream replyStream) {
+        this(
+                ticketId,
+                lifecycleState,
+                handlingMode,
+                createdAt,
+                firstRespondedAt,
+                epoch,
+                sequence,
+                agentGeneration,
+                messages,
+                clarification,
+                replyStream,
+                null,
+                null);
+    }
+
+    CustomerPublicSnapshot(
+            UUID ticketId,
+            String lifecycleState,
+            String handlingMode,
+            Instant createdAt,
+            Instant firstRespondedAt,
+            String epoch,
+            long sequence,
+            long agentGeneration,
+            List<PublicMessage> messages,
+            CurrentClarification clarification,
+            CurrentReplyStream replyStream,
+            CurrentAutoResolution autoResolution) {
+        this(
+                ticketId,
+                lifecycleState,
+                handlingMode,
+                createdAt,
+                firstRespondedAt,
+                epoch,
+                sequence,
+                agentGeneration,
+                messages,
+                clarification,
+                replyStream,
+                autoResolution,
+                null);
+    }
+}
+
+record PendingCompensationProjection(
+        String compensationMethod, String amount, String currency, String status) {}
 
 record CustomerPublicEvent(
         String epoch, long sequence, long agentGeneration, String type, String jsonPayload) {

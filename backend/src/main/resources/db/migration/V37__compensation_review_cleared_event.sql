@@ -8,7 +8,7 @@ ALTER TABLE customer_public_event ADD CONSTRAINT customer_public_event_event_typ
         'AGENT_PROCESSING_STARTED', 'AGENT_REPLY_LOADING',
         'PUBLIC_PROGRESS_UPDATED', 'AGENT_REPLY_STREAM_STARTED',
         'AGENT_REPLY_CONTENT_DELTA', 'AGENT_REPLY_COMPLETED',
-        'AGENT_REPLY_ABORTED', 'AGENT_REPLY_FAILED', 'AUTO_RESOLUTION_CHANGED',
+        'AGENT_REPLY_ABORTED', 'AGENT_REPLY_FAILED',
         'COMPENSATION_REVIEW_PENDING', 'COMPENSATION_REVIEW_CLEARED'
     ));
 
@@ -45,7 +45,6 @@ BEGIN
         WHEN 'AGENT_REPLY_COMPLETED' THEN ARRAY['status']
         WHEN 'AGENT_REPLY_ABORTED' THEN ARRAY['status']
         WHEN 'AGENT_REPLY_FAILED' THEN ARRAY['status']
-        WHEN 'AUTO_RESOLUTION_CHANGED' THEN ARRAY['autoResolution']
         WHEN 'TICKET_RESOLVED' THEN ARRAY['lifecycleState']
         WHEN 'CUSTOMER_CLARIFICATION_REQUESTED' THEN ARRAY['lifecycleState', 'clarification']
         WHEN 'TICKET_INVESTIGATION_RESUMED' THEN ARRAY['lifecycleState', 'clarification']
@@ -147,59 +146,6 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'invalid public clarification payload';
     END IF;
-    IF NEW.event_type = 'AUTO_RESOLUTION_CHANGED' THEN
-        IF jsonb_typeof(NEW.payload->'autoResolution') IS DISTINCT FROM 'object' THEN
-            RAISE EXCEPTION 'invalid auto resolution payload';
-        END IF;
-        IF NOT (NEW.payload->'autoResolution' ?& ARRAY['status', 'dueAt']) OR EXISTS (
-            SELECT 1 FROM jsonb_object_keys(NEW.payload->'autoResolution') AS candidate_key
-            WHERE candidate_key <> ALL (ARRAY['status', 'dueAt'])
-        ) OR (NEW.payload->'autoResolution'->>'status' IN (
-            'PENDING', 'CANCELLED', 'REEVALUATING', 'RESOLVED'
-        )) IS NOT TRUE THEN
-            RAISE EXCEPTION 'invalid auto resolution payload';
-        END IF;
-        IF NEW.payload->'autoResolution'->>'status' = 'PENDING' THEN
-            IF jsonb_typeof(NEW.payload->'autoResolution'->'dueAt') IS DISTINCT FROM 'string' THEN
-                RAISE EXCEPTION 'pending auto resolution requires due time';
-            END IF;
-            PERFORM (NEW.payload->'autoResolution'->>'dueAt')::timestamptz;
-        ELSIF NEW.payload->'autoResolution'->'dueAt' IS DISTINCT FROM 'null'::jsonb THEN
-            RAISE EXCEPTION 'inactive auto resolution must not expose a due time';
-        END IF;
-    END IF;
     RETURN NEW;
 END;
 $$;
-
--- 候选更新与公开事件同事务提交；调用方先取得工单权威锁。
-CREATE FUNCTION project_customer_auto_resolution() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    IF TG_OP = 'UPDATE' THEN
-        IF OLD.status IS NOT DISTINCT FROM NEW.status
-           AND OLD.due_at IS NOT DISTINCT FROM NEW.due_at
-           AND OLD.generation_id IS NOT DISTINCT FROM NEW.generation_id THEN
-            RETURN NEW;
-        END IF;
-    END IF;
-    PERFORM 1 FROM support_ticket WHERE id = NEW.ticket_id FOR UPDATE;
-    INSERT INTO customer_public_event (
-        ticket_id, epoch, sequence, event_type, payload, occurred_at
-    )
-    SELECT NEW.ticket_id, 'customer-public-v1', coalesce(max(sequence), 0) + 1,
-           'AUTO_RESOLUTION_CHANGED', jsonb_build_object(
-               'autoResolution', jsonb_build_object(
-                   'status', NEW.status,
-                   'dueAt', CASE WHEN NEW.status = 'PENDING' THEN NEW.due_at ELSE NULL END
-               )
-           ), NEW.updated_at
-    FROM customer_public_event
-    WHERE ticket_id = NEW.ticket_id AND epoch = 'customer-public-v1';
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER project_customer_auto_resolution
-AFTER INSERT OR UPDATE ON ticket_auto_resolution
-FOR EACH ROW EXECUTE FUNCTION project_customer_auto_resolution();

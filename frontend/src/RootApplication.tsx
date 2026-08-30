@@ -28,6 +28,7 @@ import { INTERNAL_WORKSPACES, LEGACY_ROUTE_REDIRECTS, ROUTES } from "./workspace
 const CustomerShell = lazy(() => import("./shells/CustomerShell"));
 const InternalShell = lazy(() => import("./shells/InternalShell"));
 const CustomerWorkspace = lazy(() => import("./workspaces/CustomerWorkspace"));
+const CustomerHelpDocs = lazy(() => import("./workspaces/CustomerHelpDocs"));
 const InternalLanding = lazy(() => import("./workspaces/InternalLanding"));
 const SupportWorkspace = lazy(() => import("./workspaces/SupportWorkspace"));
 const ApprovalWorkspace = lazy(() => import("./workspaces/ApprovalWorkspace"));
@@ -79,6 +80,7 @@ export function RootApplication() {
                 }
               >
                 <Route index element={<CustomerWorkspace />} />
+                <Route path="docs" element={<CustomerHelpDocs />} />
               </Route>
               <Route
                 path={ROUTES.internalHome}

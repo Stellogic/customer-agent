@@ -1,3 +1,42 @@
+ALTER TABLE compensation_proposal_revision
+    ALTER COLUMN generation_id DROP NOT NULL;
+
+CREATE TABLE support_compensation_proposal_request (
+    support_id text NOT NULL,
+    request_id text NOT NULL CHECK (char_length(btrim(request_id)) BETWEEN 1 AND 200),
+    ticket_id uuid NOT NULL REFERENCES support_ticket(id),
+    parameter_digest char(64) NOT NULL,
+    proposal_revision_id uuid NOT NULL REFERENCES compensation_proposal_revision(id),
+    proposal_revision integer NOT NULL CHECK (proposal_revision > 0),
+    outcome text NOT NULL CHECK (outcome = 'ACCEPTED'),
+    received_at timestamptz NOT NULL,
+    PRIMARY KEY (support_id, request_id),
+    UNIQUE (proposal_revision_id, request_id)
+);
+
+CREATE TABLE exceptional_compensation_request (
+    id uuid PRIMARY KEY,
+    ticket_id uuid NOT NULL REFERENCES support_ticket(id),
+    order_reference text NOT NULL REFERENCES synthetic_order(order_reference),
+    support_id text NOT NULL CHECK (btrim(support_id) <> ''),
+    reason_code text NOT NULL CHECK (reason_code = 'STANDARD_PLAN_INSUFFICIENT'),
+    justification text NOT NULL CHECK (char_length(btrim(justification)) BETWEEN 1 AND 2000),
+    status text NOT NULL CHECK (status = 'SUBMITTED'),
+    created_at timestamptz NOT NULL
+);
+
+CREATE TABLE exceptional_compensation_request_receipt (
+    support_id text NOT NULL,
+    request_id text NOT NULL CHECK (char_length(btrim(request_id)) BETWEEN 1 AND 200),
+    ticket_id uuid NOT NULL REFERENCES support_ticket(id),
+    parameter_digest char(64) NOT NULL,
+    exceptional_request_id uuid NOT NULL REFERENCES exceptional_compensation_request(id),
+    outcome text NOT NULL CHECK (outcome = 'ACCEPTED'),
+    received_at timestamptz NOT NULL,
+    PRIMARY KEY (support_id, request_id),
+    UNIQUE (exceptional_request_id)
+);
+
 ALTER TABLE customer_public_event DROP CONSTRAINT customer_public_event_event_type_check;
 ALTER TABLE customer_public_event ADD CONSTRAINT customer_public_event_event_type_check
     CHECK (event_type IN (
@@ -8,8 +47,8 @@ ALTER TABLE customer_public_event ADD CONSTRAINT customer_public_event_event_typ
         'AGENT_PROCESSING_STARTED', 'AGENT_REPLY_LOADING',
         'PUBLIC_PROGRESS_UPDATED', 'AGENT_REPLY_STREAM_STARTED',
         'AGENT_REPLY_CONTENT_DELTA', 'AGENT_REPLY_COMPLETED',
-        'AGENT_REPLY_ABORTED', 'AGENT_REPLY_FAILED', 'AUTO_RESOLUTION_CHANGED',
-        'COMPENSATION_REVIEW_PENDING', 'COMPENSATION_REVIEW_CLEARED'
+        'AGENT_REPLY_ABORTED', 'AGENT_REPLY_FAILED',
+        'COMPENSATION_REVIEW_PENDING'
     ));
 
 CREATE OR REPLACE FUNCTION validate_customer_public_event_payload() RETURNS trigger
@@ -45,7 +84,6 @@ BEGIN
         WHEN 'AGENT_REPLY_COMPLETED' THEN ARRAY['status']
         WHEN 'AGENT_REPLY_ABORTED' THEN ARRAY['status']
         WHEN 'AGENT_REPLY_FAILED' THEN ARRAY['status']
-        WHEN 'AUTO_RESOLUTION_CHANGED' THEN ARRAY['autoResolution']
         WHEN 'TICKET_RESOLVED' THEN ARRAY['lifecycleState']
         WHEN 'CUSTOMER_CLARIFICATION_REQUESTED' THEN ARRAY['lifecycleState', 'clarification']
         WHEN 'TICKET_INVESTIGATION_RESUMED' THEN ARRAY['lifecycleState', 'clarification']
@@ -53,7 +91,6 @@ BEGIN
         WHEN 'TICKET_REOPENED' THEN ARRAY['lifecycleState']
         WHEN 'TICKET_CLOSED' THEN ARRAY['lifecycleState']
         WHEN 'COMPENSATION_REVIEW_PENDING' THEN ARRAY['compensationMethod', 'amount', 'status']
-        WHEN 'COMPENSATION_REVIEW_CLEARED' THEN ARRAY['status']
         ELSE NULL
     END;
     IF allowed_keys IS NULL OR EXISTS (
@@ -73,21 +110,14 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'invalid public message payload';
     END IF;
-    IF NEW.event_type = 'COMPENSATION_REVIEW_PENDING' AND (
-        jsonb_typeof(NEW.payload->'compensationMethod') IS DISTINCT FROM 'string'
-        OR NEW.payload->>'compensationMethod' NOT IN ('COUPON', 'SIMULATED_PARTIAL_REFUND')
-        OR jsonb_typeof(NEW.payload->'amount') IS DISTINCT FROM 'string'
-        OR NEW.payload->>'amount' !~ '^[0-9]+\.[0-9]{2}$'
-        OR jsonb_typeof(NEW.payload->'status') IS DISTINCT FROM 'string'
-        OR NEW.payload->>'status' <> 'PENDING_REVIEW'
+    IF NEW.event_type = 'COMPENSATION_REVIEW_PENDING' AND NOT (
+        NEW.payload ?& ARRAY['compensationMethod', 'amount', 'status']
+        AND NEW.payload->>'compensationMethod' IN ('COUPON', 'SIMULATED_PARTIAL_REFUND')
+        AND jsonb_typeof(NEW.payload->'amount') = 'string'
+        AND NEW.payload->>'amount' ~ '^[0-9]+\.[0-9]{2}$'
+        AND NEW.payload->>'status' = 'PENDING_REVIEW'
     ) THEN
         RAISE EXCEPTION 'invalid compensation review payload';
-    END IF;
-    IF NEW.event_type = 'COMPENSATION_REVIEW_CLEARED' AND (
-        jsonb_typeof(NEW.payload->'status') IS DISTINCT FROM 'string'
-        OR NEW.payload->>'status' NOT IN ('APPROVED', 'REJECTED')
-    ) THEN
-        RAISE EXCEPTION 'invalid compensation review cleared payload';
     END IF;
     IF NEW.event_type = 'AGENT_REPLY_CONTENT_DELTA' AND NOT (
         NEW.payload ?& ARRAY['chunkIndex', 'delta']
@@ -147,59 +177,13 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'invalid public clarification payload';
     END IF;
-    IF NEW.event_type = 'AUTO_RESOLUTION_CHANGED' THEN
-        IF jsonb_typeof(NEW.payload->'autoResolution') IS DISTINCT FROM 'object' THEN
-            RAISE EXCEPTION 'invalid auto resolution payload';
-        END IF;
-        IF NOT (NEW.payload->'autoResolution' ?& ARRAY['status', 'dueAt']) OR EXISTS (
-            SELECT 1 FROM jsonb_object_keys(NEW.payload->'autoResolution') AS candidate_key
-            WHERE candidate_key <> ALL (ARRAY['status', 'dueAt'])
-        ) OR (NEW.payload->'autoResolution'->>'status' IN (
-            'PENDING', 'CANCELLED', 'REEVALUATING', 'RESOLVED'
-        )) IS NOT TRUE THEN
-            RAISE EXCEPTION 'invalid auto resolution payload';
-        END IF;
-        IF NEW.payload->'autoResolution'->>'status' = 'PENDING' THEN
-            IF jsonb_typeof(NEW.payload->'autoResolution'->'dueAt') IS DISTINCT FROM 'string' THEN
-                RAISE EXCEPTION 'pending auto resolution requires due time';
-            END IF;
-            PERFORM (NEW.payload->'autoResolution'->>'dueAt')::timestamptz;
-        ELSIF NEW.payload->'autoResolution'->'dueAt' IS DISTINCT FROM 'null'::jsonb THEN
-            RAISE EXCEPTION 'inactive auto resolution must not expose a due time';
-        END IF;
-    END IF;
     RETURN NEW;
 END;
 $$;
 
--- 候选更新与公开事件同事务提交；调用方先取得工单权威锁。
-CREATE FUNCTION project_customer_auto_resolution() RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    IF TG_OP = 'UPDATE' THEN
-        IF OLD.status IS NOT DISTINCT FROM NEW.status
-           AND OLD.due_at IS NOT DISTINCT FROM NEW.due_at
-           AND OLD.generation_id IS NOT DISTINCT FROM NEW.generation_id THEN
-            RETURN NEW;
-        END IF;
-    END IF;
-    PERFORM 1 FROM support_ticket WHERE id = NEW.ticket_id FOR UPDATE;
-    INSERT INTO customer_public_event (
-        ticket_id, epoch, sequence, event_type, payload, occurred_at
-    )
-    SELECT NEW.ticket_id, 'customer-public-v1', coalesce(max(sequence), 0) + 1,
-           'AUTO_RESOLUTION_CHANGED', jsonb_build_object(
-               'autoResolution', jsonb_build_object(
-                   'status', NEW.status,
-                   'dueAt', CASE WHEN NEW.status = 'PENDING' THEN NEW.due_at ELSE NULL END
-               )
-           ), NEW.updated_at
-    FROM customer_public_event
-    WHERE ticket_id = NEW.ticket_id AND epoch = 'customer-public-v1';
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER project_customer_auto_resolution
-AFTER INSERT OR UPDATE ON ticket_auto_resolution
-FOR EACH ROW EXECUTE FUNCTION project_customer_auto_resolution();
+GRANT SELECT, INSERT ON support_compensation_proposal_request TO spring_app;
+GRANT SELECT ON support_compensation_proposal_request TO spring_fixture;
+GRANT SELECT, INSERT ON exceptional_compensation_request TO spring_app;
+GRANT SELECT ON exceptional_compensation_request TO spring_fixture;
+GRANT SELECT, INSERT ON exceptional_compensation_request_receipt TO spring_app;
+GRANT SELECT ON exceptional_compensation_request_receipt TO spring_fixture;
