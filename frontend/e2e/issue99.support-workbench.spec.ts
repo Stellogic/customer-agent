@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { continueAsNewIfDuplicate, login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
-import { executeFixtureSql } from "./support/database";
+import { executeFixtureSql, revokeActiveAssignmentsForSupport } from "./support/database";
 
 test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏", async ({ browser }, testInfo) => {
   const customerContext = await newAcceptanceContext(browser, {
@@ -27,6 +27,7 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
   await customer.getByRole("button", { name: "确认转人工" }).click();
   await expect(customer.getByText("人工客服处理中")).toBeVisible();
 
+  revokeActiveAssignmentsForSupport("support-demo");
   const supportContext = await newAcceptanceContext(browser, {
     viewport: { width: 1440, height: 960 },
   });

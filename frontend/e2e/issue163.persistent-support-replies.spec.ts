@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { continueAsNewIfDuplicate, login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
-import { executeFixtureSql } from "./support/database";
+import { executeFixtureSql, revokeActiveAssignmentsForSupport } from "./support/database";
 
 test("Issue #163 持久化领取、人工公开回复与刷新恢复", async ({ browser }) => {
   test.setTimeout(90_000);
@@ -29,6 +29,7 @@ test("Issue #163 持久化领取、人工公开回复与刷新恢复", async ({ 
   await customer.getByRole("button", { name: "确认转人工" }).click();
   await expect(customer.getByText("人工客服处理中")).toBeVisible();
 
+  revokeActiveAssignmentsForSupport("support-demo");
   const supportContext = await newAcceptanceContext(browser, {
     viewport: { width: 1440, height: 960 },
   });
