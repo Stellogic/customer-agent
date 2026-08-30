@@ -555,6 +555,38 @@ button:disabled {
   padding-bottom: 20px;
   border-bottom: 1px solid #d9ddd6;
 }
+.pending-compensation-card {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: #fffdf8;
+  padding: 16px 18px;
+}
+.pending-compensation-card h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.pending-compensation-card dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.pending-compensation-card dt {
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+}
+.pending-compensation-card dd {
+  margin: 4px 0 0;
+  font-weight: 750;
+}
+.pending-compensation-card p {
+  margin: 0;
+  color: var(--muted);
+}
 .ticket-identity {
   min-width: 0;
 }
@@ -802,6 +834,9 @@ h2 {
   .ticket-heading {
     align-items: stretch;
     flex-direction: column;
+  }
+  .pending-compensation-card dl {
+    grid-template-columns: 1fr;
   }
   .ticket-state-summary {
     justify-items: start;
@@ -1257,6 +1292,63 @@ h2 {
   background: linear-gradient(135deg, var(--forest-50), #fffdf8);
   padding: 20px 24px;
 }
+.support-compensation-panel {
+  display: grid;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #fffdf8, rgb(255 255 252 / 92%));
+  padding: 20px 24px;
+}
+.support-compensation-status,
+.support-compensation-empty {
+  margin: 0;
+  color: var(--muted);
+}
+.support-compensation-form,
+.support-exception-form {
+  display: grid;
+  gap: 12px;
+}
+.support-compensation-form label,
+.support-exception-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.support-compensation-form select,
+.support-exception-form textarea {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: var(--ink);
+  font: inherit;
+}
+.support-compensation-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.support-compensation-facts dt {
+  color: var(--muted);
+  font-size: 0.64rem;
+  letter-spacing: 0.05em;
+}
+.support-compensation-facts dd {
+  margin: 4px 0 0;
+  font-weight: 750;
+}
+.support-compensation-form button,
+.support-exception-form button {
+  justify-self: start;
+  min-height: 36px;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
 .support-reply-heading {
   display: flex;
   align-items: baseline;
@@ -1591,6 +1683,12 @@ select:focus-visible {
     align-items: flex-start;
     flex-direction: column;
   }
+  .support-compensation-facts {
+    grid-template-columns: 1fr;
+  }
+  .support-compensation-form button,
+  .support-exception-form button,
+  .support-reply-query,
   .support-reply-actions button {
     width: 100%;
   }

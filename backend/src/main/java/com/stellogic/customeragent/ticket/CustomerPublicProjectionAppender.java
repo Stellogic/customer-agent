@@ -291,6 +291,27 @@ public final class CustomerPublicProjectionAppender {
         return eventSequence + 1;
     }
 
+    public void appendSupportCompensationReview(
+            UUID ticketId,
+            UUID publicMessageId,
+            String body,
+            String compensationMethod,
+            String amount,
+            Instant now) {
+        long nextSequence = appendMessage(ticketId, publicMessageId, null, "SUPPORT", body, now);
+        jdbc.update(
+                "insert into customer_public_event "
+                        + "(ticket_id, epoch, sequence, event_type, payload, occurred_at) "
+                        + "values (?, ?, ?, 'COMPENSATION_REVIEW_PENDING', "
+                        + "jsonb_build_object('compensationMethod', ?, 'amount', ?, 'status', 'PENDING_REVIEW'), ?)",
+                ticketId,
+                EPOCH,
+                nextSequence,
+                compensationMethod,
+                amount,
+                Timestamp.from(now));
+    }
+
     private void appendGenerationEvent(
             UUID ticketId,
             UUID generationId,

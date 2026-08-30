@@ -463,7 +463,22 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 ticket.agentGeneration(),
                 messages,
                 clarifications.isEmpty() ? null : clarifications.getFirst(),
-                currentReplyStream);
+                currentReplyStream,
+                pendingCompensation(ticketId));
+    }
+
+    private PendingCompensationProjection pendingCompensation(UUID ticketId) {
+        List<PendingCompensationProjection> pending =
+                jdbc.query(
+                        "select compensation_method, to_char(amount, 'FM999999990.00') "
+                                + "from compensation_proposal_revision "
+                                + "where ticket_id = ? and status = 'PENDING_APPROVAL' "
+                                + "order by revision_number desc, created_at desc limit 1",
+                        (rs, row) ->
+                                new PendingCompensationProjection(
+                                        rs.getString(1), rs.getString(2), "CNY", "PENDING_REVIEW"),
+                        ticketId);
+        return pending.isEmpty() ? null : pending.getFirst();
     }
 
     @Override

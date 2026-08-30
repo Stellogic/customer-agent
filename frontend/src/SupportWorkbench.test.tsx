@@ -151,6 +151,7 @@ describe("客服共享队列工作台", () => {
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
         return openStream();
       }
+      if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
 
@@ -215,6 +216,7 @@ describe("客服共享队列工作台", () => {
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
         return sseResponse("");
       }
+      if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
 
@@ -261,6 +263,7 @@ describe("客服共享队列工作台", () => {
       if (path === `/api/support/workbench/tickets/${SECOND_HUMAN_TICKET}/claims`) {
         return Response.json({}, { status: 404 });
       }
+      if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
 
@@ -423,6 +426,7 @@ describe("客服共享队列工作台", () => {
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
         return openStream();
       }
+      if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
 
@@ -467,6 +471,7 @@ describe("客服共享队列工作台", () => {
       ) {
         return openStream();
       }
+      if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
 
@@ -524,6 +529,7 @@ describe("客服共享队列工作台", () => {
           { status: 201 },
         );
       }
+      if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
 
@@ -590,6 +596,7 @@ describe("客服共享队列工作台", () => {
           { status: 201 },
         );
       }
+      if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
 
@@ -645,6 +652,7 @@ describe("客服共享队列工作台", () => {
           replayed: true,
         });
       }
+      if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
 
@@ -681,6 +689,7 @@ describe("客服共享队列工作台", () => {
       if (path === `/api/support/workbench/tickets/${BREACHED_TICKET}/events`) {
         return openStream();
       }
+      if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
 
@@ -689,6 +698,34 @@ describe("客服共享队列工作台", () => {
     expect(await screen.findByRole("heading", { name: "授权工单详情" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "人工公开回复" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "公开回复" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "标准补偿" })).not.toBeInTheDocument();
+  });
+
+  it("读取标准补偿方案时展示 loading", async () => {
+    let resolveOptions: ((value: Response) => void) | undefined;
+    const pendingOptions = new Promise<Response>((resolve) => {
+      resolveOptions = resolve;
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [handoffItem()], [], [HANDOFF_TICKET]);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json(humanDetails());
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      if (path.endsWith("/compensation-options")) return pendingOptions;
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+    expect(await screen.findByText("正在读取当前允许的标准补偿方案…")).toBeInTheDocument();
+    resolveOptions?.(couponOptions());
+    expect(await screen.findByText("10.00 CNY")).toBeInTheDocument();
   });
 
   it("重新登录后不会沿用上一主体未确认发送请求", async () => {
@@ -697,6 +734,13 @@ describe("客服共享队列工作台", () => {
       JSON.stringify({
         idempotencyKey: "16300000-0000-4000-8000-000000000003",
         body: "上一主体未确认的回复",
+      }),
+    );
+    globalThis.sessionStorage.setItem(
+      `support-workbench:pending-compensation:${HANDOFF_TICKET}`,
+      JSON.stringify({
+        kind: "proposal",
+        idempotencyKey: "16400000-0000-4000-8000-000000000003",
       }),
     );
     announceHumanSessionChange("logged-out");
@@ -712,6 +756,7 @@ describe("客服共享队列工作台", () => {
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
         return openStream();
       }
+      if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
 
@@ -720,6 +765,204 @@ describe("客服共享队列工作台", () => {
     expect(await screen.findByRole("heading", { name: "人工公开回复" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "查询发送结果" })).not.toBeInTheDocument();
     expect(screen.queryByText("上一主体未确认的回复")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查询提交结果" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("上次标准补偿提交结果尚未确认，请查询 Spring 权威结果。"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("HUMAN 模式展示 Spring 计算的标准补偿并提交审批", async () => {
+    const idempotencyKey = "16400000-0000-4000-8000-000000000001";
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(idempotencyKey);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [handoffItem()], [], [HANDOFF_TICKET]);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json(humanDetails());
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      if (path.endsWith("/compensation-options")) return couponOptions();
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/compensation-proposals`) {
+        expect(init?.method).toBe("POST");
+        expect(new Headers(init?.headers).get("Idempotency-Key")).toBe(idempotencyKey);
+        expect(JSON.parse(String(init?.body))).toEqual({
+          schema: "support-workbench-v2",
+          planCode: "COUPON",
+          reasonCode: "LOGISTICS_DELAY",
+        });
+        return Response.json(
+          {
+            schema: "support-workbench-v2",
+            ticketId: HANDOFF_TICKET,
+            requestId: idempotencyKey,
+            proposalRevisionId: "16400000-0000-0000-0000-000000000101",
+            proposalRevision: 1,
+            compensationMethod: "COUPON",
+            amount: 10,
+            currency: "CNY",
+            status: "PENDING_APPROVAL",
+            outcome: "ACCEPTED",
+            replayed: false,
+          },
+          { status: 201 },
+        );
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+
+    expect(await screen.findByRole("heading", { name: "标准补偿" })).toBeInTheDocument();
+    expect(screen.getByText("10.00 CNY")).toBeInTheDocument();
+    expect(screen.getByText("delay-policy-v1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "提交审批" }));
+    expect(
+      await screen.findByText("标准补偿提案已提交审批。客户只会看到类型、金额和待审批。"),
+    ).toBeInTheDocument();
+  });
+
+  it("标准补偿提交结果未知时查询 Spring 权威结果", async () => {
+    const idempotencyKey = "16400000-0000-4000-8000-000000000002";
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(idempotencyKey);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [handoffItem()], [], [HANDOFF_TICKET]);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json(humanDetails());
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      if (path.endsWith("/compensation-options")) return couponOptions();
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/compensation-proposals`) {
+        throw new TypeError("disconnected");
+      }
+      if (
+        path ===
+        `/api/support/workbench/tickets/${HANDOFF_TICKET}/compensation-proposals/${idempotencyKey}`
+      ) {
+        expect(init?.method ?? "GET").toBe("GET");
+        return Response.json({
+          schema: "support-workbench-v2",
+          ticketId: HANDOFF_TICKET,
+          requestId: idempotencyKey,
+          proposalRevisionId: "16400000-0000-0000-0000-000000000101",
+          proposalRevision: 1,
+          compensationMethod: "COUPON",
+          amount: 10,
+          currency: "CNY",
+          status: "PENDING_APPROVAL",
+          outcome: "ACCEPTED",
+          replayed: true,
+        });
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+    expect(await screen.findByRole("heading", { name: "标准补偿" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "提交审批" }));
+    expect(await screen.findByRole("button", { name: "查询提交结果" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "查询提交结果" }));
+    expect(
+      await screen.findByText("已从 Spring 权威结果确认标准补偿提案已提交审批。"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查询提交结果" })).not.toBeInTheDocument();
+  });
+
+  it("标准补偿方案读取失败时展示 error", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [handoffItem()], [], [HANDOFF_TICKET]);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json(humanDetails());
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      if (path.endsWith("/compensation-options")) return new Response(null, { status: 503 });
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+    expect(
+      await screen.findByText("标准补偿方案暂时不可用，请重新同步后再试。"),
+    ).toBeInTheDocument();
+  });
+
+  it("没有标准方案时展示 empty，并允许独立例外补偿申请", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [handoffItem()], [], [HANDOFF_TICKET]);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json(humanDetails());
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      if (path.endsWith("/compensation-options")) {
+        return Response.json({
+          schema: "support-workbench-v2",
+          policyVersion: "delay-policy-v1",
+          plans: [],
+        });
+      }
+      if (path.endsWith("/exceptional-compensation-requests")) {
+        expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toEqual({
+          schema: "support-workbench-v2",
+          reasonCode: "STANDARD_PLAN_INSUFFICIENT",
+          justification: "标准优惠券无法覆盖客户损失",
+        });
+        return Response.json(
+          {
+            schema: "support-workbench-v2",
+            ticketId: HANDOFF_TICKET,
+            requestId: "ex-1",
+            exceptionalRequestId: "16400000-0000-0000-0000-000000000201",
+            reasonCode: "STANDARD_PLAN_INSUFFICIENT",
+            status: "SUBMITTED",
+            outcome: "ACCEPTED",
+            replayed: false,
+          },
+          { status: 201 },
+        );
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+    expect(await screen.findByText("当前没有允许的标准补偿方案。")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "例外补偿说明" }), {
+      target: { value: "标准优惠券无法覆盖客户损失" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "提交例外补偿申请" }));
+    expect(
+      await screen.findByText("例外补偿申请已提交，不会走普通提案审批捷径。"),
+    ).toBeInTheDocument();
   });
 
   it("空队列展示 empty 状态且领取前详情区保持等待", async () => {
@@ -805,6 +1048,23 @@ function humanDetails() {
       },
     ],
   };
+}
+
+function couponOptions() {
+  return Response.json({
+    schema: "support-workbench-v2",
+    policyVersion: "delay-policy-v1",
+    plans: [
+      {
+        planCode: "COUPON",
+        compensationMethod: "COUPON",
+        amount: 10,
+        capAmount: 10,
+        currency: "CNY",
+        reasonCodes: ["LOGISTICS_DELAY"],
+      },
+    ],
+  });
 }
 
 function snapshotResponse(

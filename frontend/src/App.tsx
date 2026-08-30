@@ -36,6 +36,12 @@ type Snapshot = {
     body: string;
     progressStage: "UNDERSTANDING" | "VERIFYING_FACTS" | "QUERYING_RULES" | "COMPOSING_REPLY";
   } | null;
+  pendingCompensation?: {
+    compensationMethod: string;
+    amount: string;
+    currency: string;
+    status: "PENDING_REVIEW";
+  } | null;
 };
 
 type EventEnvelope = {
@@ -907,6 +913,10 @@ export function App() {
             ? { status: "FAILED", body: "", progressStage: "COMPOSING_REPLY" }
             : current.replyStream,
       };
+    } else if (event.type === "COMPENSATION_REVIEW_PENDING") {
+      const pending = parsePendingCompensation(payload);
+      if (!pending) return false;
+      next = { ...current, cursor: event.id, pendingCompensation: pending };
     } else if (
       event.type === "TICKET_RESOLVED" ||
       event.type === "TICKET_REOPENED" ||
@@ -1285,6 +1295,34 @@ export function App() {
               <p>{currentLifecyclePresentation.description}</p>
             </div>
           </div>
+          {snapshot.pendingCompensation && (
+            <aside
+              className="pending-compensation-card"
+              aria-labelledby="pending-compensation-title"
+            >
+              <p className="eyebrow">补偿建议</p>
+              <h3 id="pending-compensation-title">待审批</h3>
+              <dl>
+                <div>
+                  <dt>建议类型</dt>
+                  <dd>
+                    {compensationMethodLabel(snapshot.pendingCompensation.compensationMethod)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>建议金额</dt>
+                  <dd>
+                    {snapshot.pendingCompensation.amount} {snapshot.pendingCompensation.currency}
+                  </dd>
+                </div>
+                <div>
+                  <dt>当前状态</dt>
+                  <dd>待审批</dd>
+                </div>
+              </dl>
+              <p>最终结果将在处理完成后通知你。现在还没有批准或执行补偿。</p>
+            </aside>
+          )}
           <div className="conversation-heading">
             <div>
               <p className="eyebrow">公开沟通</p>
@@ -1516,19 +1554,22 @@ export function App() {
 function isSnapshot(value: unknown): value is Snapshot {
   if (
     !isRecord(value) ||
-    !hasOnlyKeys(value, [
-      "view",
-      "schema",
-      "cursor",
-      "ticket",
-      "messages",
-      "clarification",
-      "replyStream",
-    ]) ||
     value.view !== "PUBLIC_CONVERSATION" ||
     value.schema !== PUBLIC_CONVERSATION_SCHEMA
   )
     return false;
+  const keys = Object.keys(value);
+  const required = [
+    "view",
+    "schema",
+    "cursor",
+    "ticket",
+    "messages",
+    "clarification",
+    "replyStream",
+  ];
+  if (!required.every((key) => keys.includes(key))) return false;
+  if (keys.some((key) => !required.includes(key) && key !== "pendingCompensation")) return false;
   const cursor = typeof value.cursor === "string" ? parseCursor(value.cursor) : null;
   return (
     cursor?.epoch === value.schema &&
@@ -1542,8 +1583,40 @@ function isSnapshot(value: unknown): value is Snapshot {
     Number(value.ticket.agentGeneration) >= 0 &&
     value.messages.every(isPublicMessage) &&
     isClarification(value.clarification) &&
-    (value.replyStream === undefined || isReplyStream(value.replyStream))
+    (value.replyStream === undefined || isReplyStream(value.replyStream)) &&
+    (value.pendingCompensation === undefined ||
+      value.pendingCompensation === null ||
+      parsePendingCompensation(value.pendingCompensation) !== null)
   );
+}
+
+function parsePendingCompensation(
+  value: unknown,
+): NonNullable<Snapshot["pendingCompensation"]> | null {
+  if (!isRecord(value)) return null;
+  const keys = Object.keys(value);
+  const allowed = ["compensationMethod", "amount", "currency", "status"];
+  if (
+    !["compensationMethod", "amount", "status"].every((key) => keys.includes(key)) ||
+    keys.some((key) => !allowed.includes(key)) ||
+    typeof value.compensationMethod !== "string" ||
+    value.status !== "PENDING_REVIEW" ||
+    (value.currency !== undefined && value.currency !== "CNY")
+  )
+    return null;
+  const amount =
+    typeof value.amount === "number" && Number.isFinite(value.amount)
+      ? value.amount.toFixed(2)
+      : typeof value.amount === "string"
+        ? value.amount
+        : null;
+  if (!amount || !/^\d+\.\d{2}$/.test(amount)) return null;
+  return {
+    compensationMethod: value.compensationMethod,
+    amount,
+    currency: "CNY",
+    status: "PENDING_REVIEW",
+  };
 }
 
 function isReplyStream(value: unknown): value is NonNullable<Snapshot["replyStream"]> | null {
@@ -1988,6 +2061,12 @@ function shortTicketId(ticketId: string) {
 
 function handlingModeLabel(handlingMode: string) {
   return handlingMode === "HUMAN" ? "人工客服处理中" : "智能客服处理中";
+}
+
+function compensationMethodLabel(method: string) {
+  if (method === "COUPON") return "优惠券";
+  if (method === "SIMULATED_PARTIAL_REFUND") return "模拟原路部分退款";
+  return method;
 }
 
 const LIFECYCLE_PRESENTATIONS: Record<

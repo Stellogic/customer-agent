@@ -90,4 +90,23 @@ class DelayCompensationPolicyTest {
     static Stream<Arguments> nonProposablePartialRefundAmounts() {
         return Stream.of(Arguments.of("0.00"), Arguments.of("-1.00"), Arguments.of("0.04"));
     }
+
+    @Test
+    void currentPlanExposesSpringComputedTypeAmountCapAndPolicyVersion() {
+        DelayCompensationPolicy.Plan coupon =
+                policy.currentPlan(Duration.ofHours(30), new BigDecimal("268.00"));
+        assertThat(coupon.eligible()).isTrue();
+        assertThat(coupon.planCode()).isEqualTo("COUPON");
+        assertThat(coupon.method()).isEqualTo(DelayCompensationPolicy.Method.COUPON);
+        assertThat(coupon.amount()).isEqualByComparingTo("10.00");
+        assertThat(coupon.capAmount()).isEqualByComparingTo("10.00");
+        assertThat(coupon.policyVersion()).isEqualTo(DelayCompensationPolicy.VERSION);
+
+        DelayCompensationPolicy.Plan refund =
+                policy.currentPlan(Duration.ofHours(80), new BigDecimal("268.00"));
+        assertThat(refund.planCode()).isEqualTo("SIMULATED_PARTIAL_REFUND");
+        assertThat(refund.amount()).isEqualByComparingTo("26.80");
+        assertThat(refund.capAmount()).isEqualByComparingTo("50.00");
+        assertThat(refund.policyVersion()).isEqualTo(DelayCompensationPolicy.VERSION);
+    }
 }
