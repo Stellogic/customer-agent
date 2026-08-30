@@ -30,7 +30,15 @@ PostgreSQL [显式锁](https://www.postgresql.org/docs/17/explicit-locking.html)
 
 ## 验证状态
 
-尚未执行测试、格式/类型预检或完整门禁。当前遵守协调任务预约窗口，FREE 不代表获准测试。
+2026-08-30 在协调明确放行的单次 backend 空档运行
+`pwsh ./scripts/check.ps1 -Component backend -SkipAcceptance -Issue 162`，结果 FAIL（退出码 1）。
+HEAD 为 `dfabf13d9417ce2cbf214c58f47b073c38376f03`，记录的 `origin/main` 为
+`2ca9d097da1f93d4cdf3eeef347c62cf51f0e058`。公共预检发现
+`e2e/issue162.auto-resolution.spec.ts` 未分类，尚未进入 backend 编译或单测。
+已将该含登录与交互的用例加入 Serial 清单；仅静态修复，没有重试。
+运行后一次宿主锁查询确认 FREE，并通知协调任务结束空档。
+本次入口自动生成的 RunId 未捕获，退出时状态文件已删除，不能补造运行标识。
+后端业务测试、格式/类型预检与最终完整门禁仍未完成；后续测试需要重新放行，FREE 不代表获准测试。
 测试源码覆盖白名单/拒绝场景、客户 API 身份与 CSRF、快照/SSE、倒计时与取消失败恢复、桌面与窄屏。
 `scripts/test-auto-resolution.ps1` 已接入隔离完整门禁：固定时钟推进、真实能力 HTTP 与完整回复、
 截止时刻已接受消息优先、到期失效矩阵、重启幂等与七十二小时关闭，最终恢复原时钟。
