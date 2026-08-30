@@ -38,10 +38,10 @@
 
 | 字段 | 记录 |
 | --- | --- |
-| 基线 SHA | `0a9ee031ca5c5febcd0c6fb11a660c5eee83046f` |
-| 受测 SHA / RunId | 聚焦阶段工作树未提交；最终门禁未验证 |
+| 基线 SHA | 开始实施：`0a9ee031ca5c5febcd0c6fb11a660c5eee83046f`；已同步并用于最新双轴审查：`efbdb8348dc9c12f259c69d9e8c16de5e4d3994c`（仅增加过程数据记录要求） |
+| 受测 SHA / RunId | 聚焦阶段工作树未提交，不能只凭 SHA 标识中间构建；固定旧 SHA 的两次 RED 见正文。当前代码与 fixture 修正提交到 `0eb800241352166064c0718509190e066be003b2`；fixture 修正尚未复测，最终门禁未验证 |
 | 聚焦测试结果 / 失败对照 | 最新 `issue165-focus-1c677b9f`：15 项 Java 测试通过；Ruff/Pyright 通过（0 错误、0 警告）；前 5 个合成订单 HTTP/PostgreSQL 场景通过，第 6 个自动解决候选断言失败，因此整轮 FAIL。随后仅静态修正测试数据，未复测。此前 5 订单版本整轮通过。过程中修复 3 项 RUF002/RUF003 标点 lint、1 项 SIM117 写法 lint；业务并发失败对照见上方固定 SHA 的两类锁序 RED。 |
-| Standards / Spec | 首轮 Standards PASS、Spec FAIL（上述锁序）；修复后等待复审，不沿用首轮结果 |
+| Standards / Spec | 对 `efbdb834` → `0eb80024` 的最新独立静态复审：Standards PASS（0 项有效违反）、Spec PASS（0 项剩余缺陷）。此前两轮 Spec P1 均有修复和真实 PostgreSQL 失败对照；最新 PASS 不替代未完成的测试。 |
 | 最终完整门禁 | 未验证 |
 | 耗时 | 首轮 `issue165-focus-3d2576e3` 219.531 秒；第二轮静态失败 `issue165-focus-36477ea6` 46.634 秒；第三轮 `issue165-focus-d2f7426a` 133.209 秒；锁序回归静态失败 `issue165-focus-1dbbf447` 37.497 秒；5 订单 GREEN `issue165-focus-41f02a95` 135.342 秒；6 订单候选断言失败 `issue165-focus-1c677b9f` 145.380 秒。均含环境准备/清理，不是单请求延迟；缓存状态与改动不同，不构成性能提升对照。 |
 | 模型调用 / 外部费用 | 本票不需调用真实模型；外部费用未采集，不能等同全部开发成本为零 |
