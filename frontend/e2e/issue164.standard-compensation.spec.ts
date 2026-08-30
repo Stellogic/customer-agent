@@ -59,7 +59,13 @@ test("Issue #164 选择标准补偿并提交审批", async ({ browser }) => {
   await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
   await expect(support.getByRole("heading", { name: "标准补偿" })).toBeVisible();
   await expect(support.getByText("delay-policy-v1")).toBeVisible();
-  await expect(support.getByText("26.80 CNY").first()).toBeVisible();
+  const eligibleAmount = support
+    .getByRole("region", { name: "标准补偿", exact: true })
+    .locator(".support-compensation-facts > div")
+    .filter({ has: support.locator("dt").filter({ hasText: /^资格金额$/ }) })
+    .locator("dd");
+  await expect(eligibleAmount).toHaveText("26.80 CNY");
+  await expect(eligibleAmount).toBeVisible();
   await expect(support.getByRole("combobox", { name: "补偿方案" })).toContainText(
     "模拟原路部分退款 · 26.80 CNY",
   );
