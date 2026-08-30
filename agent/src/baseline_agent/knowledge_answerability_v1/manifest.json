@@ -19,8 +19,9 @@
       "queryCount": 144,
       "articleCount": 24,
       "author": "Codex implementation task",
-      "annotationReview": "PENDING_STATIC_REVIEW",
-      "computedFeatures": "NOT_RUN"
+      "annotationReview": "PASS",
+      "computedFeatures": "NOT_RUN",
+      "annotationReviewSource": "Spec static review at 4bf8c6dc07793ec07794cf1926fa69c4ec3d7c11; no model/features run"
     },
     {
       "split": "calibration",
@@ -35,8 +36,9 @@
       "queryCount": 72,
       "articleCount": 12,
       "author": "Codex implementation task",
-      "annotationReview": "PENDING_STATIC_REVIEW",
-      "computedFeatures": "NOT_RUN"
+      "annotationReview": "PASS",
+      "computedFeatures": "NOT_RUN",
+      "annotationReviewSource": "Spec static review at 4bf8c6dc07793ec07794cf1926fa69c4ec3d7c11; no model/features run"
     }
   ],
   "holdout": {
