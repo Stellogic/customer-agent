@@ -11,7 +11,7 @@ from decimal import Decimal
 import httpx
 import psycopg
 
-from smoke import expect_status, login_human
+from smoke import collect_investigation_facts, evidence_sufficiency, expect_status, login_human
 
 
 class Acceptance:
@@ -313,6 +313,34 @@ class Acceptance:
                 "'2026-08-08T13:00Z', '2026-08-09T13:00Z')",
                 (revision, uuid.uuid4(), tickets[0], order, revision.hex * 2),
             )
+        # 审计外键也锁工单行: claim 必须先经过工单行屏障, 再取得订单锁。
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with psycopg.connect(self.database) as connection:
+                pid = connection.execute("select pg_backend_pid()").fetchone()[0]
+                connection.execute(
+                    "select id from support_ticket where id = %s for update", (tickets[0],)
+                )
+                claim = pool.submit(
+                    self.approver.post,
+                    f"{self.spring}/api/approver/compensation-proposals/{revision}/claims",
+                    headers={"Idempotency-Key": str(uuid.uuid4())},
+                    json={"requestedLeaseSeconds": 900},
+                )
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    if connection.execute(
+                        "select count(*) from pg_stat_activity where %s = any(pg_blocking_pids(pid))",
+                        (pid,),
+                    ).fetchone()[0]:
+                        break
+                    time.sleep(0.02)
+                else:
+                    raise AssertionError("到期 claim 未到达工单行锁屏障")
+                assert connection.execute(
+                    "select pg_try_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (order + "\nCOMPENSATION_ALLOWANCE",),
+                ).fetchone()[0], "claim 等待工单行时抢先占有订单锁"
+            expect_status(claim.result(timeout=10), 410)
         # 在订单锁被持有时, 到期 claim 必须等在订单锁前, 不能先持有提案行。
         with ThreadPoolExecutor(max_workers=1) as pool:
             with psycopg.connect(self.database) as connection:
@@ -361,6 +389,21 @@ class Acceptance:
             psycopg.connect(self.database) as connection,
         ):
             connection.execute(
+                "select id from support_ticket where id = %s for update", (tickets[1],)
+            )
+            queue = pool.submit(
+                self.approver.get, f"{self.spring}/api/approver/compensation-proposals"
+            )
+            expect_status(queue.result(timeout=5), 200)
+            assert connection.execute(
+                "select pg_try_advisory_xact_lock(hashtextextended(%s, 0))",
+                (order + "\nCOMPENSATION_ALLOWANCE",),
+            ).fetchone()[0]
+        with (
+            ThreadPoolExecutor(max_workers=1) as pool,
+            psycopg.connect(self.database) as connection,
+        ):
+            connection.execute(
                 "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
                 (order + "\nCOMPENSATION_ALLOWANCE",),
             )
@@ -378,6 +421,90 @@ class Acceptance:
                 "select status from compensation_proposal_revision where id = %s", (second,)
             ).fetchone() == ("EXPIRED",)
         print("#165 到期 claim 在订单锁前等待；队列跳过忙订单且下次完成过期；无提案行/订单锁反序")
+
+    def independent_auto_resolution(self) -> None:
+        order = "ORDER-ALLOW165-AUTO"
+        ticket, sibling = self.tickets(order)
+        self.proposal(sibling)
+        with psycopg.connect(os.environ["SPRING_FIXTURE_DATABASE_URI"]) as connection:
+            connection.execute(
+                "update synthetic_order set delay_hours = 23, delay_seconds = 82800 where order_reference = %s",
+                (order,),
+            )
+        generation = uuid.uuid4()
+        with psycopg.connect(self.database) as connection:
+            connection.execute(
+                "update support_ticket set handling_mode = 'AGENT', description = '请解释物流状态' where id = %s",
+                (ticket,),
+            )
+            connection.execute(
+                "insert into agent_processing_generation (id, ticket_id, generation_number, thread_id, status, created_at) values (%s, %s, 1, %s, 'ACTIVE', '2026-08-09T14:00Z')",
+                (generation, ticket, uuid.uuid4()),
+            )
+
+        def headers(operation: str, request: str) -> dict[str, str]:
+            return {
+                "Authorization": f"Bearer {os.environ['AGENT_MACHINE_TOKEN']}",
+                "X-Agent-Generation-Id": str(generation),
+                "X-Agent-Operation": operation,
+                "Idempotency-Key": str(generation) + request,
+            }
+
+        facts = collect_investigation_facts(
+            self.support,
+            self.spring,
+            uuid.UUID(ticket),
+            generation,
+            headers("USE_INVESTIGATION_CAPABILITY", "facts"),
+        )
+        base = f"{self.spring}/internal/agent/tickets/{ticket}/generations/{generation}"
+        body = f"经核验，订单 {order} 的物流延迟不足 24 小时，当前不符合补偿条件。"
+        for index, payload in enumerate(
+            ({"type": "STREAM_STARTED"}, {"type": "CONTENT_DELTA", "chunkIndex": 0, "delta": body})
+        ):
+            expect_status(
+                self.support.post(
+                    base + "/public-reply-events",
+                    headers=headers("PUBLISH_PUBLIC_REPLY_EVENT", str(index)),
+                    json=payload,
+                ),
+                202,
+            )
+        conclusion = {
+            "compensationRequired": False,
+            "reasonCode": "DELAY_UNDER_24_HOURS",
+            "delayHours": facts["delayHours"],
+            "delaySeconds": facts["delaySeconds"],
+            "orderReference": order,
+            "evidenceRefs": facts["evidenceRefs"],
+            **evidence_sufficiency(order),
+            "customerReply": {
+                "schemaVersion": "customer-reply-v1",
+                "body": body,
+                "intent": "NO_COMPENSATION_RESOLUTION",
+                "evidenceRefs": facts["evidenceRefs"],
+                "escalationRequired": False,
+                "referencedOrder": order,
+            },
+        }
+        expect_status(
+            self.support.post(
+                base + "/conclusions",
+                headers=headers("SUBMIT_INVESTIGATION_CONCLUSION", "conclusion"),
+                json=conclusion,
+            ),
+            200,
+        )
+        with psycopg.connect(self.database) as connection:
+            candidate = connection.execute(
+                "select status, extract(epoch from due_at - created_at) from ticket_auto_resolution where ticket_id = %s",
+                (ticket,),
+            ).fetchone()
+            assert candidate == ("PENDING", Decimal("300")), candidate
+            assert connection.execute(
+                "select status from compensation_proposal_revision where ticket_id = %s", (sibling,)
+            ).fetchone() == ("PENDING_APPROVAL",)
+        print("#165 同订单另一工单待审批不阻止当前低风险工单形成五分钟自动解决候选")
 
 
 def main() -> None:
@@ -397,7 +524,8 @@ def main() -> None:
         acceptance.failure_and_combination()
         acceptance.storage_race()
         acceptance.expiry_lock_order()
-    print("Issue #165 订单额度仲裁验收 PASS：5 个合成订单，无模型调用")
+        acceptance.independent_auto_resolution()
+    print("Issue #165 订单额度仲裁验收 PASS：6 个合成订单，无模型调用")
 
 
 if __name__ == "__main__":

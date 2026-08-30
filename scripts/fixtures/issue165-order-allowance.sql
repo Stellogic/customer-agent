@@ -13,4 +13,6 @@ INSERT INTO synthetic_order (
     ('ORDER-ALLOW165-STORAGE', 'customer-demo', 268.00, 'CNY', 80, 288000,
      true, false, false, false, 'delay-policy-v1', 30.00),
     ('ORDER-ALLOW165-EXPIRY', 'customer-demo', 268.00, 'CNY', 80, 288000,
+     true, false, false, false, 'delay-policy-v1', 30.00),
+    ('ORDER-ALLOW165-AUTO', 'customer-demo', 268.00, 'CNY', 80, 288000,
      true, false, false, false, 'delay-policy-v1', 30.00);

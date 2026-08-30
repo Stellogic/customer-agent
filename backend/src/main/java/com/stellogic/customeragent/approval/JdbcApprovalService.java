@@ -512,7 +512,6 @@ class JdbcApprovalService implements ApprovalService {
                         Long.toString(command.leaseVersion()),
                         command.internalReason());
         lockRequest(command.approverId(), command.requestId(), "PROPOSAL_DECISION");
-        lockTicketAuthority(command.revisionId());
         lockParticipantPolicy(command.revisionId());
         requireNotSupportParticipant(command.revisionId(), command.approverId());
         List<DecisionReplay> existing =
@@ -666,7 +665,6 @@ class JdbcApprovalService implements ApprovalService {
                         Long.toString(command.leaseVersion()),
                         normalizedNote);
         lockRequest(command.approverId(), command.requestId(), "PROPOSAL_DECISION");
-        lockTicketAuthority(command.revisionId());
         lockParticipantPolicy(command.revisionId());
         requireNotSupportParticipant(command.revisionId(), command.approverId());
         List<ApprovalReplay> existing =
@@ -949,6 +947,10 @@ class JdbcApprovalService implements ApprovalService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
         }
         authorityLock.acquire(ticketIds.getFirst());
+        jdbc.query(
+                "select id from support_ticket where id = ? for key share",
+                (rs, row) -> rs.getObject(1, UUID.class),
+                ticketIds.getFirst());
     }
 
     private void requireNotSupportParticipant(UUID revisionId, String approverId) {
@@ -986,6 +988,7 @@ class JdbcApprovalService implements ApprovalService {
     }
 
     private void lockOrderForProposal(UUID revisionId) {
+        lockTicketAuthority(revisionId);
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(order_reference || E'\\nCOMPENSATION_ALLOWANCE', 0)) "
                         + "from compensation_proposal_revision where id = ?",

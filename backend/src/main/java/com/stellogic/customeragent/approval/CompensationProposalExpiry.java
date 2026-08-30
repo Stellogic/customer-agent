@@ -19,25 +19,41 @@ public final class CompensationProposalExpiry {
     }
 
     public void expireDue(Instant now) {
-        List<String> orders =
+        List<DueRevision> due =
                 jdbc.query(
-                        "select distinct order_reference from compensation_proposal_revision "
-                                + "where status = 'PENDING_APPROVAL' and expires_at <= ? order by order_reference",
-                        (rs, row) -> rs.getString(1),
+                        "select id, ticket_id, order_reference from compensation_proposal_revision "
+                                + "where status = 'PENDING_APPROVAL' and expires_at <= ? order by order_reference, ticket_id",
+                        (rs, row) ->
+                                new DueRevision(
+                                        rs.getObject(1, UUID.class),
+                                        rs.getObject(2, UUID.class),
+                                        rs.getString(3)),
                         Timestamp.from(now));
-        for (String order : orders) {
+        for (DueRevision revision : due) {
+            Boolean ticketAcquired =
+                    jdbc.queryForObject(
+                            "select pg_try_advisory_xact_lock(hashtextextended(?, 0))",
+                            Boolean.class,
+                            revision.ticketId() + "\nBUSINESS_AUTHORITY");
+            if (!Boolean.TRUE.equals(ticketAcquired)) continue;
+            List<UUID> tickets =
+                    jdbc.query(
+                            "select id from support_ticket where id = ? for key share skip locked",
+                            (rs, row) -> rs.getObject(1, UUID.class),
+                            revision.ticketId());
+            if (tickets.isEmpty()) continue;
             Boolean acquired =
                     jdbc.queryForObject(
                             "select pg_try_advisory_xact_lock(hashtextextended(?, 0))",
                             Boolean.class,
-                            order + "\nCOMPENSATION_ALLOWANCE");
+                            revision.orderReference() + "\nCOMPENSATION_ALLOWANCE");
             if (!Boolean.TRUE.equals(acquired)) continue;
             List<UUID> revisionIds =
                     jdbc.query(
-                            "select id from compensation_proposal_revision where order_reference = ? "
+                            "select id from compensation_proposal_revision where id = ? "
                                     + "and status = 'PENDING_APPROVAL' and expires_at <= ? for update skip locked",
                             (rs, row) -> rs.getObject(1, UUID.class),
-                            order,
+                            revision.id(),
                             Timestamp.from(now));
             revisionIds.forEach(revisionId -> expireLocked(revisionId, now));
         }
@@ -115,4 +131,6 @@ public final class CompensationProposalExpiry {
     private record ExpiryScope(UUID ticketId, Long leaseVersion) {}
 
     private record PendingRevision(UUID id, Instant expiresAt) {}
+
+    private record DueRevision(UUID id, UUID ticketId, String orderReference) {}
 }

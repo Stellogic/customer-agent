@@ -35,3 +35,17 @@ Issue #165 订单额度仲裁验收 PASS：5 个合成订单，无模型调用
 FOCUS_PASS issue=165 run=issue165-focus-41f02a95 seconds=131.0323216
 LOCK_RELEASED issue=165 run=issue165-focus-41f02a95 seconds=135.3416215
 JUnit fix run: 15 tests (adds CompensationProposalExpiryTest=1), 0 failures, 0 errors. Five synthetic orders; no real model calls.
+
+Ticket FK lock-order RED target: 4f65f92455a226fe0d9523ed3f40a5fa8d5282db.
+AssertionError: claim 等待工单行时抢先占有订单锁
+LOCK_RELEASED issue=165 run=issue165-focus-df095395 seconds=38.5500683
+Latest working-source run (not an all-pass result):
+#17 2.570 All checks passed!
+#17 60.08 0 errors, 0 warnings, 0 informations
+#165 PostgreSQL 并发预占=1成功/1约束冲突；已消费不恢复额度
+#165 到期 claim 在订单锁前等待；队列跳过忙订单且下次完成过期；无提案行/订单锁反序
+  File "/smoke/order_allowance_smoke.py", line 525, in main
+    acceptance.independent_auto_resolution()
+AssertionError
+LOCK_RELEASED issue=165 run=issue165-focus-1c677b9f seconds=145.3800571
+JUnit latest run: 15 tests, 0 failures, 0 errors. The sixth synthetic order used a non-whitelisted description; fixture correction is not yet verified. The ticket/order/proposal lock barriers passed before the sixth scenario failed.
