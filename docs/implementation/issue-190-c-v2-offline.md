@@ -2,7 +2,9 @@
 
 [Issue #190](https://github.com/Stellogic/customer-agent/issues/190) / [Draft PR203](https://github.com/Stellogic/customer-agent/pull/203)；2026-08-31。实施依据为已接受的[单一合同变更和完整72题计划](issue-190-c-v2-contract-proposal.md)。本阶段只离线验证，不允许真实72题、留出/#189、产品切换、最终门禁或合入。
 
-**最新状态：CODE_READY_OFFLINE_PASS。** d轮覆盖最终源码 `aa5e03c8c78e0e849b14ad3c7c6fb8987948b9d4`，双轴静态CR均PASS；本轮窗口已归还。真实C-v2质量未验证，不能据此解阻下游或宣称Issue交付。
+**离线阶段结论：CODE_READY_OFFLINE_PASS。** d轮覆盖最终源码 `aa5e03c8c78e0e849b14ad3c7c6fb8987948b9d4`，双轴静态CR均PASS；该轮窗口已归还。当时真实C-v2质量尚未验证，不能据此解阻下游或宣称Issue交付。
+
+后续已获单独授权完成[唯一一次真实72题开发验证](issue-190-c-v2-development-attempt-a.md)：契约72/72合法，但语义质量FAIL；此结果不改变本文件的历史离线通过记录，也不构成交付PASS。
 
 ## 实现边界
 
