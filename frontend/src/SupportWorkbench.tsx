@@ -390,11 +390,7 @@ export function SupportWorkbench() {
         "发送结果暂未确认；请查询 Spring 权威结果，不要重复发送。",
       );
     }
-    const result = (await parseReplyResponse(
-      response,
-      ticketId,
-      idempotencyKey,
-    )) as SupportPublicReplyResponse;
+    const result = await parseReplyResponse(response, ticketId, idempotencyKey);
     void refreshTicketDetails(ticketId);
     return result;
   }
@@ -415,11 +411,7 @@ export function SupportWorkbench() {
     if (!response.ok) {
       throw new SupportReplyUncertainError("Spring 尚未返回可确认结果；请不要重新发送相同内容。");
     }
-    const result = (await parseReplyResponse(
-      response,
-      ticketId,
-      idempotencyKey,
-    )) as SupportPublicReplyResponse;
+    const result = await parseReplyResponse(response, ticketId, idempotencyKey);
     void refreshTicketDetails(ticketId);
     return result;
   }
