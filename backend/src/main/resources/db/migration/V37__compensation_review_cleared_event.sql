@@ -81,9 +81,9 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'invalid compensation review payload';
     END IF;
-    IF NEW.event_type = 'COMPENSATION_REVIEW_CLEARED' AND NOT (
-        NEW.payload ?& ARRAY['status']
-        AND NEW.payload->>'status' IN ('APPROVED', 'REJECTED')
+    IF NEW.event_type = 'COMPENSATION_REVIEW_CLEARED' AND (
+        jsonb_typeof(NEW.payload->'status') IS DISTINCT FROM 'string'
+        OR NEW.payload->>'status' NOT IN ('APPROVED', 'REJECTED')
     ) THEN
         RAISE EXCEPTION 'invalid compensation review cleared payload';
     END IF;

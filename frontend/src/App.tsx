@@ -1685,7 +1685,7 @@ function isCompensationReviewCleared(value: unknown) {
   return (
     isRecord(value) &&
     hasOnlyKeys(value, ["status"]) &&
-    ["APPROVED", "REJECTED"].includes(String(value.status))
+    (value.status === "APPROVED" || value.status === "REJECTED")
   );
 }
 

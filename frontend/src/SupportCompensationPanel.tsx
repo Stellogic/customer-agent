@@ -397,7 +397,9 @@ async function postCompensation(
   try {
     csrf = await loadCsrfToken();
   } catch {
-    throw new CompensationRejectedError("无法取得提交凭证，请稍后重试。");
+    throw new CompensationUncertainError(
+      "提交结果暂未确认；请查询 Spring 权威结果，不要重复提交。",
+    );
   }
   let response: Response;
   try {
