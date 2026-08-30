@@ -1,0 +1,9 @@
+#10 9.043 BUILD SUCCESSFUL in 8s
+13 passed in 0.30s
+0 errors, 0 warnings, 0 informations
+#10 13.86 BUILD SUCCESSFUL in 13s
+#11 99.41 BUILD SUCCESSFUL in 1m 38s
+#13 86.32  Test Files  13 passed | 1 skipped (14)
+#13 86.32       Tests  164 passed | 3 skipped (167)
+OWN_LOCK_RELEASED issue190-preflight-20260831d PASS
+TEST_GATE_FREE
