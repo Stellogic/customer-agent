@@ -2,6 +2,8 @@
 
 2026-08-31；[Issue #190](https://github.com/Stellogic/customer-agent/issues/190) / [Draft PR203](https://github.com/Stellogic/customer-agent/pull/203)。**CODE_READY_NO_TESTS：本轮只有静态实现、测试源码与审查，无测试/格式/类型/模型运行，无付费许可。** 不以此前受测SHA的PASS替代新增代码验证。
 
+后续另获授权的[离线预检与67项请求字节清单](issue-190-c-remaining67-offline.md)已完成；下文保留本静态阶段当时的未验证状态，不覆盖历史。真实67题仍未运行。
+
 ## 唯一范围与冻结清单
 
 只准备原固定合成开发集第6至72项，共67题，保留原顺序。第一项 `weaving-paraphrase-3`，最后一项 `rainfall-negative-12`。不重新调用前5题、不换题、不改Top5正文或重新检索。

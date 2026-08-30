@@ -52,6 +52,8 @@
 
 ## A方案后续记录
 
+**剩余67题离线预检：** [日志与请求清单](issue-190-c-remaining67-offline.md)，RunId issue190-c-remaining-offline-20260831a，起始1a9dac4/base c19a7ebe，期间仅Ruff排版保存为e449982。三模式实际入口、23聚焦/42相关组件、格式/类型PASS，55.7541624秒；冻结构造器物化67项请求hash，清单SHA cfe20b1d…，无HTTP/模型调用、原费用账本不变。不是67题真实结果或质量提升。
+
 **剩余67题静态准备：** [独立补充诊断边界](issue-190-c-remaining67-static.md)，源码1252495；固定原第6–72题ID/顺序和来源hash，独立不可重开phase，保持原两phase、费用及metrics=null。静态双CR PASS；新增代码/测试源码尚未运行，未生成逐请求字节hash或新增真实结果，不可当作已验证正确性或质量提升。
 
 **C单次真实诊断完成：** [第5请求独立诊断b](issue-190-c-fifth-diagnostic.md)，受测f77e8a5/base c19a7ebe，RunId issue190-c-fifth-diagnostic-20260831b。经新授权只发1次与原第5次同字节SHA请求，合法结构/引文解析通过；输入467/输出32 token，请求观测1500毫秒、Python阶段2.914815秒。新增费用上界0.001689元、全局累计0.010773元、未结算0，实付账单未采集。DIAGNOSTIC_COMPLETED不等于质量PASS，metrics=null；开发仍5请求/4完成，旧原文NOT_CAPTURED未被补造，全局6次调用不能当作6个质量样本。
