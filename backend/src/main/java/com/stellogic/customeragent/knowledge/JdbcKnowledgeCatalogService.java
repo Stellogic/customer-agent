@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-final class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
+class JdbcKnowledgeCatalogService implements KnowledgeCatalogService {
     private static final String VIEW = "KNOWLEDGE_CATALOG";
     private static final String SCHEMA = "knowledge-catalog-v1";
 
