@@ -1,0 +1,65 @@
+{
+  "run_id": "issue190-c-v2-offline-20260831c",
+  "kind": "OFFLINE_ENGINEERING_NOT_MODEL_QUALITY",
+  "launch_arguments": [
+    "-RunId",
+    "issue190-c-v2-offline-20260831c",
+    "-FinalOnly"
+  ],
+  "paid_api_calls": 0,
+  "post_run_shared_ledger_sha256": "c11630710263c473fbf938b60e789b33ef93b776021e258976825fdf47206a50",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da"
+    },
+    {
+      "path": "entry-argv.log",
+      "sha256": "19f72d999cfcdc4255566678908e2731b331f27bcc0f02c4ffd612a5aaf7344f"
+    },
+    {
+      "path": "focused.log",
+      "sha256": "dd8fe9dd4026844abbd9193faa1ee218ef7303a4550c85b82108dff24a0c3140"
+    },
+    {
+      "path": "focused.xml",
+      "sha256": "db7e10f60ff66bcea78d4bc4788e057a1342ce74357d757283a81f44815410f0"
+    },
+    {
+      "path": "format-check.log",
+      "sha256": "870d56ea1dd9e0c036cfe62581f12c237a5daf761f1bd1bd846e4b922d8777c0"
+    },
+    {
+      "path": "lint.log",
+      "sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0"
+    },
+    {
+      "path": "phase.json",
+      "sha256": "3ac3f1335a34490d2aaec1bf7473b896c2c5fa3fa0c3b6c3d6764bf5c9bd358b"
+    },
+    {
+      "path": "preflight.ps1",
+      "sha256": "1a89df2bcf0d05281d5da4174f288949bf763f2c2e62f2ef3ebe2cc088e7806d"
+    },
+    {
+      "path": "types.log",
+      "sha256": "42f66b7c9640157a000f08b25fb29b7644305fa26e668c3187714c398e3b4075"
+    },
+    {
+      "path": "argv/c-v2.log",
+      "sha256": "6d98870c2953cbb10de90a0d1c3337f58ffab50f435f206c09bae51fb68b3129"
+    },
+    {
+      "path": "argv/development.log",
+      "sha256": "a2b1e14e9d81508e81b8ce4cc165ab49ee208b0ac764fef6aca880b787d3ae65"
+    },
+    {
+      "path": "argv/diagnostic.log",
+      "sha256": "2e5b55f7647c46386ac50bd43d73989b2150f75581d602a44d6a46519546c587"
+    },
+    {
+      "path": "argv/remaining.log",
+      "sha256": "4728508e97340507a801a3f75b0b00206861aa67a721bec2a0151278bb0457ba"
+    }
+  ]
+}

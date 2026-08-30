@@ -2,6 +2,8 @@
 
 [Issue #190](https://github.com/Stellogic/customer-agent/issues/190) / [Draft PR203](https://github.com/Stellogic/customer-agent/pull/203)；2026-08-31。实施依据为已接受的[单一合同变更和完整72题计划](issue-190-c-v2-contract-proposal.md)。本阶段只离线验证，不允许真实72题、留出/#189、产品切换、最终门禁或合入。
 
+**最新状态：CODE_READY_OFFLINE_PASS。** d轮覆盖最终源码 `aa5e03c8c78e0e849b14ad3c7c6fb8987948b9d4`，双轴静态CR均PASS；本轮窗口已归还。真实C-v2质量未验证，不能据此解阻下游或宣称Issue交付。
+
 ## 实现边界
 
 - 唯一方法变化：C-v2允许同一编号多条原文摘录，保留精确字段、布尔/数组关系、最多5条、原文1–24字符、编号范围和供应商/usage检查。C-v1资产未改，默认解析仍拒绝重复编号。没有静默修改原始响应。
@@ -23,7 +25,7 @@
 
 `scripts/materialize-knowledge-sufficiency-v2.py`仅在持锁时调用冻结构造器物化请求hash，不创建HTTP客户端或账本。题目/标签/固定Top5归档不改；旧结果不重新解释或评分。新请求字节因prompt/schema名称版本变化而不同，不能与旧合同混称一次实验。
 
-## 验证进度（待最终离线归档补齐）
+## 首轮实施与修复记录
 
 已同步main `c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`；本次无迁移变更，未发布向量迁移仍V42，main的V36/V37等保持原样。
 
@@ -45,4 +47,21 @@
 
 静态PASS @ `31eaa45`，原唯一报告契约缺口已修复。独立spec_review确认C-v2成功及失败均保存六层状态，供应商/usage失败不误记契约通过，旧合同和历史账本保持。两位审查者均未运行验证、查询锁或读取留出/#189。
 
-两轴最终静态发现均0。**当前交接状态：CODE_READY_OFFLINE_RECHECK_REQUIRED**。待协调重新分配离线窗口后，对31eaa45源码完成格式/类型、12项新版聚焦、旧版与相关组件及四模式实际入口复验；项目最终完整门禁和真实模型阶段仍未授权。上文测试项数量12是待运行用例数，不是已通过数。
+两轴静态发现均0。该时点交接状态为CODE_READY_OFFLINE_RECHECK_REQUIRED，12项新版测试尚待运行；此历史状态由下节获准复验结果更新，不把预期用例数写成当时已通过数。
+
+## 分层报告最终离线复验
+
+协调重新放行后，fetch确认base仍为 `c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`。未重物化或修改请求，72项hash仍 `7234a4f5812e976f3e3efc594fc3e2b0760b46b760b0f2a8d403525fbfd5cd91`。
+
+| RunId | 受测干净SHA | 结果与范围 | 耗时 |
+| --- | --- | --- | ---: |
+| issue190-c-v2-offline-20260831c | 42ff4e6a6c5da0293f512cf5053ddcedefd50c66 | 四模式入口、12聚焦、lint/格式PASS；Pyright字典键Literal推断1项错误后停，组件未运行 | 38.5144888秒 |
+| issue190-c-v2-offline-20260831d | aa5e03c8c78e0e849b14ad3c7c6fb8987948b9d4 | 四模式入口、12聚焦、54相关组件、81文件格式/lint、Pyright 0错误/0警告全部PASS | 59.8880946秒 |
+
+唯一修复是为 `checks` 增加 `dict[str, str]` 类型标注；没有方法、判定或请求字节变化。c轮为工程类型检查失败，不能记为模型质量失败。d轮组件54项包含新版12项，不将两次执行相加包装为66项独立测试。四模式入口经实际PowerShell→uv→Python链路，在缺少真实key处按预期停止，未建立真实API调用。受锁启动参数为 `.local/issue190-c-v2-preflight.ps1 -RunId <对应RunId> -FinalOnly`。
+
+增量Standards PASS / Spec PASS @ `aa5e03c`，均确认仅类型标注、无运行时语义变化。此前31eaa45审查结论继续适用；d轮同时覆盖该分层修复和单行类型标注。后续归档提交只增加文档/原始日志，不把新文档SHA冒充受测SHA。
+
+原始[c失败证据](evidence/issue190-c-v2-offline-20260831c/index.json)与[d通过证据](evidence/issue190-c-v2-offline-20260831d/index.json)包含phase、逐项日志、JUnit、实际入口日志及执行脚本快照。c/d每次均释放自有锁、单次宿主回读FREE并成功发送LOCK_RELEASED；d轮明确归还阶段窗口，之后无新运行。
+
+真实API请求/计费token/新增费用均0；共享账本hash仍 `c11630710263c473fbf938b60e789b33ef93b776021e258976825fdf47206a50`，累计费用上界0.079923元、未结算0。c结束只读hash确认未变，d报告保存前后相同hash；原50次付费调用的历史与旧STOPPED不变。使用现有Windows/CPython/依赖环境，未安装或下载。实际账单、静态修复总耗时和机器成本未采集，以上耗时仅本地离线预检，不是生产延迟或吞吐收益。
