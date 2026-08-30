@@ -419,7 +419,9 @@ export function App() {
     void consumeEvents(ticketId, authoritative.cursor);
   }
 
-  async function refreshPendingCompensationSnapshot(ticketId: string) {
+  async function refreshPendingCompensationSnapshot(ticketId: string, minimumCursor: string) {
+    const requestedCursor = parseCursor(minimumCursor);
+    if (!requestedCursor) return;
     try {
       const loaded = await humanSessionFetch(`${PUBLIC_CONVERSATION_BASE}/${ticketId}`, {
         credentials: "same-origin",
@@ -428,7 +430,20 @@ export function App() {
       if (!loaded.ok) return;
       const authoritative = (await loaded.json()) as unknown;
       if (!isSnapshot(authoritative) || authoritative.ticket.id !== ticketId) return;
-      if (snapshotRef.current?.ticket.id !== ticketId) return;
+      const current = snapshotRef.current;
+      const authoritativeCursor = parseCursor(authoritative.cursor);
+      const currentCursor = current ? parseCursor(current.cursor) : null;
+      if (
+        !current ||
+        current.ticket.id !== ticketId ||
+        !authoritativeCursor ||
+        !currentCursor ||
+        authoritativeCursor.epoch !== requestedCursor.epoch ||
+        authoritativeCursor.sequence < requestedCursor.sequence ||
+        authoritativeCursor.epoch !== currentCursor.epoch ||
+        authoritativeCursor.sequence < currentCursor.sequence
+      )
+        return;
       snapshotRef.current = authoritative;
       setSnapshot(authoritative);
     } catch {
@@ -939,6 +954,9 @@ export function App() {
       const pending = parsePendingCompensation(payload);
       if (!pending) return false;
       next = { ...current, cursor: event.id, pendingCompensation: pending };
+    } else if (event.type === "COMPENSATION_REVIEW_CLEARED") {
+      if (!isCompensationReviewCleared(payload)) return false;
+      next = { ...current, cursor: event.id, pendingCompensation: null };
     } else if (
       event.type === "TICKET_RESOLVED" ||
       event.type === "TICKET_REOPENED" ||
@@ -957,7 +975,7 @@ export function App() {
     snapshotRef.current = next;
     setSnapshot(next);
     if (refreshPendingCompensation) {
-      void refreshPendingCompensationSnapshot(current.ticket.id);
+      void refreshPendingCompensationSnapshot(current.ticket.id, event.id);
     }
     return true;
   }
@@ -1661,6 +1679,14 @@ function isReplyStream(value: unknown): value is NonNullable<Snapshot["replyStre
 
 function isReplyStatus(value: unknown, status: string) {
   return isRecord(value) && hasOnlyKeys(value, ["status"]) && value.status === status;
+}
+
+function isCompensationReviewCleared(value: unknown) {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["status"]) &&
+    ["APPROVED", "REJECTED"].includes(String(value.status))
+  );
 }
 
 function isProgress(

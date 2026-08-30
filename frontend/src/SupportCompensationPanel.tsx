@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { loadCsrfToken } from "./csrf";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import { hasOnlyKeys, isRecord } from "./streamProtocol";
+import type { PendingCompensationBody } from "./supportCompensationStorage";
 import {
   clearPendingCompensationSubmit,
   readPendingCompensationSubmit,
@@ -51,6 +52,9 @@ export function SupportCompensationPanel({
     stored?.kind ?? null,
   );
   const [pendingKey, setPendingKey] = useState(stored?.idempotencyKey ?? "");
+  const [pendingBody, setPendingBody] = useState<PendingCompensationBody | null>(
+    stored?.body ?? null,
+  );
   const [notice, setNotice] = useState(
     stored ? "上次标准补偿提交结果尚未确认，请查询 Spring 权威结果。" : "",
   );
@@ -82,20 +86,22 @@ export function SupportCompensationPanel({
   async function submitProposal() {
     if (!selected) return;
     const idempotencyKey = globalThis.crypto.randomUUID();
+    const body = {
+      schema: SUPPORT_SCHEMA,
+      planCode: selected.planCode,
+      reasonCode,
+    };
     setPendingKind("proposal");
     setPendingKey(idempotencyKey);
-    storePendingCompensationSubmit(ticketId, { kind: "proposal", idempotencyKey });
+    setPendingBody(body);
+    storePendingCompensationSubmit(ticketId, { kind: "proposal", idempotencyKey, body });
     setSubmitState("submitting");
     setNotice("");
     try {
       await postCompensation(
         `/api/support/workbench/tickets/${ticketId}/compensation-proposals`,
         idempotencyKey,
-        {
-          schema: SUPPORT_SCHEMA,
-          planCode: selected.planCode,
-          reasonCode,
-        },
+        body,
         ticketId,
         "proposal",
       );
@@ -117,20 +123,22 @@ export function SupportCompensationPanel({
 
   async function submitException() {
     const idempotencyKey = globalThis.crypto.randomUUID();
+    const body: PendingCompensationBody = {
+      schema: SUPPORT_SCHEMA,
+      reasonCode: "STANDARD_PLAN_INSUFFICIENT",
+      justification: justification.trim(),
+    };
     setPendingKind("exception");
     setPendingKey(idempotencyKey);
-    storePendingCompensationSubmit(ticketId, { kind: "exception", idempotencyKey });
+    setPendingBody(body);
+    storePendingCompensationSubmit(ticketId, { kind: "exception", idempotencyKey, body });
     setSubmitState("submitting");
     setNotice("");
     try {
       await postCompensation(
         `/api/support/workbench/tickets/${ticketId}/exceptional-compensation-requests`,
         idempotencyKey,
-        {
-          schema: SUPPORT_SCHEMA,
-          reasonCode: "STANDARD_PLAN_INSUFFICIENT",
-          justification: justification.trim(),
-        },
+        body,
         ticketId,
         "exception",
       );
@@ -151,8 +159,40 @@ export function SupportCompensationPanel({
     }
   }
 
+  async function retryPendingSubmit() {
+    if (!pendingKind || !pendingKey || !pendingBody || submitState === "submitting") return;
+    const path =
+      pendingKind === "proposal"
+        ? `/api/support/workbench/tickets/${ticketId}/compensation-proposals`
+        : `/api/support/workbench/tickets/${ticketId}/exceptional-compensation-requests`;
+    setSubmitState("submitting");
+    setNotice("正在使用同一请求身份重试提交…");
+    try {
+      await postCompensation(path, pendingKey, pendingBody, ticketId, pendingKind);
+      clearPendingCompensationSubmit(ticketId);
+      setSubmitState("idle");
+      setNotice(
+        pendingKind === "proposal"
+          ? "标准补偿提案已提交审批。客户只会看到类型、金额和待审批。"
+          : "例外补偿申请已提交，不会走普通提案审批捷径。",
+      );
+      onSubmitted();
+    } catch (error) {
+      if (error instanceof CompensationUncertainError) {
+        setSubmitState("unknown");
+        setNotice(error.message);
+        return;
+      }
+      clearPendingCompensationSubmit(ticketId);
+      setSubmitState("error");
+      setNotice(
+        error instanceof Error ? error.message : "补偿提交未被接受。请确认当前客服责任后重试。",
+      );
+    }
+  }
+
   async function queryResult() {
-    if (!pendingKind || !pendingKey) return;
+    if (!pendingKind || !pendingKey || submitState === "submitting") return;
     const path =
       pendingKind === "proposal"
         ? `/api/support/workbench/tickets/${ticketId}/compensation-proposals/${pendingKey}`
@@ -164,9 +204,8 @@ export function SupportCompensationPanel({
         cache: "no-store",
       });
       if (response.status === 404) {
-        clearPendingCompensationSubmit(ticketId);
-        setSubmitState("error");
-        setNotice("Spring 未找到该提交请求，可以安全重试。");
+        setSubmitState("unknown");
+        setNotice("Spring 尚未找到该提交请求，请稍后使用同一请求身份继续查询。");
         return;
       }
       if (!response.ok) throw new Error("query failed");
@@ -305,9 +344,20 @@ export function SupportCompensationPanel({
         </form>
       )}
       {submitState === "unknown" && pendingKey && (
-        <button type="button" className="support-reply-query" onClick={() => void queryResult()}>
-          查询提交结果
-        </button>
+        <div className="support-compensation-recovery-actions">
+          <button type="button" className="support-reply-query" onClick={() => void queryResult()}>
+            查询提交结果
+          </button>
+          {pendingBody && (
+            <button
+              type="button"
+              className="support-reply-query"
+              onClick={() => void retryPendingSubmit()}
+            >
+              使用同一请求身份重试提交
+            </button>
+          )}
+        </div>
       )}
       {notice && (
         <p

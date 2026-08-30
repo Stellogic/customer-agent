@@ -1,6 +1,19 @@
+export type PendingCompensationBody =
+  | {
+      schema: "support-workbench-v2";
+      planCode: string;
+      reasonCode: string;
+    }
+  | {
+      schema: "support-workbench-v2";
+      reasonCode: "STANDARD_PLAN_INSUFFICIENT";
+      justification: string;
+    };
+
 export type PendingCompensationSubmit = {
   kind: "proposal" | "exception";
   idempotencyKey: string;
+  body?: PendingCompensationBody;
 };
 
 const PENDING_COMPENSATION_PREFIX = "support-workbench:pending-compensation:";
@@ -18,7 +31,8 @@ export function readPendingCompensationSubmit(ticketId: string): PendingCompensa
       value.idempotencyKey.length > 200
     )
       return null;
-    return { kind: value.kind, idempotencyKey: value.idempotencyKey };
+    const body = isPendingCompensationBody(value.body, value.kind) ? value.body : undefined;
+    return { kind: value.kind, idempotencyKey: value.idempotencyKey, body };
   } catch {
     return null;
   }
@@ -62,4 +76,34 @@ function storageKey(ticketId: string) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPendingCompensationBody(
+  value: unknown,
+  kind: "proposal" | "exception",
+): value is PendingCompensationBody {
+  if (!isRecord(value) || value.schema !== "support-workbench-v2") return false;
+  if (kind === "proposal") {
+    return (
+      hasOnlyKeys(value, ["schema", "planCode", "reasonCode"]) &&
+      nonEmptyText(value.planCode, 200) &&
+      nonEmptyText(value.reasonCode, 200)
+    );
+  }
+  return (
+    hasOnlyKeys(value, ["schema", "reasonCode", "justification"]) &&
+    value.reasonCode === "STANDARD_PLAN_INSUFFICIENT" &&
+    typeof value.justification === "string" &&
+    value.justification.trim().length > 0 &&
+    value.justification.length <= 2000
+  );
+}
+
+function nonEmptyText(value: unknown, maximumLength: number) {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= maximumLength;
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, keys: string[]) {
+  const actual = Object.keys(value);
+  return actual.length === keys.length && actual.every((key) => keys.includes(key));
 }

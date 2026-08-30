@@ -47,7 +47,8 @@ public final class CustomerTicketV2Controller {
                     "AGENT_REPLY_COMPLETED",
                     "AGENT_REPLY_ABORTED",
                     "AGENT_REPLY_FAILED",
-                    "COMPENSATION_REVIEW_PENDING");
+                    "COMPENSATION_REVIEW_PENDING",
+                    "COMPENSATION_REVIEW_CLEARED");
 
     private final CustomerTicketService service;
 

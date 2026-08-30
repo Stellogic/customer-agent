@@ -1558,6 +1558,127 @@ describe("客户帮助中心", () => {
     });
   });
 
+  it("驳回状态事件直接清除客户待审批投影", async () => {
+    const ticketId = "16400000-0000-0000-0000-000000000004";
+    let resolveEvents: ((response: Response) => void) | undefined;
+    const pendingEvents = new Promise<Response>((resolve) => {
+      resolveEvents = resolve;
+    });
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:4",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "HUMAN",
+              agentGeneration: 1,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: null,
+            pendingCompensation: {
+              compensationMethod: "COUPON",
+              amount: "10.00",
+              currency: "CNY",
+              status: "PENDING_REVIEW",
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockReturnValueOnce(pendingEvents);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "待审批" })).toBeInTheDocument();
+    resolveEvents?.(
+      eventResponse([
+        publicEvent("public-conversation-v2:5", "COMPENSATION_REVIEW_CLEARED", {
+          status: "REJECTED",
+        }),
+      ]),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "待审批" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("拒绝落后 cursor 的补偿刷新快照", async () => {
+    const ticketId = "16400000-0000-0000-0000-000000000005";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:4",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "HUMAN",
+              agentGeneration: 1,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: null,
+            pendingCompensation: {
+              compensationMethod: "COUPON",
+              amount: "10.00",
+              currency: "CNY",
+              status: "PENDING_REVIEW",
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        eventResponse([
+          publicEvent("public-conversation-v2:5", "PUBLIC_MESSAGE_APPENDED", {
+            author: "SUPPORT",
+            body: "补偿方案已获批准，正在等待补偿处理。",
+            sentAt: "2026-08-30T00:03:00Z",
+          }),
+        ]),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:4",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "HUMAN",
+              agentGeneration: 1,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: null,
+            pendingCompensation: {
+              compensationMethod: "COUPON",
+              amount: "10.00",
+              currency: "CNY",
+              status: "PENDING_REVIEW",
+            },
+          }),
+          { status: 200 },
+        ),
+      );
+
+    render(<App />);
+
+    expect(await screen.findByText("补偿方案已获批准，正在等待补偿处理。")).toBeInTheDocument();
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(3));
+    expect(screen.getByRole("heading", { name: "待审批" })).toBeInTheDocument();
+  });
+
   it("在首个内容片段到达前持续显示可读的等待状态", async () => {
     const ticketId = "15900000-0000-0000-0000-000000000002";
     globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);

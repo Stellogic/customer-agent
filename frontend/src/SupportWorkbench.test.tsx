@@ -868,6 +868,9 @@ describe("客服共享队列工作台", () => {
         expect(init?.method ?? "GET").toBe("GET");
         queryCount += 1;
         if (queryCount === 1) {
+          return new Response(null, { status: 404 });
+        }
+        if (queryCount === 2) {
           return Response.json({ schema: "support-workbench-v2", ticketId: HANDOFF_TICKET });
         }
         return Response.json({
@@ -893,6 +896,11 @@ describe("客服共享队列工作台", () => {
     expect(await within(panel).findByRole("button", { name: "查询提交结果" })).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole("button", { name: "查询提交结果" }));
     expect(
+      await screen.findByText("Spring 尚未找到该提交请求，请稍后使用同一请求身份继续查询。"),
+    ).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "查询提交结果" })).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: "查询提交结果" }));
+    expect(
       await screen.findByText("提交结果仍未确认；请继续查询 Spring 权威结果，不要重复提交。"),
     ).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: "查询提交结果" })).toBeInTheDocument();
@@ -900,6 +908,83 @@ describe("客服共享队列工作台", () => {
     expect(
       await screen.findByText("已从 Spring 权威结果确认标准补偿提案已提交审批。"),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查询提交结果" })).not.toBeInTheDocument();
+  });
+
+  it("查询 404 后可用同一请求身份重试提交", async () => {
+    const idempotencyKey = "16400000-0000-4000-8000-000000000004";
+    let postCount = 0;
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(idempotencyKey);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL) {
+        return snapshotResponse("support-workbench-v2:1", [handoffItem()], [], [HANDOFF_TICKET]);
+      }
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        return Response.json(humanDetails());
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) {
+        return openStream();
+      }
+      if (path.endsWith("/compensation-options")) return couponOptions();
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/compensation-proposals`) {
+        expect(init?.method).toBe("POST");
+        expect(new Headers(init?.headers).get("Idempotency-Key")).toBe(idempotencyKey);
+        expect(JSON.parse(String(init?.body))).toEqual({
+          schema: "support-workbench-v2",
+          planCode: "COUPON",
+          reasonCode: "LOGISTICS_DELAY",
+        });
+        postCount += 1;
+        if (postCount === 1) {
+          return Response.json(
+            { schema: "support-workbench-v2", ticketId: HANDOFF_TICKET },
+            { status: 201 },
+          );
+        }
+        return Response.json(
+          {
+            schema: "support-workbench-v2",
+            ticketId: HANDOFF_TICKET,
+            requestId: idempotencyKey,
+            proposalRevisionId: "16400000-0000-0000-0000-000000000104",
+            proposalRevision: 1,
+            compensationMethod: "COUPON",
+            amount: 10,
+            currency: "CNY",
+            status: "PENDING_APPROVAL",
+            outcome: "ACCEPTED",
+            replayed: true,
+          },
+          { status: 200 },
+        );
+      }
+      if (
+        path ===
+        `/api/support/workbench/tickets/${HANDOFF_TICKET}/compensation-proposals/${idempotencyKey}`
+      ) {
+        expect(init?.method ?? "GET").toBe("GET");
+        return new Response(null, { status: 404 });
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<SupportWorkbench />);
+    const panel = await screen.findByRole("region", { name: "标准补偿" });
+    fireEvent.click(await within(panel).findByRole("button", { name: "提交审批" }));
+    fireEvent.click(await within(panel).findByRole("button", { name: "查询提交结果" }));
+    expect(
+      await screen.findByText("Spring 尚未找到该提交请求，请稍后使用同一请求身份继续查询。"),
+    ).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: "使用同一请求身份重试提交" }));
+    expect(
+      await screen.findByText("标准补偿提案已提交审批。客户只会看到类型、金额和待审批。"),
+    ).toBeInTheDocument();
+    expect(postCount).toBe(2);
     expect(screen.queryByRole("button", { name: "查询提交结果" })).not.toBeInTheDocument();
   });
 
