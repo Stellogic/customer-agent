@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -24,6 +25,116 @@ from baseline_agent.knowledge_sufficiency import (
     response_observation,
 )
 from baseline_agent.knowledge_sufficiency_run import ExperimentLedger, run_development
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("result", ["valid", "invalid", "unknown_usage"])
+async def test_fifth_diagnostic_is_once_exact_request_and_keeps_original_stopped(
+    tmp_path: Path, result: str,
+) -> None:
+    path = tmp_path / "cost.json"
+    path.write_bytes(runner.ORIGINAL_LEDGER.read_bytes())
+    frozen = contract()
+    ledger = ExperimentLedger(path, frozen)
+    original = copy.deepcopy(ledger.state)
+    calls = 0
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        assert hashlib.sha256(request.content).hexdigest() == runner.FIFTH_REQUEST_SHA
+        response = payload(fingerprint=None)
+        response["model"] = "deepseek-v4-flash"
+        response["output"][0]["content"][0]["text"] = json.dumps(
+            {"sufficient": False if result == "valid" else "false", "evidence": []}
+        )
+        if result == "unknown_usage":
+            del response["usage"]
+        return httpx.Response(200, json=response)
+
+    report: dict[str, Any] = {"run_id": "diagnostic-offline", "metrics": None}
+    if result == "valid":
+        await run_development(
+            report, ledger, frozen, api_key="offline-only",
+            transport=httpx.MockTransport(handle), diagnose_fifth_once=True,
+        )
+        assert report["status"] == "DIAGNOSTIC_COMPLETED"
+        assert len(report["rows"]) == 1
+    else:
+        expected = "USAGE_UNTRUSTED" if result == "unknown_usage" else "INVALID_DECISION_SCHEMA"
+        with pytest.raises(SufficiencyBlocked, match=expected):
+            await run_development(
+                report, ledger, frozen, api_key="offline-only",
+                transport=httpx.MockTransport(handle), diagnose_fifth_once=True,
+            )
+        report["status"] = "STOPPED"
+        assert report["rows"] == []
+    ledger.finish(report["status"])
+    assert calls == 1 and report["metrics"] is None
+    assert ledger.state["phases"][runner.PHASE] == original["phases"][runner.PHASE]
+    assert ledger.state["attempts"][:5] == original["attempts"]
+    assert len(ledger.state["attempts"]) == 6
+    assert ledger.state["identity"] == original["identity"]
+    assert ledger.totals() == {
+        "settled_upper_micro_cny": 9084 if result == "unknown_usage" else 9564,
+        "unsettled_reserved_micro_cny": 3148032 if result == "unknown_usage" else 0,
+    }
+    if result == "invalid":
+        evidence = ledger.state["attempts"][-1]["observation"]["decision_diagnostic"]
+        assert evidence["fields"][0] == {"name": "sufficient", "type": "str"}
+    resumed = ExperimentLedger(path, frozen)
+    before_retry = path.read_bytes()
+    with pytest.raises(SufficiencyBlocked, match="DIAGNOSTIC_ALREADY_STARTED_NO_RETRY"):
+        await run_development(
+            {"run_id": "new-id-must-not-retry"}, resumed, frozen, api_key="offline-only",
+            transport=httpx.MockTransport(handle), diagnose_fifth_once=True,
+        )
+    assert calls == 1 and path.read_bytes() == before_retry
+    with pytest.raises(SufficiencyBlocked, match="ALREADY_STARTED|UNSETTLED_COST"):
+        resumed.begin("must-not-resume-development", frozen["asset_sha256"])
+
+
+@pytest.mark.asyncio
+async def test_fifth_diagnostic_rejects_changed_request_before_ledger_write_or_send(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "cost.json"
+    path.write_bytes(runner.ORIGINAL_LEDGER.read_bytes())
+    original = path.read_bytes()
+    frozen = contract()
+    source = development_rows()
+    source[4]["text"] += "离线契约故意改字，不是新题或实际提示变更"
+    monkeypatch.setattr(runner, "development_rows", lambda: source)
+
+    def no_send(_: httpx.Request) -> httpx.Response:
+        raise AssertionError("changed request must not be sent")
+
+    with pytest.raises(SufficiencyBlocked, match="DIAGNOSTIC_REQUEST_MISMATCH"):
+        await run_development(
+            {"run_id": "mismatch-offline"}, ExperimentLedger(path, frozen), frozen,
+            api_key="offline-only", transport=httpx.MockTransport(no_send),
+            diagnose_fifth_once=True,
+        )
+    assert path.read_bytes() == original
+
+
+def test_fifth_diagnostic_rejects_lost_history_and_uses_original_budget(tmp_path: Path) -> None:
+    frozen = contract()
+    ledger = ExperimentLedger(tmp_path / "cost.json", frozen)
+    with pytest.raises(SufficiencyBlocked, match="LEDGER_PRECONDITION_CHANGED"):
+        ledger.begin_fifth_diagnostic(
+            "no-history", frozen["asset_sha256"], runner.FIFTH_QUERY_ID, runner.FIFTH_REQUEST_SHA,
+        )
+    ledger.path.write_bytes(runner.ORIGINAL_LEDGER.read_bytes())
+    ledger = ExperimentLedger(ledger.path, frozen)
+    ledger.begin_fifth_diagnostic(
+        "budget-offline", frozen["asset_sha256"], runner.FIFTH_QUERY_ID, runner.FIFTH_REQUEST_SHA,
+    )
+    ledger.plan["total_budget_micro_cny"] = 9084 + 3148032 - 1
+    with pytest.raises(SufficiencyBlocked, match="BUDGET_INCOMPLETE"):
+        ledger.reserve(runner.FIFTH_QUERY_ID, runner.FIFTH_REQUEST_SHA)
+    assert ledger.totals()["settled_upper_micro_cny"] == 9084
+    assert len(ledger.state["attempts"]) == 5
 
 
 def row(index: int = 0) -> dict[str, Any]:

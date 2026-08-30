@@ -33,6 +33,14 @@ from baseline_agent.knowledge_sufficiency import (
 
 OPT_IN = "issue-190-synthetic-sufficiency-c-once"
 PHASE = "seen_development"
+DIAGNOSTIC_OPT_IN = "issue-190-fifth-request-diagnostic-once"
+DIAGNOSTIC_PHASE = "fifth_request_diagnostic_once"
+FIFTH_QUERY_ID = "weaving-direct-3"
+FIFTH_REQUEST_SHA = "d3a9e630949ed0093103ac435db610d9eacd9115c92be2e750be5914b056e20b"
+ORIGINAL_LEDGER = (
+    REPO / "docs/implementation/evidence/issue190-c-development-20260831a/cost-ledger.json"
+)
+ORIGINAL_LEDGER_SHA = "5cd9e0ef8ee6977f0897db31d4c00bfee498194b9456bc437ffe0776b79e8507"
 
 
 def decision_diagnostic(text: str, api_key: str) -> dict[str, Any]:
@@ -82,6 +90,7 @@ def write_json(path: Path, value: dict[str, Any]) -> None:
 class ExperimentLedger:
     def __init__(self, path: Path, frozen: dict[str, Any]) -> None:
         self.path = path
+        self.phase = PHASE
         self.plan = budget_plan(frozen)
         if path.exists():
             self.state = json.loads(path.read_text(encoding="utf-8"))
@@ -135,13 +144,18 @@ class ExperimentLedger:
         reserved = self.plan["per_call_reservation_micro_cny"]
         if totals["settled_upper_micro_cny"] + reserved > self.plan["total_budget_micro_cny"]:
             raise SufficiencyBlocked("BUDGET_INCOMPLETE")
-        phase_attempts = [entry for entry in self.state["attempts"] if entry["phase"] == PHASE]
-        if len(phase_attempts) >= 72 or any(
+        phase_attempts = [entry for entry in self.state["attempts"] if entry["phase"] == self.phase]
+        limit = 1 if self.phase == DIAGNOSTIC_PHASE else 72
+        if self.phase == DIAGNOSTIC_PHASE and (
+            query_id != FIFTH_QUERY_ID or request_sha != FIFTH_REQUEST_SHA
+        ):
+            raise SufficiencyBlocked("DIAGNOSTIC_REQUEST_MISMATCH")
+        if len(phase_attempts) >= limit or any(
             entry["query_id"] == query_id for entry in phase_attempts
         ):
             raise SufficiencyBlocked("CALL_LIMIT_NO_RETRY")
         entry = {
-            "phase": PHASE,
+            "phase": self.phase,
             "query_id": query_id,
             "request_sha256": request_sha,
             "status": "PENDING",
@@ -161,7 +175,36 @@ class ExperimentLedger:
         write_json(self.path, self.state)
 
     def finish(self, status: str) -> None:
-        self.state["phases"][PHASE]["status"] = status
+        self.state["phases"][self.phase]["status"] = status
+        write_json(self.path, self.state)
+
+    def begin_fifth_diagnostic(
+        self, run_id: str, assets: dict[str, str], query_id: str, request_sha: str
+    ) -> None:
+        if DIAGNOSTIC_PHASE in self.state["phases"]:
+            raise SufficiencyBlocked("DIAGNOSTIC_ALREADY_STARTED_NO_RETRY")
+        original = ORIGINAL_LEDGER.read_bytes()
+        if sha256(original) != ORIGINAL_LEDGER_SHA:
+            raise SufficiencyBlocked("ORIGINAL_LEDGER_ARCHIVE_CHANGED")
+        # 本次授权精确绑定原5次调用后的账本,不重置STOPPED或接受丢失的历史费用。
+        if self.state != json.loads(original):
+            raise SufficiencyBlocked("DIAGNOSTIC_LEDGER_PRECONDITION_CHANGED")
+        if (
+            query_id != FIFTH_QUERY_ID
+            or request_sha != FIFTH_REQUEST_SHA
+            or assets != self.state["phases"][PHASE]["assets"]
+        ):
+            raise SufficiencyBlocked("DIAGNOSTIC_REQUEST_MISMATCH")
+        self.phase = DIAGNOSTIC_PHASE
+        self.state["phases"][self.phase] = {
+            "run_id": run_id,
+            "status": "RUNNING",
+            "assets": assets,
+            "original_run_id": self.state["phases"][PHASE]["run_id"],
+            "request_sha256": request_sha,
+            "maximum_requests": 1,
+            "quality_evaluation": False,
+        }
         write_json(self.path, self.state)
 
 
@@ -172,10 +215,22 @@ async def run_development(
     *,
     api_key: str,
     transport: httpx.AsyncBaseTransport | None = None,
+    diagnose_fifth_once: bool = False,
 ) -> None:
     rows = development_rows()
+    if diagnose_fifth_once:
+        rows = [rows[4]]
     bodies = [request_body(row, frozen) for row in rows]
-    ledger.begin(report["run_id"], frozen["asset_sha256"])
+    encoded_bodies = [
+        json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        for body in bodies
+    ]
+    if diagnose_fifth_once:
+        ledger.begin_fifth_diagnostic(
+            report["run_id"], frozen["asset_sha256"], rows[0]["id"], sha256(encoded_bodies[0])
+        )
+    else:
+        ledger.begin(report["run_id"], frozen["asset_sha256"])
     report["rows"] = []
     config = frozen["config"]
     async with httpx.AsyncClient(
@@ -184,8 +239,7 @@ async def run_development(
         follow_redirects=False,
         headers={"Authorization": f"Bearer {api_key}"},
     ) as client:
-        for row, body in zip(rows, bodies, strict=True):
-            encoded = json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        for row, encoded in zip(rows, encoded_bodies, strict=True):
             entry = ledger.reserve(row["id"], sha256(encoded))
             started = time.perf_counter()
             observation: dict[str, Any] = {"usage_trusted": False}
@@ -262,6 +316,9 @@ async def run_development(
             finally:
                 observation["duration_ms"] = round((time.perf_counter() - started) * 1000)
                 ledger.settle(entry, observation)
+    if diagnose_fifth_once:
+        report.update(status="DIAGNOSTIC_COMPLETED", metrics=None)
+        return
     decisions = [entry["decision"]["sufficient"] for entry in report["rows"]]
     report.update(replay_metrics(rows, decisions))
     report["by_topic"] = {
@@ -282,6 +339,7 @@ def main() -> None:
     for name in ("run-id", "head-sha", "base-sha", "pricing-and-context-verified-date"):
         parser.add_argument(f"--{name}", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--diagnose-fifth-once", action="store_true")
     args = parser.parse_args()
     # 正式入口必须验证活的共享锁;没有任何自建锁身份或无锁付费模式。
     if os.environ.get("CUSTOMER_AGENT_TEST_GATE_IDENTITY"):
@@ -299,7 +357,8 @@ def main() -> None:
     )
     if locked.returncode != 0:
         raise SufficiencyBlocked("TEST_GATE_LOCK_REQUIRED")
-    if os.environ.get("KNOWLEDGE_SUFFICIENCY_EXPERIMENT") != OPT_IN:
+    expected_opt_in = DIAGNOSTIC_OPT_IN if args.diagnose_fifth_once else OPT_IN
+    if os.environ.get("KNOWLEDGE_SUFFICIENCY_EXPERIMENT") != expected_opt_in:
         raise SufficiencyBlocked("EXPERIMENT_OPT_IN_REQUIRED")
     if args.pricing_and_context_verified_date != datetime.now(UTC).date().isoformat():
         raise SufficiencyBlocked("CURRENT_PRICING_REVIEW_REQUIRED")
@@ -326,8 +385,10 @@ def main() -> None:
             "retrieval_observation_head_sha": SOURCE_SHA,
             "archive_sha256": ARCHIVE_SHA256,
             "dataset_sha256": DATA_SHA256,
-            "partition": "seen_development_not_unseen",
-            "query_count": 72,
+            "partition": "fifth_request_diagnostic_not_quality"
+            if args.diagnose_fifth_once else "seen_development_not_unseen",
+            "query_count": 1 if args.diagnose_fifth_once else 72,
+            "diagnose_fifth_once": args.diagnose_fifth_once,
             "contract": frozen,
             "budget_plan": budget_plan(frozen),
             "pricing_and_context_verified_date": args.pricing_and_context_verified_date,
@@ -337,8 +398,14 @@ def main() -> None:
         }
         ledger: ExperimentLedger | None = None
         try:
+            if args.diagnose_fifth_once and not ledger_path.exists():
+                raise SufficiencyBlocked("DIAGNOSTIC_REQUIRES_EXISTING_LEDGER")
             ledger = ExperimentLedger(ledger_path, frozen)
-            asyncio.run(run_development(report, ledger, frozen, api_key=api_key))
+            report["cost_totals_before"] = ledger.totals()
+            asyncio.run(run_development(
+                report, ledger, frozen, api_key=api_key,
+                diagnose_fifth_once=args.diagnose_fifth_once,
+            ))
         except SufficiencyBlocked as error:
             report.update(status="STOPPED", stopped_reason=str(error))
         except Exception as error:
@@ -346,14 +413,14 @@ def main() -> None:
             report.update(status="ERROR", error_type=type(error).__name__)
         finally:
             if ledger is not None:
-                phase = ledger.state["phases"].get(PHASE, {})
+                phase = ledger.state["phases"].get(ledger.phase, {})
                 if phase.get("run_id") == args.run_id and phase.get("status") == "RUNNING":
                     ledger.finish(report["status"])
                 report["cost_ledger"] = ledger.state
                 report["cost_totals"] = ledger.totals()
             report["elapsed_seconds"] = time.perf_counter() - started
             json.dump(report, output, ensure_ascii=False, indent=2, allow_nan=False)
-    if report["status"] != "PASS":
+    if report["status"] not in {"PASS", "DIAGNOSTIC_COMPLETED"}:
         raise SystemExit(1)
 
 

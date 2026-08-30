@@ -1,13 +1,15 @@
 param(
     [Parameter(Mandatory)][string]$RunId,
     [Parameter(Mandatory)][string]$PricingAndContextVerifiedDate,
-    [string]$Uv = 'uv'
+    [string]$Uv = 'uv',
+    [switch]$DiagnoseFifthOnce
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/test-gate-lock.ps1"
 if ($RunId -notmatch '^[a-z0-9][a-z0-9-]{7,}$') { throw '需要唯一RunId。' }
 if ($env:CUSTOMER_AGENT_TEST_GATE_IDENTITY) { throw '真实合成实验不能使用自定义锁身份。' }
-if ($env:KNOWLEDGE_SUFFICIENCY_EXPERIMENT -ne 'issue-190-synthetic-sufficiency-c-once') {
+$expectedOptIn = if ($DiagnoseFifthOnce) { 'issue-190-fifth-request-diagnostic-once' } else { 'issue-190-synthetic-sufficiency-c-once' }
+if ($env:KNOWLEDGE_SUFFICIENCY_EXPERIMENT -ne $expectedOptIn) {
     throw '需要明确实验opt-in；本脚本不代表协调已放行运行窗口。'
 }
 # 此日期是操作者已重核官方高峰价格和上下文上限的确认,不能由脚本自动补今天。
@@ -20,17 +22,20 @@ if ($LASTEXITCODE -ne 0) { throw '无法读取源码SHA。' }
 $baseSha = git -C $root rev-parse origin/main
 if ($LASTEXITCODE -ne 0) { throw '无法读取main基线。' }
 if (git -C $root status --porcelain) { throw 'C回放要求先提交唯一合同及源码。' }
-$holder = Enter-TestGateLock -Issue 190 -RunId $RunId -CommandType 'sufficiency-c-development' -HeadSha $headSha -BaseSha $baseSha
+$commandType = if ($DiagnoseFifthOnce) { 'sufficiency-c-fifth-diagnostic' } else { 'sufficiency-c-development' }
+$holder = Enter-TestGateLock -Issue 190 -RunId $RunId -CommandType $commandType -HeadSha $headSha -BaseSha $baseSha
 try {
-    $output = Join-Path $root ".local/gate-evidence/$RunId/sufficiency-development.json"
+    $reportName = if ($DiagnoseFifthOnce) { 'sufficiency-fifth-diagnostic.json' } else { 'sufficiency-development.json' }
+    $output = Join-Path $root ".local/gate-evidence/$RunId/$reportName"
+    $modeArgs = if ($DiagnoseFifthOnce) { @('--diagnose-fifth-once') } else { @() }
     Push-Location (Join-Path $root 'agent')
     try {
         # 不在实验入口隐式安装/生成依赖;准备依赖需另外受锁且获运行授权。
         & $Uv run --frozen --no-sync python -m baseline_agent.knowledge_sufficiency_run `
             --run-id $RunId --head-sha $headSha --base-sha $baseSha `
-            --pricing-and-context-verified-date $PricingAndContextVerifiedDate --output $output
+            --pricing-and-context-verified-date $PricingAndContextVerifiedDate --output $output @modeArgs
         if ($LASTEXITCODE -ne 0) { throw "C阶段停止，证据：$output；不重试、不切方法、不进入留出或冻结门。" }
-        Write-Host "开发回放记录：$output；不是产品或最终质量门PASS。"
+        Write-Host "实验记录：$output；不是产品或质量门PASS；单次诊断不恢复开发回放。"
     } finally { Pop-Location }
 } finally {
     Exit-TestGateLock $holder
