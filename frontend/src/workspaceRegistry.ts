@@ -2,6 +2,7 @@ import type { HumanCapability } from "./authContract";
 
 export const ROUTES = {
   customerHome: "/help",
+  customerDocs: "/help/docs",
   customerLogin: "/help/login",
   internalHome: "/internal",
   internalLogin: "/internal/login",

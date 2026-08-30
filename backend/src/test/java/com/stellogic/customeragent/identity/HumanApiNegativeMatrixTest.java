@@ -51,6 +51,20 @@ class HumanApiNegativeMatrixTest {
                     postApi("/api/support/workbench/tickets/" + ID + "/reassignments"),
                     postApi("/api/support/workbench/tickets/" + ID + "/messages"),
                     getApi("/api/support/workbench/tickets/" + ID + "/messages/reply-163"),
+                    getApi("/api/support/workbench/tickets/" + ID + "/compensation-options"),
+                    postApi("/api/support/workbench/tickets/" + ID + "/compensation-proposals"),
+                    getApi(
+                            "/api/support/workbench/tickets/"
+                                    + ID
+                                    + "/compensation-proposals/issue-164"),
+                    postApi(
+                            "/api/support/workbench/tickets/"
+                                    + ID
+                                    + "/exceptional-compensation-requests"),
+                    getApi(
+                            "/api/support/workbench/tickets/"
+                                    + ID
+                                    + "/exceptional-compensation-requests/issue-164"),
                     getApi("/api/support/workbench/tickets/" + ID + "/events"),
                     getApi("/api/support/workbench/events"));
     private static final List<ApiRequest> APPROVAL_APIS =

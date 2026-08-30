@@ -643,6 +643,7 @@ class JdbcApprovalService implements ApprovalService {
                 command.revisionId());
         auditDecision(ticketId, decisionId, command.leaseVersion(), command.approverId(), at);
         handoffService.handoffAfterProposalRejection(ticketId, command.approverId());
+        publicProjection.appendCompensationReviewCleared(ticketId, "REJECTED", now);
         return new ApprovalModels.RejectionResult(
                 command.revisionId(),
                 command.proposalRevision(),
@@ -904,6 +905,7 @@ class JdbcApprovalService implements ApprovalService {
                 command.revisionId());
         auditApproved(ticketId, decisionId, command.leaseVersion(), command.approverId(), at);
         publicProjection.appendSupportMessage(ticketId, APPROVAL_PUBLIC_MESSAGE, now);
+        publicProjection.appendCompensationReviewCleared(ticketId, "APPROVED", now);
         return new ApprovalModels.ApprovalResult(
                 command.revisionId(),
                 command.proposalRevision(),

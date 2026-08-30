@@ -12,6 +12,7 @@ import { loadCsrfToken } from "./csrf";
 import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import { OrderTicketGroups } from "./OrderTicketGroups";
+import { CustomerCapabilityGuide, CustomerTrustStrip } from "./components/CustomerHelpTrust";
 
 const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
 const PUBLIC_CONVERSATION_BASE = "/api/customer/v2/tickets";
@@ -35,6 +36,12 @@ type Snapshot = {
     status: "LOADING" | "STREAMING" | "COMPLETED" | "ABORTED" | "FAILED";
     body: string;
     progressStage: "UNDERSTANDING" | "VERIFYING_FACTS" | "QUERYING_RULES" | "COMPOSING_REPLY";
+  } | null;
+  pendingCompensation?: {
+    compensationMethod: string;
+    amount: string;
+    currency: string;
+    status: "PENDING_REVIEW";
   } | null;
 };
 
@@ -413,6 +420,38 @@ export function App() {
     void consumeEvents(ticketId, authoritative.cursor);
   }
 
+  async function refreshPendingCompensationSnapshot(ticketId: string, minimumCursor: string) {
+    const requestedCursor = parseCursor(minimumCursor);
+    if (!requestedCursor) return;
+    try {
+      const loaded = await humanSessionFetch(`${PUBLIC_CONVERSATION_BASE}/${ticketId}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!loaded.ok) return;
+      const authoritative = (await loaded.json()) as unknown;
+      if (!isSnapshot(authoritative) || authoritative.ticket.id !== ticketId) return;
+      const current = snapshotRef.current;
+      const authoritativeCursor = parseCursor(authoritative.cursor);
+      const currentCursor = current ? parseCursor(current.cursor) : null;
+      if (
+        !current ||
+        current.ticket.id !== ticketId ||
+        !authoritativeCursor ||
+        !currentCursor ||
+        authoritativeCursor.epoch !== requestedCursor.epoch ||
+        authoritativeCursor.sequence < requestedCursor.sequence ||
+        authoritativeCursor.epoch !== currentCursor.epoch ||
+        authoritativeCursor.sequence < currentCursor.sequence
+      )
+        return;
+      snapshotRef.current = authoritative;
+      setSnapshot(authoritative);
+    } catch {
+      // Keep the last committed snapshot; the active SSE stream remains the recovery path.
+    }
+  }
+
   async function submitClarification(event: FormEvent) {
     event.preventDefault();
     if (!snapshot?.clarification) return;
@@ -764,6 +803,7 @@ export function App() {
     }
     const payload = envelope.payload;
     let next: Snapshot;
+    let refreshPendingCompensation = false;
     if (
       event.type === "AGENT_PROCESSING_STARTED" &&
       envelope.generation > current.ticket.agentGeneration
@@ -784,6 +824,10 @@ export function App() {
     ) {
       if (!isPublicMessage(payload)) return false;
       const message = payload;
+      refreshPendingCompensation =
+        current.pendingCompensation !== undefined &&
+        current.pendingCompensation !== null &&
+        message.author === "SUPPORT";
       if (current.ticket.handlingMode === "HUMAN" && message.author === "AGENT") {
         next = { ...current, cursor: event.id };
       } else {
@@ -907,6 +951,13 @@ export function App() {
             ? { status: "FAILED", body: "", progressStage: "COMPOSING_REPLY" }
             : current.replyStream,
       };
+    } else if (event.type === "COMPENSATION_REVIEW_PENDING") {
+      const pending = parsePendingCompensation(payload);
+      if (!pending) return false;
+      next = { ...current, cursor: event.id, pendingCompensation: pending };
+    } else if (event.type === "COMPENSATION_REVIEW_CLEARED") {
+      if (!isCompensationReviewCleared(payload)) return false;
+      next = { ...current, cursor: event.id, pendingCompensation: null };
     } else if (
       event.type === "TICKET_RESOLVED" ||
       event.type === "TICKET_REOPENED" ||
@@ -917,14 +968,21 @@ export function App() {
         ...current,
         cursor: event.id,
         ticket: { ...current.ticket, lifecycleState: payload.lifecycleState },
+        pendingCompensation: null,
       };
     } else {
       return false;
     }
     snapshotRef.current = next;
     setSnapshot(next);
+    if (refreshPendingCompensation) {
+      void refreshPendingCompensationSnapshot(current.ticket.id, event.id);
+    }
     return true;
   }
+
+  const showingHelpHome =
+    !snapshot && !intake && recoveringTicketId === null && intakeRecoveryState === "idle";
 
   return (
     <main className="help-center">
@@ -941,7 +999,8 @@ export function App() {
           </p>
         </header>
 
-        {!snapshot && !intake && !recoveringTicketId && intakeRecoveryState === "idle" && (
+        {showingHelpHome && <CustomerTrustStrip />}
+        {showingHelpHome && (
           <OrderTicketGroups autoLoad onOpenTicket={(ticketId) => void loadTicket(ticketId)} />
         )}
       </div>
@@ -1285,6 +1344,34 @@ export function App() {
               <p>{currentLifecyclePresentation.description}</p>
             </div>
           </div>
+          {snapshot.pendingCompensation && (
+            <aside
+              className="pending-compensation-card"
+              aria-labelledby="pending-compensation-title"
+            >
+              <p className="eyebrow">补偿建议</p>
+              <h3 id="pending-compensation-title">待审批</h3>
+              <dl>
+                <div>
+                  <dt>建议类型</dt>
+                  <dd>
+                    {compensationMethodLabel(snapshot.pendingCompensation.compensationMethod)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>建议金额</dt>
+                  <dd>
+                    {snapshot.pendingCompensation.amount} {snapshot.pendingCompensation.currency}
+                  </dd>
+                </div>
+                <div>
+                  <dt>当前状态</dt>
+                  <dd>待审批</dd>
+                </div>
+              </dl>
+              <p>最终结果将在处理完成后通知你。现在还没有批准或执行补偿。</p>
+            </aside>
+          )}
           <div className="conversation-heading">
             <div>
               <p className="eyebrow">公开沟通</p>
@@ -1509,6 +1596,7 @@ export function App() {
           )}
         </section>
       )}
+      {showingHelpHome && <CustomerCapabilityGuide />}
     </main>
   );
 }
@@ -1516,17 +1604,17 @@ export function App() {
 function isSnapshot(value: unknown): value is Snapshot {
   if (
     !isRecord(value) ||
-    !hasOnlyKeys(value, [
-      "view",
-      "schema",
-      "cursor",
-      "ticket",
-      "messages",
-      "clarification",
-      "replyStream",
-    ]) ||
     value.view !== "PUBLIC_CONVERSATION" ||
     value.schema !== PUBLIC_CONVERSATION_SCHEMA
+  )
+    return false;
+  const keys = Object.keys(value);
+  const required = ["view", "schema", "cursor", "ticket", "messages", "clarification"];
+  if (!required.every((key) => keys.includes(key))) return false;
+  if (
+    keys.some(
+      (key) => !required.includes(key) && key !== "replyStream" && key !== "pendingCompensation",
+    )
   )
     return false;
   const cursor = typeof value.cursor === "string" ? parseCursor(value.cursor) : null;
@@ -1542,8 +1630,40 @@ function isSnapshot(value: unknown): value is Snapshot {
     Number(value.ticket.agentGeneration) >= 0 &&
     value.messages.every(isPublicMessage) &&
     isClarification(value.clarification) &&
-    (value.replyStream === undefined || isReplyStream(value.replyStream))
+    (value.replyStream === undefined || isReplyStream(value.replyStream)) &&
+    (value.pendingCompensation === undefined ||
+      value.pendingCompensation === null ||
+      parsePendingCompensation(value.pendingCompensation) !== null)
   );
+}
+
+function parsePendingCompensation(
+  value: unknown,
+): NonNullable<Snapshot["pendingCompensation"]> | null {
+  if (!isRecord(value)) return null;
+  const keys = Object.keys(value);
+  const allowed = ["compensationMethod", "amount", "currency", "status"];
+  if (
+    !["compensationMethod", "amount", "status"].every((key) => keys.includes(key)) ||
+    keys.some((key) => !allowed.includes(key)) ||
+    typeof value.compensationMethod !== "string" ||
+    value.status !== "PENDING_REVIEW" ||
+    (value.currency !== undefined && value.currency !== "CNY")
+  )
+    return null;
+  const amount =
+    typeof value.amount === "number" && Number.isFinite(value.amount)
+      ? value.amount.toFixed(2)
+      : typeof value.amount === "string"
+        ? value.amount
+        : null;
+  if (!amount || !/^\d+\.\d{2}$/.test(amount)) return null;
+  return {
+    compensationMethod: value.compensationMethod,
+    amount,
+    currency: "CNY",
+    status: "PENDING_REVIEW",
+  };
 }
 
 function isReplyStream(value: unknown): value is NonNullable<Snapshot["replyStream"]> | null {
@@ -1562,6 +1682,14 @@ function isReplyStream(value: unknown): value is NonNullable<Snapshot["replyStre
 
 function isReplyStatus(value: unknown, status: string) {
   return isRecord(value) && hasOnlyKeys(value, ["status"]) && value.status === status;
+}
+
+function isCompensationReviewCleared(value: unknown) {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["status"]) &&
+    (value.status === "APPROVED" || value.status === "REJECTED")
+  );
 }
 
 function isProgress(
@@ -1988,6 +2116,12 @@ function shortTicketId(ticketId: string) {
 
 function handlingModeLabel(handlingMode: string) {
   return handlingMode === "HUMAN" ? "人工客服处理中" : "智能客服处理中";
+}
+
+function compensationMethodLabel(method: string) {
+  if (method === "COUPON") return "优惠券";
+  if (method === "SIMULATED_PARTIAL_REFUND") return "模拟原路部分退款";
+  return method;
 }
 
 const LIFECYCLE_PRESENTATIONS: Record<
