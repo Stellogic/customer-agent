@@ -26,11 +26,6 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/baseline_agent"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"src/baseline_agent/rag_eval_v1/queries.json" = "baseline_agent/rag_eval_v1/queries.json"
-"src/baseline_agent/rag_eval_v1/protocol.json" = "baseline_agent/rag_eval_v1/protocol.json"
-"src/baseline_agent/rag_eval_v1/manifest.json" = "baseline_agent/rag_eval_v1/manifest.json"
-
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
