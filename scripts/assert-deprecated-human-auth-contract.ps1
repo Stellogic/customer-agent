@@ -14,6 +14,7 @@ if ($LASTEXITCODE -notin @(0, 1)) {
 }
 $negativeHeaderTestAllowlist = @(
     'backend/src/test/java/com/stellogic/customeragent/ticket/CustomerTicketPrincipalSecurityTest.java',
+    'backend/src/test/java/com/stellogic/customeragent/ticket/CustomerAutoResolutionControllerTest.java',
     'backend/src/test/java/com/stellogic/customeragent/sla/SupportSlaPrincipalSecurityTest.java',
     'backend/src/test/java/com/stellogic/customeragent/queue/SupportPrincipalSecurityTest.java',
     'backend/src/test/java/com/stellogic/customeragent/approval/ApprovalCoarseSecurityTest.java',

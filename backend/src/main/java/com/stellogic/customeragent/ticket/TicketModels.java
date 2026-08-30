@@ -21,6 +21,8 @@ record PublicMessage(String author, String body, Instant sentAt) {}
 
 record CurrentClarification(UUID id, String promptCode, String question) {}
 
+record CurrentAutoResolution(String status, Instant dueAt) {}
+
 record CustomerPublicSnapshot(
         UUID ticketId,
         String lifecycleState,
@@ -33,6 +35,7 @@ record CustomerPublicSnapshot(
         List<PublicMessage> messages,
         CurrentClarification clarification,
         CurrentReplyStream replyStream,
+        CurrentAutoResolution autoResolution,
         PendingCompensationProjection pendingCompensation) {
     CustomerPublicSnapshot(
             UUID ticketId,
@@ -58,6 +61,36 @@ record CustomerPublicSnapshot(
                 messages,
                 clarification,
                 replyStream,
+                null,
+                null);
+    }
+
+    CustomerPublicSnapshot(
+            UUID ticketId,
+            String lifecycleState,
+            String handlingMode,
+            Instant createdAt,
+            Instant firstRespondedAt,
+            String epoch,
+            long sequence,
+            long agentGeneration,
+            List<PublicMessage> messages,
+            CurrentClarification clarification,
+            CurrentReplyStream replyStream,
+            CurrentAutoResolution autoResolution) {
+        this(
+                ticketId,
+                lifecycleState,
+                handlingMode,
+                createdAt,
+                firstRespondedAt,
+                epoch,
+                sequence,
+                agentGeneration,
+                messages,
+                clarification,
+                replyStream,
+                autoResolution,
                 null);
     }
 }

@@ -47,6 +47,7 @@ public final class CustomerTicketV2Controller {
                     "AGENT_REPLY_COMPLETED",
                     "AGENT_REPLY_ABORTED",
                     "AGENT_REPLY_FAILED",
+                    "AUTO_RESOLUTION_CHANGED",
                     "COMPENSATION_REVIEW_PENDING",
                     "COMPENSATION_REVIEW_CLEARED");
 
@@ -207,6 +208,7 @@ public final class CustomerTicketV2Controller {
             List<PublicMessage> messages,
             CurrentClarification clarification,
             CurrentReplyStream replyStream,
+            CurrentAutoResolution autoResolution,
             PendingCompensationProjection pendingCompensation) {
         static SnapshotResponse from(CustomerPublicSnapshot snapshot) {
             return new SnapshotResponse(
@@ -221,6 +223,7 @@ public final class CustomerTicketV2Controller {
                     snapshot.messages(),
                     snapshot.clarification(),
                     snapshot.replyStream(),
+                    snapshot.autoResolution(),
                     snapshot.pendingCompensation());
         }
     }

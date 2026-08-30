@@ -162,11 +162,11 @@ def authorized_customer_reply_bodies(
             f"调查结果显示，订单 {order_reference} 的物流出现延迟。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
         )
     return (
-        f"经核验，订单 {order_reference} 的本次物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
-        f"经核验，订单 {order_reference} 的物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
-        f"调查结果显示，订单 {order_reference} 的物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
-        f"经核验，订单 {order_reference} 的物流延迟未达到 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
-        f"调查结果显示，订单 {order_reference} 的物流延迟未达到 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+        f"经核验，订单 {order_reference} 的本次物流延迟不足 24 小时，当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。",
+        f"经核验，订单 {order_reference} 的物流延迟不足 24 小时，当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。",
+        f"调查结果显示，订单 {order_reference} 的物流延迟不足 24 小时，当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。",
+        f"经核验，订单 {order_reference} 的物流延迟未达到 24 小时，当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。",
+        f"调查结果显示，订单 {order_reference} 的物流延迟未达到 24 小时，当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。",
     )
 
 
@@ -220,6 +220,10 @@ _SENSITIVE_LEAK_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _PERSON_NAME_CLAIM_PATTERN = re.compile(r"(?:由|被)\s*[\u4e00-\u9fff]{2,4}\s*签收")
+_PREMATURE_TICKET_STATUS_PATTERN = re.compile(
+    r"(?:工单|问题)(?:已经|已)(?:自动)?(?:解决|关闭|结案)|已自动(?:解决|关闭|结案)|关闭等待期"
+    r"|(?:五|5)\s*分钟(?:后|内).{0,8}(?:解决|关闭|结案)"
+)
 
 
 def is_authorized_body_prefix(body: str, order_reference: str, *, complete: bool) -> bool:
@@ -232,6 +236,8 @@ def is_authorized_body_prefix(body: str, order_reference: str, *, complete: bool
     if _SENSITIVE_LEAK_PATTERN.search(body) is not None:
         return False
     if _PERSON_NAME_CLAIM_PATTERN.search(body) is not None:
+        return False
+    if _PREMATURE_TICKET_STATUS_PATTERN.search(body) is not None:
         return False
     saw_scoped_order = False
     for match in _ORDER_REFERENCE_PATTERN.finditer(body):
@@ -451,7 +457,7 @@ def default_customer_reply_body(order_reference: str, intent: CustomerReplyInten
         )
     return (
         f"经核验，订单 {order_reference} 的本次物流延迟不足 24 小时，"
-        "当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。"
+        "当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。"
     )
 
 

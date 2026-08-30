@@ -42,7 +42,7 @@ ignore = ["E501", "RUF001"]
 "tests/**" = ["SIM105"]
 
 [tool.pyright]
-include = ["src", "smoke.py", "approval_queue_time_smoke.py"]
+include = ["src", "smoke.py", "approval_queue_time_smoke.py", "auto_resolution_smoke.py"]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 reportTypedDictNotRequiredAccess = false
