@@ -47,3 +47,16 @@ def test_only_committed_training_and_calibration_data_follow_the_registered_coun
         groups.append({topic["id"] for topic in data["topics"]})
     assert groups[0].isdisjoint(groups[1])
     assert not (ROOT / "holdout.json").exists()
+
+
+def test_holdout_guard_rejects_pending_product_even_with_successful_fit(monkeypatch, tmp_path):
+    from baseline_agent import knowledge_answerability_run as runner
+
+    fitted_path = tmp_path / "fit.json"
+    policy = {"status": "CALIBRATED", "holdoutSealSha256": "a" * 64}
+    monkeypatch.setattr(runner, "file_sha", lambda _: "a" * 64)
+    monkeypatch.setattr(runner, "read_json", lambda path:
+        {"status": "CALIBRATED", "proposed_policy": policy} if path == fitted_path
+        else {"status": "PENDING_CALIBRATION"})
+    with pytest.raises(ValueError, match="尚未原样应用"):
+        runner.applied_holdout_policy(fitted_path, tmp_path / "seal.json")

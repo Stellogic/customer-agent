@@ -26,7 +26,7 @@ for (const viewport of [
       expect(data.schema).toBe("knowledge-hybrid-v1");
       expect(data.results.length).toBeGreaterThan(0);
       expect(data.lexicalCandidates.length).toBeGreaterThan(0);
-      expect(data.policy.id).toBe("independent-cosine-v1");
+      expect(data.policy.id).toBe("retrieval-logistic-v1");
       for (const hit of [...data.results, ...data.lexicalCandidates, ...data.vectorCandidates]) {
         expect(hit.version === "v1" && hit.articleId === "logistics-delay").toBe(false);
         expect(hit.sourceFile).toMatch(/^knowledge\//);

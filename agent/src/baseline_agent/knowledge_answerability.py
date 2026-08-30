@@ -96,7 +96,8 @@ def fit_once(training: list[dict[str, Any]], calibration: list[dict[str, Any]]) 
         for left, right in zip(scores, reference, strict=True)):
         raise ValueError("导出参数与训练器分数不一致")
     selection = select_threshold(calibration, scores)
-    result = {"status": selection["status"], "training_label_counts": {"supported": sum(labels), "unsupported": len(labels) - sum(labels)},
+    result = {"status": selection["status"], "fitted_model": dict(policy),
+        "training_label_counts": {"supported": sum(labels), "unsupported": len(labels) - sum(labels)},
         "selection": selection, "calibration_scores": scores, "proposed_policy": None}
     if selection["selected"] is not None:
         policy.update(status="CALIBRATED", threshold=selection["selected"]["threshold"])

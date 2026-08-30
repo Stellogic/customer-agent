@@ -23,6 +23,18 @@ try {
     $baseSha = git -C $root rev-parse origin/main
     if ($LASTEXITCODE -ne 0) { throw '无法读取main基线。' }
     if (git -C $root status --porcelain) { throw '独立开发运行要求先提交源码与数据。' }
+    if ($Split -eq 'holdout' -or $Phase -eq 'audit') {
+        if (-not $FitReport) { throw '打开留出前必须指定已提交的拟合报告。' }
+        $fitPath = (Resolve-Path -LiteralPath $FitReport).Path
+        $fitRelative = [System.IO.Path]::GetRelativePath($root, $fitPath)
+        if ($fitRelative.StartsWith('..') -or [System.IO.Path]::IsPathRooted($fitRelative)) {
+            throw '拟合报告须先归档并提交到本仓库。'
+        }
+        git -C $root ls-files --error-unmatch -- $fitRelative | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw '拟合报告未纳入已提交源码，不能读取留出。' }
+        git -C $root ls-files --error-unmatch -- 'backend/src/main/resources/knowledge-answerability-logistic.json' | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw '产品策略未提交。' }
+    }
     $outputRoot = Join-Path $root ".local/gate-evidence/$RunId"
     $pythonArgs = @($Phase, '--output', (Join-Path $outputRoot "answerability-$Phase.json"),
         '--holdout-seal', (Resolve-Path -LiteralPath $HoldoutSeal).Path,

@@ -39,6 +39,21 @@ def read_seal(path: Path) -> dict[str, Any]:
     return seal
 
 
+def applied_holdout_policy(fit_report: Path, seal: Path) -> dict[str, Any]:
+    """打开留出前核对已提交产品参数;是否已提交由PowerShell检查Git追踪与干净HEAD。"""
+    fitted = read_json(fit_report)
+    policy = fitted.get("proposed_policy")
+    if fitted["status"] != "CALIBRATED" or not policy:
+        raise ValueError("校准不可行或尚无拟合参数")
+    if policy["holdoutSealSha256"] != file_sha(seal):
+        raise ValueError("拟合时的留出封存承诺已改变")
+    active_path = ROOT.parents[3] / "backend/src/main/resources/knowledge-answerability-logistic.json"
+    active = read_json(active_path)
+    if active != policy:
+        raise ValueError("产品配置尚未原样应用已保存的proposal,不能打开留出")
+    return policy
+
+
 def login(client: httpx.Client) -> None:
     csrf = client.get("/api/auth/csrf")
     csrf.raise_for_status()
@@ -158,11 +173,8 @@ def fit_reports(args: argparse.Namespace, report: dict[str, Any]) -> None:
 
 
 def audit_report(args: argparse.Namespace, report: dict[str, Any]) -> None:
+    policy = applied_holdout_policy(args.fit_report, args.holdout_seal)
     observed = checked_observations(args.observations, "holdout", args.head_sha)
-    fitted = read_json(args.fit_report)
-    if fitted["status"] != "CALIBRATED" or fitted.get("proposed_policy") is None:
-        raise ValueError("校准不可行或无已提交策略,不能启动留出审计")
-    policy = fitted["proposed_policy"]
     if (observed["dataset_sha256"] != report["holdout_seal"]["datasetSha256"]
         or policy["holdoutSealSha256"] != file_sha(args.holdout_seal)):
         raise ValueError("留出内容或封存元数据已改变")
@@ -220,10 +232,8 @@ def main() -> None:
                     raise ValueError("数据阶段必须声明分区")
                 if args.split == "holdout":
                     # 只有协调指定的独立运行者可提供留出文件;不得在校准成功前打开。
-                    fitted = read_json(args.fit_report)
-                    if (fitted["status"] != "CALIBRATED"
-                        or fitted["proposed_policy"]["holdoutSealSha256"] != file_sha(args.holdout_seal)
-                        or file_sha(args.dataset) != report["holdout_seal"]["datasetSha256"]):
+                    applied_holdout_policy(args.fit_report, args.holdout_seal)
+                    if file_sha(args.dataset) != report["holdout_seal"]["datasetSha256"]:
                         raise ValueError("留出运行的先决条件不成立")
                 else:
                     manifest = read_json(ROOT / "manifest.json")
