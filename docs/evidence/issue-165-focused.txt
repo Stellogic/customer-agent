@@ -49,3 +49,19 @@ Latest working-source run (not an all-pass result):
 AssertionError
 LOCK_RELEASED issue=165 run=issue165-focus-1c677b9f seconds=145.3800571
 JUnit latest run: 15 tests, 0 failures, 0 errors. The sixth synthetic order used a non-whitelisted description; fixture correction is not yet verified. The ticket/order/proposal lock barriers passed before the sixth scenario failed.
+
+Final focused GREEN: clean HEAD 3193ebed7e1ecd211b42e8c67bb57035d2ab7ddc, base efbdb8348dc9c12f259c69d9e8c16de5e4d3994c.
+RunId: issue165-focus-e31a5bf0; isolated project customer-agent-gate-issue165-focus-e31a5bf0.
+#17 2.901 63 files left unchanged
+#17 2.966 All checks passed!
+#17 34.64 0 errors, 0 warnings, 0 informations
+#165 并发提案=2成功；并发审批=1成功/1冲突；响应丢失及重放后副作用=1，已消费=26.80/30.00
+#165 确认失败释放=26.80；驳回不占额；合法组合=2×26.80，成功后剩余=6.40/60.00
+#165 PostgreSQL 并发预占=1成功/1约束冲突；已消费不恢复额度
+#165 到期 claim 在订单锁前等待；队列跳过忙订单且下次完成过期；无提案行/订单锁反序
+#165 同订单另一工单待审批不阻止当前低风险工单形成五分钟自动解决候选
+Issue #165 订单额度仲裁验收 PASS：6 个合成订单，无模型调用
+FOCUS_PASS issue=165 run=issue165-focus-e31a5bf0 seconds=91.9832854
+LOCK_RELEASED issue=165 run=issue165-focus-e31a5bf0 seconds=96.5309994
+JUnit: CompensationProposalExpiryTest=1, JdbcApprovalServiceTest=1, CompensationExecutionControllerTest=5, JdbcCompensationProposalStoreTest=2, SupportCompensationControllerTest=6; total=15, failures=0, errors=0.
+Full gate is a separate required run; this focused PASS does not establish full-gate completion.
