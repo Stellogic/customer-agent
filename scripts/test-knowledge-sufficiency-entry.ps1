@@ -16,12 +16,15 @@ $env:HF_HUB_OFFLINE = '1'
 $env:TRANSFORMERS_OFFLINE = '1'
 $root = Split-Path -Parent $PSScriptRoot
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
-foreach ($mode in @('development', 'diagnostic', 'remaining')) {
+foreach ($mode in @('development', 'diagnostic', 'remaining', 'c-v2')) {
     $env:KNOWLEDGE_SUFFICIENCY_EXPERIMENT = if ($mode -eq 'diagnostic') {
         'issue-190-fifth-request-diagnostic-once'
     } else { 'issue-190-synthetic-sufficiency-c-once' }
     if ($mode -eq 'remaining') {
         $env:KNOWLEDGE_SUFFICIENCY_EXPERIMENT = 'issue-190-remaining67-diagnostic-once'
+    }
+    if ($mode -eq 'c-v2') {
+        $env:KNOWLEDGE_SUFFICIENCY_EXPERIMENT = 'issue-190-c-v2-whole-development-once'
     }
     [string[]]$entryArgs = @(
         '-NoProfile', '-File', "$PSScriptRoot/knowledge-sufficiency.ps1",
@@ -31,6 +34,7 @@ foreach ($mode in @('development', 'diagnostic', 'remaining')) {
     )
     if ($mode -eq 'diagnostic') { $entryArgs += '-DiagnoseFifthOnce' }
     if ($mode -eq 'remaining') { $entryArgs += '-DiagnoseRemainingOnce' }
+    if ($mode -eq 'c-v2') { $entryArgs += '-CV2WholeOnce' }
     $log = Join-Path $OutputDirectory "$mode.log"
     & pwsh @entryArgs *> $log
     $exitCode = $LASTEXITCODE

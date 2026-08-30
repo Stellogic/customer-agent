@@ -15,11 +15,13 @@ from typing import Any
 
 import httpx
 
+from baseline_agent.knowledge_answerability import QUALITY
 from baseline_agent.knowledge_sufficiency import (
     ARCHIVE_SHA256,
     DATA_SHA256,
     REPO,
     SOURCE_SHA,
+    V2_ASSETS,
     SufficiencyBlocked,
     budget_plan,
     contract,
@@ -49,6 +51,14 @@ REMAINING_LEDGER = (
 REMAINING_LEDGER_SHA = "0bd04be15c1c6e1eeb96f96cdadf994aa14b5a0f2d894e38c3426193896b40f8"
 REMAINING_MANIFEST = Path(__file__).with_name("knowledge_sufficiency_remaining_v1.json")
 REMAINING_MANIFEST_SHA = "d9e11464642afb0de4fe2b4cf170f62b298284f681f2f7843e5e53c349e13bf1"
+V2_OPT_IN = "issue-190-c-v2-whole-development-once"
+V2_PHASE = "seen_development_c_v2_once"
+V2_LEDGER = (
+    REPO / "docs/implementation/evidence/issue190-c-remaining-diagnostic-20260831a/cost-ledger.json"
+)
+V2_LEDGER_SHA = "c11630710263c473fbf938b60e789b33ef93b776021e258976825fdf47206a50"
+V2_REQUESTS = V2_ASSETS / "requests.json"
+V2_REQUESTS_SHA = "7234a4f5812e976f3e3efc594fc3e2b0760b46b760b0f2a8d403525fbfd5cd91"
 
 
 def remaining_manifest() -> dict[str, Any]:
@@ -169,7 +179,7 @@ class ExperimentLedger:
             entry["query_id"] == query_id for entry in phase_attempts
         ):
             raise SufficiencyBlocked("CALL_LIMIT_NO_RETRY")
-        if self.phase == REMAINING_PHASE:
+        if self.phase in {REMAINING_PHASE, V2_PHASE}:
             expected = self.state["phases"][self.phase]["requests"][len(phase_attempts)]
             if expected != {"query_id": query_id, "request_sha256": request_sha}:
                 raise SufficiencyBlocked("REMAINING_REQUEST_ORDER_MISMATCH")
@@ -253,6 +263,32 @@ class ExperimentLedger:
         }
         write_json(self.path, self.state)
 
+    def begin_v2(self, run_id: str, assets: dict[str, str], requests: list[dict[str, str]]) -> None:
+        if V2_PHASE in self.state["phases"]:
+            raise SufficiencyBlocked("V2_ALREADY_STARTED_NO_RETRY")
+        original = V2_LEDGER.read_bytes()
+        if sha256(original) != V2_LEDGER_SHA:
+            raise SufficiencyBlocked("V2_LEDGER_ARCHIVE_CHANGED")
+        if self.state != json.loads(original):
+            raise SufficiencyBlocked("V2_LEDGER_PRECONDITION_CHANGED")
+        content = V2_REQUESTS.read_bytes()
+        if sha256(content) != V2_REQUESTS_SHA:
+            raise SufficiencyBlocked("V2_REQUEST_MANIFEST_CHANGED")
+        manifest = json.loads(content)
+        if assets != manifest["asset_sha256"] or requests != manifest["requests"]:
+            raise SufficiencyBlocked("V2_REQUEST_MANIFEST_MISMATCH")
+        self.phase = V2_PHASE
+        self.state["phases"][self.phase] = {
+            "run_id": run_id,
+            "status": "RUNNING",
+            "assets": assets,
+            "manifest_sha256": V2_REQUESTS_SHA,
+            "requests": requests,
+            "maximum_requests": 72,
+            "quality_evaluation": "SEEN_DEVELOPMENT_ONLY",
+        }
+        write_json(self.path, self.state)
+
 
 async def run_development(
     report: dict[str, Any],
@@ -263,9 +299,15 @@ async def run_development(
     transport: httpx.AsyncBaseTransport | None = None,
     diagnose_fifth_once: bool = False,
     diagnose_remaining_once: bool = False,
+    c_v2_whole_once: bool = False,
 ) -> None:
-    if diagnose_fifth_once and diagnose_remaining_once:
+    if sum((diagnose_fifth_once, diagnose_remaining_once, c_v2_whole_once)) > 1:
         raise SufficiencyBlocked("DIAGNOSTIC_MODES_ARE_EXCLUSIVE")
+    # 不允许把v2解析规则用到旧请求,或把旧解析器用于新版方法。
+    if frozen["asset_sha256"] != contract(c_v2=c_v2_whole_once)["asset_sha256"]:
+        raise SufficiencyBlocked("METHOD_MODE_MISMATCH")
+    if c_v2_whole_once and frozen["config"]["quality_thresholds"] != QUALITY:
+        raise SufficiencyBlocked("QUALITY_THRESHOLDS_CHANGED")
     rows = development_rows()
     if diagnose_fifth_once:
         rows = [rows[4]]
@@ -276,7 +318,14 @@ async def run_development(
         json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         for body in bodies
     ]
-    if diagnose_remaining_once:
+    if c_v2_whole_once:
+        requests = [
+            {"query_id": row["id"], "request_sha256": sha256(encoded)}
+            for row, encoded in zip(rows, encoded_bodies, strict=True)
+        ]
+        ledger.begin_v2(report["run_id"], frozen["asset_sha256"], requests)
+        report.update(request_manifest=requests, source_manifest_sha256=V2_REQUESTS_SHA)
+    elif diagnose_remaining_once:
         requests = [
             {"query_id": row["id"], "request_sha256": sha256(encoded)}
             for row, encoded in zip(rows, encoded_bodies, strict=True)
@@ -335,6 +384,7 @@ async def run_development(
                         if identity is not None
                         else None,
                         duration_ms=elapsed,
+                        c_v2=c_v2_whole_once,
                     )
                 except SufficiencyBlocked as error:
                     if str(error) in {
@@ -366,6 +416,21 @@ async def run_development(
                         else [],
                     }
                 )
+                if c_v2_whole_once:
+                    # 保留所有原始摘录;文章统计去重,不把多段摘录当多个独立来源。
+                    evidence = parsed["decision"]["evidence"]
+                    source_ids = list(
+                        dict.fromkeys(
+                            row["fusedCandidates"][item["chunk"] - 1]["articleId"]
+                            for item in evidence
+                        )
+                    )
+                    report["rows"][-1].update(
+                        evidence_item_count=len(evidence),
+                        cited_article_ids=source_ids,
+                        distinct_cited_article_count=len(source_ids),
+                        contract_validation="PASS",
+                    )
             except (TimeoutError, httpx.TransportError):
                 observation["failure"] = "SUPPLIER_TIMEOUT_OR_TRANSPORT_ERROR"
                 raise SufficiencyBlocked("SUPPLIER_TIMEOUT_OR_TRANSPORT_ERROR") from None
@@ -380,6 +445,26 @@ async def run_development(
         return
     decisions = [entry["decision"]["sufficient"] for entry in report["rows"]]
     report.update(replay_metrics(rows, decisions))
+    if c_v2_whole_once:
+        report.update(
+            contract_validation="PASS_72_OF_72",
+            semantic_validation=report["status"],
+            quality_scope="SEEN_DEVELOPMENT_NOT_HOLDOUT_OR_DELIVERY",
+            confusion_counts={
+                "answerable_accepted": sum(
+                    r["answerable"] and d for r, d in zip(rows, decisions, strict=True)
+                ),
+                "answerable_rejected": sum(
+                    r["answerable"] and not d for r, d in zip(rows, decisions, strict=True)
+                ),
+                "unanswerable_accepted": sum(
+                    not r["answerable"] and d for r, d in zip(rows, decisions, strict=True)
+                ),
+                "unanswerable_rejected": sum(
+                    not r["answerable"] and not d for r, d in zip(rows, decisions, strict=True)
+                ),
+            },
+        )
     report["by_topic"] = {
         topic: {
             "count": sum(row["topic"] == topic for row in rows),
@@ -401,6 +486,7 @@ def main() -> None:
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--diagnose-fifth-once", action="store_true")
     modes.add_argument("--diagnose-remaining-once", action="store_true")
+    modes.add_argument("--c-v2-whole-once", action="store_true")
     args = parser.parse_args()
     # 正式入口必须验证活的共享锁;没有任何自建锁身份或无锁付费模式。
     if os.environ.get("CUSTOMER_AGENT_TEST_GATE_IDENTITY"):
@@ -421,6 +507,8 @@ def main() -> None:
     expected_opt_in = DIAGNOSTIC_OPT_IN if args.diagnose_fifth_once else OPT_IN
     if args.diagnose_remaining_once:
         expected_opt_in = REMAINING_OPT_IN
+    if args.c_v2_whole_once:
+        expected_opt_in = V2_OPT_IN
     if os.environ.get("KNOWLEDGE_SUFFICIENCY_EXPERIMENT") != expected_opt_in:
         raise SufficiencyBlocked("EXPERIMENT_OPT_IN_REQUIRED")
     if args.pricing_and_context_verified_date != datetime.now(UTC).date().isoformat():
@@ -435,7 +523,7 @@ def main() -> None:
         check=True,
     ).stdout.strip()
     ledger_path = Path(git_dir).parent / ".local/issue190-sufficiency/cost-ledger.json"
-    frozen = contract()
+    frozen = contract(c_v2=args.c_v2_whole_once)
     is_diagnostic = args.diagnose_fifth_once or args.diagnose_remaining_once
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x", encoding="utf-8", newline="\n") as output:
@@ -466,9 +554,16 @@ def main() -> None:
             report.update(
                 partition="remaining67_development_diagnostic_not_quality", query_count=67
             )
+        if args.c_v2_whole_once:
+            report.update(
+                schema="knowledge-sufficiency-experiment-run-v2",
+                partition="seen_development_c_v2_not_unseen",
+                contract_validation="INCOMPLETE",
+                semantic_validation="NOT_EVALUATED",
+            )
         ledger: ExperimentLedger | None = None
         try:
-            if is_diagnostic and not ledger_path.exists():
+            if (is_diagnostic or args.c_v2_whole_once) and not ledger_path.exists():
                 raise SufficiencyBlocked("DIAGNOSTIC_REQUIRES_EXISTING_LEDGER")
             ledger = ExperimentLedger(ledger_path, frozen)
             report["cost_totals_before"] = ledger.totals()
@@ -480,6 +575,7 @@ def main() -> None:
                     api_key=api_key,
                     diagnose_fifth_once=args.diagnose_fifth_once,
                     diagnose_remaining_once=args.diagnose_remaining_once,
+                    c_v2_whole_once=args.c_v2_whole_once,
                 )
             )
         except SufficiencyBlocked as error:

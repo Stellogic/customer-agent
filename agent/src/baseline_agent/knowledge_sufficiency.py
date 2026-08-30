@@ -22,6 +22,12 @@ ASSET_SHA256 = {
     "schema.json": "27ef4d19440b4279ac4b0426eb299e87445a455be5206716ad82c0da6f3733f4",
     "config.json": "11e970eca4aa7ee711af9602f14eea5a5c4ea28efe1e67c74f712843b9cbad45",
 }
+V2_ASSETS = Path(__file__).with_name("knowledge_sufficiency_v2")
+V2_ASSET_SHA256 = {
+    "prompt.txt": "a18bfb7648847dd9b040cdcbb9832e21e50143b9b1496068a1b645c2c4fa9b32",
+    "schema.json": "27ef4d19440b4279ac4b0426eb299e87445a455be5206716ad82c0da6f3733f4",
+    "config.json": "3716498d23b0ce1586599d7ad6f7ae28bab913414b28607ea1105899a3167212",
+}
 
 
 class SufficiencyBlocked(ValueError):
@@ -36,13 +42,15 @@ def sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
-def contract() -> dict[str, Any]:
-    hashes = {name: sha256((ASSETS / name).read_bytes()) for name in ASSET_SHA256}
-    if hashes != ASSET_SHA256:
+def contract(*, c_v2: bool = False) -> dict[str, Any]:
+    assets = V2_ASSETS if c_v2 else ASSETS
+    expected = V2_ASSET_SHA256 if c_v2 else ASSET_SHA256
+    hashes = {name: sha256((assets / name).read_bytes()) for name in expected}
+    if hashes != expected:
         raise SufficiencyBlocked("FROZEN_CONTRACT_CHANGED")
-    config = json.loads((ASSETS / "config.json").read_text(encoding="utf-8"))
-    prompt = (ASSETS / "prompt.txt").read_text(encoding="utf-8")
-    schema = json.loads((ASSETS / "schema.json").read_text(encoding="utf-8"))
+    config = json.loads((assets / "config.json").read_text(encoding="utf-8"))
+    prompt = (assets / "prompt.txt").read_text(encoding="utf-8")
+    schema = json.loads((assets / "schema.json").read_text(encoding="utf-8"))
     return {
         "config": config,
         "prompt": prompt,
@@ -99,7 +107,9 @@ def request_body(row: dict[str, Any], frozen: dict[str, Any]) -> dict[str, Any]:
         "text": {
             "format": {
                 "type": "json_schema",
-                "name": "knowledge_sufficiency_c_v1",
+                "name": "knowledge_sufficiency_c_v2"
+                if config["method"] == "context-sufficiency-c-v2"
+                else "knowledge_sufficiency_c_v1",
                 "strict": True,
                 "schema": frozen["schema"],
             }
@@ -183,6 +193,7 @@ def parse_response(
     *,
     expected_identity: tuple[str, str | None] | None,
     duration_ms: int,
+    c_v2: bool = False,
 ) -> dict[str, Any]:
     """供应商契约解析;首次实返标识由实验账本持久化,后续逐次比较。"""
     model = payload.get("model")
@@ -251,7 +262,7 @@ def parse_response(
         if (
             type(chunk) is not int
             or not 1 <= chunk <= len(hits)
-            or chunk in seen
+            or (not c_v2 and chunk in seen)
             or not isinstance(quote, str)
             or not 1 <= len(quote) <= 24
             or not quote.strip()
