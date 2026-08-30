@@ -27,7 +27,8 @@ $holder = Enter-TestGateLock -Issue 190 -RunId $RunId -CommandType $commandType 
 try {
     $reportName = if ($DiagnoseFifthOnce) { 'sufficiency-fifth-diagnostic.json' } else { 'sufficiency-development.json' }
     $output = Join-Path $root ".local/gate-evidence/$RunId/$reportName"
-    $modeArgs = if ($DiagnoseFifthOnce) { @('--diagnose-fifth-once') } else { @() }
+    [string[]]$modeArgs = @()
+    if ($DiagnoseFifthOnce) { $modeArgs += '--diagnose-fifth-once' }
     Push-Location (Join-Path $root 'agent')
     try {
         # 不在实验入口隐式安装/生成依赖;准备依赖需另外受锁且获运行授权。
