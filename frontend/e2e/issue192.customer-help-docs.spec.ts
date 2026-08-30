@@ -18,9 +18,7 @@ test("客户壳帮助入口、信任说明与开发中无写副作用", async ({
   await expect(page.getByRole("navigation", { name: "客户导航" })).toBeVisible();
   await expect(page.getByRole("link", { name: "帮助文档" })).toBeVisible();
   await expect(page.getByRole("region", { name: "信任说明" })).toContainText("确认后才创建工单");
-  await expect(
-    page.getByRole("region", { name: "AI、人工与补偿如何分工" }),
-  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "AI、人工与补偿如何分工" })).toBeVisible();
   await expect(page.getByRole("region", { name: "尚未提供的帮助条目" })).toBeVisible();
   await expect(page.getByRole("article", { name: "AI 调查" })).toBeVisible();
   await expect(page.getByRole("article", { name: "人工客服" })).toBeVisible();
