@@ -419,6 +419,23 @@ export function App() {
     void consumeEvents(ticketId, authoritative.cursor);
   }
 
+  async function refreshPendingCompensationSnapshot(ticketId: string) {
+    try {
+      const loaded = await humanSessionFetch(`${PUBLIC_CONVERSATION_BASE}/${ticketId}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!loaded.ok) return;
+      const authoritative = (await loaded.json()) as unknown;
+      if (!isSnapshot(authoritative) || authoritative.ticket.id !== ticketId) return;
+      if (snapshotRef.current?.ticket.id !== ticketId) return;
+      snapshotRef.current = authoritative;
+      setSnapshot(authoritative);
+    } catch {
+      // Keep the last committed snapshot; the active SSE stream remains the recovery path.
+    }
+  }
+
   async function submitClarification(event: FormEvent) {
     event.preventDefault();
     if (!snapshot?.clarification) return;
@@ -770,6 +787,7 @@ export function App() {
     }
     const payload = envelope.payload;
     let next: Snapshot;
+    let refreshPendingCompensation = false;
     if (
       event.type === "AGENT_PROCESSING_STARTED" &&
       envelope.generation > current.ticket.agentGeneration
@@ -790,6 +808,10 @@ export function App() {
     ) {
       if (!isPublicMessage(payload)) return false;
       const message = payload;
+      refreshPendingCompensation =
+        current.pendingCompensation !== undefined &&
+        current.pendingCompensation !== null &&
+        message.author === "SUPPORT";
       if (current.ticket.handlingMode === "HUMAN" && message.author === "AGENT") {
         next = { ...current, cursor: event.id };
       } else {
@@ -927,12 +949,16 @@ export function App() {
         ...current,
         cursor: event.id,
         ticket: { ...current.ticket, lifecycleState: payload.lifecycleState },
+        pendingCompensation: null,
       };
     } else {
       return false;
     }
     snapshotRef.current = next;
     setSnapshot(next);
+    if (refreshPendingCompensation) {
+      void refreshPendingCompensationSnapshot(current.ticket.id);
+    }
     return true;
   }
 

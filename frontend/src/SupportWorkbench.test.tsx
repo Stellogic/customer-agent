@@ -855,7 +855,11 @@ describe("客服共享队列工作台", () => {
       }
       if (path.endsWith("/compensation-options")) return couponOptions();
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/compensation-proposals`) {
-        throw new TypeError("disconnected");
+        expect(init?.method).toBe("POST");
+        return Response.json(
+          { schema: "support-workbench-v2", ticketId: HANDOFF_TICKET },
+          { status: 201 },
+        );
       }
       if (
         path ===
@@ -947,6 +951,8 @@ describe("客服共享队列工作台", () => {
       }
       if (path.endsWith("/exceptional-compensation-requests")) {
         expect(init?.method).toBe("POST");
+        const requestId = new Headers(init?.headers).get("Idempotency-Key");
+        expect(requestId).toBeTruthy();
         expect(JSON.parse(String(init?.body))).toEqual({
           schema: "support-workbench-v2",
           reasonCode: "STANDARD_PLAN_INSUFFICIENT",
@@ -956,7 +962,7 @@ describe("客服共享队列工作台", () => {
           {
             schema: "support-workbench-v2",
             ticketId: HANDOFF_TICKET,
-            requestId: "ex-1",
+            requestId,
             exceptionalRequestId: "16400000-0000-0000-0000-000000000201",
             reasonCode: "STANDARD_PLAN_INSUFFICIENT",
             status: "SUBMITTED",

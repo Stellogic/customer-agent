@@ -96,6 +96,8 @@ export function SupportCompensationPanel({
           planCode: selected.planCode,
           reasonCode,
         },
+        ticketId,
+        "proposal",
       );
       clearPendingCompensationSubmit(ticketId);
       setSubmitState("idle");
@@ -129,6 +131,8 @@ export function SupportCompensationPanel({
           reasonCode: "STANDARD_PLAN_INSUFFICIENT",
           justification: justification.trim(),
         },
+        ticketId,
+        "exception",
       );
       clearPendingCompensationSubmit(ticketId);
       setJustification("");
@@ -336,6 +340,8 @@ async function postCompensation(
   path: string,
   idempotencyKey: string,
   body: Record<string, string>,
+  ticketId: string,
+  kind: "proposal" | "exception",
 ) {
   let csrf: Awaited<ReturnType<typeof loadCsrfToken>>;
   try {
@@ -372,6 +378,23 @@ async function postCompensation(
       "提交结果暂未确认；请查询 Spring 权威结果，不要重复提交。",
     );
   }
+  let value: unknown;
+  try {
+    value = await response.json();
+  } catch {
+    throw new CompensationUncertainError(
+      "提交结果暂未确认；请查询 Spring 权威结果，不要重复提交。",
+    );
+  }
+  const valid =
+    kind === "proposal"
+      ? isConfirmedProposalResult(value, ticketId, idempotencyKey, false)
+      : isConfirmedExceptionResult(value, ticketId, idempotencyKey, false);
+  if (!valid) {
+    throw new CompensationUncertainError(
+      "提交结果暂未确认；请查询 Spring 权威结果，不要重复提交。",
+    );
+  }
 }
 
 function isOptions(value: unknown): value is CompensationOptions {
@@ -389,7 +412,12 @@ function isOptions(value: unknown): value is CompensationOptions {
   return true;
 }
 
-function isConfirmedProposalResult(value: unknown, ticketId: string, requestId: string) {
+function isConfirmedProposalResult(
+  value: unknown,
+  ticketId: string,
+  requestId: string,
+  requireReplayed = true,
+) {
   return (
     isRecord(value) &&
     hasOnlyKeys(value, [
@@ -419,11 +447,17 @@ function isConfirmedProposalResult(value: unknown, ticketId: string, requestId: 
     value.currency === "CNY" &&
     value.status === "PENDING_APPROVAL" &&
     value.outcome === "ACCEPTED" &&
-    value.replayed === true
+    typeof value.replayed === "boolean" &&
+    (!requireReplayed || value.replayed === true)
   );
 }
 
-function isConfirmedExceptionResult(value: unknown, ticketId: string, requestId: string) {
+function isConfirmedExceptionResult(
+  value: unknown,
+  ticketId: string,
+  requestId: string,
+  requireReplayed = true,
+) {
   return (
     isRecord(value) &&
     hasOnlyKeys(value, [
@@ -443,7 +477,8 @@ function isConfirmedExceptionResult(value: unknown, ticketId: string, requestId:
     value.reasonCode === "STANDARD_PLAN_INSUFFICIENT" &&
     value.status === "SUBMITTED" &&
     value.outcome === "ACCEPTED" &&
-    value.replayed === true
+    typeof value.replayed === "boolean" &&
+    (!requireReplayed || value.replayed === true)
   );
 }
 

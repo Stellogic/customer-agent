@@ -1481,6 +1481,83 @@ describe("客户帮助中心", () => {
     expect(screen.queryByText("已执行")).not.toBeInTheDocument();
   });
 
+  it("审批公开消息到达后从 Spring 权威快照移除旧待审批投影", async () => {
+    const ticketId = "16400000-0000-0000-0000-000000000003";
+    let resolveRefresh: ((response: Response) => void) | undefined;
+    const pendingRefresh = new Promise<Response>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            view: "PUBLIC_CONVERSATION",
+            schema: "public-conversation-v2",
+            cursor: "public-conversation-v2:4",
+            ticket: {
+              id: ticketId,
+              lifecycleState: "INVESTIGATING",
+              handlingMode: "HUMAN",
+              agentGeneration: 1,
+            },
+            messages: [],
+            clarification: null,
+            replyStream: null,
+            pendingCompensation: {
+              compensationMethod: "COUPON",
+              amount: "10.00",
+              currency: "CNY",
+              status: "PENDING_REVIEW",
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        eventResponse([
+          publicEvent("public-conversation-v2:5", "PUBLIC_MESSAGE_APPENDED", {
+            author: "SUPPORT",
+            body: "补偿方案已获批准，正在等待补偿处理。",
+            sentAt: "2026-08-30T00:02:00Z",
+          }),
+        ]),
+      )
+      .mockReturnValueOnce(pendingRefresh);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "待审批" })).toBeInTheDocument();
+    resolveRefresh?.(
+      new Response(
+        JSON.stringify({
+          view: "PUBLIC_CONVERSATION",
+          schema: "public-conversation-v2",
+          cursor: "public-conversation-v2:5",
+          ticket: {
+            id: ticketId,
+            lifecycleState: "INVESTIGATING",
+            handlingMode: "HUMAN",
+            agentGeneration: 1,
+          },
+          messages: [
+            {
+              author: "SUPPORT",
+              body: "补偿方案已获批准，正在等待补偿处理。",
+              sentAt: "2026-08-30T00:02:00Z",
+            },
+          ],
+          clarification: null,
+          replyStream: null,
+        }),
+        { status: 200 },
+      ),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "待审批" })).not.toBeInTheDocument();
+    });
+  });
+
   it("在首个内容片段到达前持续显示可读的等待状态", async () => {
     const ticketId = "15900000-0000-0000-0000-000000000002";
     globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
