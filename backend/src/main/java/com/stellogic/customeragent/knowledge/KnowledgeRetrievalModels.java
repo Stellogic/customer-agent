@@ -28,6 +28,16 @@ record KnowledgeRetrievalResponse(
         List<KnowledgeRetrievalHit> vectorCandidates,
         List<KnowledgeRetrievalHit> results) {}
 
+record KnowledgeDevelopmentResponse(
+        String schema,
+        long generation,
+        String revision,
+        List<String> featureNames,
+        List<Double> features,
+        List<KnowledgeRetrievalHit> lexicalCandidates,
+        List<KnowledgeRetrievalHit> vectorCandidates,
+        List<KnowledgeRetrievalHit> fusedCandidates) {}
+
 final class KnowledgeRetrievalUnavailableException extends RuntimeException {
     private final String code;
 

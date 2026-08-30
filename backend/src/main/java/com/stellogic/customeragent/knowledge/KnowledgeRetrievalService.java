@@ -42,6 +42,23 @@ class KnowledgeRetrievalService {
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public KnowledgeRetrievalResponse search(String principal, String query, String scope) {
+        access.requireScopes(principal);
+        KnowledgeRetrievalPolicy policy = answerability.requireCalibrated();
+        var candidates = retrieve(principal, query, scope);
+        List<KnowledgeRetrievalHit> results = candidates.vectorCandidates().isEmpty()
+                || !answerability.accepts(candidates.features())
+                ? List.of() : candidates.fusedCandidates();
+        return new KnowledgeRetrievalResponse("knowledge-hybrid-v1", query.trim(),
+                candidates.generation(), candidates.revision(), policy,
+                candidates.lexicalCandidates(), candidates.vectorCandidates(), results);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public KnowledgeDevelopmentResponse developmentCandidates(String principal, String query, String scope) {
+        return retrieve(principal, query, scope);
+    }
+
+    private KnowledgeDevelopmentResponse retrieve(String principal, String query, String scope) {
         List<String> allowed = access.requireScopes(principal);
         if (query == null || query.isBlank() || query.length() > 200) {
             throw new KnowledgeInvalidQueryException("检索问题长度必须在 1 到 200 之间");
@@ -53,7 +70,6 @@ class KnowledgeRetrievalService {
             throw new KnowledgeInvalidQueryException("检索适用范围无效");
         }
         try {
-            KnowledgeRetrievalPolicy policy = answerability.requireCalibrated();
             Long generation =
                     jdbc.queryForObject(
                             """
@@ -102,19 +118,11 @@ class KnowledgeRetrievalService {
                             KnowledgeEmbeddingGateway.REVISION,
                             vector,
                             vector);
-            List<KnowledgeRetrievalHit> results =
-                    dense.isEmpty() || dense.getFirst().score() < policy.threshold()
-                            ? List.of()
-                            : fuse(lexical, dense);
-            return new KnowledgeRetrievalResponse(
-                    "knowledge-hybrid-v1",
-                    query.trim(),
-                    generation,
-                    KnowledgeEmbeddingGateway.REVISION,
-                    policy,
-                    lexical,
-                    dense,
-                    results);
+            List<KnowledgeRetrievalHit> fused = fuse(lexical, dense);
+            return new KnowledgeDevelopmentResponse("knowledge-development-v1", generation,
+                    KnowledgeEmbeddingGateway.REVISION, KnowledgeAnswerabilityFeatures.NAMES,
+                    KnowledgeAnswerabilityFeatures.extract(query.trim(), lexical, dense, fused),
+                    lexical, dense, fused);
         } catch (KnowledgeRetrievalUnavailableException exception) {
             throw exception;
         } catch (org.springframework.dao.EmptyResultDataAccessException exception) {

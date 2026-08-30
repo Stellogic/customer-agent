@@ -1,0 +1,14 @@
+{
+  "id": "retrieval-logistic-v1",
+  "status": "PENDING_CALIBRATION",
+  "modelRevision": "7999e1d3359715c523056ef9478215996d62a620",
+  "featureNames": ["dense_max", "dense_margin", "query_term_coverage", "retriever_agreement"],
+  "trainingDatasetSha256": null,
+  "calibrationDatasetSha256": null,
+  "sourceSha": null,
+  "mean": null,
+  "scale": null,
+  "coefficients": null,
+  "intercept": null,
+  "threshold": null
+}

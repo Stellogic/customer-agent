@@ -23,7 +23,7 @@ final class KnowledgeLexicalAnalyzer {
                 .collect(Collectors.joining(" | "));
     }
 
-    private static List<String> terms(String text) {
+    static List<String> terms(String text) {
         try (var analyzer = new CJKAnalyzer();
                 var stream = analyzer.tokenStream("knowledge", text)) {
             var term = stream.addAttribute(CharTermAttribute.class);

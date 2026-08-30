@@ -1,0 +1,49 @@
+{
+  "schema": "knowledge-answerability-manifest-v1",
+  "methodCommit": "963ee0fe99ccfc7c855ec16be5420d99056a54e6",
+  "source": "原创合成；仅训练与校准，不含未见留出内容",
+  "datasets": [
+    {
+      "split": "training",
+      "file": "training.json",
+      "sha256": "ae12ed3e4a4e94d99be4b94411b7d8ee826b77bbea8f5e35b31deb14eeae2864",
+      "topics": [
+        "ceramic",
+        "darkroom",
+        "espresso",
+        "joinery",
+        "sourdough",
+        "choir"
+      ],
+      "topicCount": 6,
+      "queryCount": 144,
+      "articleCount": 24,
+      "author": "Codex implementation task",
+      "annotationReview": "PENDING_STATIC_REVIEW",
+      "computedFeatures": "NOT_RUN"
+    },
+    {
+      "split": "calibration",
+      "file": "calibration.json",
+      "sha256": "4ba56767f8729ba064f614c856076c30f08e5852bad0255c2bf6b443c31014b6",
+      "topics": [
+        "weaving",
+        "leather",
+        "rainfall"
+      ],
+      "topicCount": 3,
+      "queryCount": 72,
+      "articleCount": 12,
+      "author": "Codex implementation task",
+      "annotationReview": "PENDING_STATIC_REVIEW",
+      "computedFeatures": "NOT_RUN"
+    }
+  ],
+  "holdout": {
+    "state": "AWAITING_COORDINATOR_SEAL",
+    "topicCount": 3,
+    "queryCount": 72,
+    "contentReadByImplementer": false
+  },
+  "runStatus": "NOT_RUN"
+}
