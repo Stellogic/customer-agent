@@ -54,9 +54,12 @@ export default function KnowledgeHybridSearch() {
       const value: unknown = await response.json();
       if (!response.ok) {
         const stale = record(value) && value.code === "INDEX_STALE";
+        const pending = record(value) && value.code === "CALIBRATION_REQUIRED";
         throw new Error(
           stale
             ? "混合检索索引过期，请联系维护者重新准备索引。"
+            : pending
+              ? "拒答策略尚未完成独立校准，没有返回知识结果。"
             : "混合检索不可用；没有返回知识结果，请稍后重试。",
         );
       }

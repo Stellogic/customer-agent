@@ -70,13 +70,14 @@ final class KnowledgeVectorIndexer {
                                 Chunk chunk = batch.get(i);
                                 jdbc.update(
                                         "insert into knowledge_embedding"
-                                            + " (chunk_id,generation,content_hash,revision,embedding)"
-                                            + " values(?,?,?,?,?::vector)",
+                                            + " (chunk_id,generation,content_hash,revision,embedding,lexical_vector)"
+                                            + " values(?,?,?,?,?::vector,to_tsvector('simple',?))",
                                         chunk.id(),
                                         generation,
                                         chunk.hash(),
                                         KnowledgeEmbeddingGateway.REVISION,
-                                        vectors.get(i));
+                                        vectors.get(i),
+                                        KnowledgeLexicalAnalyzer.document(chunk.content()));
                             }
                         }
                         jdbc.update(

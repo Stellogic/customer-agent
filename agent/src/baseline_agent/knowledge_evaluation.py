@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import platform
+import time
 from dataclasses import asdict
 from importlib.metadata import version
 from pathlib import Path
@@ -154,7 +155,12 @@ def run_query(base_url: str, query: EvalQuery) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--run-id")
+    parser.add_argument("--head-sha")
+    parser.add_argument("--base-sha")
+    parser.add_argument("--working-tree-dirty", action="store_true")
     args = parser.parse_args()
+    started = time.perf_counter()
     dataset = load_rag_eval_v1()
     report: dict[str, Any] = {
         "dataset": dataset.dataset_id,
@@ -162,6 +168,11 @@ def main() -> None:
         "revision": dataset.protocol.model.revision,
         "passed": False,
         "status": "ERROR",
+        "run_id": args.run_id,
+        "head_sha": args.head_sha,
+        "base_sha": args.base_sha,
+        "working_tree_dirty": args.working_tree_dirty,
+        "paid_model_cost_cny": 0,
         "environment": {"python": platform.python_version(), "platform": platform.platform()},
         "thresholds": asdict(dataset.thresholds),
         "rows": [],
@@ -235,6 +246,7 @@ def main() -> None:
         # 不保存带凭据的连接串或供应商异常正文。
         report["error_type"] = type(error).__name__
     finally:
+        report["elapsed_seconds"] = time.perf_counter() - started
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     raise SystemExit(0 if report["passed"] else 1)

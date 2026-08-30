@@ -14,12 +14,10 @@ import java.util.Map;
 
 @Service
 class KnowledgeRetrievalService {
-    // 预先选择一次，不通过冻结评测反向调参。
-    private static final double MIN_SIMILARITY = 0.80;
     private static final String ELIGIBLE =
             """
             with eligible as materialized (
-              select c.*, a.title, e.embedding from knowledge_chunk c
+              select c.*, a.title, e.embedding, e.lexical_vector from knowledge_chunk c
               join knowledge_article a using(article_id,version)
               join knowledge_embedding e using(chunk_id)
               where a.publication_status='PUBLISHED' and a.is_current
@@ -30,12 +28,15 @@ class KnowledgeRetrievalService {
     private final JdbcTemplate jdbc;
     private final KnowledgeAccessPolicy access;
     private final KnowledgeEmbeddingGateway embedding;
+    private final KnowledgeAnswerabilityPolicy answerability;
 
     KnowledgeRetrievalService(
-            JdbcTemplate jdbc, KnowledgeAccessPolicy access, KnowledgeEmbeddingGateway embedding) {
+            JdbcTemplate jdbc, KnowledgeAccessPolicy access, KnowledgeEmbeddingGateway embedding,
+            KnowledgeAnswerabilityPolicy answerability) {
         this.jdbc = jdbc;
         this.access = access;
         this.embedding = embedding;
+        this.answerability = answerability;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -51,6 +52,7 @@ class KnowledgeRetrievalService {
             throw new KnowledgeInvalidQueryException("检索适用范围无效");
         }
         try {
+            KnowledgeRetrievalPolicy policy = answerability.requireCalibrated();
             Long generation =
                     jdbc.queryForObject(
                             """
@@ -69,12 +71,13 @@ class KnowledgeRetrievalService {
             if (generation == null) throw new KnowledgeRetrievalUnavailableException("INDEX_STALE");
             String vector = embedding.encode(List.of(query.trim()), true).getFirst();
             String[] scopeArray = scopes.toArray(String[]::new);
+            String lexicalQuery = KnowledgeLexicalAnalyzer.query(query.trim());
             List<KnowledgeRetrievalHit> lexical =
                     jdbc.query(
                             ELIGIBLE
                                     + """
-                                    select *, ts_rank_cd(search_vector, plainto_tsquery('simple', ?)) as score
-                                    from eligible where search_vector @@ plainto_tsquery('simple', ?)
+                                    select *, ts_rank_cd(lexical_vector, to_tsquery('simple', ?)) as score
+                                    from eligible where lexical_vector @@ to_tsquery('simple', ?)
                                     order by score desc, chunk_id limit 20
                                     """,
                             (rs, row) -> hit(rs, true),
@@ -82,8 +85,8 @@ class KnowledgeRetrievalService {
                             scopeArray,
                             generation,
                             KnowledgeEmbeddingGateway.REVISION,
-                            query.trim(),
-                            query.trim());
+                            lexicalQuery,
+                            lexicalQuery);
             List<KnowledgeRetrievalHit> dense =
                     jdbc.query(
                             ELIGIBLE
@@ -98,12 +101,15 @@ class KnowledgeRetrievalService {
                             KnowledgeEmbeddingGateway.REVISION,
                             vector,
                             vector);
-            List<KnowledgeRetrievalHit> results = fuse(lexical, dense);
+            List<KnowledgeRetrievalHit> results =
+                    dense.isEmpty() || dense.getFirst().score() < policy.threshold()
+                            ? List.of() : fuse(lexical, dense);
             return new KnowledgeRetrievalResponse(
                     "knowledge-hybrid-v1",
                     query.trim(),
                     generation,
                     KnowledgeEmbeddingGateway.REVISION,
+                    policy,
                     lexical,
                     dense,
                     results);
@@ -138,7 +144,6 @@ class KnowledgeRetrievalService {
 
     private static List<KnowledgeRetrievalHit> fuse(
             List<KnowledgeRetrievalHit> lexical, List<KnowledgeRetrievalHit> dense) {
-        if (dense.isEmpty() || dense.getFirst().score() < MIN_SIMILARITY) return List.of();
         Map<String, KnowledgeRetrievalHit> hits = new HashMap<>();
         Map<String, Double> scores = new HashMap<>();
         Map<String, Double> lexicalScores = new HashMap<>();

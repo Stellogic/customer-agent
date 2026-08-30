@@ -25,6 +25,8 @@ for (const viewport of [
       const data = await response.json();
       expect(data.schema).toBe("knowledge-hybrid-v1");
       expect(data.results.length).toBeGreaterThan(0);
+      expect(data.lexicalCandidates.length).toBeGreaterThan(0);
+      expect(data.policy.id).toBe("independent-cosine-v1");
       for (const hit of [...data.results, ...data.lexicalCandidates, ...data.vectorCandidates]) {
         expect(hit.version === "v1" && hit.articleId === "logistics-delay").toBe(false);
         expect(hit.sourceFile).toMatch(/^knowledge\//);
@@ -115,13 +117,13 @@ test("Issue #190 两路排名前排除高分草稿和退役版本", async ({ bro
       SELECT 'chunk-' || lpad(n::text,64,'0'),'issue190-draft-' || n,'v1',1,
         'knowledge/issue190-draft-' || n || '.md',1,1,ARRAY['INTERNAL'],'物流延迟',now()
       FROM generate_series(1,25) n;
-      INSERT INTO knowledge_embedding(chunk_id,generation,content_hash,revision,embedding)
-      SELECT c.chunk_id,e.generation,repeat('a',64),e.revision,e.embedding
+      INSERT INTO knowledge_embedding(chunk_id,generation,content_hash,revision,embedding,lexical_vector)
+      SELECT c.chunk_id,e.generation,repeat('a',64),e.revision,e.embedding,to_tsvector('simple','物流 流延 延迟')
       FROM knowledge_chunk c CROSS JOIN LATERAL
         (SELECT * FROM knowledge_embedding ORDER BY chunk_id LIMIT 1) e
       WHERE c.article_id LIKE 'issue190-draft-%';
-      INSERT INTO knowledge_embedding(chunk_id,generation,content_hash,revision,embedding)
-      SELECT c.chunk_id,e.generation,a.content_hash,e.revision,e.embedding
+      INSERT INTO knowledge_embedding(chunk_id,generation,content_hash,revision,embedding,lexical_vector)
+      SELECT c.chunk_id,e.generation,a.content_hash,e.revision,e.embedding,to_tsvector('simple','物流 流延 延迟')
       FROM knowledge_chunk c JOIN knowledge_article a USING(article_id,version)
       CROSS JOIN LATERAL (SELECT * FROM knowledge_embedding ORDER BY chunk_id LIMIT 1) e
       WHERE a.publication_status='RETIRED' ON CONFLICT(chunk_id) DO NOTHING;
@@ -130,6 +132,7 @@ test("Issue #190 两路排名前排除高分草稿和退役版本", async ({ bro
     expect(response.status()).toBe(200);
     const body = await response.json();
     expect(body.vectorCandidates.length).toBeGreaterThan(0);
+    expect(body.lexicalCandidates.length).toBeGreaterThan(0);
     for (const hit of [...body.results, ...body.vectorCandidates, ...body.lexicalCandidates]) {
       expect(hit.articleId).not.toMatch(/^issue190-draft-/);
       expect(hit.articleId === "logistics-delay" && hit.version === "v1").toBe(false);

@@ -2,8 +2,7 @@ from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from baseline_agent.knowledge_embedding import configured_encoder
-from baseline_agent.rag_eval_v1 import load_rag_eval_v1
+from baseline_agent.knowledge_embedding import configured_encoder, load_model_protocol
 
 
 class EmbeddingState(TypedDict, total=False):
@@ -19,7 +18,7 @@ def embed(state: EmbeddingState) -> EmbeddingState:
         raise ValueError("编码服务只接受 Spring 的明确编码请求")
     return {
         "embeddings": configured_encoder().encode(state["texts"], query=state["kind"] == "QUERY"),
-        "revision": load_rag_eval_v1().protocol.model.revision,
+        "revision": load_model_protocol()["revision"],
     }
 
 

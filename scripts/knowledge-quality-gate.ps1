@@ -6,12 +6,17 @@ if ($RunId -notmatch '^[a-z0-9][a-z0-9-]{7,}$') { throw '质量门需要明确�
 $outputDirectory = Join-Path (Split-Path -Parent $PSScriptRoot) ".local/gate-evidence/$RunId"
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 $containerOutput = "/tmp/knowledge-$RunId.json"
+$root = Split-Path -Parent $PSScriptRoot
+$headSha = git -C $root rev-parse HEAD
+$baseSha = git -C $root rev-parse origin/main
+$dirtyArgs = if (git -C $root status --porcelain) { @('--working-tree-dirty') } else { @() }
 $nativePreference = $PSNativeCommandUseErrorActionPreference
 $PSNativeCommandUseErrorActionPreference = $false
 try {
     docker compose exec -T `
         -e SPRING_FIXTURE_DATABASE_URI=postgresql://spring_fixture:local-spring-fixture@postgres:5432/customer_agent `
-        agent-server python -m baseline_agent.knowledge_evaluation --output $containerOutput
+        agent-server python -m baseline_agent.knowledge_evaluation --output $containerOutput `
+        --run-id $RunId --head-sha $headSha --base-sha $baseSha @dirtyArgs
     $evaluationExit = $LASTEXITCODE
 } finally { $PSNativeCommandUseErrorActionPreference = $nativePreference }
 docker compose cp "agent-server:$containerOutput" (Join-Path $outputDirectory 'rag-eval-v1-result.json')
