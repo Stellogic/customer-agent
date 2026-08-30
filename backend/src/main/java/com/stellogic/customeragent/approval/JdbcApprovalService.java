@@ -792,7 +792,6 @@ class JdbcApprovalService implements ApprovalService {
                     HttpStatus.CONFLICT, "proposal revision content mismatch");
         }
 
-        lockAllowance(proposal.orderReference());
         List<AuthoritativeOrderFacts> orders =
                 jdbc.query(
                         "select paid_amount, available_compensation_amount, delay_hours, delay_seconds, paid, cancelled, "
@@ -923,6 +922,7 @@ class JdbcApprovalService implements ApprovalService {
     }
 
     private void lockProposal(UUID revisionId) {
+        lockOrderForProposal(revisionId);
         jdbc.query(
                 "select id from compensation_proposal_revision where id = ? for update",
                 (rs, row) -> rs.getObject(1, UUID.class),
@@ -930,10 +930,27 @@ class JdbcApprovalService implements ApprovalService {
     }
 
     private void lockParticipantPolicy(UUID revisionId) {
+        lockOrderForProposal(revisionId);
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
                 revisionId + "\nPROPOSAL_REVISION_SUPPORT_PARTICIPANT");
+    }
+
+    private void lockTicketAuthority(UUID revisionId) {
+        List<UUID> ticketIds =
+                jdbc.query(
+                        "select ticket_id from compensation_proposal_revision where id = ?",
+                        (rs, row) -> rs.getObject(1, UUID.class),
+                        revisionId);
+        if (ticketIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "approval proposal not found");
+        }
+        authorityLock.acquire(ticketIds.getFirst());
+        jdbc.query(
+                "select id from support_ticket where id = ? for key share",
+                (rs, row) -> rs.getObject(1, UUID.class),
+                ticketIds.getFirst());
     }
 
     private void requireNotSupportParticipant(UUID revisionId, String approverId) {
@@ -970,11 +987,13 @@ class JdbcApprovalService implements ApprovalService {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "current approval lease required");
     }
 
-    private void lockAllowance(String orderReference) {
+    private void lockOrderForProposal(UUID revisionId) {
+        lockTicketAuthority(revisionId);
         jdbc.query(
-                "select pg_advisory_xact_lock(hashtextextended(?, 0))",
+                "select pg_advisory_xact_lock(hashtextextended(order_reference || E'\\nCOMPENSATION_ALLOWANCE', 0)) "
+                        + "from compensation_proposal_revision where id = ?",
                 rs -> null,
-                orderReference + "\nCOMPENSATION_ALLOWANCE");
+                revisionId);
     }
 
     private static boolean matchesAuthoritativeFacts(

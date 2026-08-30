@@ -175,6 +175,8 @@ Remove-Item Env:EXECUTOR_SIMULATION_SCENARIO -ErrorAction SilentlyContinue
 Remove-Item Env:EXECUTOR_POLL_DELAY -ErrorAction SilentlyContinue
 
 if ($Reset) {
+    docker compose exec -T postgres psql -U postgres -d customer_agent -f /smoke/issue165-order-allowance.sql
+    docker compose --profile smoke run --rm --no-deps --entrypoint python integration-smoke /smoke/order_allowance_smoke.py
     docker compose --profile smoke run --rm integration-smoke
     if ($LASTEXITCODE -ne 0) {
         throw "集成 smoke 失败，退出码: $LASTEXITCODE"
