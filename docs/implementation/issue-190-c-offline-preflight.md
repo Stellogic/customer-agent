@@ -1,5 +1,7 @@
 # Issue #190 C离线预检：通过与失败对照
 
+后续：[首次真实合成开发回放在第5次请求结构失败后中止](issue-190-c-development-attempt-a.md)，4/72题完成、未生成质量指标；不改变本文离线检查已通过的事实。
+
 2026-08-31；关联 [Issue #190](https://github.com/Stellogic/customer-agent/issues/190) / [Draft PR203](https://github.com/Stellogic/customer-agent/pull/203)。**本阶段OFFLINE_PREFLIGHT_PASS，不是C模型质量PASS或最终门禁。** 没有真实DeepSeek调用、72题回放、留出/原冻结评测、产品策略切换、合入或下游放行。
 
 开始时fetch确认 `origin/main=c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`，分支已包含该main。此前审查源码 `ec158123` 到交接 `a4093028` 仅增14行文档。最终受测干净SHA **`b9c46a932267bf1264dfbe1ed81950dfc3e17d72`**，后续只归档文档/日志，不把归档提交冒称重新受测。
