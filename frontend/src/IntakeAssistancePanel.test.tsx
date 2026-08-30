@@ -133,6 +133,79 @@ describe("受理协助队列", () => {
     fireEvent.click(screen.getByRole("button", { name: "重新同步受理协助" }));
     await waitFor(() => expect(screen.getByText("当前没有待处理的受理协助")).toBeInTheDocument());
   });
+
+  it("客户确认完成后刷新队列快照仍保留权限撤销告警", async () => {
+    const queueStream = openPushableStream();
+    const authorityStream = openPushableStream();
+    let detailsCalls = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === "/api/support/intake-assistance/snapshot") {
+        return Response.json({
+          view: "INTAKE_ASSISTANCE",
+          schema: "intake-assistance-v1",
+          cursor: detailsCalls > 1 ? "intake-assistance-v1:3" : "intake-assistance-v1:1",
+          requests:
+            detailsCalls > 1
+              ? []
+              : [
+                  {
+                    requestId: REQUEST_ID,
+                    status: "WAITING_FOR_CUSTOMER",
+                    reasonCode: "AGENT_UNAVAILABLE",
+                    requestedAt: "2026-08-28T04:00:00Z",
+                    claimExpiresAt: "2026-08-28T04:15:00Z",
+                    assignedToCurrentSupport: true,
+                  },
+                ],
+        });
+      }
+      if (path === "/api/support/intake-assistance/events") return queueStream.response();
+      if (path === `/api/support/intake-assistance/requests/${REQUEST_ID}`) {
+        detailsCalls += 1;
+        if (detailsCalls > 1) return new Response("gone", { status: 404 });
+        return Response.json({
+          requestId: REQUEST_ID,
+          intakeId: INTAKE_ID,
+          status: "WAITING_FOR_CUSTOMER",
+          reasonCode: "AGENT_UNAVAILABLE",
+          originalMessage: "订单一直没有更新，请找人工客服",
+          orderCandidates: [{ reference: "ORDER-DELAY-001", summary: "配送中的合成订单" }],
+          selectedOrderReference: "ORDER-DELAY-001",
+          issues: [{ kind: "LOGISTICS_DELAY", summary: "物流多日没有更新" }],
+          intakeVersion: 2,
+          claimExpiresAt: "2026-08-28T04:15:00Z",
+        });
+      }
+      if (path === `/api/support/intake-assistance/requests/${REQUEST_ID}/events`) {
+        return authorityStream.response();
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    render(<IntakeAssistancePanel />);
+    fireEvent.click(await screen.findByRole("button", { name: `领取受理协助 ${REQUEST_ID}` }));
+    expect(await screen.findByRole("heading", { name: "协助确认受理" })).toBeInTheDocument();
+
+    authorityStream.close();
+    expect(await screen.findByRole("alert")).toHaveTextContent("受理协助权限已撤销");
+
+    queueStream.push(
+      [
+        "id: intake-assistance-v1:2",
+        `data: ${JSON.stringify({
+          view: "INTAKE_ASSISTANCE",
+          schema: "intake-assistance-v1",
+          payload: {},
+        })}`,
+        "",
+        "",
+      ].join("\n"),
+    );
+    await waitFor(() => expect(screen.getByText("当前没有待处理的受理协助")).toBeInTheDocument());
+    expect(screen.getByRole("alert")).toHaveTextContent("受理协助权限已撤销");
+    expect(screen.queryByRole("heading", { name: "协助确认受理" })).not.toBeInTheDocument();
+  });
 });
 
 function openStream() {
@@ -140,4 +213,26 @@ function openStream() {
     status: 200,
     headers: { "Content-Type": "text/event-stream" },
   });
+}
+
+function openPushableStream() {
+  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+  return {
+    response() {
+      return new Response(
+        new ReadableStream({
+          start(next) {
+            controller = next;
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "text/event-stream" } },
+      );
+    },
+    push(value: string) {
+      controller?.enqueue(new TextEncoder().encode(value));
+    },
+    close() {
+      controller?.close();
+    },
+  };
 }
