@@ -1,0 +1,12 @@
+[
+  {
+    "certificate_source": "inherited-proxy-environment",
+    "initialization_seconds": 1.228812100016512,
+    "network_requests": 0
+  },
+  {
+    "certificate_source": "offline-no-proxy",
+    "initialization_seconds": 0.27195479997317307,
+    "network_requests": 0
+  }
+]

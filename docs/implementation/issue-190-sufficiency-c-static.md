@@ -1,5 +1,7 @@
 # Issue #190 C：合成充分性回放的静态实现
 
+后续状态：[C离线预检已通过](issue-190-c-offline-preflight.md)，受测源码b9c46a93；以下“未运行”为本次静态交接时历史状态，不能据此覆盖后续证据。真实72题模型回放仍未运行。
+
 2026-08-31；关联 [Issue #190](https://github.com/Stellogic/customer-agent/issues/190) / [Draft PR203](https://github.com/Stellogic/customer-agent/pull/203)。本轮基线 `73b76d19a993729ce2b2818df6da9c39db117557`；已有main基线 `c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`，本轮未同步新main或启动运行。
 
 **仅完成静态源码和待运行测试，C准确率/接口兼容性均未验证。** 当前授权仅限合成数据可行性准备；默认产品仍 `PENDING_CALIBRATION`，本地BGE、全文/向量硬过滤、RRF、迁移、内部搜索、依赖及#189冻结资产均未修改。没有继续A/B，没有留出读取或#168/#169/#170放行。
