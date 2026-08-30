@@ -3,7 +3,7 @@ package com.stellogic.customeragent.identity;
 import com.stellogic.customeragent.identity.HumanIdentityDirectory.HumanCapability;
 import com.stellogic.customeragent.identity.HumanIdentityDirectory.HumanRole;
 import com.stellogic.customeragent.identity.HumanIdentityDirectory.SubjectType;
-
+import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -11,8 +11,6 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-
-import java.util.List;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("local-demo")

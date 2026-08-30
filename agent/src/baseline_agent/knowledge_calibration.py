@@ -10,6 +10,7 @@ import platform
 import time
 from dataclasses import asdict
 from importlib.metadata import version
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -23,8 +24,10 @@ def classification(rows: list[dict[str, Any]], threshold: float) -> dict[str, fl
     if not positives or not negatives:
         raise ValueError("校准和审计组都必须包含有答案与无答案样本")
     return {
-        "answerable_acceptance": sum(row["score"] >= threshold for row in positives) / len(positives),
-        "unanswerable_rejection": sum(row["score"] < threshold for row in negatives) / len(negatives),
+        "answerable_acceptance": sum(row["score"] >= threshold for row in positives)
+        / len(positives),
+        "unanswerable_rejection": sum(row["score"] < threshold for row in negatives)
+        / len(negatives),
     }
 
 
@@ -33,7 +36,11 @@ def choose_threshold(rows: list[dict[str, Any]]) -> float:
     scores = sorted({float(row["score"]) for row in calibration})
     if not scores or any(not math.isfinite(score) or not -1 <= score <= 1 for score in scores):
         raise ValueError("缺少有效的校准分数")
-    candidates = [-1.0, 1.0, *[(left + right) / 2 for left, right in zip(scores, scores[1:], strict=False)]]
+    candidates = [
+        -1.0,
+        1.0,
+        *[(left + right) / 2 for left, right in pairwise(scores)],
+    ]
 
     def objective(threshold: float) -> tuple[float, float, float]:
         values = classification(calibration, threshold).values()
@@ -92,7 +99,9 @@ def main() -> None:
             ids = list(documents)
             vectors: list[list[float]] = []
             for start in range(0, len(ids), 32):
-                vectors.extend(encoder.encode([documents[key] for key in ids[start : start + 32]], query=False))
+                vectors.extend(
+                    encoder.encode([documents[key] for key in ids[start : start + 32]], query=False)
+                )
             for query in queries:
                 vector = encoder.encode([query.text], query=True)[0]
                 candidates: list[dict[str, Any]] = [
@@ -106,7 +115,9 @@ def main() -> None:
                         **asdict(query),
                         "score": candidates[0]["score"],
                         "candidates": candidates,
-                        "required_chunks_in_top5": all(key in top_ids for key in query.expected_chunks),
+                        "required_chunks_in_top5": all(
+                            key in top_ids for key in query.expected_chunks
+                        ),
                     }
                 )
             threshold = choose_threshold(report["rows"])
@@ -117,7 +128,8 @@ def main() -> None:
                     **classification(rows, threshold),
                     "answerable_recall_at_5": sum(
                         row["required_chunks_in_top5"] for row in rows if row["expected_chunks"]
-                    ) / sum(bool(row["expected_chunks"]) for row in rows),
+                    )
+                    / sum(bool(row["expected_chunks"]) for row in rows),
                 }
                 for split in ("calibration", "audit")
             }

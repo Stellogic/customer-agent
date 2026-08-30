@@ -1,5 +1,16 @@
 package com.stellogic.customeragent.knowledge;
 
+import java.io.IOException;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,19 +23,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import java.io.IOException;
-import java.time.Clock;
-import java.time.Instant;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import javax.sql.DataSource;
 
 @Component
 final class KnowledgeCatalogIndexer {
@@ -216,8 +214,8 @@ final class KnowledgeCatalogIndexer {
     private void insertArticle(KnowledgeArticleDocument article, Instant indexedAt) {
         jdbc.update(
                 "insert into knowledge_article (article_id, version, title, updated_at,"
-                    + " applicability, publication_status, is_current, source_file, content_hash,"
-                    + " body, indexed_at) values (?, ?, ?, ?, ?::text[], ?, ?, ?, ?, ?, ?)",
+                        + " applicability, publication_status, is_current, source_file, content_hash,"
+                        + " body, indexed_at) values (?, ?, ?, ?, ?::text[], ?, ?, ?, ?, ?, ?)",
                 article.articleId(),
                 article.version(),
                 article.title(),
@@ -301,8 +299,8 @@ final class KnowledgeCatalogIndexer {
     private KnowledgeIndexState readState() {
         return jdbc.queryForObject(
                 "select status, generation, source_digest, indexed_at, updated_at, article_count,"
-                    + " chunk_count, failure_code, failure_message from knowledge_index_state where"
-                    + " id = 1",
+                        + " chunk_count, failure_code, failure_message from knowledge_index_state where"
+                        + " id = 1",
                 (rs, row) ->
                         new KnowledgeIndexState(
                                 KnowledgeIndexStatus.valueOf(rs.getString(1)),

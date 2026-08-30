@@ -11,7 +11,8 @@ final class KnowledgeAnswerabilityPolicy {
     private final JsonNode configuration;
 
     KnowledgeAnswerabilityPolicy(ObjectMapper json) throws IOException {
-        try (var input = new ClassPathResource("knowledge-retrieval-policy.json").getInputStream()) {
+        try (var input =
+                new ClassPathResource("knowledge-retrieval-policy.json").getInputStream()) {
             configuration = json.readTree(input);
         }
     }
@@ -19,8 +20,12 @@ final class KnowledgeAnswerabilityPolicy {
     KnowledgeRetrievalPolicy requireCalibrated() {
         var threshold = configuration.path("threshold");
         if (!"CALIBRATED".equals(configuration.path("status").asText())
-                || !KnowledgeEmbeddingGateway.REVISION.equals(configuration.path("modelRevision").asText())
-                || !configuration.path("calibrationDatasetSha256").asText("").matches("[0-9a-f]{64}")
+                || !KnowledgeEmbeddingGateway.REVISION.equals(
+                        configuration.path("modelRevision").asText())
+                || !configuration
+                        .path("calibrationDatasetSha256")
+                        .asText("")
+                        .matches("[0-9a-f]{64}")
                 || !threshold.isNumber()
                 || !Double.isFinite(threshold.asDouble())
                 || threshold.asDouble() < -1

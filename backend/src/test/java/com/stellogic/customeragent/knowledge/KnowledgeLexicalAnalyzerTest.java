@@ -7,8 +7,7 @@ import org.junit.jupiter.api.Test;
 class KnowledgeLexicalAnalyzerTest {
     @Test
     void continuousChineseQuestionAndDocumentShareTermsWithoutWholeSentenceMatch() {
-        assertThat(KnowledgeLexicalAnalyzer.document("育苗温室保持适宜温度。"))
-                .contains("温室", "温度");
+        assertThat(KnowledgeLexicalAnalyzer.document("育苗温室保持适宜温度。")).contains("温室", "温度");
         assertThat(KnowledgeLexicalAnalyzer.query("温室温度？"))
                 .contains("'温室'", "'温度'", " | ")
                 .doesNotContain(" & ");

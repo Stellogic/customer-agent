@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.knowledge;
 
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,8 +11,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import java.util.List;
 
 @Component
 final class KnowledgeVectorIndexer {
@@ -44,16 +43,16 @@ final class KnowledgeVectorIndexer {
                         Long generation =
                                 jdbc.queryForObject(
                                         "select generation from knowledge_index_state where id=1"
-                                            + " and status in ('READY','EMPTY') and failure_code is"
-                                            + " null",
+                                                + " and status in ('READY','EMPTY') and failure_code is"
+                                                + " null",
                                         Long.class);
                         List<Chunk> chunks =
                                 jdbc.query(
                                         "select c.chunk_id, c.content, a.content_hash from"
-                                            + " knowledge_chunk c join knowledge_article a"
-                                            + " using(article_id,version) where"
-                                            + " a.publication_status='PUBLISHED' and a.is_current"
-                                            + " order by c.chunk_id",
+                                                + " knowledge_chunk c join knowledge_article a"
+                                                + " using(article_id,version) where"
+                                                + " a.publication_status='PUBLISHED' and a.is_current"
+                                                + " order by c.chunk_id",
                                         (rs, row) ->
                                                 new Chunk(
                                                         rs.getString(1),
@@ -70,8 +69,8 @@ final class KnowledgeVectorIndexer {
                                 Chunk chunk = batch.get(i);
                                 jdbc.update(
                                         "insert into knowledge_embedding"
-                                            + " (chunk_id,generation,content_hash,revision,embedding,lexical_vector)"
-                                            + " values(?,?,?,?,?::vector,to_tsvector('simple',?))",
+                                                + " (chunk_id,generation,content_hash,revision,embedding,lexical_vector)"
+                                                + " values(?,?,?,?,?::vector,to_tsvector('simple',?))",
                                         chunk.id(),
                                         generation,
                                         chunk.hash(),
@@ -82,8 +81,8 @@ final class KnowledgeVectorIndexer {
                         }
                         jdbc.update(
                                 "insert into knowledge_vector_state(id,generation,revision)"
-                                    + " values(1,?,?) on conflict(id) do update set"
-                                    + " generation=excluded.generation, revision=excluded.revision",
+                                        + " values(1,?,?) on conflict(id) do update set"
+                                        + " generation=excluded.generation, revision=excluded.revision",
                                 generation,
                                 KnowledgeEmbeddingGateway.REVISION);
                     });

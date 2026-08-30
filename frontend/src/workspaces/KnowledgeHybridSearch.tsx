@@ -60,7 +60,7 @@ export default function KnowledgeHybridSearch() {
             ? "混合检索索引过期，请联系维护者重新准备索引。"
             : pending
               ? "拒答策略尚未完成独立校准，没有返回知识结果。"
-            : "混合检索不可用；没有返回知识结果，请稍后重试。",
+              : "混合检索不可用；没有返回知识结果，请稍后重试。",
         );
       }
       if (!isRetrieval(value)) throw new Error("检索返回的数据不兼容，已停止显示结果。");

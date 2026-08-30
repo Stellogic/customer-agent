@@ -1,16 +1,15 @@
 package com.stellogic.customeragent.knowledge;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 class KnowledgeRetrievalService {
@@ -31,7 +30,9 @@ class KnowledgeRetrievalService {
     private final KnowledgeAnswerabilityPolicy answerability;
 
     KnowledgeRetrievalService(
-            JdbcTemplate jdbc, KnowledgeAccessPolicy access, KnowledgeEmbeddingGateway embedding,
+            JdbcTemplate jdbc,
+            KnowledgeAccessPolicy access,
+            KnowledgeEmbeddingGateway embedding,
             KnowledgeAnswerabilityPolicy answerability) {
         this.jdbc = jdbc;
         this.access = access;
@@ -103,7 +104,8 @@ class KnowledgeRetrievalService {
                             vector);
             List<KnowledgeRetrievalHit> results =
                     dense.isEmpty() || dense.getFirst().score() < policy.threshold()
-                            ? List.of() : fuse(lexical, dense);
+                            ? List.of()
+                            : fuse(lexical, dense);
             return new KnowledgeRetrievalResponse(
                     "knowledge-hybrid-v1",
                     query.trim(),
