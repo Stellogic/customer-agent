@@ -1,4 +1,4 @@
-"""冻结 BGE 编码协议；运行阶段仅接受经过校验的本地模型。"""
+"""冻结 BGE 编码协议;运行阶段仅接受经过校验的本地模型。"""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def verify_model_directory(directory: Path) -> Path:
 class OfflineBgeEncoder:
     def __init__(self, directory: Path):
         path = verify_model_directory(directory)
-        # 延迟导入：未配置/校验失败时不加载框架，更不会尝试联网取模型。
+        # 延迟导入:未配置/校验失败时不加载框架,更不会尝试联网取模型。
         import torch
         from transformers import AutoModel, AutoTokenizer
 

@@ -1,4 +1,4 @@
-"""显式准备命令；不由运行时加载器调用。"""
+"""显式准备命令;不由运行时加载器调用。"""
 
 import argparse
 from pathlib import Path

@@ -167,8 +167,8 @@ final class KnowledgeCatalogIndexer {
                             indexStatus.name(),
                             generation,
                             sourceDigest,
-                            indexedAt,
-                            indexedAt,
+                            java.sql.Timestamp.from(indexedAt),
+                            java.sql.Timestamp.from(indexedAt),
                             articles.size(),
                             articles.stream().mapToInt(article -> article.chunks().size()).sum());
                     return new KnowledgeIndexState(
@@ -188,7 +188,7 @@ final class KnowledgeCatalogIndexer {
         Map<String, IndexedVersion> existing = new HashMap<>();
         jdbc.query(
                         "select article_id, version, content_hash, source_file from"
-                            + " knowledge_article",
+                                + " knowledge_article",
                         (rs, row) ->
                                 new IndexedVersion(
                                         rs.getString(1),
@@ -221,14 +221,14 @@ final class KnowledgeCatalogIndexer {
                 article.articleId(),
                 article.version(),
                 article.title(),
-                article.updatedAt(),
+                java.sql.Timestamp.from(article.updatedAt()),
                 article.applicability().toArray(String[]::new),
                 article.publicationStatus().name(),
                 article.current(),
                 article.sourceFile(),
                 article.contentHash(),
                 article.body(),
-                indexedAt);
+                java.sql.Timestamp.from(indexedAt));
     }
 
     private void insertChunk(KnowledgeChunkDocument chunk, Instant indexedAt) {
@@ -245,7 +245,7 @@ final class KnowledgeCatalogIndexer {
                 chunk.endLine(),
                 chunk.applicability().toArray(String[]::new),
                 chunk.content(),
-                indexedAt);
+                java.sql.Timestamp.from(indexedAt));
     }
 
     private KnowledgeIndexState markFailure(
@@ -267,7 +267,7 @@ final class KnowledgeCatalogIndexer {
                                         retained.name(),
                                         code,
                                         safeMessage,
-                                        updatedAt,
+                                        java.sql.Timestamp.from(updatedAt),
                                         baseState.generation())
                                 == 0) {
                             return readState();

@@ -1,4 +1,4 @@
-"""通过真实 Spring 会话/API 执行冻结题，不将服务故障计作正确拒答。"""
+"""通过真实 Spring 会话/API 执行冻结题,不将服务故障计作正确拒答。"""
 
 from __future__ import annotations
 
@@ -130,7 +130,7 @@ def run_query(base_url: str, query: EvalQuery) -> dict[str, Any]:
             for hit in hits
         )
     }
-    # 越权/不适用时任何内容都是违规，不能只检查预先列出的几个条目。
+    # 越权/不适用时任何内容都是违规,不能只检查预先列出的几个条目。
     if denied and hits:
         violations.add("unauthorized")
     if query.kind == "out_of_scope" and hits:
@@ -182,6 +182,19 @@ def main() -> None:
                 for a in dataset.protocol.corpus_snapshot
             )
             if articles != expected:
+                report["corpus_differences"] = {
+                    "actual_count": len(articles),
+                    "expected_count": len(expected),
+                    "actual_versions": [list(row[:2]) for row in articles],
+                    "mismatched_columns": [
+                        [
+                            index
+                            for index, (actual, wanted) in enumerate(zip(row, target, strict=True))
+                            if actual != wanted
+                        ]
+                        for row, target in zip(articles, expected, strict=False)
+                    ],
+                }
                 raise ValueError("数据库语料与冻结正文/权限/版本不符")
             report["environment"]["postgres"] = connection.execute("select version()").fetchall()[
                 0
