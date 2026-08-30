@@ -526,10 +526,16 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     }
 
     String revalidateAutoResolution(UUID ticketId, UUID generationId,
-            InvestigationConclusion conclusion, Instant now) {
-        ScopedOrder order = currentOrder(ticketId, conclusion.orderReference());
+            InvestigationConclusion conclusion) {
+        ScopedOrder order;
+        try {
+            order = currentOrder(ticketId, conclusion.orderReference());
+        } catch (ResponseStatusException exception) {
+            if (exception.getStatusCode() == HttpStatus.FORBIDDEN) return null;
+            throw exception;
+        }
         List<PersistedInvestigationFact> facts = persistedFacts(ticketId, generationId);
-        if (EvidenceSufficiencyPolicy.validate(conclusion, facts, now) != null
+        if (EvidenceSufficiencyPolicy.validate(conclusion, facts, clock.instant()) != null
                 || !factsStillMatchCurrentOrder(facts, order)
                 || CustomerReplySafetyPolicy.rejectionReason(conclusion, order.orderReference(), order.evidenceRefs()) != null)
             return null;

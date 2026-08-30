@@ -420,6 +420,7 @@ export function App() {
     if (snapshot?.autoResolution?.status !== "PENDING" || cancellingAutoResolution) return;
     const ticketId = snapshot.ticket.id;
     const candidateDueAt = snapshot.autoResolution.dueAt;
+    const candidateGeneration = snapshot.ticket.agentGeneration;
     setCancellingAutoResolution(true);
     setError("");
     try {
@@ -430,7 +431,7 @@ export function App() {
           method: "POST",
           credentials: "same-origin",
           headers: { [csrf.headerName]: csrf.token, "Content-Type": "application/json" },
-          body: JSON.stringify({ candidateDueAt }),
+          body: JSON.stringify({ candidateDueAt, candidateGeneration }),
         },
       );
       if (!response.ok && response.status !== 409) throw new Error("auto resolution cancel failed");
@@ -1602,8 +1603,9 @@ function isAutoResolution(value: unknown): value is AutoResolution | null {
     (isRecord(value) &&
       hasOnlyKeys(value, ["status", "dueAt"]) &&
       ["PENDING", "CANCELLED", "REEVALUATING", "RESOLVED"].includes(String(value.status)) &&
-      ((value.status !== "PENDING" && value.dueAt === null) ||
-        (typeof value.dueAt === "string" && Number.isFinite(Date.parse(value.dueAt)))))
+      (value.status === "PENDING"
+        ? typeof value.dueAt === "string" && Number.isFinite(Date.parse(value.dueAt))
+        : value.dueAt === null))
   );
 }
 

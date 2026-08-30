@@ -14,17 +14,31 @@ class AutoResolutionPolicyTest {
     void springWhitelistAllowsOnlyThreeExplicitScenarioAndConclusionPairs() {
         assertThat(AutoResolutionPolicy.WAIT).isEqualTo(Duration.ofSeconds(300));
         assertThat(scenario(DecisionReasonCode.DELAY_UNDER_24_HOURS, InvestigationRiskScenario.LOGISTICS_DELAY,
-                order(false, false, false, 0, "IN_TRANSIT"), "物流状态是什么"))
+                order(false, false, false, 0, "IN_TRANSIT", 23), "物流状态是什么"))
                 .isEqualTo("AUTHORITATIVE_STATUS_EXPLANATION");
         assertThat(scenario(DecisionReasonCode.ORDER_RULE_EXPLAINED, InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE,
                 order(false, false, false, 0, "IN_TRANSIT"), "请说明订单规则"))
                 .isEqualTo("RULE_EXPLANATION");
-        assertThat(scenario(DecisionReasonCode.REFUND_STATUS_EXPLAINED, InvestigationRiskScenario.REFUND_STATUS,
-                order(true, false, false, 0, "IN_TRANSIT"), "核对已完成的状态"))
+        assertThat(scenario(DecisionReasonCode.DELAY_UNDER_24_HOURS, InvestigationRiskScenario.LOGISTICS_DELAY,
+                order(false, false, false, 0, "IN_TRANSIT"), "核对已完成的状态"))
                 .isEqualTo("COMPLETED_NON_COMPENSATION_CHECK");
         assertThat(scenario(DecisionReasonCode.REFUND_STATUS_EXPLAINED, InvestigationRiskScenario.REFUND_STATUS,
                 order(false, false, false, 0, "IN_TRANSIT"), "核对退款"))
                 .isNull();
+    }
+
+    @Test
+    void aRuleQuestionMustNotHideAnOrderOperationRequest() {
+        var order = order(false, false, false, 0, "IN_TRANSIT");
+        assertThat(scenario(DecisionReasonCode.ORDER_RULE_EXPLAINED,
+                InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE, order,
+                "订单地址填错了，需要修改收货地址")).isNull();
+        assertThat(scenario(DecisionReasonCode.ORDER_RULE_EXPLAINED,
+                InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE, order,
+                "取消订单的规则是什么？")).isEqualTo("RULE_EXPLANATION");
+        assertThat(scenario(DecisionReasonCode.ORDER_RULE_EXPLAINED,
+                InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE, order,
+                "取消订单的规则是什么？\n请立即取消订单")).isNull();
     }
 
     @Test
@@ -73,7 +87,12 @@ class AutoResolutionPolicyTest {
 
     private static JdbcAgentInvestigationService.ScopedOrder order(boolean refunded, boolean compensated,
             boolean duplicate, int pending, String logistics) {
-        return new JdbcAgentInvestigationService.ScopedOrder("ORDER-162", 0, 0, true, false, refunded,
+        return order(refunded, compensated, duplicate, pending, logistics, 0);
+    }
+
+    private static JdbcAgentInvestigationService.ScopedOrder order(boolean refunded, boolean compensated,
+            boolean duplicate, int pending, String logistics, int delayHours) {
+        return new JdbcAgentInvestigationService.ScopedOrder("ORDER-162", delayHours, delayHours * 3600L, true, false, refunded,
                 compensated, "delay-policy-v1", BigDecimal.TEN, BigDecimal.TEN, pending, BigDecimal.ZERO,
                 logistics, "ORDER_RULE_V1", duplicate);
     }

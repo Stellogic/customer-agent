@@ -23,7 +23,7 @@ function snapshot(status: string, cursor = 2) {
     },
     messages: [],
     clarification: null,
-    autoResolution: { status, dueAt },
+    autoResolution: { status, dueAt: status === "PENDING" ? dueAt : null },
   };
 }
 
@@ -81,7 +81,7 @@ describe("Issue #162 客户自动解决", () => {
     expect(request[0]).toBe(`/api/customer/tickets/${ticketId}/auto-resolution/cancel`);
     expect(request[1]?.method).toBe("POST");
     expect(new Headers(request[1]?.headers).get("X-CSRF-TOKEN")).toBe("customer-csrf");
-    expect(JSON.parse(String(request[1]?.body))).toEqual({ candidateDueAt: dueAt });
+    expect(JSON.parse(String(request[1]?.body))).toEqual({ candidateDueAt: dueAt, candidateGeneration: 1 });
     expect(fetchMock.mock.calls[3][0]).toBe(`/api/customer/v2/tickets/${ticketId}`);
   });
 
@@ -124,7 +124,7 @@ describe("Issue #162 客户自动解决", () => {
         view: "PUBLIC_CONVERSATION",
         schema: "public-conversation-v2",
         generation: 1,
-        payload: { autoResolution: { status, dueAt } },
+        payload: { autoResolution: { status, dueAt: status === "PENDING" ? dueAt : null } },
       });
       await act(async () => {
         stream.enqueue(

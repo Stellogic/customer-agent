@@ -35,10 +35,10 @@ class CustomerAutoResolutionControllerTest {
                                 .principal(customer())
                                 .header("X-Synthetic-Customer-Id", "customer-other-demo")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"candidateDueAt\":\"2026-08-30T04:00:00Z\"}"))
+                                .content("{\"candidateDueAt\":\"2026-08-30T04:00:00Z\",\"candidateGeneration\":1}"))
                 .andExpect(status().isNoContent());
 
-        verify(service).cancel("customer-demo", TICKET_ID, DUE_AT);
+        verify(service).cancel("customer-demo", TICKET_ID, DUE_AT, 1);
     }
 
     @Test
@@ -57,13 +57,13 @@ class CustomerAutoResolutionControllerTest {
     void staleCandidateRemainsAConflictInsteadOfReportingCancellation() throws Exception {
         doThrow(new ResponseStatusException(HttpStatus.CONFLICT))
                 .when(service)
-                .cancel("customer-demo", TICKET_ID, DUE_AT);
+                .cancel("customer-demo", TICKET_ID, DUE_AT, 1);
 
         mvc.perform(
                         post("/api/customer/tickets/{ticketId}/auto-resolution/cancel", TICKET_ID)
                                 .principal(customer())
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"candidateDueAt\":\"2026-08-30T04:00:00Z\"}"))
+                                .content("{\"candidateDueAt\":\"2026-08-30T04:00:00Z\",\"candidateGeneration\":1}"))
                 .andExpect(status().isConflict());
     }
 

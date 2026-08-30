@@ -11,8 +11,11 @@ final class AutoResolutionPolicy {
     static final Duration WAIT = Duration.ofMinutes(5);
     private static final Map<DecisionReasonCode, String> SCENARIOS = Map.of(
             DecisionReasonCode.DELAY_UNDER_24_HOURS, "AUTHORITATIVE_STATUS_EXPLANATION",
-            DecisionReasonCode.ORDER_RULE_EXPLAINED, "RULE_EXPLANATION",
-            DecisionReasonCode.REFUND_STATUS_EXPLAINED, "COMPLETED_NON_COMPENSATION_CHECK");
+            DecisionReasonCode.ORDER_RULE_EXPLAINED, "RULE_EXPLANATION");
+    // v1 admits explicit rule questions, not arbitrary operation requests in the same issue kind.
+    private static final Pattern RULE_QUESTION = Pattern.compile(
+            "(?:请)?(?:说明|解释|介绍)(?:一下)?(?:订单|收货地址修改|地址修改|取消订单)(?:的)?(?:规则|规定|条件)[。？?]?"
+                    + "|(?:订单|收货地址修改|地址修改|修改地址|取消订单)(?:的)?(?:规则|规定|条件)(?:是什么|有哪些)[。？?]?");
     // Denial signals supplement authoritative facts, and never grant eligibility.
     private static final Pattern DISPUTE_OR_ACTION = Pattern.compile(
             "签收.{0,8}(没|未|不).{0,4}收到|丢件|丢失|重复.{0,4}(扣款|收费)|退款.{0,8}(异常|没到|未到|不到账)|"
@@ -39,13 +42,13 @@ final class AutoResolutionPolicy {
             case DELAY_UNDER_24_HOURS ->
                     conclusion.sufficiency().riskScenario() == InvestigationRiskScenario.LOGISTICS_DELAY
                             && order.delaySeconds() < Duration.ofHours(24).toSeconds()
-                            && !order.fullyRefunded() ? scenario : null;
+                            && !order.fullyRefunded()
+                            ? (order.delaySeconds() == 0 ? "COMPLETED_NON_COMPENSATION_CHECK" : scenario) : null;
             case ORDER_RULE_EXPLAINED ->
                     conclusion.sufficiency().riskScenario() == InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE
-                            && !order.fullyRefunded() ? scenario : null;
-            case REFUND_STATUS_EXPLAINED ->
-                    conclusion.sufficiency().riskScenario() == InvestigationRiskScenario.REFUND_STATUS
-                            && order.fullyRefunded() ? scenario : null;
+                            && !order.fullyRefunded()
+                            && customerText.lines().filter(line -> !line.isBlank())
+                                    .allMatch(line -> RULE_QUESTION.matcher(line.strip()).matches()) ? scenario : null;
             default -> null;
         };
     }

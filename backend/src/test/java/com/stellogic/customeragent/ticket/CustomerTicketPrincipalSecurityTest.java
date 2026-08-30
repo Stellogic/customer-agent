@@ -57,7 +57,7 @@ class CustomerTicketPrincipalSecurityTest {
     @Test
     void autoResolutionCancellationRequiresCustomerSessionAndCurrentCsrfToken() throws Exception {
         String endpoint = "/api/customer/tickets/{ticketId}/auto-resolution/cancel";
-        String body = "{\"candidateDueAt\":\"2026-08-30T04:00:00Z\"}";
+        String body = "{\"candidateDueAt\":\"2026-08-30T04:00:00Z\",\"candidateGeneration\":1}";
         MockHttpSession customer = login("customer-demo");
 
         mvc.perform(
@@ -81,7 +81,7 @@ class CustomerTicketPrincipalSecurityTest {
                 .andExpect(status().isNoContent());
 
         verify(autoResolutionService)
-                .cancel("customer-demo", TICKET_ID, Instant.parse("2026-08-30T04:00:00Z"));
+                .cancel("customer-demo", TICKET_ID, Instant.parse("2026-08-30T04:00:00Z"), 1);
 
         MockHttpSession support = login("support-demo");
         MvcResult supportCsrf =

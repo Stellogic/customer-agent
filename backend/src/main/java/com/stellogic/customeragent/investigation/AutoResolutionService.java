@@ -40,7 +40,7 @@ public class AutoResolutionService {
     @Transactional(readOnly = true)
     public List<UUID> dueTicketIds() {
         return jdbc.query("select ticket_id from ticket_auto_resolution where status = 'PENDING' "
-                        + "and due_at <= ? order by due_at",
+                        + "and due_at <= ? order by due_at, ticket_id",
                 (rs, row) -> rs.getObject(1, UUID.class), Timestamp.from(clock.instant()));
     }
 
@@ -70,10 +70,11 @@ public class AutoResolutionService {
                 candidate.generationId(), candidate.customerSequence());
         if (!Boolean.TRUE.equals(current) || !AutoResolutionPolicy.VERSION.equals(candidate.policyVersion())
                 || !candidate.scenario().equals(investigation.revalidateAutoResolution(
-                        ticketId, candidate.generationId(), candidate.conclusion(), now))) {
-            changeStatus(ticketId, "REEVALUATING", now);
+                        ticketId, candidate.generationId(), candidate.conclusion()))) {
+            changeStatus(ticketId, "REEVALUATING", clock.instant());
             return;
         }
+        now = clock.instant();
         sla.evaluateTicket(ticketId, now);
         if (resolution.fromAgentInvestigation(ticketId, now) != 1)
             throw new IllegalStateException("locked auto-resolution ticket lost authority");
@@ -88,13 +89,15 @@ public class AutoResolutionService {
     }
 
     @Transactional
-    public void cancel(String customerId, UUID ticketId, Instant candidateDueAt) {
+    public void cancel(String customerId, UUID ticketId, Instant candidateDueAt, long candidateGeneration) {
         authorityLock.acquire(ticketId);
         List<String> tickets = jdbc.query("select lifecycle_state from support_ticket where id = ? and customer_id = ? for update",
                 (rs, row) -> rs.getString(1), ticketId, customerId);
         if (tickets.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "ticket not found");
-        List<String> states = jdbc.query("select status from ticket_auto_resolution where ticket_id = ? and due_at = ? for update",
-                (rs, row) -> rs.getString(1), ticketId, Timestamp.from(candidateDueAt));
+        List<String> states = jdbc.query("select a.status from ticket_auto_resolution a "
+                        + "join agent_processing_generation g on g.id = a.generation_id "
+                        + "where a.ticket_id = ? and a.due_at = ? and g.generation_number = ? for update of a",
+                (rs, row) -> rs.getString(1), ticketId, Timestamp.from(candidateDueAt), candidateGeneration);
         if (states.isEmpty() || "RESOLVED".equals(states.getFirst()))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "candidate changed; reload snapshot");
         if ("CANCELLED".equals(states.getFirst())) return;

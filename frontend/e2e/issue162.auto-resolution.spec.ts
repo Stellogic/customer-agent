@@ -25,14 +25,14 @@ for (const width of [1440, 390]) {
           },
           messages: [],
           clarification: null,
-          autoResolution: { status, dueAt },
+          autoResolution: { status, dueAt: status === "PENDING" ? dueAt : null },
         },
       }),
     );
     // Keep the stream request pending so the fixture does not simulate an EOF/disconnection.
     await page.route(`**/api/customer/v2/tickets/${ticketId}/events`, () => {});
     await page.route(`**/api/customer/tickets/${ticketId}/auto-resolution/cancel`, (route) => {
-      expect(route.request().postDataJSON()).toEqual({ candidateDueAt: dueAt });
+      expect(route.request().postDataJSON()).toEqual({ candidateDueAt: dueAt, candidateGeneration: 1 });
       status = "CANCELLED";
       return route.fulfill({ json: {} });
     });
