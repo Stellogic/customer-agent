@@ -1,7 +1,7 @@
 {
   "id": "independent-cosine-v1",
-  "status": "PENDING_CALIBRATION",
+  "status": "CALIBRATED",
   "modelRevision": "7999e1d3359715c523056ef9478215996d62a620",
-  "calibrationDatasetSha256": null,
-  "threshold": null
+  "calibrationDatasetSha256": "d07cbea9ec854a34a702f9fe38eb147ccf6de0ddc619248a8201b77a97bd397a",
+  "threshold": 0.6228445617150831
 }

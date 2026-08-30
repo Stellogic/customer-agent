@@ -1,0 +1,2 @@
+# 保留本次 Windows 校准原始报告的字节，避免提交时转换 CRLF。
+issue190-calibration-20260831a.json -text
