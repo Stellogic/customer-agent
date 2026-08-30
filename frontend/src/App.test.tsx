@@ -1,6 +1,17 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render as testingLibraryRender,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+
+function render(ui: Parameters<typeof testingLibraryRender>[0]) {
+  return testingLibraryRender(<MemoryRouter>{ui}</MemoryRouter>);
+}
 
 vi.mock("./csrf", () => ({
   loadCsrfToken: async () => ({ token: "customer-csrf", headerName: "X-CSRF-TOKEN" }),
@@ -31,6 +42,19 @@ describe("客户帮助中心", () => {
       "data-auto-load",
       "true",
     );
+  });
+
+  it("Issue #192 帮助中心首页呈现信任说明与三块能力边界", () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    render(<App />);
+
+    expect(screen.getByRole("region", { name: "信任说明" })).toHaveTextContent("确认后才创建工单");
+    expect(screen.getByRole("heading", { name: "AI 调查" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "人工客服" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "补偿审批" })).toHaveTextContent("补偿审批");
+    fireEvent.click(screen.getByRole("button", { name: "服务时间承诺（开发中）" }));
+    expect(screen.getByRole("status")).toHaveTextContent("服务时间承诺入口正在开发中");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("自然语言受理确认后读取 PUBLIC_CONVERSATION v2 权威快照", async () => {

@@ -5,6 +5,7 @@ export type { CurrentSession, HumanCapability } from "./authContract";
 
 const RETURNABLE_PATHS = new Set<string>([
   ROUTES.customerHome,
+  ROUTES.customerDocs,
   ROUTES.internalHome,
   ...INTERNAL_WORKSPACES.map((workspace) => workspace.path),
 ]);
