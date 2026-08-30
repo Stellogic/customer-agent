@@ -73,7 +73,7 @@ export function UnimplementedHelpActions() {
   const [notice, setNotice] = useState("");
 
   return (
-    <div className="customer-help-unimplemented" aria-label="尚未提供的帮助条目">
+    <section className="customer-help-unimplemented" aria-label="尚未提供的帮助条目">
       <p>尚未写成独立页面的帮助条目会明确显示开发中，点击不会发送写请求。</p>
       <div className="customer-help-unimplemented-actions">
         {UNIMPLEMENTED_HELP_ITEMS.map((label) => (
@@ -91,6 +91,6 @@ export function UnimplementedHelpActions() {
         ))}
       </div>
       {notice && <StatusNotice role="status">{notice}</StatusNotice>}
-    </div>
+    </section>
   );
 }
