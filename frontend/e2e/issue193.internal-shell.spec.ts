@@ -122,9 +122,8 @@ test("独立壳 loading/error：身份未确认时不暴露内部入口", async 
   try {
     const page = await context.newPage();
     await page.goto("/internal", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("status", { name: "正在确认当前身份" })).toHaveAttribute(
-      "aria-busy", "true",
-    );
+    await expect(page.getByRole("status", { name: "正在确认当前身份" })).toBeVisible();
+    await expect(page.getByRole("main")).toHaveAttribute("aria-busy", "true");
     await expect(page.getByRole("navigation", { name: "快捷入口" })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath("shell-loading.png"), fullPage: true });
     releaseSession();
