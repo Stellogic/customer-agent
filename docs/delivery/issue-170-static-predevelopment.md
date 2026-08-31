@@ -1,8 +1,8 @@
 # #170 客服辅助独立组件：静态预开发记录
 
-当前状态：**CODE_READY_NO_TESTS（仅本轮独立组件范围）**，未完成整票。所有测试、格式/lint/类型检查、构建、浏览器、Docker、模型与评测均未运行，未占用测试锁。CI 关闭；不合入、不关票。
+当前状态：**FOCUSED_VALIDATION_PASS（仅独立组件与纯状态）**，未完成整票。2026-08-31 在用户新授权的协调窗口内持共享锁完成 25 项聚焦测试及目标格式、ESLint、前端类型检查；锁已释放。此前 CODE_READY_NO_TESTS 是历史阶段状态。构建、浏览器、Docker、模型、真实检索/服务端授权与完整门禁仍未运行。CI 关闭；不合入、不关票。
 
-2026-08-31 续办：已同步 `origin/main@c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`，保留首轮 `8bd3ef6`，本轮 assignment/请求绑定增量已重新完成完整 #170 差异的双轴静态审查，Standards / Spec 均 PASS。下方已实现范围按当前源码更新，末尾首轮审查保留为历史证据。全部运行验证仍为 NOT_RUN。
+2026-08-31 静态续办：已同步 `origin/main@c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`，保留首轮 `8bd3ef6`，assignment/请求绑定增量在 `1783b36` 完成完整 #170 差异双轴静态审查，Standards / Spec 均 PASS。该阶段全部运行验证为 NOT_RUN，随后聚焦验证见文末。
 
 ## 归属与基线
 
@@ -36,7 +36,7 @@ PR #203 的内部检索模型包含候选分数、源文件等，不是 Agent �
 
 ## 测试源码与待集成清单
 
-组件测试源码包含：无网络请求、字段展示/纯文本、手动插入与审阅、替换确认、新结果不覆盖编辑、撤权后迟到结果、身份/工单/责任切换清屏、失败不影响人工编辑、移交不可用及空白/超长草稿。全部未运行。
+组件测试包含：无网络请求、字段展示/纯文本、手动插入与审阅、替换确认、新结果不覆盖编辑、撤权后迟到结果、身份/工单/责任切换清屏、失败不影响人工编辑、移交不可用及空白/超长草稿。与纯状态测试合计 25 项，现已在 Node 24.19.0 下聚焦通过；不是浏览器视觉或真实后端授权验收。
 
 尚待：依已收敛最小契约实现独立编排与后端 assignment 授权（HUMAN 不使用或复活 Agent generation）；限制输入为当前工单授权投影、近期公开消息、可重建摘要、调查事实及允许知识范围；建立稳定请求记录、参数摘要、结果访问/引用复核；接入真实检索；挂载工作台并复用人工发送权限与幂等路径；运行后端/组件/桌面及窄屏验收。消费者约定见 [HUMAN 辅助最小消费者契约](../implementation/issue-170-human-assistance-consumer-contract.md)。
 
@@ -44,7 +44,7 @@ PR #203 的内部检索模型包含候选分数、源文件等，不是 Agent �
 
 ## 贡献证据口径
 
-本轮贡献仅为独立 UI、草稿编辑、客户端投影隔离和未运行的测试源码；不称已完成 Agent 检索、完整后端授权或生产能力。合成 fixture 仅在测试源码，不是质量数据。实际模型调用为零，无运行或性能指标。
+本轮贡献为独立 UI、草稿编辑、客户端投影隔离、测试源码及限定模块聚焦验证；不称已完成 Agent 检索、完整后端授权或生产能力。合成 fixture 仅在测试源码，不是检索质量数据。实际模型调用为零，测试执行时长不是产品性能指标。
 
 ## 首轮双轴静态审查（8bd3ef6）
 
@@ -59,3 +59,22 @@ PR #203 的内部检索模型包含候选分数、源文件等，不是 Agent �
 2026-08-31，两位独立代理完整审查 `git diff --cached c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`：七个自有文件，含首轮组件和本轮纯状态、测试源码、消费者说明。Standards PASS / Spec PASS，各 0 项有效发现，没有需要修复的代码问题。确认当前 assignment 拒绝与普通失败分开、旧请求结果/旧 assignment 拒绝隔离、引用展示和两类模型失败符合本轮限定范围。
 
 只读参考 #169 共用纯解析固定提交 `a248aca70405c53592c4df6e624bd84d60337806`；不复制适配、DTO 或 HTTP 解析，不把其字段校验当浏览器授权。审查后仅追加本段、顶部状态和固定引用 SHA，文档增量另交两轴补充复核。未运行任何测试或检查；不修改 #190 冻结 c5、不抢独立验证窗口、不合入或关票。
+
+## 获准后的独立模块聚焦验证（2026-08-31）
+
+协调明确转述用户解除早期测试禁令，并把共享窗口分配给 #170；仅允许自有测试和必要检查、普通修复与双 CR，不允许 HTTP/LLM、工作台挂载、全栈、完整门禁或合入。先完整读取锁规则和脚本，宿主正常审批通过、只读状态 FREE 后通过现有 `Enter-TestGateLock` 获取同一仓库共享互斥量，未改锁身份或令牌规则。
+
+| 运行 | 真实结果 |
+| --- | --- |
+| `issue170-focused-20260831-a` | PATH 为 Node 22.15.0/npm 10.9.2；`npm ci --ignore-scripts --no-audit --no-fund` 安装锁文件依赖，有项目 engine 警告。25 测试、ESLint、tsc 通过，但目标 Prettier 检查 5 文件失败。版本不符，**不作为最终规范环境证据**。 |
+| `issue170-focused-20260831-b` | 改当前进程 PATH 使用现有 bundled Node **24.19.0**，与 #169 核对同一路径；没有修改全局配置/共享缓存。Prettier 只格式化自有 5 文件后检查 PASS；Vitest **2 文件、25 测试 PASS**；目标 ESLint PASS；前端 `tsc --noEmit` PASS，四项退出码均 0。 |
+
+原始 transcript：[首轮退出码/锁记录](../evidence/issue-170-focused-a.txt)、[Node24 聚焦退出码与源码 SHA256](../evidence/issue-170-focused-b.txt)。PowerShell transcript 未捕获原生命令 stdout，实际终端工具返回中的 engine 警告、格式失败、Vitest 25 项结果另存为[原生输出摘录](../evidence/issue-170-native-output.txt)，明确来源而非补造报告。日志 base 为 `c19a7eb`，HEAD 为 `1783b36`；第二轮验证对象是该 HEAD **加五文件格式修订后的工作树**，不是声称未修改的旧提交通过。日志保存五个最终源码的 SHA256，之后仅更新文档/日志不改变被验证源码。
+
+实际命令在 `frontend` 下：`prettier --write/--check src/components/support-assistance`（write 仅第二轮）、`vitest run src/components/support-assistance/SupportAssistancePanel.test.tsx src/components/support-assistance/supportAssistanceState.test.ts`、`eslint src/components/support-assistance --max-warnings 0`、`tsc --noEmit`。使用现有 node_modules 的 `.cmd` 工具，Node 由该进程 PATH 指向 `C:\Users\lizhuo\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`；安装步骤使用 Node22 的事实保留，不把它改写成 Node24 安装。
+
+两次运行均在 finally 调用 `Exit-TestGateLock` 并主动报告 **LOCK_RELEASED**；第二轮释放后只读状态为 FREE。进入格式差异审查/文档阶段不持锁。仅有格式修复，没有业务逻辑修复、依赖文件变更或新增共用 DTO。
+
+聚焦验证后增量双轴审查：两位独立代理完整阅读 `git diff --cached 1783b36b71de6c8785f517d7c6b1b276c012b5e8` 的十个文件（五个格式修订源码、两份文档、三份证据），**Standards PASS / Spec PASS，均 0 项有效发现**。源码 SHA256 只读回核与 B 轮记录一致；审查不重复运行检查或持锁。后续仅补记本段结果，不改变被测源码。
+
+仍未运行/未完成：浏览器窄屏视觉、构建、全栈、后端鉴权竞态、真实检索/LLM、#190 质量门及本票完整门禁。#190 冻结 c5 和其他票文件不变；PR #209 保持 Draft，Issue #170 保持 OPEN，不能以聚焦通过替代整票交付。

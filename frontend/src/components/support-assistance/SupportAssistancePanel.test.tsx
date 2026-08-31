@@ -1,9 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  SupportAssistancePanel,
-  type SupportAssistancePanelProps,
-} from "./SupportAssistancePanel";
+import { SupportAssistancePanel, type SupportAssistancePanelProps } from "./SupportAssistancePanel";
 import {
   createSupportAssistanceState,
   reduceSupportAssistance,
@@ -12,24 +9,30 @@ import {
 } from "./supportAssistanceState";
 
 // 仅测试展示交互的合成 fixture；不代表真实 Agent 或检索契约、质量证据。
-const assignment: SupportAssignment = { sessionKey: "session-a", ticketId: "ticket-a", assignmentId: "claim-1" };
+const assignment: SupportAssignment = {
+  sessionKey: "session-a",
+  ticketId: "ticket-a",
+  assignmentId: "claim-1",
+};
 const fixture: AssistanceView = {
   status: "ready",
   kind: "draft",
   requestId: "fixture-request-1",
   text: "您好，我们会继续核实物流情况。",
   suggestions: ["人工核实签收信息"],
-  citations: [{
-    title: "合成物流政策",
-    version: "fixture-v1",
-    articleId: "fixture-article",
-    chunkId: "fixture-chunk",
-    updatedAt: "2026-08-31T01:00:00Z",
-    startLine: 3,
-    endLine: 5,
-    snippet: "合成引用：先核实签收情况。",
-    applicability: ["合成测试范围"],
-  }],
+  citations: [
+    {
+      title: "合成物流政策",
+      version: "fixture-v1",
+      articleId: "fixture-article",
+      chunkId: "fixture-chunk",
+      updatedAt: "2026-08-31T01:00:00Z",
+      startLine: 3,
+      endLine: 5,
+      snippet: "合成引用：先核实签收情况。",
+      applicability: ["合成测试范围"],
+    },
+  ],
 };
 
 function props(content: AssistanceView = fixture): SupportAssistancePanelProps {
@@ -38,10 +41,11 @@ function props(content: AssistanceView = fixture): SupportAssistancePanelProps {
     const request = {
       assignment,
       requestId: content.status === "ready" ? content.requestId : "fixture-request-1",
-      kind: "kind" in content ? content.kind : "draft" as const,
+      kind: "kind" in content ? content.kind : ("draft" as const),
     };
     state = reduceSupportAssistance(state, { type: "start", request });
-    if (content.status !== "loading") state = reduceSupportAssistance(state, { type: "complete", request, view: content });
+    if (content.status !== "loading")
+      state = reduceSupportAssistance(state, { type: "complete", request, view: content });
   }
   return { state, onReviewDraft: null };
 }
@@ -55,7 +59,10 @@ function review() {
 }
 
 describe("独立客服辅助展示与草稿", () => {
-  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   it("四类入口仅反馈开发中，不发请求或传出草稿", () => {
     const fetch = vi.spyOn(globalThis, "fetch");
@@ -77,7 +84,13 @@ describe("独立客服辅助展示与草稿", () => {
       rawRetrieval: "不应呈现的原始载荷",
     };
     const { container } = render(<SupportAssistancePanel {...props(content)} />);
-    for (const text of ["合成物流政策", "fixture-v1", "合成测试范围", "合成引用：先核实签收情况。", "<script>内部文本</script>"]) {
+    for (const text of [
+      "合成物流政策",
+      "fixture-v1",
+      "合成测试范围",
+      "合成引用：先核实签收情况。",
+      "<script>内部文本</script>",
+    ]) {
       expect(screen.getByText(text)).toBeInTheDocument();
     }
     expect(screen.getByText("fixture-article / fixture-chunk")).toBeInTheDocument();
@@ -125,7 +138,11 @@ describe("独立客服辅助展示与草稿", () => {
     const { rerender } = render(<SupportAssistancePanel {...props()} />);
     fireEvent.change(editor(), { target: { value: "人工内容" } });
     fireEvent.click(screen.getByRole("button", { name: "插入回复草稿" }));
-    rerender(<SupportAssistancePanel {...props({ ...fixture, requestId: "fixture-request-2", text: "另一草稿" })} />);
+    rerender(
+      <SupportAssistancePanel
+        {...props({ ...fixture, requestId: "fixture-request-2", text: "另一草稿" })}
+      />,
+    );
     expect(screen.queryByRole("button", { name: "确认替换" })).not.toBeInTheDocument();
     expect(editor()).toHaveValue("人工内容");
   });
@@ -138,10 +155,17 @@ describe("独立客服辅助展示与草稿", () => {
     rerender(<SupportAssistancePanel {...props()} state={denied} />);
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByText("合成物流政策")).not.toBeInTheDocument();
-    const late = reduceSupportAssistance(denied, { type: "complete", request: props().state.request!, view: fixture });
+    const late = reduceSupportAssistance(denied, {
+      type: "complete",
+      request: props().state.request!,
+      view: fixture,
+    });
     rerender(<SupportAssistancePanel {...props()} state={late} />);
     expect(screen.queryByText(fixture.text)).not.toBeInTheDocument();
-    const reclaimed = reduceSupportAssistance(late, { type: "authorize", assignment: { ...assignment, assignmentId: "claim-2" } });
+    const reclaimed = reduceSupportAssistance(late, {
+      type: "authorize",
+      assignment: { ...assignment, assignmentId: "claim-2" },
+    });
     rerender(<SupportAssistancePanel {...props()} state={reclaimed} />);
     expect(editor()).toHaveValue("");
     expect(screen.queryByText("合成物流政策")).not.toBeInTheDocument();
@@ -152,18 +176,19 @@ describe("独立客服辅助展示与草稿", () => {
     { ...assignment, sessionKey: "session-b" },
     { ...assignment, ticketId: "ticket-b" },
     { ...assignment, assignmentId: "claim-2" },
-  ])(
-    "身份/工单/责任切换清除内容与审阅状态：%j", (nextAssignment) => {
-      const { rerender } = render(<SupportAssistancePanel {...props()} />);
-      fireEvent.click(screen.getByRole("button", { name: "插入回复草稿" }));
-      review();
-      const state = reduceSupportAssistance(props().state, { type: "authorize", assignment: nextAssignment });
-      rerender(<SupportAssistancePanel {...props()} state={state} />);
-      expect(editor()).toHaveValue("");
-      expect(screen.getByRole("checkbox")).not.toBeChecked();
-      expect(screen.queryByText("合成物流政策")).not.toBeInTheDocument();
-    },
-  );
+  ])("身份/工单/责任切换清除内容与审阅状态：%j", (nextAssignment) => {
+    const { rerender } = render(<SupportAssistancePanel {...props()} />);
+    fireEvent.click(screen.getByRole("button", { name: "插入回复草稿" }));
+    review();
+    const state = reduceSupportAssistance(props().state, {
+      type: "authorize",
+      assignment: nextAssignment,
+    });
+    rerender(<SupportAssistancePanel {...props()} state={state} />);
+    expect(editor()).toHaveValue("");
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(screen.queryByText("合成物流政策")).not.toBeInTheDocument();
+  });
 
   it.each<AssistanceView>([
     { status: "loading", kind: "summary" },
@@ -185,7 +210,9 @@ describe("独立客服辅助展示与草稿", () => {
   });
 
   it("向量检索模型与回复生成模型失败展示不同原因", () => {
-    const { rerender } = render(<SupportAssistancePanel {...props({ status: "error", reason: "embedding" })} />);
+    const { rerender } = render(
+      <SupportAssistancePanel {...props({ status: "error", reason: "embedding" })} />,
+    );
     expect(screen.getByRole("alert")).toHaveTextContent("知识向量模型暂不可用");
     rerender(<SupportAssistancePanel {...props({ status: "error", reason: "model" })} />);
     expect(screen.getByRole("alert")).toHaveTextContent("回复生成模型暂不可用");

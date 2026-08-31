@@ -5,7 +5,10 @@ export type AssistanceView =
   | { status: "idle" }
   | { status: "loading"; kind: AssistanceKind }
   | { status: "empty"; kind: AssistanceKind }
-  | { status: "error"; reason: "conflict" | "index" | "embedding" | "model" | "retrieval" | "request" }
+  | {
+      status: "error";
+      reason: "conflict" | "index" | "embedding" | "model" | "retrieval" | "request";
+    }
   | {
       status: "ready";
       kind: AssistanceKind;
@@ -56,10 +59,15 @@ export function assignmentKey(assignment: SupportAssignment): string {
 }
 
 function sameAssignment(left: SupportAssignment | null, right: SupportAssignment | null) {
-  return left === right || (left !== null && right !== null && assignmentKey(left) === assignmentKey(right));
+  return (
+    left === right ||
+    (left !== null && right !== null && assignmentKey(left) === assignmentKey(right))
+  );
 }
 
-export function createSupportAssistanceState(assignment: SupportAssignment | null): SupportAssistanceState {
+export function createSupportAssistanceState(
+  assignment: SupportAssignment | null,
+): SupportAssistanceState {
   return { assignment, request: null, view: { status: "idle" } };
 }
 
@@ -69,10 +77,14 @@ export function reduceSupportAssistance(
   event: SupportAssistanceEvent,
 ): SupportAssistanceState {
   if (event.type === "authorize") {
-    return sameAssignment(state.assignment, event.assignment) ? state : createSupportAssistanceState(event.assignment);
+    return sameAssignment(state.assignment, event.assignment)
+      ? state
+      : createSupportAssistanceState(event.assignment);
   }
   if (event.type === "accessDenied") {
-    return sameAssignment(state.assignment, event.assignment) ? createSupportAssistanceState(null) : state;
+    return sameAssignment(state.assignment, event.assignment)
+      ? createSupportAssistanceState(null)
+      : state;
   }
   if (!sameAssignment(state.assignment, event.request.assignment)) return state;
   if (event.type === "start") {
@@ -81,11 +93,20 @@ export function reduceSupportAssistance(
       if (state.request.kind !== event.request.kind) throw new Error("REQUEST_CONFLICT");
       return state;
     }
-    return { ...state, request: event.request, view: { status: "loading", kind: event.request.kind } };
+    return {
+      ...state,
+      request: event.request,
+      view: { status: "loading", kind: event.request.kind },
+    };
   }
-  if (state.request?.requestId !== event.request.requestId || state.request.kind !== event.request.kind) return state;
+  if (
+    state.request?.requestId !== event.request.requestId ||
+    state.request.kind !== event.request.kind
+  )
+    return state;
   if (state.view.status !== "loading") return state;
   if ("kind" in event.view && event.view.kind !== event.request.kind) return state;
-  if (event.view.status === "ready" && event.view.requestId !== event.request.requestId) return state;
+  if (event.view.status === "ready" && event.view.requestId !== event.request.requestId)
+    return state;
   return { ...state, view: event.view };
 }

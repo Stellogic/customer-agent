@@ -1,5 +1,9 @@
 import { useId, useState } from "react";
-import { assignmentKey, type AssistanceView, type SupportAssistanceState } from "./supportAssistanceState";
+import {
+  assignmentKey,
+  type AssistanceView,
+  type SupportAssistanceState,
+} from "./supportAssistanceState";
 import "./support-assistance.css";
 
 const assistanceLabels = {
@@ -60,7 +64,9 @@ function AuthorizedAssistance({
   return (
     <section className="support-assistance" aria-labelledby={titleId}>
       <header className="support-assistance__heading">
-        <span className="support-assistance__mark" aria-hidden="true">✧</span>
+        <span className="support-assistance__mark" aria-hidden="true">
+          ✧
+        </span>
         <div>
           <h3 id={titleId}>AI 智能辅助</h3>
           <p>当前工单 · 仅内部可见 · 由客服审阅</p>
@@ -82,10 +88,21 @@ function AuthorizedAssistance({
       <div className="support-assistance__result" aria-busy={view.status === "loading"}>
         {view.status === "idle" && <p>暂无辅助结果，可继续人工编辑回复。</p>}
         {view.status === "loading" && <p role="status">正在准备{assistanceLabels[view.kind]}…</p>}
-        {view.status === "empty" && <p role="status">{assistanceLabels[view.kind]}暂无可用答案，请人工核实。</p>}
+        {view.status === "empty" && (
+          <p role="status">{assistanceLabels[view.kind]}暂无可用答案，请人工核实。</p>
+        )}
         {view.status === "error" && (
           <p role="alert">
-            {{ conflict: "知识依据不可用，请人工核实适用政策。", index: "知识索引暂不可用。", embedding: "知识向量模型暂不可用。", model: "回复生成模型暂不可用。", retrieval: "知识检索暂不可用。", request: "辅助请求未被接受，请核实输入和请求身份。" }[view.reason]}
+            {
+              {
+                conflict: "知识依据不可用，请人工核实适用政策。",
+                index: "知识索引暂不可用。",
+                embedding: "知识向量模型暂不可用。",
+                model: "回复生成模型暂不可用。",
+                retrieval: "知识检索暂不可用。",
+                request: "辅助请求未被接受，请核实输入和请求身份。",
+              }[view.reason]
+            }
             人工处理不受影响。
           </p>
         )}
@@ -98,21 +115,48 @@ function AuthorizedAssistance({
               <>
                 <h4>AI 建议操作</h4>
                 <p className="support-assistance__hint">仅供人工判断，不会自动执行。</p>
-                <ul>{view.suggestions.map((text, index) => <li key={index}>{text}</li>)}</ul>
+                <ul>
+                  {view.suggestions.map((text, index) => (
+                    <li key={index}>{text}</li>
+                  ))}
+                </ul>
               </>
             )}
             <h4>知识引用</h4>
-            {view.citations.length === 0 ? <p>没有可展示的知识引用。</p> : (
+            {view.citations.length === 0 ? (
+              <p>没有可展示的知识引用。</p>
+            ) : (
               <ul className="support-assistance__citations">
                 {view.citations.map((citation) => (
                   <li key={`${citation.articleId}:${citation.version}:${citation.chunkId}`}>
                     <strong>{citation.title}</strong>
                     <dl>
-                      <div><dt>版本</dt><dd>{citation.version}</dd></div>
-                      <div><dt>更新时间</dt><dd><time dateTime={citation.updatedAt}>{citation.updatedAt}</time></dd></div>
-                      <div><dt>内部标识</dt><dd>{citation.articleId} / {citation.chunkId}</dd></div>
-                      <div><dt>适用范围</dt><dd>{citation.applicability.join("、")}</dd></div>
-                      <div><dt>引用行号</dt><dd>{citation.startLine}–{citation.endLine}</dd></div>
+                      <div>
+                        <dt>版本</dt>
+                        <dd>{citation.version}</dd>
+                      </div>
+                      <div>
+                        <dt>更新时间</dt>
+                        <dd>
+                          <time dateTime={citation.updatedAt}>{citation.updatedAt}</time>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>内部标识</dt>
+                        <dd>
+                          {citation.articleId} / {citation.chunkId}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>适用范围</dt>
+                        <dd>{citation.applicability.join("、")}</dd>
+                      </div>
+                      <div>
+                        <dt>引用行号</dt>
+                        <dd>
+                          {citation.startLine}–{citation.endLine}
+                        </dd>
+                      </div>
                     </dl>
                     <blockquote>{citation.snippet}</blockquote>
                   </li>
@@ -124,14 +168,24 @@ function AuthorizedAssistance({
                 <button
                   type="button"
                   disabled={!candidate.trim() || candidate.length > 2000}
-                  onClick={() => draft.trim() ? setReplaceRequestId(view.requestId) : insertDraft()}
-                >插入回复草稿</button>
-                {candidate.length > 2000 && <p role="alert">辅助草稿超过 2000 字，请人工编写；不会截断后发送。</p>}
+                  onClick={() =>
+                    draft.trim() ? setReplaceRequestId(view.requestId) : insertDraft()
+                  }
+                >
+                  插入回复草稿
+                </button>
+                {candidate.length > 2000 && (
+                  <p role="alert">辅助草稿超过 2000 字，请人工编写；不会截断后发送。</p>
+                )}
                 {replaceRequestId === view.requestId && (
                   <div role="group" aria-label="确认替换草稿">
                     <p>编辑区已有内容，是否用当前辅助草稿替换？</p>
-                    <button type="button" onClick={insertDraft}>确认替换</button>
-                    <button type="button" onClick={() => setReplaceRequestId(null)}>保留当前编辑</button>
+                    <button type="button" onClick={insertDraft}>
+                      确认替换
+                    </button>
+                    <button type="button" onClick={() => setReplaceRequestId(null)}>
+                      保留当前编辑
+                    </button>
                   </div>
                 )}
               </div>
@@ -144,11 +198,21 @@ function AuthorizedAssistance({
         <h4>回复草稿</h4>
         <label>
           内部编辑区（尚未发送）
-          <textarea rows={5} maxLength={2000} value={draft} onChange={(event) => editDraft(event.target.value)} />
+          <textarea
+            rows={5}
+            maxLength={2000}
+            value={draft}
+            onChange={(event) => editDraft(event.target.value)}
+          />
         </label>
         <small>{draft.length}/2000</small>
         <label className="support-assistance__review">
-          <input type="checkbox" checked={reviewed} disabled={!draft.trim()} onChange={(event) => setReviewed(event.target.checked)} />
+          <input
+            type="checkbox"
+            checked={reviewed}
+            disabled={!draft.trim()}
+            onChange={(event) => setReviewed(event.target.checked)}
+          />
           我已核实事实、政策与客户可见措辞
         </label>
         <button
@@ -160,11 +224,21 @@ function AuthorizedAssistance({
             setReviewed(false);
             setNotice("已交给人工发送区；仍需在那里显式发送，尚未发送给客户。");
           }}
-        >交给人工发送区</button>
-        {onReviewDraft === null && <p className="support-assistance__hint">人工发送衔接当前不可用；可继续编辑，不会发送。</p>}
-        <p className="support-assistance__hint">最终发送仍由 Spring 校验当前责任、HUMAN 模式与请求幂等。</p>
+        >
+          交给人工发送区
+        </button>
+        {onReviewDraft === null && (
+          <p className="support-assistance__hint">人工发送衔接当前不可用；可继续编辑，不会发送。</p>
+        )}
+        <p className="support-assistance__hint">
+          最终发送仍由 Spring 校验当前责任、HUMAN 模式与请求幂等。
+        </p>
       </section>
-      {notice && <p className="support-assistance__notice" role="status">{notice}</p>}
+      {notice && (
+        <p className="support-assistance__notice" role="status">
+          {notice}
+        </p>
+      )}
     </section>
   );
 }
