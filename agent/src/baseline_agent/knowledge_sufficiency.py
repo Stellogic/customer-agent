@@ -50,9 +50,15 @@ def sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
-def contract(*, c_v2: bool = False) -> dict[str, Any]:
+def contract(*, c_v2: bool = False, development_version: str | None = None) -> dict[str, Any]:
     assets = V2_ASSETS if c_v2 else ASSETS
     expected = V2_ASSET_SHA256 if c_v2 else ASSET_SHA256
+    if development_version is not None:
+        if not re.fullmatch(r"c[0-9]+", development_version):
+            raise SufficiencyBlocked("INVALID_DEVELOPMENT_VERSION")
+        assets = Path(__file__).with_name("knowledge_sufficiency_development") / development_version
+        # 开发版本提交后运行,实际资产hash随报告/账本固定;不改旧v1/v2的冻结资产。
+        expected = {name: sha256((assets / name).read_bytes()) for name in ASSET_SHA256}
     hashes = {name: sha256((assets / name).read_bytes()) for name in expected}
     if hashes != expected:
         raise SufficiencyBlocked("FROZEN_CONTRACT_CHANGED")
@@ -115,9 +121,11 @@ def request_body(row: dict[str, Any], frozen: dict[str, Any]) -> dict[str, Any]:
         "text": {
             "format": {
                 "type": "json_schema",
-                "name": "knowledge_sufficiency_c_v2"
-                if config["method"] == "context-sufficiency-c-v2"
-                else "knowledge_sufficiency_c_v1",
+                "name": config.get("response_schema_name") or (
+                    "knowledge_sufficiency_c_v2"
+                    if config["method"] == "context-sufficiency-c-v2"
+                    else "knowledge_sufficiency_c_v1"
+                ),
                 "strict": True,
                 "schema": frozen["schema"],
             }

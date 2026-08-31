@@ -60,6 +60,9 @@ V2_LEDGER = (
 V2_LEDGER_SHA = "c11630710263c473fbf938b60e789b33ef93b776021e258976825fdf47206a50"
 V2_REQUESTS = V2_ASSETS / "requests.json"
 V2_REQUESTS_SHA = "7234a4f5812e976f3e3efc594fc3e2b0760b46b760b0f2a8d403525fbfd5cd91"
+DEVELOPMENT_OPT_IN = "issue-190-versioned-synthetic-development"
+DEVELOPMENT_ANCHOR = REPO / "docs/implementation/evidence/issue190-c-v2-development-20260831a/cost-ledger.json"
+DEVELOPMENT_ANCHOR_SHA = "0800a19d7111b2838d7131734a62cdf6a64be48dcac1fc8c9b44d3435b9646f0"
 
 
 def remaining_manifest() -> dict[str, Any]:
@@ -180,7 +183,7 @@ class ExperimentLedger:
             entry["query_id"] == query_id for entry in phase_attempts
         ):
             raise SufficiencyBlocked("CALL_LIMIT_NO_RETRY")
-        if self.phase in {REMAINING_PHASE, V2_PHASE}:
+        if self.phase in {REMAINING_PHASE, V2_PHASE} or self.phase.startswith("development_"):
             expected = self.state["phases"][self.phase]["requests"][len(phase_attempts)]
             if expected != {"query_id": query_id, "request_sha256": request_sha}:
                 raise SufficiencyBlocked("REMAINING_REQUEST_ORDER_MISMATCH")
@@ -291,6 +294,33 @@ class ExperimentLedger:
         write_json(self.path, self.state)
 
 
+    def begin_version(
+        self, version: str, run_id: str, assets: dict[str, str], requests: list[dict[str, str]]
+    ) -> None:
+        phase = f"development_{version}"
+        if phase in self.state["phases"]:
+            raise SufficiencyBlocked("VERSION_ALREADY_RUN")
+        if self.totals()["unsettled_reserved_micro_cny"]:
+            raise SufficiencyBlocked("UNSETTLED_COST_REQUIRES_COORDINATOR")
+        content = DEVELOPMENT_ANCHOR.read_bytes()
+        if sha256(content) != DEVELOPMENT_ANCHOR_SHA:
+            raise SufficiencyBlocked("DEVELOPMENT_HISTORY_CHANGED")
+        anchor = json.loads(content)
+        if (
+            self.state["prior_paid_micro_cny"] != anchor["prior_paid_micro_cny"]
+            or self.state["attempts"][:len(anchor["attempts"])] != anchor["attempts"]
+            or any(self.state["phases"].get(key) != value for key, value in anchor["phases"].items())
+        ):
+            raise SufficiencyBlocked("DEVELOPMENT_HISTORY_CHANGED")
+        self.phase = phase
+        self.state["phases"][phase] = {
+            "run_id": run_id, "status": "RUNNING", "version": version,
+            "assets": assets, "requests": requests, "maximum_requests": 72,
+            "quality_evaluation": "SEEN_DEVELOPMENT_ONLY",
+        }
+        write_json(self.path, self.state)
+
+
 async def run_development(
     report: dict[str, Any],
     ledger: ExperimentLedger,
@@ -301,13 +331,15 @@ async def run_development(
     diagnose_fifth_once: bool = False,
     diagnose_remaining_once: bool = False,
     c_v2_whole_once: bool = False,
+    development_version: str | None = None,
 ) -> None:
-    if sum((diagnose_fifth_once, diagnose_remaining_once, c_v2_whole_once)) > 1:
+    if sum((diagnose_fifth_once, diagnose_remaining_once, c_v2_whole_once, development_version is not None)) > 1:
         raise SufficiencyBlocked("DIAGNOSTIC_MODES_ARE_EXCLUSIVE")
+    modern_contract = c_v2_whole_once or development_version is not None
     # 不允许把v2解析规则用到旧请求,或把旧解析器用于新版方法。
-    if frozen["asset_sha256"] != contract(c_v2=c_v2_whole_once)["asset_sha256"]:
+    if frozen["asset_sha256"] != contract(c_v2=c_v2_whole_once, development_version=development_version)["asset_sha256"]:
         raise SufficiencyBlocked("METHOD_MODE_MISMATCH")
-    if c_v2_whole_once and frozen["config"]["quality_thresholds"] != QUALITY:
+    if modern_contract and frozen["config"]["quality_thresholds"] != QUALITY:
         raise SufficiencyBlocked("QUALITY_THRESHOLDS_CHANGED")
     rows = development_rows()
     if diagnose_fifth_once:
@@ -319,7 +351,14 @@ async def run_development(
         json.dumps(body, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         for body in bodies
     ]
-    if c_v2_whole_once:
+    if development_version is not None:
+        requests = [
+            {"query_id": row["id"], "request_sha256": sha256(encoded)}
+            for row, encoded in zip(rows, encoded_bodies, strict=True)
+        ]
+        ledger.begin_version(development_version, report["run_id"], frozen["asset_sha256"], requests)
+        report.update(request_manifest=requests, development_version=development_version)
+    elif c_v2_whole_once:
         requests = [
             {"query_id": row["id"], "request_sha256": sha256(encoded)}
             for row, encoded in zip(rows, encoded_bodies, strict=True)
@@ -352,7 +391,7 @@ async def run_development(
             entry = ledger.reserve(row["id"], sha256(encoded))
             started = time.perf_counter()
             observation: dict[str, Any] = {"usage_trusted": False}
-            if c_v2_whole_once:
+            if modern_contract:
                 observation["contract_checks"] = dict.fromkeys(
                     CONTRACT_CHECK_LAYERS, "NOT_EVALUATED"
                 )
@@ -389,10 +428,10 @@ async def run_development(
                         if identity is not None
                         else None,
                         duration_ms=elapsed,
-                        c_v2=c_v2_whole_once,
+                        c_v2=modern_contract,
                     )
                 except SufficiencyBlocked as error:
-                    if c_v2_whole_once:
+                    if modern_contract:
                         observation["contract_checks"] = error.observation["contract_checks"]
                     if str(error) in {
                         "INVALID_DECISION_JSON",
@@ -405,7 +444,7 @@ async def run_development(
                             payload["output"][0]["content"][0]["text"], api_key
                         )
                     raise
-                if c_v2_whole_once:
+                if modern_contract:
                     observation["contract_checks"] = parsed["observation"]["contract_checks"]
                 if identity is None:
                     ledger.state["identity"] = [
@@ -425,7 +464,7 @@ async def run_development(
                         else [],
                     }
                 )
-                if c_v2_whole_once:
+                if modern_contract:
                     # 保留所有原始摘录;文章统计去重,不把多段摘录当多个独立来源。
                     evidence = parsed["decision"]["evidence"]
                     source_ids = list(
@@ -454,7 +493,7 @@ async def run_development(
         return
     decisions = [entry["decision"]["sufficient"] for entry in report["rows"]]
     report.update(replay_metrics(rows, decisions))
-    if c_v2_whole_once:
+    if modern_contract:
         report.update(
             contract_validation="PASS_72_OF_72",
             semantic_validation=report["status"],
@@ -496,6 +535,7 @@ def main() -> None:
     modes.add_argument("--diagnose-fifth-once", action="store_true")
     modes.add_argument("--diagnose-remaining-once", action="store_true")
     modes.add_argument("--c-v2-whole-once", action="store_true")
+    modes.add_argument("--development-version")
     args = parser.parse_args()
     # 正式入口必须验证活的共享锁;没有任何自建锁身份或无锁付费模式。
     if os.environ.get("CUSTOMER_AGENT_TEST_GATE_IDENTITY"):
@@ -518,6 +558,8 @@ def main() -> None:
         expected_opt_in = REMAINING_OPT_IN
     if args.c_v2_whole_once:
         expected_opt_in = V2_OPT_IN
+    if args.development_version:
+        expected_opt_in = DEVELOPMENT_OPT_IN
     if os.environ.get("KNOWLEDGE_SUFFICIENCY_EXPERIMENT") != expected_opt_in:
         raise SufficiencyBlocked("EXPERIMENT_OPT_IN_REQUIRED")
     if args.pricing_and_context_verified_date != datetime.now(UTC).date().isoformat():
@@ -532,7 +574,7 @@ def main() -> None:
         check=True,
     ).stdout.strip()
     ledger_path = Path(git_dir).parent / ".local/issue190-sufficiency/cost-ledger.json"
-    frozen = contract(c_v2=args.c_v2_whole_once)
+    frozen = contract(c_v2=args.c_v2_whole_once, development_version=args.development_version)
     is_diagnostic = args.diagnose_fifth_once or args.diagnose_remaining_once
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x", encoding="utf-8", newline="\n") as output:
@@ -570,9 +612,16 @@ def main() -> None:
                 contract_validation="INCOMPLETE",
                 semantic_validation="NOT_EVALUATED",
             )
+        if args.development_version:
+            report.update(
+                schema="knowledge-sufficiency-development-run-v1",
+                partition="seen_development_not_unseen",
+                development_version=args.development_version,
+                contract_validation="INCOMPLETE", semantic_validation="NOT_EVALUATED",
+            )
         ledger: ExperimentLedger | None = None
         try:
-            if (is_diagnostic or args.c_v2_whole_once) and not ledger_path.exists():
+            if (is_diagnostic or args.c_v2_whole_once or args.development_version) and not ledger_path.exists():
                 raise SufficiencyBlocked("DIAGNOSTIC_REQUIRES_EXISTING_LEDGER")
             ledger = ExperimentLedger(ledger_path, frozen)
             report["cost_totals_before"] = ledger.totals()
@@ -585,6 +634,7 @@ def main() -> None:
                     diagnose_fifth_once=args.diagnose_fifth_once,
                     diagnose_remaining_once=args.diagnose_remaining_once,
                     c_v2_whole_once=args.c_v2_whole_once,
+                    development_version=args.development_version,
                 )
             )
         except SufficiencyBlocked as error:
