@@ -128,7 +128,7 @@ HUMAN 通道由 #170 自有辅助请求入口验证 SUPPORT 会话、HUMAN、当
 
 #170 确认现 UI 的 title/version/articleId/chunkId/snippet/applicability 是共用条目的显示子集，后续由其增加 updatedAt/startLine/endLine。Agent 内 DTO 不是浏览器授权结果，#170 不复制 Python DTO/HTTP解析。
 HUMAN 自有绑定为 ticketId + assignmentId + requestId + assistanceType（服务端再保存输入摘要）；principal 从会话取得。新类型/输入用新 requestId，重试同身份同参数，异参 409 REQUEST_CONFLICT。发起/取结果/返回前均复核 SUPPORT/HUMAN/ACTIVE assignment；这些仍由 #170 在后续真正入口实现。
-只有匹配当前绑定的 ACCESS_DENIED/受保护资源404 才清理该 assignment 的授权内容/草稿并停重试；旧 assignment/request 的迟到结果（含拒绝）不得清理新的绑定。其余知识失败保留人工编辑；辅助生成模型失败与 MODEL_UNAVAILABLE（Embedding）分开。#170 本轮仅实现自有客户端绑定状态，路由/请求持久化/真实授权仍后置。
+普通完成结果按 assignment + requestId + assistanceType 匹配，旧 request 的普通结果忽略。ACCESS_DENIED（含受保护资源的 403/404）按当前 session/ticket/assignment 匹配，**不按 requestId**：同 assignment 的旧请求拒绝仍清理当前 assignment 的授权内容/草稿并停止重试，新请求不能掩盖责任失效；只有旧 assignment 的拒绝不得清理新的 assignment。其余知识失败保留人工编辑；辅助生成模型失败与 MODEL_UNAVAILABLE（Embedding）分开。#170 本轮仅实现自有客户端绑定状态，路由/请求持久化/真实授权仍后置。
 
 消费者测试源码在 `agent/tests/test_knowledge_retrieval.py`：双方 scope 共用 DTO、规范结果与空结果、私有字段/内部候选拒绝、引用字段约束、错误类别及不透传原始载荷。fixture 仅在测试文件，不向任何 endpoint 发请求。所有验证 **NOT_RUN**；该解析器不能宣称已经完成注入防护、当前版本复核或回复依据校验。
 
