@@ -51,7 +51,7 @@ def prepare(directory: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("phase", choices=("prepare", "development"))
+    parser.add_argument("phase", choices=("preflight", "prepare", "development"))
     parser.add_argument("--model-directory", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--run-id", required=True)
@@ -95,7 +95,11 @@ def main() -> None:
         json.dump(report, output, ensure_ascii=False, indent=2)
     started = time.perf_counter()
     try:
-        if args.phase == "prepare":
+        if args.phase == "preflight":
+            report["source_query_count"] = len(development_rows())
+            report["model_directory"] = str(args.model_directory)
+            report["status"] = "PREFLIGHT_ONLY"
+        elif args.phase == "prepare":
             prepare(args.model_directory)
             report["status"] = "PREPARED"
         else:

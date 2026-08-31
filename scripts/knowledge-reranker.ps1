@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('prepare', 'development')][string]$Phase,
+    [Parameter(Mandatory)][ValidateSet('preflight', 'prepare', 'development')][string]$Phase,
     [Parameter(Mandatory)][string]$RunId,
     [string]$Uv = 'uv',
     [string]$ModelDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) '.local/models/bge-reranker-base')
@@ -19,7 +19,7 @@ $output = if ($Phase -eq 'development') {
     # 所有worktree共用一个阶段记录；不提供续跑/强制覆盖开关。
     Join-Path (Split-Path -Parent $commonDir.Trim()) '.local/issue190-reranker-v1/development.json'
 } else {
-    Join-Path $root ".local/gate-evidence/$RunId/reranker-prepare.json"
+    Join-Path $root ".local/gate-evidence/$RunId/reranker-$Phase.json"
 }
 $holder = Enter-TestGateLock -Issue 190 -RunId $RunId -CommandType "reranker-$Phase" -HeadSha $headSha -BaseSha $baseSha
 try {

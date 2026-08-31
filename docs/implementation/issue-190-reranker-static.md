@@ -21,7 +21,7 @@
 ## 最小实现与停止条件
 
 - `knowledge_reranker.py`：校验本地文件、评分和一次开发选择；逐题保留原候选ID顺序、各片段logit、最大分数，接受时原样返回原Top5。不是产品 endpoint，也不导出或替换 Spring 策略。
-- `knowledge_reranker_run.py` / `scripts/knowledge-reranker.ps1`：仅 prepare、development 两阶段；PowerShell沿用仓库共享锁。development使用共享Git目录旁固定 `.local/issue190-reranker-v1/development.json`，独占创建；换RunId不能续跑/覆盖。缺模型、校验失败、非有限分数或任意运行错误保存ERROR与已完成行，停止；无可行界限记INFEASIBLE，停止。进程崩溃留下RUNNING也不能自行清除或改路径续跑。工程前置失败的复验只能由协调另行安排并保留原始证据。
+- `knowledge_reranker_run.py` / `scripts/knowledge-reranker.ps1`：prepare、development 两个模型阶段；PowerShell沿用仓库共享锁。development使用共享Git目录旁固定 `.local/issue190-reranker-v1/development.json`，独占创建；换RunId不能续跑/覆盖。缺模型、校验失败、非有限分数或任意运行错误保存ERROR与已完成行，停止；无可行界限记INFEASIBLE，停止。进程崩溃留下RUNNING也不能自行清除或改路径续跑。工程前置失败的复验只能由协调另行安排并保留原始证据。
 - 开发可行只记 `DEVELOPMENT_FEASIBLE`，不记独立/冻结/交付PASS。随后须先提交唯一参数、源码与原报告，由协调安排独立数据/执行者验证；原留出不由实施者读取。独立验证或189失败则停，不重选、改模型或降低门槛。对新独立数据规模/构造的决策不在此静态入口中实现。
 - 默认 `KnowledgeRetrievalService`、BGE Embedding、全文/pgvector、RRF、迁移、UI及 #168/#169/#170 不改；保留 A失败、c6暂停源码及所有旧成绩。取消24字限制的产品原则继续有效，本候选不输出摘录，因此没有字符合同或新增结构化云调用。
 
@@ -30,9 +30,12 @@
 **以下仅供协调授权后执行，现在未运行：**
 
 ```powershell
+pwsh ./scripts/knowledge-reranker.ps1 -Phase preflight -RunId <协调指定RunId>
 pwsh ./scripts/knowledge-reranker.ps1 -Phase prepare -RunId <协调指定RunId>
 pwsh ./scripts/knowledge-reranker.ps1 -Phase development -RunId <协调指定RunId>
 ```
+
+离线窗口补充 `preflight`：真实走 PowerShell→uv→Python 和有效锁校验，仅核对固定开发源hash/数量及传入模型路径，输出 `PREFLIGHT_ONLY`，不下载、读取权重或评分，不触碰共享 development 阶段记录。它用于验证实际参数接缝，不能用其成功替代模型准备/质量验证；不修改方法或数据。
 
 先受锁完成离线公共接缝回归 `agent/tests/test_knowledge_reranker.py`、格式/lint/类型及实际 PowerShell→Python 参数检查，再安排模型准备与一次开发评分；不因锁FREE自行开始。测试源码覆盖可行界限且RRF顺序不变、不可区分分数不得出策略、模型错误保留部分证据、文件缺失停止。人工分数测试只证明编排，不能证明模型分数或质量。
 
