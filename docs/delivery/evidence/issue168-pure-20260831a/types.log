@@ -1,0 +1,7 @@
+c:\Users\lizhuo\.codex\worktrees\7d39\customer-agent\agent\src\baseline_agent\knowledge_ablation.py
+  c:\Users\lizhuo\.codex\worktrees\7d39\customer-agent\agent\src\baseline_agent\knowledge_ablation.py:64:13 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
+  c:\Users\lizhuo\.codex\worktrees\7d39\customer-agent\agent\src\baseline_agent\knowledge_ablation.py:71:17 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
+  c:\Users\lizhuo\.codex\worktrees\7d39\customer-agent\agent\src\baseline_agent\knowledge_ablation.py:72:32 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
+  c:\Users\lizhuo\.codex\worktrees\7d39\customer-agent\agent\src\baseline_agent\knowledge_ablation.py:77:13 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
+  c:\Users\lizhuo\.codex\worktrees\7d39\customer-agent\agent\src\baseline_agent\knowledge_ablation.py:78:13 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
+5 errors, 0 warnings, 0 informations
