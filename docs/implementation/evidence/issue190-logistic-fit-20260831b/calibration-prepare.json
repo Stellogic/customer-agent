@@ -1,0 +1,105 @@
+{
+  "schema": "knowledge-answerability-run-v1",
+  "status": "PREPARED",
+  "phase": "prepare",
+  "run_id": "issue190-logistic-fit-20260831b-calibration-prepare",
+  "head_sha": "98b49949d6d835d510c4959d787b443fa95bc794",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "paid_model_cost_cny": 0,
+  "environment": {
+    "python": "3.13.13",
+    "platform": "Windows-11-10.0.26200-SP0"
+  },
+  "model": {
+    "name": "BAAI/bge-small-zh-v1.5",
+    "revision": "7999e1d3359715c523056ef9478215996d62a620",
+    "license": "MIT",
+    "query_instruction": "为这个句子生成表示以用于检索相关文章：",
+    "document_instruction": "",
+    "pooling": "cls",
+    "pooling_source": "1_Pooling/config.json pooling_mode_cls_token=true",
+    "normalize": "l2",
+    "normalize_source": "modules.json sentence_transformers.models.Normalize",
+    "max_seq_length": 512,
+    "tokenizer_do_lower_case": false,
+    "tokenize_chinese_chars": true,
+    "truncation": true,
+    "truncation_strategy": "longest_first",
+    "truncation_side": "right",
+    "padding": true,
+    "output_dimensions": 512,
+    "backend": "cpu_pytorch_safetensors",
+    "weights_not_in_git": true,
+    "offline_load_only": true,
+    "fail_closed_on_missing_or_checksum_mismatch": true,
+    "files": {
+      "model.safetensors": {
+        "sha256": "354763b9b1357bc9c44f62c6be2276321081ed2567773608c0d0785b61d5a026",
+        "size_bytes": 95827648,
+        "required_at_runtime": true
+      },
+      "config.json": {
+        "git_blob_sha1": "f79ec8dfc5812a1d5d7d2e69253eb9054be2246d",
+        "size_bytes": 776,
+        "required_at_runtime": true
+      },
+      "tokenizer.json": {
+        "git_blob_sha1": "cdb3043fc938fc918c06e66cf704c2ba58f88747",
+        "size_bytes": 439125,
+        "required_at_runtime": true
+      },
+      "tokenizer_config.json": {
+        "git_blob_sha1": "3a59388f0fd1bd22dec2ce7902c1be8e1fb84107",
+        "size_bytes": 367,
+        "required_at_runtime": true
+      },
+      "vocab.txt": {
+        "git_blob_sha1": "ca4f9781030019ab9b253c6dcb8c7878b6dc87a5",
+        "size_bytes": 109540,
+        "required_at_runtime": true
+      },
+      "special_tokens_map.json": {
+        "git_blob_sha1": "a8b3208c2884c4efb86e49300fdd3dc877220cdf",
+        "size_bytes": 125,
+        "required_at_runtime": true
+      },
+      "modules.json": {
+        "git_blob_sha1": "952a9b81c0bfd99800fabf352f69c7ccd46c5e43",
+        "size_bytes": 349,
+        "required_at_runtime": true
+      },
+      "1_Pooling/config.json": {
+        "git_blob_sha1": "e25f4f3261cf0c6156611f5b5fdba0825859f4f3",
+        "size_bytes": 190,
+        "required_at_runtime": true
+      },
+      "sentence_bert_config.json": {
+        "git_blob_sha1": "ea85692bff64b0d1917833c31ddbca8ab10f5455",
+        "size_bytes": 52,
+        "required_at_runtime": true
+      },
+      "config_sentence_transformers.json": {
+        "git_blob_sha1": "dcb0c0d97d09b930d13600b1a773ddb27e441aab",
+        "size_bytes": 124,
+        "required_at_runtime": true
+      }
+    }
+  },
+  "model_revision": "7999e1d3359715c523056ef9478215996d62a620",
+  "holdout_seal": {
+    "schema": "knowledge-answerability-holdout-seal-v1",
+    "datasetSha256": "4f3b8238c6d3ea772c2d0fff1ba38431f9e7b4e923327956e8db79b1b9e26523",
+    "topicCount": 3,
+    "queryCount": 72,
+    "authorContext": "/root/holdout_author; fork_turns=none; gpt-5.6-sol medium",
+    "reviewerContext": "/root/holdout_reviewer; fork_turns=none; gpt-5.6-sol medium",
+    "annotationReview": "PASS",
+    "topicIsolation": true,
+    "implementerHasReadContent": false,
+    "sealedAt": "2026-08-31T02:48:00.3227024+08:00"
+  },
+  "holdout_seal_sha256": "0fc933afdb217763d51bfe3989482cf2c512c0a0d9829852ba9508190768189a",
+  "split": "calibration",
+  "dataset_sha256": "4ba56767f8729ba064f614c856076c30f08e5852bad0255c2bf6b443c31014b6",
+  "elapsed_seconds": 0.11115780001273379
+}

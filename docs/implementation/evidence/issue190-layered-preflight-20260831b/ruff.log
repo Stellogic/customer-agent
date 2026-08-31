@@ -1,0 +1,76 @@
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+   --> src\baseline_agent\knowledge_sufficiency.py:105:34
+    |
+103 |         raise SufficiencyBlocked("ARCHIVE_SCOPE_MISMATCH")
+104 |     config = frozen["config"]
+105 |     # Chat与Responses使用同一问题/完整Top5，不加入标签、答案或特征。
+    |                                           ^^
+106 |     input_text = json.dumps(
+107 |         {
+    |
+
+RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+   --> src\baseline_agent\knowledge_sufficiency.py:272:25
+    |
+270 |     payload: dict[str, Any], observation: dict[str, Any], *, chat: bool = False
+271 | ) -> str:
+272 |     """只提取一个完整响应中的原始判定文本，不执行函数或修复内容。"""
+    |                                          ^^
+273 |     if chat:
+274 |         choices = payload.get("choices")
+    |
+
+RUF003 Comment contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+   --> src\baseline_agent\knowledge_sufficiency.py:380:29
+    |
+378 |     if not observation["usage_trusted"]:
+379 |         raise SufficiencyBlocked("USAGE_UNTRUSTED", observation)
+380 |     # Chat文档将reasoning明细列为可选；缺失记None，不伪报0。
+    |                                      ^^
+381 |     # 非思考请求还须没有reasoning_content；总completion费用仍全部计入。
+382 |     if observation["reasoning_tokens"] not in ((None, 0) if chat else (0,)):
+    |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+   --> src\baseline_agent\knowledge_sufficiency.py:380:37
+    |
+378 |     if not observation["usage_trusted"]:
+379 |         raise SufficiencyBlocked("USAGE_UNTRUSTED", observation)
+380 |     # Chat文档将reasoning明细列为可选；缺失记None，不伪报0。
+    |                                                  ^^
+381 |     # 非思考请求还须没有reasoning_content；总completion费用仍全部计入。
+382 |     if observation["reasoning_tokens"] not in ((None, 0) if chat else (0,)):
+    |
+
+RUF003 Comment contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+   --> src\baseline_agent\knowledge_sufficiency.py:381:33
+    |
+379 |         raise SufficiencyBlocked("USAGE_UNTRUSTED", observation)
+380 |     # Chat文档将reasoning明细列为可选；缺失记None，不伪报0。
+381 |     # 非思考请求还须没有reasoning_content；总completion费用仍全部计入。
+    |                                          ^^
+382 |     if observation["reasoning_tokens"] not in ((None, 0) if chat else (0,)):
+383 |         raise SufficiencyBlocked("TOKEN_CONTRACT_INVALID", observation)
+    |
+
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+ --> tests\test_knowledge_sufficiency_chat.py:1:24
+  |
+1 | """Beta strict输出通道的离线契约；Mock不代表供应商支持或质量通过。"""
+  |                                 ^^
+2 |
+3 | from __future__ import annotations
+  |
+
+RUF003 Comment contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+   --> tests\test_knowledge_sufficiency_chat.py:175:16
+    |
+173 |     frozen = contract(development_version="c6")
+174 |     ledger = ExperimentLedger(path, frozen)
+175 |     # 模拟其他已完成阶段；不读取独立留出的账本或结果。
+    |                         ^^
+176 |     ledger.state["phases"]["synthetic_previous_phase"] = {"status": "STOPPED"}
+177 |     original = copy.deepcopy(ledger.state)
+    |
+
+Found 7 errors.

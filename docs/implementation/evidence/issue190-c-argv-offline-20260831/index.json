@@ -1,0 +1,119 @@
+{
+  "schema": "issue190-c-argv-offline-evidence-v1",
+  "head_sha": "366985c6a12d6ec574604fb2499191daca321244",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "paid_model_calls": 0,
+  "ledger_unchanged_sha256": "5cd9e0ef8ee6977f0897db31d4c00bfee498194b9456bc437ffe0776b79e8507",
+  "settled_upper_micro_cny": 9084,
+  "unsettled_reserved_micro_cny": 0,
+  "evidence": [
+    {
+      "path": "a/entry-argv.log",
+      "source_sha256": "7c97b118bbdcb452d84a56ff491c4635a29d37a1cf2270d8c0f3e53a5e8770c3",
+      "archived_sha256": "f92f1cfd11dcac4290b87492aca175e3c24b7d50f03209f6e8c063a7d7915e6b",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "a/entry-syntax.log",
+      "source_sha256": "a07f0e275769cd713b16a624ab47b39eabdc8ecfeb95acd1ce63330fa4acdbfe",
+      "archived_sha256": "a07f0e275769cd713b16a624ab47b39eabdc8ecfeb95acd1ce63330fa4acdbfe",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "a/phase.json",
+      "source_sha256": "89ea98ed7d43dd2b5cc954c5ee18cf5bec734f10732d57fcb0e869934b8d80e7",
+      "archived_sha256": "89ea98ed7d43dd2b5cc954c5ee18cf5bec734f10732d57fcb0e869934b8d80e7",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "a/argv\\development.log",
+      "source_sha256": "49c2d8d84f5a6e88b34eea411f6ccab717b69459ba6faf0a7e5c2d7bf06c62e2",
+      "archived_sha256": "ce8c385cc45529a3fb351dfb3cce3c033370a09512caaa4e445df8bbaf75ee6c",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "a/argv\\diagnostic.log",
+      "source_sha256": "1cb42c86f55ca8596e4c4d6d9e39bd70890a3792d71987e910bfad714e7d902c",
+      "archived_sha256": "90c6345048cc4855bf2d0684b404a25afa29e201023779fdee7e02248d70fb7f",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/entry-argv.log",
+      "source_sha256": "c057751d14ec52aa9c2d94480bab857b5bc49a15e3b0f1c836d1a7dd10859921",
+      "archived_sha256": "c057751d14ec52aa9c2d94480bab857b5bc49a15e3b0f1c836d1a7dd10859921",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/entry-syntax.log",
+      "source_sha256": "a07f0e275769cd713b16a624ab47b39eabdc8ecfeb95acd1ce63330fa4acdbfe",
+      "archived_sha256": "a07f0e275769cd713b16a624ab47b39eabdc8ecfeb95acd1ce63330fa4acdbfe",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/focused.log",
+      "source_sha256": "6feb02ad4369ac2b271db21f2aa84c63e21af7170dd662fc5c540d52b59facab",
+      "archived_sha256": "f9fab75ed25ceaefa51acc09cee4d5e6d1ef739e5e2c3436a740bbc5fd89db68",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/focused.xml",
+      "source_sha256": "22fe34b7be594904c3ca975655a41b19638115dae46fc929fbf7d58cbb7cf503",
+      "archived_sha256": "22fe34b7be594904c3ca975655a41b19638115dae46fc929fbf7d58cbb7cf503",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/format-check.log",
+      "source_sha256": "3f6f054a01559f492f8b48142f182876dce5da1f261615b5664acd1ff26f03dc",
+      "archived_sha256": "3f6f054a01559f492f8b48142f182876dce5da1f261615b5664acd1ff26f03dc",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/format.log",
+      "source_sha256": "4a6ccf42c41f0ddce553aae02fdd6ecd7fbde75237b00eaca1031646d01b62ce",
+      "archived_sha256": "4a6ccf42c41f0ddce553aae02fdd6ecd7fbde75237b00eaca1031646d01b62ce",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/lint.log",
+      "source_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0",
+      "archived_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/offline-component.log",
+      "source_sha256": "dc451a54fb51b95affa8fd4703cab783728f7d1b4e286ba29a41526094e069dc",
+      "archived_sha256": "938c58c2b293e95b5b04110474cad5c8eee39f734e4038777df11996355d6bf9",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/offline-component.xml",
+      "source_sha256": "2dc0d5f9a6521fa77d90fff0594ae07028f5b6971a6a15f4163ece979ce8d810",
+      "archived_sha256": "2dc0d5f9a6521fa77d90fff0594ae07028f5b6971a6a15f4163ece979ce8d810",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/phase.json",
+      "source_sha256": "ee9f88adabcf8a0a81c86d11e3df5de8ff94baa7950dd6cdacba43683e584b62",
+      "archived_sha256": "ee9f88adabcf8a0a81c86d11e3df5de8ff94baa7950dd6cdacba43683e584b62",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/types.log",
+      "source_sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14",
+      "archived_sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/argv\\development.log",
+      "source_sha256": "aac96c9933509fb98c9affcbce7a5c55a7cd0f68f8efabb9b39858d4d1ab5783",
+      "archived_sha256": "3e6df433e3ebad16b8ca16b7167dc5849182e177d7fcdbb1237ec8e0456ae952",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "b/argv\\diagnostic.log",
+      "source_sha256": "867b8286f7269732b016e9ac222dd65e7a8f6fbf67d5409c6abdaf33c3945ba4",
+      "archived_sha256": "593e510335a3c631c77e8d4656d225381c290c4f4c2b30581fd5c97cfe31d644",
+      "redaction": "literal worktree path only"
+    }
+  ]
+}

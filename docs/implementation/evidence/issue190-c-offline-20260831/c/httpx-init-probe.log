@@ -1,0 +1,12 @@
+[
+  {
+    "certificate_source": "windows-default",
+    "initialization_seconds": 1.1844859999837354,
+    "network_requests": 0
+  },
+  {
+    "certificate_source": "explicit-certifi",
+    "initialization_seconds": 1.0426627000269946,
+    "network_requests": 0
+  }
+]

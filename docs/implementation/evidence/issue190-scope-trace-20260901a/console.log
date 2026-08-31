@@ -1,0 +1,633 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 877B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 26.48kB 0.0s done
+#5 DONE 0.0s
+
+#6 [build 4/6] COPY config ./config
+#6 CACHED
+
+#7 [build 5/6] COPY src ./src
+#7 CACHED
+
+#8 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#8 CACHED
+
+#9 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#9 CACHED
+
+#10 [build 2/6] WORKDIR /workspace
+#10 CACHED
+
+#11 [test 1/1] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts check --no-daemon
+#11 CACHED
+
+#12 exporting to image
+#12 exporting layers done
+#12 writing image sha256:7e30ff62705acaa4a497e401778405d26aff28022940941aede4ce15b7d51f9e done
+#12 naming to docker.io/customer-agent/backend-test:gate-issue190-scope-trace-20260901a done
+#12 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.04kB done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/python:3.13.14-slim-bookworm
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 96B done
+#3 DONE 0.1s
+
+#4 [base 1/7] FROM docker.io/library/python:3.13.14-slim-bookworm
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 2.59MB 0.1s done
+#5 DONE 0.1s
+
+#6 [base 2/7] WORKDIR /app
+#6 CACHED
+
+#7 [base 7/7] COPY src ./src
+#7 CACHED
+
+#8 [test 6/7] COPY order_allowance_smoke.py ./
+#8 CACHED
+
+#9 [base 4/7] COPY pyproject.toml uv.lock ./
+#9 CACHED
+
+#10 [test 3/7] COPY smoke.py ./
+#10 CACHED
+
+#11 [base 3/7] RUN apt-get update     && apt-get install --yes --no-install-recommends libatomic1     && rm -rf /var/lib/apt/lists/*     && pip install --no-cache-dir uv==0.8.22
+#11 CACHED
+
+#12 [base 5/7] RUN uv sync --frozen
+#12 CACHED
+
+#13 [base 6/7] COPY langgraph.json ./
+#13 CACHED
+
+#14 [test 2/7] COPY tests/fixtures/knowledge-history /docs/implementation/evidence
+#14 CACHED
+
+#15 [test 5/7] COPY auto_resolution_smoke.py ./
+#15 CACHED
+
+#16 [test 1/7] COPY tests ./tests
+#16 CACHED
+
+#17 [test 4/7] COPY approval_queue_time_smoke.py ./
+#17 CACHED
+
+#18 [test 7/7] RUN uv run ruff format --check .     && uv run ruff check .     && uv run pyright     && uv run pytest
+#18 CACHED
+
+#19 exporting to image
+#19 exporting layers done
+#19 writing image sha256:427d09971e6e5b9298e057abed4c62f47a48715b2b36ffc22a88e3e572b259c4 0.0s done
+#19 naming to docker.io/customer-agent/agent-test:gate-issue190-scope-trace-20260901a done
+#19 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context:
+#3 transferring context: 2B done
+#3 DONE 1.8s
+
+#4 [build 1/8] FROM docker.io/library/node:24.19.0-bookworm-slim
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 2.95kB done
+#5 DONE 0.0s
+
+#6 [build 8/8] RUN npm run build
+#6 CACHED
+
+#7 [build 3/8] COPY package.json package-lock.json ./
+#7 CACHED
+
+#8 [build 6/8] COPY scripts ./scripts
+#8 CACHED
+
+#9 [build 7/8] COPY src ./src
+#9 CACHED
+
+#10 [build 4/8] RUN npm ci
+#10 CACHED
+
+#11 [build 5/8] COPY tsconfig.json vite.config.ts index.html eslint.config.js .prettierrc.json .prettierignore ./
+#11 CACHED
+
+#12 [build 2/8] WORKDIR /app
+#12 CACHED
+
+#13 [test 1/1] RUN npm run check
+#13 CACHED
+
+#14 exporting to image
+#14 exporting layers done
+#14 writing image sha256:a77540d416130944897dd08345c834cfd1be7561eae46023f14a58150a122e8f 0.1s done
+#14 naming to docker.io/customer-agent/frontend-test:gate-issue190-scope-trace-20260901a
+#14 naming to docker.io/customer-agent/frontend-test:gate-issue190-scope-trace-20260901a done
+#14 DONE 0.1s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 877B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#5 DONE 0.0s
+
+#6 [runtime 1/5] FROM docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 26.48kB 0.0s done
+#7 DONE 0.0s
+
+#8 [build 5/6] COPY src ./src
+#8 CACHED
+
+#9 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#9 CACHED
+
+#10 [build 2/6] WORKDIR /workspace
+#10 CACHED
+
+#11 [build 4/6] COPY config ./config
+#11 CACHED
+
+#12 [runtime 4/5] WORKDIR /app
+#12 CACHED
+
+#13 [runtime 3/5] RUN useradd --system --uid 10001 --create-home app
+#13 CACHED
+
+#14 [runtime 2/5] RUN apt-get update     && apt-get install --yes --no-install-recommends curl     && rm -rf /var/lib/apt/lists/*
+#14 CACHED
+
+#15 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#15 CACHED
+
+#16 [runtime 5/5] COPY --from=build /workspace/build/libs/customer-agent-backend-0.1.0-SNAPSHOT.jar app.jar
+#16 CACHED
+
+#17 exporting to image
+#17 exporting layers done
+#17 writing image sha256:6e0f15da996bc18ac597ab858c8a64239982785b7ec881ffe099a08dc767be20 done
+#17 naming to docker.io/customer-agent/backend:gate-issue190-scope-trace-20260901a done
+#17 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.04kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.13.14-slim-bookworm
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 96B done
+#3 DONE 0.0s
+
+#4 [base 1/7] FROM docker.io/library/python:3.13.14-slim-bookworm
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 6.46kB 0.0s done
+#5 DONE 0.0s
+
+#6 [base 4/7] COPY pyproject.toml uv.lock ./
+#6 CACHED
+
+#7 [base 2/7] WORKDIR /app
+#7 CACHED
+
+#8 [runtime 1/2] RUN uv sync --frozen --no-dev
+#8 CACHED
+
+#9 [base 7/7] COPY src ./src
+#9 CACHED
+
+#10 [base 6/7] COPY langgraph.json ./
+#10 CACHED
+
+#11 [base 3/7] RUN apt-get update     && apt-get install --yes --no-install-recommends libatomic1     && rm -rf /var/lib/apt/lists/*     && pip install --no-cache-dir uv==0.8.22
+#11 CACHED
+
+#12 [base 5/7] RUN uv sync --frozen
+#12 CACHED
+
+#13 [runtime 2/2] RUN useradd --system --uid 10002 --create-home agent && chown -R agent:agent /app
+#13 CACHED
+
+#14 exporting to image
+#14 exporting layers done
+#14 writing image sha256:c4ace1dd59b1a8372176b3d53108083f3d7152313c06137c92a77823905f440d done
+#14 naming to docker.io/customer-agent/agent:gate-issue190-scope-trace-20260901a done
+#14 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/nginx:1.29.4-alpine
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [build 1/8] FROM docker.io/library/node:24.19.0-bookworm-slim
+#5 DONE 0.0s
+
+#6 [runtime 1/3] FROM docker.io/library/nginx:1.29.4-alpine
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 3.31kB done
+#7 DONE 0.0s
+
+#8 [build 5/8] COPY tsconfig.json vite.config.ts index.html eslint.config.js .prettierrc.json .prettierignore ./
+#8 CACHED
+
+#9 [build 3/8] COPY package.json package-lock.json ./
+#9 CACHED
+
+#10 [build 4/8] RUN npm ci
+#10 CACHED
+
+#11 [build 7/8] COPY src ./src
+#11 CACHED
+
+#12 [runtime 2/3] COPY nginx.conf /etc/nginx/conf.d/default.conf
+#12 CACHED
+
+#13 [build 2/8] WORKDIR /app
+#13 CACHED
+
+#14 [build 6/8] COPY scripts ./scripts
+#14 CACHED
+
+#15 [build 8/8] RUN npm run build
+#15 CACHED
+
+#16 [runtime 3/3] COPY --from=build /app/dist /usr/share/nginx/html
+#16 CACHED
+
+#17 exporting to image
+#17 exporting layers done
+#17 writing image sha256:3e14d597f328b2ade89a916358abb3aa97d013b7d93d8211e35a3e4cc21a4239 done
+#17 naming to docker.io/customer-agent/frontend:gate-issue190-scope-trace-20260901a done
+#17 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [browser-test  1/10] FROM docker.io/library/node:24.19.0-bookworm-slim
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 172.44kB 0.0s done
+#5 DONE 0.0s
+
+#6 [browser-test  9/10] COPY e2e ./e2e
+#6 CACHED
+
+#7 [browser-test  7/10] RUN for attempt in 1 2 3; do       npx playwright install chromium && exit 0;       echo "Playwright Chromium download attempt ${attempt} failed";     done;     exit 1
+#7 CACHED
+
+#8 [browser-test  3/10] COPY package.json package-lock.json ./
+#8 CACHED
+
+#9 [browser-test  6/10] RUN --mount=type=cache,target=/var/cache/apt,sharing=locked     --mount=type=cache,target=/var/lib/apt,sharing=locked     for attempt in 1 2 3 4 5; do       npx playwright install-deps chromium         && apt-get install -y --no-install-recommends postgresql-client         && exit 0;       echo "Playwright system dependency attempt ${attempt} failed";     done;     exit 1
+#9 CACHED
+
+#10 [browser-test  2/10] WORKDIR /app
+#10 CACHED
+
+#11 [browser-test  4/10] RUN npm ci
+#11 CACHED
+
+#12 [browser-test  8/10] COPY playwright.config.ts ./
+#12 CACHED
+
+#13 [browser-test  5/10] RUN rm -f /etc/apt/apt.conf.d/docker-clean     && printf 'Acquire::Retries "10";\nAcquire::http::Timeout "30";\nBinary::apt-get::APT::Keep-Downloaded-Packages "true";\n'     > /etc/apt/apt.conf.d/80-playwright-retries
+#13 CACHED
+
+#14 [browser-test 10/10] COPY src/sensitive-content-patterns.json ./src/sensitive-content-patterns.json
+#14 CACHED
+
+#15 exporting to image
+#15 exporting layers done
+#15 writing image sha256:b01357c9b7c6605dc227c1540c35d7382893c76a9d8465daadb94a5806eb5ace done
+#15 naming to docker.io/customer-agent/frontend-browser-test:gate-issue190-scope-trace-20260901a done
+#15 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/nginx:1.29.4-alpine
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [build 1/8] FROM docker.io/library/node:24.19.0-bookworm-slim
+#5 DONE 0.0s
+
+#6 [browser-server 1/4] FROM docker.io/library/nginx:1.29.4-alpine
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 644.96kB 0.0s done
+#7 DONE 0.0s
+
+#8 [build 5/8] COPY tsconfig.json vite.config.ts index.html eslint.config.js .prettierrc.json .prettierignore ./
+#8 CACHED
+
+#9 [browser-server 3/4] COPY nginx.browser.conf /etc/nginx/conf.d/default.conf
+#9 CACHED
+
+#10 [build 7/8] COPY src ./src
+#10 CACHED
+
+#11 [build 3/8] COPY package.json package-lock.json ./
+#11 CACHED
+
+#12 [browser-server 2/4] RUN apk add --no-cache openssl     && mkdir -p /etc/nginx/tls     && openssl req -x509 -newkey rsa:2048 -nodes -days 1        -subj '/CN=browser-frontend'        -addext 'subjectAltName=DNS:browser-frontend'        -keyout /etc/nginx/tls/key.pem        -out /etc/nginx/tls/cert.pem
+#12 CACHED
+
+#13 [build 4/8] RUN npm ci
+#13 CACHED
+
+#14 [build 2/8] WORKDIR /app
+#14 CACHED
+
+#15 [build 8/8] RUN npm run build
+#15 CACHED
+
+#16 [build 6/8] COPY scripts ./scripts
+#16 CACHED
+
+#17 [browser-server 4/4] COPY --from=build /app/dist /usr/share/nginx/html
+#17 CACHED
+
+#18 exporting to image
+#18 exporting layers done
+#18 writing image sha256:22939a4407e6b6f8a6b08c2cd0fb5f3c7cad55974d16cb58a82fb46643db80fb done
+#18 naming to docker.io/customer-agent/frontend-browser-server:gate-issue190-scope-trace-20260901a done
+#18 DONE 0.0s
+ Network customer-agent-issue190-scope-trace-20260901a_provider-egress  Creating
+ Network customer-agent-issue190-scope-trace-20260901a_provider-egress  Created
+ Network customer-agent-issue190-scope-trace-20260901a_data  Creating
+ Network customer-agent-issue190-scope-trace-20260901a_data  Created
+ Network customer-agent-issue190-scope-trace-20260901a_services  Creating
+ Network customer-agent-issue190-scope-trace-20260901a_services  Created
+ Network customer-agent-issue190-scope-trace-20260901a_edge  Creating
+ Network customer-agent-issue190-scope-trace-20260901a_edge  Created
+ Volume "customer-agent-issue190-scope-trace-20260901a_postgres-data"  Creating
+ Volume "customer-agent-issue190-scope-trace-20260901a_postgres-data"  Created
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Creating
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Created
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Creating
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Creating
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Created
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Creating
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Created
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Created
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Creating
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Created
+ Container customer-agent-issue190-scope-trace-20260901a-frontend-1  Creating
+ Container customer-agent-issue190-scope-trace-20260901a-compensation-executor-1  Creating
+ Container customer-agent-issue190-scope-trace-20260901a-compensation-executor-1  Created
+ Container customer-agent-issue190-scope-trace-20260901a-frontend-1  Created
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Starting
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Started
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Healthy
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Healthy
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Starting
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Starting
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Started
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Started
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Exited
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Starting
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Started
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Exited
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Healthy
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Starting
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Started
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Healthy
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Healthy
+ Container customer-agent-issue190-scope-trace-20260901a-compensation-executor-1  Starting
+ Container customer-agent-issue190-scope-trace-20260901a-frontend-1  Starting
+ Container customer-agent-issue190-scope-trace-20260901a-compensation-executor-1  Started
+ Container customer-agent-issue190-scope-trace-20260901a-frontend-1  Started
+ Container customer-agent-issue190-scope-trace-20260901a-frontend-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-compensation-executor-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Exited
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Healthy
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Healthy
+ Container customer-agent-issue190-scope-trace-20260901a-compensation-executor-1  Healthy
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Healthy
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Exited
+ Container customer-agent-issue190-scope-trace-20260901a-frontend-1  Healthy
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+DO
+ Container customer-agent-issue190-scope-trace-20260901a-browser-frontend-1  Creating
+ Container customer-agent-issue190-scope-trace-20260901a-browser-frontend-1  Created
+ Container customer-agent-issue190-scope-trace-20260901a-browser-frontend-1  Starting
+ Container customer-agent-issue190-scope-trace-20260901a-browser-frontend-1  Started
+ Container customer-agent-issue190-scope-trace-20260901a-browser-frontend-1  Waiting
+ Container customer-agent-issue190-scope-trace-20260901a-browser-frontend-1  Healthy
+ Volume "customer-agent-issue190-scope-trace-20260901a_browser-artifacts"  Creating
+ Volume "customer-agent-issue190-scope-trace-20260901a_browser-artifacts"  Created
+
+> customer-agent-frontend@0.1.0 test:browser
+> playwright test --workers=1 e2e/issue190.hybrid-retrieval.spec.ts --grep 显式未授权范围
+
+
+Running 1 test using 1 worker
+
+[1/1] e2e/issue190.hybrid-retrieval.spec.ts:124:1 › Issue #190 显式未授权范围返回权限错误而非空结果
+  1) e2e/issue190.hybrid-retrieval.spec.ts:124:1 › Issue #190 显式未授权范围返回权限错误而非空结果 ───────────────────
+
+    Test timeout of 30000ms exceeded.
+
+    Error: browserContext.close: Test ended.
+    Browser logs:
+
+    <launching> /root/.cache/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=/tmp/playwright_chromiumdev_profile-ycBP8T --remote-debugging-pipe --no-startup-window
+    <launched> pid=43
+    [pid=43][err] [0831/163821.875275:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+    [pid=43][err] [0831/163821.877826:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+    [pid=43][err] [0831/163821.878081:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+    [pid=43][err] [0831/163821.900055:WARNING:media/gpu/vaapi/vaapi_wrapper.cc:1655] drmGetDevices2() has not found any devices
+    [pid=43][err] [0831/163821.901524:WARNING:sandbox/policy/linux/sandbox_linux.cc:405] InitializeSandbox() called with multiple threads in process gpu-process.
+    [pid=43][err] [0831/163822.000334:WARNING:device/bluetooth/dbus/bluez_dbus_manager.cc:209] Floss manager service not available, cannot set Floss enable/disable.
+    [pid=43][err] [0831/163822.135926:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.155367:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.155682:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.155906:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.156579:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.157852:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.161393:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.161885:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.162316:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.162716:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.164822:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.165784:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.166831:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.168395:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.168676:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43][err] [0831/163822.169280:ERROR:net/socket/ssl_client_socket_impl.cc:964] handshake failed; returned -1, SSL error code 1, net_error -202
+    [pid=43] <gracefully close start>
+
+      142 |     await expect(panel.getByRole("list", { name: "RRF 检索片段" })).toHaveCount(0);
+      143 |   } finally {
+    > 144 |     await context.close();
+          |     ^
+      145 |   }
+      146 | });
+      147 |
+        at /app/e2e/issue190.hybrid-retrieval.spec.ts:144:5
+
+    Error Context: test-results/issue190.hybrid-retrieval-Issue-190-显式未授权范围返回权限错误而非空结果/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/issue190.hybrid-retrieval-Issue-190-显式未授权范围返回权限错误而非空结果/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/issue190.hybrid-retrieval-Issue-190-显式未授权范围返回权限错误而非空结果/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  1 failed
+    e2e/issue190.hybrid-retrieval.spec.ts:124:1 › Issue #190 显式未授权范围返回权限错误而非空结果 ────────────────────
+
+浏览器聚焦失败: 1
+ Container customer-agent-issue190-scope-trace-20260901a-compensation-executor-1  Stopping
+ Container customer-agent-issue190-scope-trace-20260901a-frontend-1  Stopping
+ Container customer-agent-issue190-scope-trace-20260901a-browser-frontend-1  Stopping
+ Container customer-agent-issue190-scope-trace-20260901a-browser-frontend-1  Stopped
+ Container customer-agent-issue190-scope-trace-20260901a-browser-frontend-1  Removing
+ Container customer-agent-issue190-scope-trace-20260901a-browser-frontend-1  Removed
+ Container customer-agent-issue190-scope-trace-20260901a-frontend-1  Stopped
+ Container customer-agent-issue190-scope-trace-20260901a-frontend-1  Removing
+ Container customer-agent-issue190-scope-trace-20260901a-frontend-1  Removed
+ Container customer-agent-issue190-scope-trace-20260901a-compensation-executor-1  Stopped
+ Container customer-agent-issue190-scope-trace-20260901a-compensation-executor-1  Removing
+ Container customer-agent-issue190-scope-trace-20260901a-compensation-executor-1  Removed
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Stopping
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Stopped
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Removing
+ Container customer-agent-issue190-scope-trace-20260901a-backend-1  Removed
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Stopping
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Stopping
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Stopped
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Removing
+ Container customer-agent-issue190-scope-trace-20260901a-spring-migrate-1  Removed
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Stopped
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Removing
+ Container customer-agent-issue190-scope-trace-20260901a-agent-server-1  Removed
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Stopping
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Stopped
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Removing
+ Container customer-agent-issue190-scope-trace-20260901a-agent-migrate-1  Removed
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Stopping
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Stopped
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Removing
+ Container customer-agent-issue190-scope-trace-20260901a-postgres-1  Removed
+ Container customer-agent-issue190-scope-trace-20260901a-browser-evidence  Stopping
+ Container customer-agent-issue190-scope-trace-20260901a-browser-evidence  Stopped
+ Container customer-agent-issue190-scope-trace-20260901a-browser-evidence  Removing
+ Container customer-agent-issue190-scope-trace-20260901a-browser-evidence  Removed
+ Network customer-agent-issue190-scope-trace-20260901a_data  Removing
+ Volume customer-agent-issue190-scope-trace-20260901a_postgres-data  Removing
+ Network customer-agent-issue190-scope-trace-20260901a_provider-egress  Removing
+ Network customer-agent-issue190-scope-trace-20260901a_services  Removing
+ Network customer-agent-issue190-scope-trace-20260901a_edge  Removing
+ Volume customer-agent-issue190-scope-trace-20260901a_browser-artifacts  Removing
+ Volume customer-agent-issue190-scope-trace-20260901a_postgres-data  Removed
+ Volume customer-agent-issue190-scope-trace-20260901a_browser-artifacts  Removed
+ Network customer-agent-issue190-scope-trace-20260901a_data  Removed
+ Network customer-agent-issue190-scope-trace-20260901a_provider-egress  Removed
+ Network customer-agent-issue190-scope-trace-20260901a_services  Removed
+ Network customer-agent-issue190-scope-trace-20260901a_edge  Removed

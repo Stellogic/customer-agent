@@ -224,6 +224,7 @@ try {
 
     $protectedScripts = @(
         @{ Name = 'smoke.ps1'; Args = @() },
+        @{ Name = 'test-auto-resolution.ps1'; Args = @() },
         @{ Name = 'issue80-acceptance.ps1'; Args = @() },
         @{ Name = 'build-offline-runtime.ps1'; Args = @('-TestTag', 'local', '-RuntimeTag', 'local') },
         @{ Name = 'real-model-smoke.ps1'; Args = @() },

@@ -1,0 +1,70 @@
+{
+  "run_id": "issue190-startup-20260901a",
+  "head_sha": "94765cefab95da09d4db826c10ecae902cd76551",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "PASS",
+  "working_tree_dirty": true,
+  "paid_model_calls": 0,
+  "model_downloads": 0,
+  "quality": "NOT_RUN",
+  "phases": [
+    "README_POWERSHELL_SYNTAX_PASS",
+    "EXISTING_MODEL_HASH_CHECK_PASS_NO_DOWNLOAD",
+    "EXISTING_V41_VOLUME_RESTART_DOES_NOT_RUN_NEW_INIT",
+    "README_ADMIN_BOOTSTRAP_IDEMPOTENT_AND_V42_MIGRATION_PASS_DATA_PRESERVED"
+  ],
+  "fingerprint": "e0d4568bd09e7ce808712f1a9a9518de59d73f442827f0282524a5aa7a763ad9",
+  "builds": [
+    {
+      "Image": "customer-agent/backend-test:gate-issue190-startup-20260901a",
+      "Target": "test",
+      "Seconds": 1.156,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/agent-test:gate-issue190-startup-20260901a",
+      "Target": "test",
+      "Seconds": 1.267,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/frontend-test:gate-issue190-startup-20260901a",
+      "Target": "test",
+      "Seconds": 1.125,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/backend:gate-issue190-startup-20260901a",
+      "Target": "runtime",
+      "Seconds": 1.103,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/agent:gate-issue190-startup-20260901a",
+      "Target": "runtime",
+      "Seconds": 1.093,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/frontend:gate-issue190-startup-20260901a",
+      "Target": "runtime",
+      "Seconds": 1.078,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/frontend-browser-test:gate-issue190-startup-20260901a",
+      "Target": "browser-test",
+      "Seconds": 1.086,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/frontend-browser-server:gate-issue190-startup-20260901a",
+      "Target": "browser-server",
+      "Seconds": 1.089,
+      "Reused": false
+    }
+  ],
+  "upgrade_readback": "1|preserved-before-vector|1|0",
+  "resources": "CLEANED",
+  "elapsed_seconds": 49.2247237
+}

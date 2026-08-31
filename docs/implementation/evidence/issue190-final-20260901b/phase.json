@@ -1,0 +1,14 @@
+{
+  "run_id": "issue190-final-20260901b",
+  "head_sha": "94765cefab95da09d4db826c10ecae902cd76551",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "PASS",
+  "resources": "CLEANED",
+  "paid_model_calls": 0,
+  "build_seconds": 15.246,
+  "smoke_seconds": 410.532,
+  "browser_seconds": 442.016,
+  "gate_body_seconds": 896.3,
+  "delivery": "NOT_DELIVERABLE_AFTER_STARTUP_DOC_FIX",
+  "note": "完整门禁PASS；已有审查确认启动文档遗漏模型准备与旧卷扩展安装，需补文档并对最终HEAD重新门禁。"
+}

@@ -233,7 +233,7 @@ class EvidenceSufficiencyPolicyTest {
                 new EvidenceSufficiencyClaim(scenario, "evidence-sufficiency-v1", evidence),
                 new CustomerReplyEnvelope(
                         "customer-reply-v1",
-                        "经核验，订单 ORDER-122 的问题已说明，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+                        "经核验，订单 ORDER-122 的问题已说明，当前不符合补偿条件，本次核对结论已给出，后续处理以页面状态为准。如仍有问题，请继续回复。",
                         CustomerReplyIntent.NO_COMPENSATION_RESOLUTION,
                         publicEvidence,
                         false,

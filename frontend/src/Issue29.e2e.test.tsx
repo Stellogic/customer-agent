@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ApprovalWorkbench } from "./ApprovalWorkbench";
@@ -160,7 +161,11 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
 
     const session = await loginCustomer(globalThis.fetch);
     expect(session.id).toBe("customer-demo");
-    const customer = render(<App />);
+    const customer = render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>,
+    );
     fireEvent.change(screen.getByLabelText("订单编号"), { target: { value: orderReference } });
     fireEvent.change(screen.getByLabelText("问题描述"), {
       target: { value: `Issue #29 ${scenario} 合成物流延迟验收` },
@@ -206,7 +211,11 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
 
     expect((await loginCustomer(globalThis.fetch)).id).toBe("customer-demo");
     globalThis.history.replaceState(null, "", ticketUrl);
-    render(<App />);
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>,
+    );
     if (scenario === "reconciliation") {
       expect(
         await screen.findByText("补偿结果正在自动确认中，请勿重复提交。", {}, { timeout: 10_000 }),

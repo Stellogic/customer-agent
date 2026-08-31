@@ -1,0 +1,18 @@
+{
+  "run_id": "issue190-development-c4-20260831a",
+  "tested_head": "dc6c71250a3d1cbf101720616f7a6039f186f763",
+  "base": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "attempted": 36,
+  "completed": 35,
+  "status": "STOPPED",
+  "reason": "INVALID_EVIDENCE",
+  "metrics": null,
+  "input_tokens": 25969.0,
+  "output_tokens": 749.0,
+  "cost_totals": {
+    "settled_upper_micro_cny": 287133,
+    "unsettled_reserved_micro_cny": 0
+  },
+  "ledger_sha256": "ED0EC71C983C076974FA0254E9222FE99F5EFA1EC6B564F7CC0B74A904928933",
+  "elapsed_seconds": 38.64861830000882
+}

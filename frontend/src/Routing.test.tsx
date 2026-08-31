@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RootApplication } from "./RootApplication";
 import { LEGACY_ROUTE_REDIRECTS } from "./workspaceRegistry";
@@ -101,6 +101,8 @@ describe("Issue #73 静态路由与两个界面壳", () => {
     );
     expect(screen.getByText("当前客户：演示客户")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "客户导航" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "帮助中心" })).toHaveAttribute("href", "/help");
+    expect(screen.getByRole("link", { name: "帮助文档" })).toHaveAttribute("href", "/help/docs");
     expect(screen.queryByRole("navigation", { name: "内部工作区" })).not.toBeInTheDocument();
   });
 
@@ -586,6 +588,58 @@ describe("Issue #191 状态画廊与独立错误路由", () => {
       credentials: "same-origin",
       cache: "no-store",
     });
+  });
+});
+
+describe("Issue #192 客户壳帮助入口与信任说明", () => {
+  afterEach(() => {
+    cleanup();
+    resetHumanSessionLifecycleForTests();
+    vi.restoreAllMocks();
+    globalThis.history.replaceState(null, "", "/");
+  });
+
+  it("帮助文档是客户壳一致入口，并连接真实说明页", async () => {
+    globalThis.history.replaceState(null, "", "/help/docs");
+    const fetchMock = mockSession(customer);
+
+    render(<RootApplication />);
+
+    expect(
+      await screen.findByRole("heading", { name: "客户帮助中心信任说明" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "帮助文档" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "帮助中心" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: "返回帮助中心" })).toHaveAttribute("href", "/help");
+    expect(fetchMock.mock.calls.every(([input]) => String(input) === "/api/auth/session")).toBe(
+      true,
+    );
+  });
+
+  it("未实现帮助条目只显示开发中且不发出业务写请求", async () => {
+    globalThis.history.replaceState(null, "", "/help/docs");
+    const fetchMock = mockSession(customer);
+
+    render(<RootApplication />);
+    await screen.findByRole("heading", { name: "客户帮助中心信任说明" });
+    const sessionCalls = fetchMock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "安全保障说明全文（开发中）" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("安全保障说明全文入口正在开发中");
+    expect(fetchMock).toHaveBeenCalledTimes(sessionCalls);
+  });
+
+  it("内部身份访问客户帮助文档时显示 403 且不加载客户说明", async () => {
+    globalThis.history.replaceState(null, "", "/help/docs");
+    mockSession(support);
+
+    render(<RootApplication />);
+
+    expect(
+      await screen.findByRole("heading", { name: "当前身份无权访问此页面" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "客户帮助中心信任说明" })).not.toBeInTheDocument();
   });
 });
 

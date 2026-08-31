@@ -1,0 +1,14 @@
+{
+  "run_id": "issue190-final-20260901a",
+  "head_sha": "2a37d882d2f311f03e7a19b5a0e99182df25000f",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "PASS",
+  "resources": "CLEANED",
+  "paid_model_calls": 0,
+  "build_seconds": 15.654,
+  "smoke_seconds": 439.448,
+  "browser_seconds": 387.294,
+  "gate_body_seconds": 870.76,
+  "delivery": "NOT_DELIVERABLE_AFTER_SCOPE_FIX",
+  "note": "自动化门禁PASS；合入前发现scope权限缺陷，需修复并重新完整门禁。"
+}

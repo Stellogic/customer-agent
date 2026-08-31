@@ -1,0 +1,32 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-scope-runtime-20260901a",
+  "head_sha": "0527552d250f6c2a819cff6365ad8870268f7761",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Text workspace/user-home/machine prefixes only; original files retained locally. Browser synthetic screenshots are unchanged.",
+  "lock_release_observation": "Own lock released, one FREE read; coordinator notified. See phase cleanup_error separately.",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "compose.log",
+      "source_sha256": "bfd67ec503cf96b26d478c3eff8a246ccee58906c915d214fbf90d49b80d1a4f",
+      "archived_sha256": "bfd67ec503cf96b26d478c3eff8a246ccee58906c915d214fbf90d49b80d1a4f"
+    },
+    {
+      "file": "console.log",
+      "source_sha256": "0c9acf2462ada560adf40ca7807e298c36d3086b993ac358166c282d89360d9b",
+      "archived_sha256": "0c9acf2462ada560adf40ca7807e298c36d3086b993ac358166c282d89360d9b"
+    },
+    {
+      "file": "phase.json",
+      "source_sha256": "6b4497dfb72d2cf99dd2dcb6d23e44bcc977efb05e3529034be8f0f6a6953ffb",
+      "archived_sha256": "6b4497dfb72d2cf99dd2dcb6d23e44bcc977efb05e3529034be8f0f6a6953ffb"
+    },
+    {
+      "file": "runtime.log",
+      "source_sha256": "d707a50d1b7cda04c0be1c48b369ea28b20d61b610e65fb6a3b286ed387c9fed",
+      "archived_sha256": "2a5deee75f10e51e3366d2413b35f78c23e7d28796b733d917ab6155bd08a1c2"
+    }
+  ]
+}

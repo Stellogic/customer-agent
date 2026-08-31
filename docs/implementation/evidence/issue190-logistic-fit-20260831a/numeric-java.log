@@ -1,0 +1,65 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.numeric
+#1 transferring dockerfile: 1.13kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 26.48kB 0.0s done
+#5 DONE 0.0s
+
+#6 [build 4/6] COPY config ./config
+#6 CACHED
+
+#7 [build 2/6] WORKDIR /workspace
+#7 CACHED
+
+#8 [build 5/6] COPY src ./src
+#8 CACHED
+
+#9 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#9 CACHED
+
+#10 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#10 CACHED
+
+#11 [numeric-test 1/1] RUN --mount=type=cache,target=/home/gradle/.gradle gradle --init-script config/gradle-proxy.init.gradle.kts test --tests '*KnowledgeAnswerabilityPolicyTest' --tests '*KnowledgeAnswerabilityFeaturesTest' --no-daemon
+#11 1.459 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+#11 2.758 Daemon will be stopped at the end of the build 
+#11 7.158 > Task :compileJava UP-TO-DATE
+#11 7.158 > Task :processResources UP-TO-DATE
+#11 7.158 > Task :classes UP-TO-DATE
+#11 10.26 
+#11 10.26 > Task :compileTestJava
+#11 10.26 Note: Some input files use or override a deprecated API.
+#11 10.26 Note: Recompile with -Xlint:deprecation for details.
+#11 10.26 Note: Some input files use unchecked or unsafe operations.
+#11 10.26 Note: Recompile with -Xlint:unchecked for details.
+#11 10.66 
+#11 10.66 > Task :processTestResources NO-SOURCE
+#11 10.66 > Task :testClasses
+#11 12.46 OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+#11 13.44 > Task :test
+#11 13.44 
+#11 13.44 [Incubating] Problems report is available at: file:///workspace/build/reports/problems/problems-report.html
+#11 13.44 
+#11 13.44 BUILD SUCCESSFUL in 13s
+#11 13.44 4 actionable tasks: 2 executed, 2 up-to-date
+#11 13.44 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+#11 DONE 13.7s
+
+#12 exporting to image
+#12 exporting layers 0.0s done
+#12 writing image sha256:f87607a4b74aac01caddfb7ff671757b4a967ca807a7fa8ccb9e167ee20026c3 done
+#12 naming to docker.io/customer-agent/numeric:gate-issue190-logistic-fit-20260831a done
+#12 DONE 0.1s

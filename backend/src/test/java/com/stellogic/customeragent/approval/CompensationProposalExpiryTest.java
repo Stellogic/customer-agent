@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,7 +19,7 @@ import org.springframework.jdbc.core.RowMapper;
 class CompensationProposalExpiryTest {
     @SuppressWarnings("unchecked")
     @Test
-    void samplesServerTimeOnlyAfterLockingPendingOrderRevisions() {
+    void samplesServerTimeOnlyAfterLockingPendingTicketRevisions() {
         JdbcTemplate jdbc = org.mockito.Mockito.mock(JdbcTemplate.class);
         Clock clock = org.mockito.Mockito.mock(Clock.class);
         when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
@@ -27,12 +28,12 @@ class CompensationProposalExpiryTest {
         when(clock.instant()).thenReturn(now);
         var expiry = new CompensationProposalExpiry(jdbc, clock);
 
-        org.assertj.core.api.Assertions.assertThat(expiry.expireDueForOrder("ORDER-DELAY-001"))
+        UUID ticketId = UUID.randomUUID();
+        org.assertj.core.api.Assertions.assertThat(expiry.expireDueForTicket(ticketId))
                 .isEqualTo(now);
 
         InOrder order = inOrder(jdbc, clock);
-        order.verify(jdbc)
-                .query(contains("for update"), any(RowMapper.class), eq("ORDER-DELAY-001"));
+        order.verify(jdbc).query(contains("for update"), any(RowMapper.class), eq(ticketId));
         order.verify(clock).instant();
     }
 }

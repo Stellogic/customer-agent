@@ -33,7 +33,7 @@ def customer_reply(
     else:
         body = (
             f"经核验，订单 {order_reference} 的本次物流延迟不足 24 小时，"
-            "当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。"
+            "当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。"
         )
         intent = "NO_COMPENSATION_RESOLUTION"
     return {
@@ -296,21 +296,23 @@ def run_evidence_sufficiency_path(
             headers={"Idempotency-Key": f"issue-160-{uuid.uuid4()}"},
             json={
                 "orderReference": order_reference,
-                "description": "合成订单物流状态解释",
+                "description": "请解释物流状态",
             },
         )
         expect_status(accepted, 201)
         ticket_id = accepted.json()["ticketId"]
         projection = None
         for _ in range(60):
-            response = client.get(f"{spring_url}/api/customer/tickets/{ticket_id}")
+            response = client.get(f"{spring_url}/api/customer/v2/tickets/{ticket_id}")
             expect_status(response, 200)
             projection = response.json()
-            if projection["ticket"]["lifecycleState"] == "RESOLVED":
+            if (projection.get("autoResolution") or {}).get("status") == "PENDING":
                 break
             time.sleep(0.5)
         assert projection is not None
-        assert projection["ticket"]["lifecycleState"] == "RESOLVED", projection
+        assert projection["ticket"]["lifecycleState"] == "INVESTIGATING", projection
+        assert projection["autoResolution"]["status"] == "PENDING", projection
+        assert projection["autoResolution"]["dueAt"] is not None
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         generation = connection.execute(
@@ -741,7 +743,7 @@ def main() -> None:
                 "insert into support_ticket "
                 "(id, customer_id, order_reference, description, issue_kind, lifecycle_state, "
                 "handling_mode, created_at, first_responded_at, resolution_running_since) "
-                "values (%s, 'customer-demo', %s, '生成竞态验收', 'LOGISTICS_DELAY', "
+                "values (%s, 'customer-demo', %s, '请解释物流状态', 'LOGISTICS_DELAY', "
                 "'INVESTIGATING', 'AGENT', now(), now(), now())",
                 (race_ticket_id, order_reference),
             )
@@ -754,7 +756,7 @@ def main() -> None:
             connection.execute(
                 "insert into public_message "
                 "(id, ticket_id, message_sequence, author, body, sent_at) values "
-                "(%s, %s, 1, 'CUSTOMER', '生成竞态验收', now()), "
+                "(%s, %s, 1, 'CUSTOMER', '请解释物流状态', now()), "
                 "(%s, %s, 2, 'SUPPORT', '我们正在调查', now())",
                 (uuid.uuid4(), race_ticket_id, uuid.uuid4(), race_ticket_id),
             )
@@ -941,7 +943,7 @@ def main() -> None:
             "compensation-proposal" if compensation_required else "public-conclusion",
             order_reference,
             old_conclusion_action,
-            ({(202, 403), (202, 200)} if compensation_required else {(202, 403), (409, 200)}),
+            {(202, 403), (202, 200)},
             (ticket_id, generation_id),
         )
 
@@ -951,7 +953,7 @@ def main() -> None:
     no_compensation_request = f"issue-14-{uuid.uuid4()}"
     no_compensation_payload = {
         "orderReference": "ORDER-DELAY-UNDER-24",
-        "description": "合成订单物流延迟不足二十四小时",
+        "description": "请解释物流状态",
     }
     no_compensation_headers = {
         "Idempotency-Key": no_compensation_request,
@@ -972,11 +974,20 @@ def main() -> None:
             )
             expect_status(snapshot, 200)
             resolved_projection = snapshot.json()
-            if resolved_projection["ticket"]["lifecycleState"] == "RESOLVED":
+            if any(
+                message["author"] == "AGENT" and "当前不符合补偿条件" in message["body"]
+                for message in resolved_projection["messages"]
+            ):
                 break
             time.sleep(0.5)
         assert resolved_projection is not None
-        assert resolved_projection["ticket"]["lifecycleState"] == "RESOLVED", resolved_projection
+        assert resolved_projection["ticket"]["lifecycleState"] == "INVESTIGATING", (
+            resolved_projection
+        )
+        candidate = client.get(f"{spring_url}/api/customer/v2/tickets/{resolved_ticket_id}")
+        expect_status(candidate, 200)
+        assert candidate.json()["autoResolution"]["status"] == "PENDING"
+        assert candidate.json()["autoResolution"]["dueAt"] is not None
         assert resolved_projection["ticket"]["handlingMode"] == "AGENT"
         assert resolved_projection["ticket"]["createdAt"] == "2026-08-09T14:00:00Z"
         assert len(resolved_projection["messages"]) == 3
@@ -1963,37 +1974,23 @@ def main() -> None:
             ("APPROVAL_LEASE_REVOKED", "2026-08-09T14:00:00+00:00"),
         ]
 
-    duplicate_ticket = uuid.uuid4()
-    duplicate_generation = uuid.uuid4()
     try:
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
             connection.execute(
-                "insert into support_ticket (id, customer_id, order_reference, description, lifecycle_state, handling_mode, created_at, first_responded_at) "
-                "values (%s, 'customer-demo', %s, 'constraint proof', 'INVESTIGATING', 'AGENT', now(), now())",
-                (duplicate_ticket, proposal_order_reference),
-            )
-            connection.execute(
-                "insert into agent_processing_generation (id, ticket_id, generation_number, thread_id, status, created_at) "
-                "values (%s, %s, 1, %s, 'ACTIVE', now())",
-                (duplicate_generation, duplicate_ticket, uuid.uuid4()),
-            )
-            connection.execute(
                 "insert into compensation_proposal_revision "
                 "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, content_digest, status, created_at, expires_at) "
-                "select %s, %s, 1, %s, order_reference, %s, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, %s, 'PENDING_APPROVAL', now(), now() + interval '24 hours' "
+                "select %s, %s, 1, ticket_id, order_reference, null, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, %s, 'PENDING_APPROVAL', now(), now() + interval '24 hours' "
                 "from compensation_proposal_revision where id = %s",
                 (
                     uuid.uuid4(),
                     uuid.uuid4(),
-                    duplicate_ticket,
-                    duplicate_generation,
                     "f" * 64,
                     first_revision_id,
                 ),
             )
-        raise AssertionError("active intent unique constraint unexpectedly accepted a duplicate")
+        raise AssertionError("active ticket intent constraint unexpectedly accepted a duplicate")
     except psycopg.errors.UniqueViolation as error:
-        assert error.diag.constraint_name == "one_active_logistics_compensation_intent"
+        assert error.diag.constraint_name == "one_active_ticket_compensation_intent"
 
     second_generation = uuid.uuid4()
 
@@ -3630,7 +3627,7 @@ def main() -> None:
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         proposal_race_results = list(executor.map(create_competing_proposal, proposal_race_scopes))
-    assert sorted(proposal_race_results) == ["accepted", "one_active_logistics_compensation_intent"]
+    assert sorted(proposal_race_results) == ["accepted", "accepted"]
 
     race_digest = "7" * 64
     _, _, race_revision_id = seed_pending_decision_fixture(
@@ -4003,7 +4000,7 @@ def main() -> None:
                 },
                 json={
                     "orderReference": "ORDER-DELAY-AMBIGUOUS",
-                    "description": f"需要确认订单 {label}",
+                    "description": "请解释物流状态",
                 },
             )
             expect_status(response, 201)
@@ -4114,11 +4111,17 @@ def main() -> None:
             )
             expect_status(projection_response, 200)
             resumed_projection = projection_response.json()
-            if resumed_projection["ticket"]["lifecycleState"] == "RESOLVED":
+            if any(
+                message["author"] == "AGENT" and "当前不符合补偿条件" in message["body"]
+                for message in resumed_projection["messages"]
+            ):
                 break
             time.sleep(0.25)
         assert resumed_projection is not None
-        assert resumed_projection["ticket"]["lifecycleState"] == "RESOLVED"
+        assert resumed_projection["ticket"]["lifecycleState"] == "INVESTIGATING"
+        candidate = client.get(f"{spring_url}/api/customer/v2/tickets/{clarification_ticket_id}")
+        expect_status(candidate, 200)
+        assert candidate.json()["autoResolution"]["status"] == "PENDING"
         assert resumed_projection["clarification"] is None
 
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -4139,7 +4142,7 @@ def main() -> None:
             clarification_generation_number,
             resolved_order_reference,
         ) = clarification_generation_row
-        assert resolution_elapsed_seconds >= 0 and resolution_running_since is None
+        assert resolution_elapsed_seconds >= 0 and resolution_running_since is not None
         assert clarification_generation_status == "COMPLETED"
         assert clarification_generation_number == 1
         assert resolved_order_reference == "ORDER-DELAY-AMBIGUOUS-A"

@@ -7,3 +7,5 @@
 frontend/dist/
 .env
 .local/
+**/model.safetensors
+**/pytorch_model.bin

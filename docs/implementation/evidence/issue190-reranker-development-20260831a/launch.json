@@ -1,0 +1,15 @@
+{
+  "run_id": "issue190-reranker-development-20260831a",
+  "head_sha": "9bbeca00b202e077963c0e8832dd2b2b4dae8994",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "INFEASIBLE",
+  "manual_download_evidence": "USER_PROVIDED_MODEL_VERIFIED_OUTPUT",
+  "model_reverification": "PASS",
+  "development_started": true,
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "shared_record_existed": false,
+  "exit_code": 1,
+  "completed_queries": 72,
+  "elapsed_seconds": 71.8615641
+}

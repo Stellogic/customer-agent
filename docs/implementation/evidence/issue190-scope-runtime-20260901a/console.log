@@ -1,0 +1,1281 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 877B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 36.38kB 0.0s done
+#5 DONE 0.0s
+
+#6 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#6 CACHED
+
+#7 [build 2/6] WORKDIR /workspace
+#7 CACHED
+
+#8 [build 4/6] COPY config ./config
+#8 CACHED
+
+#9 [build 5/6] COPY src ./src
+#9 DONE 0.1s
+
+#10 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#10 1.280 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+#10 2.379 Daemon will be stopped at the end of the build 
+#10 9.780 
+#10 9.780 > Task :compileJava
+#10 9.780 Note: Some input files use or override a deprecated API.
+#10 9.780 Note: Recompile with -Xlint:deprecation for details.
+#10 10.38 
+#10 10.38 > Task :processResources
+#10 10.38 > Task :classes
+#10 10.48 > Task :resolveMainClassName
+#10 11.18 > Task :bootJar
+#10 11.18 
+#10 11.18 [Incubating] Problems report is available at: file:///workspace/build/reports/problems/problems-report.html
+#10 11.18 
+#10 11.18 BUILD SUCCESSFUL in 10s
+#10 11.18 4 actionable tasks: 4 executed
+#10 11.18 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+#10 DONE 11.4s
+
+#11 [test 1/1] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts check --no-daemon
+#11 1.075 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+#11 2.074 Daemon will be stopped at the end of the build 
+#11 6.574 > Task :compileJava UP-TO-DATE
+#11 6.673 > Task :processResources UP-TO-DATE
+#11 6.673 > Task :classes UP-TO-DATE
+#11 10.17 
+#11 10.17 > Task :compileTestJava
+#11 10.17 Note: Some input files use or override a deprecated API.
+#11 10.17 Note: Recompile with -Xlint:deprecation for details.
+#11 10.17 Note: Some input files use unchecked or unsafe operations.
+#11 10.17 Note: Recompile with -Xlint:unchecked for details.
+#11 10.57 
+#11 10.57 > Task :processTestResources NO-SOURCE
+#11 10.57 > Task :testClasses
+#11 11.87 > Task :checkstyleMain
+#11 13.27 > Task :spotlessJava
+#11 13.27 > Task :spotlessJavaCheck
+#11 13.27 > Task :spotlessCheck
+#11 14.27 > Task :checkstyleTest
+#11 19.97 OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+#11 43.27 > Task :test
+#11 99.07 > Task :check
+#11 99.07 
+#11 99.07 [Incubating] Problems report is available at: file:///workspace/build/reports/problems/problems-report.html
+#11 99.07 
+#11 99.07 BUILD SUCCESSFUL in 1m 38s
+#11 99.07 8 actionable tasks: 6 executed, 2 up-to-date
+#11 99.07 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+#11 DONE 99.3s
+
+#12 exporting to image
+#12 exporting layers 0.1s done
+#12 writing image sha256:e8ef69ffdad350c9d12e96d1b3372a02cda52192ec3aaa160ee532721fd060d2 done
+#12 naming to docker.io/customer-agent/backend-test:gate-issue190-scope-runtime-20260901a done
+#12 DONE 0.2s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.04kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.13.14-slim-bookworm
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 96B done
+#3 DONE 0.0s
+
+#4 [base 1/7] FROM docker.io/library/python:3.13.14-slim-bookworm
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 2.60MB 0.1s done
+#5 DONE 0.1s
+
+#6 [base 2/7] WORKDIR /app
+#6 CACHED
+
+#7 [base 3/7] RUN apt-get update     && apt-get install --yes --no-install-recommends libatomic1     && rm -rf /var/lib/apt/lists/*     && pip install --no-cache-dir uv==0.8.22
+#7 CACHED
+
+#8 [base 4/7] COPY pyproject.toml uv.lock ./
+#8 CACHED
+
+#9 [base 5/7] RUN uv sync --frozen
+#9 CACHED
+
+#10 [base 6/7] COPY langgraph.json ./
+#10 CACHED
+
+#11 [base 7/7] COPY src ./src
+#11 DONE 0.1s
+
+#12 [test 1/7] COPY tests ./tests
+#12 DONE 0.1s
+
+#13 [test 2/7] COPY tests/fixtures/knowledge-history /docs/implementation/evidence
+#13 DONE 0.1s
+
+#14 [test 3/7] COPY smoke.py ./
+#14 DONE 0.0s
+
+#15 [test 4/7] COPY approval_queue_time_smoke.py ./
+#15 DONE 0.0s
+
+#16 [test 5/7] COPY auto_resolution_smoke.py ./
+#16 DONE 0.0s
+
+#17 [test 6/7] COPY order_allowance_smoke.py ./
+#17 DONE 0.0s
+
+#18 [test 7/7] RUN uv run ruff format --check .     && uv run ruff check .     && uv run pyright     && uv run pytest
+#18 0.565    Building customer-agent-baseline @ file:///app
+#18 2.249       Built customer-agent-baseline @ file:///app
+#18 2.255 Uninstalled 1 package in 3ms
+#18 2.256 Installed 1 package in 1ms
+#18 2.310 86 files already formatted
+#18 2.376 All checks passed!
+#18 4.017 {'x86': False, 'risc': False, 'lts': False}
+#18 5.291  * Install prebuilt node (26.8.1) ../app/.venv/lib/python3.13/site-packages/nodeenv.py:639: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.
+#18 72.99   archive.extractall(src_dir, extract_list)
+#18 75.60 ... done.
+#18 91.57 0 errors, 0 warnings, 0 informations
+#18 93.84 ============================= test session starts ==============================
+#18 93.84 platform linux -- Python 3.13.14, pytest-8.4.2, pluggy-1.6.0
+#18 93.85 rootdir: /app
+#18 93.85 configfile: pyproject.toml
+#18 93.85 testpaths: tests
+#18 93.85 plugins: anyio-4.14.2, langsmith-0.10.17, asyncio-1.1.0
+#18 93.85 asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+#18 95.16 collected 312 items
+#18 95.16 
+#18 95.16 tests/test_clarification_retest_evidence.py .                            [  0%]
+#18 95.16 tests/test_compensation_executor.py ....                                 [  1%]
+#18 95.17 tests/test_customer_communication_model.py .................             [  7%]
+#18 95.19 tests/test_customer_communication_model_runtime.py ......                [  8%]
+#18 95.19 tests/test_deepseek_customer_communication_model.py .........            [ 11%]
+#18 95.21 tests/test_deepseek_investigation_action_model.py .................      [ 17%]
+#18 95.24 tests/test_deepseek_investigation_model.py ........................      [ 25%]
+#18 95.29 tests/test_deepseek_model_comparison.py ......                           [ 26%]
+#18 95.34 tests/test_deepseek_offline_contract.py ...................              [ 33%]
+#18 105.3 tests/test_deepseek_real_evaluation.py ...........                       [ 36%]
+#18 105.4 tests/test_formal_mode_business_smoke.py .                               [ 36%]
+#18 105.4 tests/test_formal_mode_metrics.py ..                                     [ 37%]
+#18 105.4 tests/test_graph.py .........................                            [ 45%]
+#18 105.5 tests/test_intake_model.py ............                                  [ 49%]
+#18 105.5 tests/test_intake_model_runtime.py ..                                    [ 50%]
+#18 105.5 tests/test_investigation_action_loop.py .................                [ 55%]
+#18 105.5 tests/test_investigation_action_model_runtime.py ......                  [ 57%]
+#18 105.5 tests/test_investigation_model.py ......                                 [ 59%]
+#18 105.5 tests/test_investigation_model_runtime.py ........                       [ 61%]
+#18 105.5 tests/test_knowledge_answerability.py .....                              [ 63%]
+#18 105.5 tests/test_knowledge_calibration.py ..                                   [ 64%]
+#18 105.5 tests/test_knowledge_embedding.py ..                                     [ 64%]
+#18 105.5 tests/test_knowledge_evaluation.py .......                               [ 66%]
+#18 105.5 tests/test_knowledge_reranker.py ....                                    [ 68%]
+#18 105.5 tests/test_knowledge_sufficiency.py .......................              [ 75%]
+#18 106.8 tests/test_knowledge_sufficiency_chat.py ....................            [ 82%]
+#18 108.9 tests/test_knowledge_sufficiency_development.py ....                     [ 83%]
+#18 112.5 tests/test_knowledge_sufficiency_v2.py ............                      [ 87%]
+#18 113.6 tests/test_rag_eval_v1.py ........                                       [ 89%]
+#18 113.6 tests/test_real_shadow_business_smoke.py ..                              [ 90%]
+#18 113.6 tests/test_real_shadow_evaluation.py ...                                 [ 91%]
+#18 113.6 tests/test_release_evaluation.py .....                                   [ 92%]
+#18 113.6 tests/test_shadow_investigation.py .............                         [ 97%]
+#18 113.6 tests/test_synthetic_evaluation.py .........                             [100%]
+#18 113.6 
+#18 113.6 ============================= 312 passed in 19.76s =============================
+#18 DONE 114.4s
+
+#19 exporting to image
+#19 exporting layers
+#19 exporting layers 2.2s done
+#19 writing image sha256:9d197605576acabcc29432906125abe38d212b277200ba8bf94a35676c29dcc2 done
+#19 naming to docker.io/customer-agent/agent-test:gate-issue190-scope-runtime-20260901a done
+#19 DONE 2.2s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [build 1/8] FROM docker.io/library/node:24.19.0-bookworm-slim
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 10.36kB done
+#5 DONE 0.0s
+
+#6 [build 2/8] WORKDIR /app
+#6 CACHED
+
+#7 [build 4/8] RUN npm ci
+#7 CACHED
+
+#8 [build 5/8] COPY tsconfig.json vite.config.ts index.html eslint.config.js .prettierrc.json .prettierignore ./
+#8 CACHED
+
+#9 [build 3/8] COPY package.json package-lock.json ./
+#9 CACHED
+
+#10 [build 6/8] COPY scripts ./scripts
+#10 CACHED
+
+#11 [build 7/8] COPY src ./src
+#11 DONE 0.1s
+
+#12 [build 8/8] RUN npm run build
+#12 0.420 
+#12 0.420 > customer-agent-frontend@0.1.0 build
+#12 0.420 > npm run typecheck && npm run build:bundle && npm run bundle:evidence
+#12 0.420 
+#12 0.544 
+#12 0.544 > customer-agent-frontend@0.1.0 typecheck
+#12 0.544 > tsc --noEmit
+#12 0.544 
+#12 5.277 
+#12 5.277 > customer-agent-frontend@0.1.0 build:bundle
+#12 5.277 > vite build
+#12 5.277 
+#12 5.488 vite v8.2.1 building client environment for production...
+#12 5.498 [2K
+transforming...✓ 6086 modules transformed.
+#12 6.212 rendering chunks...
+#12 6.338 computing gzip size...
+#12 6.343 dist/index.html                                  1.58 kB │ gzip:  0.57 kB
+#12 6.343 dist/.vite/manifest.json                        10.76 kB │ gzip:  1.34 kB
+#12 6.343 dist/assets/index-QkR9HVRx.css                  64.13 kB │ gzip: 12.49 kB
+#12 6.343 dist/assets/omit-CM_Et8lu.js                     0.11 kB │ gzip:  0.12 kB
+#12 6.343 dist/assets/csrf-CiJnUY0S.js                     0.38 kB │ gzip:  0.26 kB
+#12 6.343 dist/assets/useVariants-CqNXGrsu.js              0.44 kB │ gzip:  0.29 kB
+#12 6.343 dist/assets/rolldown-runtime-D2aABDIb.js         0.68 kB │ gzip:  0.41 kB
+#12 6.343 dist/assets/RightOutlined-BS4GEDyc.js            0.83 kB │ gzip:  0.57 kB
+#12 6.343 dist/assets/CustomerShell-Jbims7zS.js            0.88 kB │ gzip:  0.47 kB
+#12 6.343 dist/assets/streamProtocol-CMMm3Ko1.js           1.02 kB │ gzip:  0.59 kB
+#12 6.343 dist/assets/CloseOutlined-C7w4V8XU.js            1.31 kB │ gzip:  0.73 kB
+#12 6.343 dist/assets/InternalShell-COMi_e-p.js            1.48 kB │ gzip:  0.74 kB
+#12 6.343 dist/assets/style-Cvj32mD0.js                    1.97 kB │ gzip:  0.82 kB
+#12 6.343 dist/assets/SessionLogoutButton-B_tFD-6k.js      2.04 kB │ gzip:  1.12 kB
+#12 6.343 dist/assets/theme-BpPzi88F.js                    2.10 kB │ gzip:  1.03 kB
+#12 6.343 dist/assets/CustomerHelpDocs-ZNiDvmPg.js         2.98 kB │ gzip:  1.44 kB
+#12 6.343 dist/assets/PlusOutlined-B1W8MSKa.js             3.79 kB │ gzip:  1.75 kB
+#12 6.343 dist/assets/CustomerHelpTrust-CYm0a-j-.js        3.99 kB │ gzip:  1.62 kB
+#12 6.343 dist/assets/humanSessionLifecycle-DO2cRqVK.js    4.59 kB │ gzip:  1.61 kB
+#12 6.343 dist/assets/Sider-BOrRpxEw.js                    7.36 kB │ gzip:  3.04 kB
+#12 6.343 dist/assets/ContextIsolator-Delq7CPh.js          7.39 kB │ gzip:  2.68 kB
+#12 6.343 dist/assets/useSize-RAbyxlwP.js                  8.25 kB │ gzip:  3.56 kB
+#12 6.343 dist/assets/config-provider-mLSQG-zK.js         10.82 kB │ gzip:  4.23 kB
+#12 6.343 dist/assets/tooltip-wKhTRRtE.js                 14.82 kB │ gzip:  5.37 kB
+#12 6.343 dist/assets/ApprovalWorkspace-D_X8gefr.js       16.51 kB │ gzip:  5.03 kB
+#12 6.343 dist/assets/KnowledgeWorkspace-CK0cKjQt.js      19.11 kB │ gzip:  5.69 kB
+#12 6.343 dist/assets/menu-DTL9Rpzc.js                    23.90 kB │ gzip:  7.10 kB
+#12 6.343 dist/assets/EllipsisOutlined-BPs74lrM.js        29.00 kB │ gzip: 10.82 kB
+#12 6.343 dist/assets/workspaceRegistry-AaEyzxvp.js       39.60 kB │ gzip: 14.51 kB
+#12 6.343 dist/assets/SupportWorkspace-CYHJJUAX.js        44.81 kB │ gzip: 12.33 kB
+#12 6.343 dist/assets/modal-Bg2v8rC3.js                   54.60 kB │ gzip: 17.74 kB
+#12 6.343 dist/assets/SystemState-B_pCTC2z.js             62.63 kB │ gzip: 20.27 kB
+#12 6.343 dist/assets/index-ZqxrUx-M.js                   67.98 kB │ gzip: 21.76 kB
+#12 6.343 dist/assets/context-CRtSfo_u.js                 68.72 kB │ gzip: 23.66 kB
+#12 6.343 dist/assets/InternalLanding-B9DGO6z-.js         80.79 kB │ gzip: 27.38 kB
+#12 6.343 dist/assets/jsx-runtime-DzOhj3eh.js            268.37 kB │ gzip: 89.50 kB
+#12 6.343 dist/assets/CustomerWorkspace-NDT6GKhZ.js      287.15 kB │ gzip: 87.73 kB
+#12 6.343 
+#12 6.344 ✓ built in 855ms
+#12 6.485 
+#12 6.485 > customer-agent-frontend@0.1.0 bundle:evidence
+#12 6.485 > node scripts/assert-bundle-evidence.mjs
+#12 6.485 
+#12 6.619 {
+#12 6.619   "generatedFrom": "dist/.vite/manifest.json",
+#12 6.619   "productionEntry": {
+#12 6.619     "bytes": 630857,
+#12 6.619     "gzipBytes": 204379,
+#12 6.619     "files": [
+#12 6.619       "assets/CloseOutlined-C7w4V8XU.js",
+#12 6.619       "assets/EllipsisOutlined-BPs74lrM.js",
+#12 6.619       "assets/PlusOutlined-B1W8MSKa.js",
+#12 6.619       "assets/SystemState-B_pCTC2z.js",
+#12 6.619       "assets/config-provider-mLSQG-zK.js",
+#12 6.619       "assets/context-CRtSfo_u.js",
+#12 6.619       "assets/csrf-CiJnUY0S.js",
+#12 6.619       "assets/humanSessionLifecycle-DO2cRqVK.js",
+#12 6.619       "assets/index-QkR9HVRx.css",
+#12 6.619       "assets/index-ZqxrUx-M.js",
+#12 6.619       "assets/jsx-runtime-DzOhj3eh.js",
+#12 6.619       "assets/omit-CM_Et8lu.js",
+#12 6.619       "assets/rolldown-runtime-D2aABDIb.js",
+#12 6.619       "assets/useSize-RAbyxlwP.js",
+#12 6.619       "assets/useVariants-CqNXGrsu.js",
+#12 6.619       "assets/workspaceRegistry-AaEyzxvp.js"
+#12 6.619     ]
+#12 6.619   },
+#12 6.619   "customerFirstScreen": {
+#12 6.619     "bytes": 1038981,
+#12 6.619     "gzipBytes": 333486,
+#12 6.619     "files": [
+#12 6.619       "assets/CloseOutlined-C7w4V8XU.js",
+#12 6.619       "assets/ContextIsolator-Delq7CPh.js",
+#12 6.619       "assets/CustomerHelpTrust-CYm0a-j-.js",
+#12 6.619       "assets/CustomerShell-Jbims7zS.js",
+#12 6.619       "assets/CustomerWorkspace-NDT6GKhZ.js",
+#12 6.619       "assets/EllipsisOutlined-BPs74lrM.js",
+#12 6.619       "assets/PlusOutlined-B1W8MSKa.js",
+#12 6.619       "assets/RightOutlined-BS4GEDyc.js",
+#12 6.619       "assets/SessionLogoutButton-B_tFD-6k.js",
+#12 6.619       "assets/Sider-BOrRpxEw.js",
+#12 6.619       "assets/SystemState-B_pCTC2z.js",
+#12 6.619       "assets/config-provider-mLSQG-zK.js",
+#12 6.619       "assets/context-CRtSfo_u.js",
+#12 6.619       "assets/csrf-CiJnUY0S.js",
+#12 6.619       "assets/humanSessionLifecycle-DO2cRqVK.js",
+#12 6.619       "assets/index-QkR9HVRx.css",
+#12 6.619       "assets/index-ZqxrUx-M.js",
+#12 6.619       "assets/jsx-runtime-DzOhj3eh.js",
+#12 6.619       "assets/menu-DTL9Rpzc.js",
+#12 6.619       "assets/modal-Bg2v8rC3.js",
+#12 6.619       "assets/omit-CM_Et8lu.js",
+#12 6.619       "assets/rolldown-runtime-D2aABDIb.js",
+#12 6.619       "assets/streamProtocol-CMMm3Ko1.js",
+#12 6.619       "assets/style-Cvj32mD0.js",
+#12 6.619       "assets/theme-BpPzi88F.js",
+#12 6.619       "assets/tooltip-wKhTRRtE.js",
+#12 6.619       "assets/useSize-RAbyxlwP.js",
+#12 6.619       "assets/useVariants-CqNXGrsu.js",
+#12 6.619       "assets/workspaceRegistry-AaEyzxvp.js"
+#12 6.619     ]
+#12 6.619   },
+#12 6.619   "lazyInternalRoutes": {
+#12 6.619     "src/shells/InternalShell.tsx": {
+#12 6.619       "bytes": 688721,
+#12 6.619       "gzipBytes": 224949,
+#12 6.619       "files": [
+#12 6.619         "assets/CloseOutlined-C7w4V8XU.js",
+#12 6.619         "assets/ContextIsolator-Delq7CPh.js",
+#12 6.619         "assets/EllipsisOutlined-BPs74lrM.js",
+#12 6.619         "assets/InternalShell-COMi_e-p.js",
+#12 6.619         "assets/PlusOutlined-B1W8MSKa.js",
+#12 6.619         "assets/RightOutlined-BS4GEDyc.js",
+#12 6.619         "assets/SessionLogoutButton-B_tFD-6k.js",
+#12 6.619         "assets/Sider-BOrRpxEw.js",
+#12 6.619         "assets/SystemState-B_pCTC2z.js",
+#12 6.619         "assets/config-provider-mLSQG-zK.js",
+#12 6.619         "assets/context-CRtSfo_u.js",
+#12 6.619         "assets/csrf-CiJnUY0S.js",
+#12 6.619         "assets/humanSessionLifecycle-DO2cRqVK.js",
+#12 6.619         "assets/index-QkR9HVRx.css",
+#12 6.619         "assets/index-ZqxrUx-M.js",
+#12 6.619         "assets/jsx-runtime-DzOhj3eh.js",
+#12 6.619         "assets/menu-DTL9Rpzc.js",
+#12 6.619         "assets/omit-CM_Et8lu.js",
+#12 6.619         "assets/rolldown-runtime-D2aABDIb.js",
+#12 6.619         "assets/tooltip-wKhTRRtE.js",
+#12 6.619         "assets/useSize-RAbyxlwP.js",
+#12 6.619         "assets/useVariants-CqNXGrsu.js",
+#12 6.619         "assets/workspaceRegistry-AaEyzxvp.js"
+#12 6.619       ]
+#12 6.619     },
+#12 6.619     "src/workspaces/InternalLanding.tsx": {
+#12 6.619       "bytes": 738793,
+#12 6.619       "gzipBytes": 242122,
+#12 6.619       "files": [
+#12 6.619         "assets/CloseOutlined-C7w4V8XU.js",
+#12 6.619         "assets/ContextIsolator-Delq7CPh.js",
+#12 6.619         "assets/EllipsisOutlined-BPs74lrM.js",
+#12 6.619         "assets/InternalLanding-B9DGO6z-.js",
+#12 6.619         "assets/PlusOutlined-B1W8MSKa.js",
+#12 6.619         "assets/RightOutlined-BS4GEDyc.js",
+#12 6.619         "assets/SystemState-B_pCTC2z.js",
+#12 6.619         "assets/config-provider-mLSQG-zK.js",
+#12 6.619         "assets/context-CRtSfo_u.js",
+#12 6.619         "assets/csrf-CiJnUY0S.js",
+#12 6.619         "assets/humanSessionLifecycle-DO2cRqVK.js",
+#12 6.619         "assets/index-QkR9HVRx.css",
+#12 6.619         "assets/index-ZqxrUx-M.js",
+#12 6.619         "assets/jsx-runtime-DzOhj3eh.js",
+#12 6.619         "assets/omit-CM_Et8lu.js",
+#12 6.619         "assets/rolldown-runtime-D2aABDIb.js",
+#12 6.619         "assets/style-Cvj32mD0.js",
+#12 6.619         "assets/theme-BpPzi88F.js",
+#12 6.619         "assets/tooltip-wKhTRRtE.js",
+#12 6.619         "assets/useSize-RAbyxlwP.js",
+#12 6.619         "assets/useVariants-CqNXGrsu.js",
+#12 6.619         "assets/workspaceRegistry-AaEyzxvp.js"
+#12 6.619       ]
+#12 6.619     },
+#12 6.619     "src/workspaces/SupportWorkspace.tsx": {
+#12 6.619       "bytes": 535702,
+#12 6.619       "gzipBytes": 177085,
+#12 6.619       "files": [
+#12 6.619         "assets/CloseOutlined-C7w4V8XU.js",
+#12 6.619         "assets/ContextIsolator-Delq7CPh.js",
+#12 6.619         "assets/SupportWorkspace-CYHJJUAX.js",
+#12 6.619         "assets/SystemState-B_pCTC2z.js",
+#12 6.619         "assets/config-provider-mLSQG-zK.js",
+#12 6.619         "assets/context-CRtSfo_u.js",
+#12 6.619         "assets/csrf-CiJnUY0S.js",
+#12 6.619         "assets/humanSessionLifecycle-DO2cRqVK.js",
+#12 6.619         "assets/jsx-runtime-DzOhj3eh.js",
+#12 6.619         "assets/modal-Bg2v8rC3.js",
+#12 6.619         "assets/omit-CM_Et8lu.js",
+#12 6.619         "assets/rolldown-runtime-D2aABDIb.js",
+#12 6.619         "assets/streamProtocol-CMMm3Ko1.js",
+#12 6.619         "assets/style-Cvj32mD0.js",
+#12 6.619         "assets/useSize-RAbyxlwP.js"
+#12 6.619       ]
+#12 6.619     },
+#12 6.619     "src/workspaces/ApprovalWorkspace.tsx": {
+#12 6.619       "bytes": 363764,
+#12 6.619       "gzipBytes": 120911,
+#12 6.619       "files": [
+#12 6.619         "assets/ApprovalWorkspace-D_X8gefr.js",
+#12 6.619         "assets/CloseOutlined-C7w4V8XU.js",
+#12 6.619         "assets/SystemState-B_pCTC2z.js",
+#12 6.619         "assets/csrf-CiJnUY0S.js",
+#12 6.619         "assets/humanSessionLifecycle-DO2cRqVK.js",
+#12 6.619         "assets/jsx-runtime-DzOhj3eh.js",
+#12 6.619         "assets/rolldown-runtime-D2aABDIb.js",
+#12 6.619         "assets/streamProtocol-CMMm3Ko1.js",
+#12 6.619         "assets/useSize-RAbyxlwP.js"
+#12 6.619       ]
+#12 6.619     }
+#12 6.619   },
+#12 6.619   "modelBoundaryLeakage": {
+#12 6.619     "scannedFiles": 35,
+#12 6.619     "forbiddenMatches": 0
+#12 6.619   }
+#12 6.619 }
+#12 DONE 6.8s
+
+#13 [test 1/1] RUN npm run check
+#13 0.371 
+#13 0.371 > customer-agent-frontend@0.1.0 check
+#13 0.371 > npm run format:check && npm run lint && npm run typecheck && npm test && npm run build:bundle && npm run bundle:evidence
+#13 0.371 
+#13 0.471 
+#13 0.471 > customer-agent-frontend@0.1.0 format:check
+#13 0.471 > prettier --check .
+#13 0.471 
+#13 0.552 Checking formatting...
+#13 2.390 All matched files use Prettier code style!
+#13 2.587 
+#13 2.587 > customer-agent-frontend@0.1.0 lint
+#13 2.587 > eslint . --max-warnings 0
+#13 2.587 
+#13 13.48 
+#13 13.48 > customer-agent-frontend@0.1.0 typecheck
+#13 13.48 > tsc --noEmit
+#13 13.48 
+#13 17.57 
+#13 17.57 > customer-agent-frontend@0.1.0 test
+#13 17.57 > vitest run
+#13 17.57 
+#13 17.84 
+#13 17.84  RUN  v4.1.0 /app
+#13 17.84 
+#13 21.47 stderr | src/App.test.tsx
+#13 21.47 Warning: [antdx: XNotification] Notification API is not supported in this environment.
+#13 21.47 
+#13 22.32 stderr | src/App.test.tsx > 客户帮助中心 > 自然语言受理确认后读取 PUBLIC_CONVERSATION v2 权威快照
+#13 22.32 `NaN` is an invalid value for the `height` css style property.
+#13 22.32 
+#13 27.62 Not implemented: Window's getComputedStyle() method: with pseudo-elements
+#13 30.25 Not implemented: Window's getComputedStyle() method: with pseudo-elements
+#13 31.00  ✓ src/App.test.tsx (54 tests) 9448ms
+#13 31.00      ✓ 自然语言受理确认后读取 PUBLIC_CONVERSATION v2 权威快照  448ms
+#13 31.00      ✓ 一次展示同订单的多个拟建问题与原子创建数量  408ms
+#13 31.00      ✓ 重新登录后列出归档受理并在恢复期间禁止直接确认  342ms
+#13 31.00      ✓ 转人工响应丢失时按稳定请求身份对账并从权威快照恢复  667ms
+#13 31.00      ✓ 转人工结果未知时只提供权威结果查询，不提供普通重复提交路径  871ms
+#13 34.28 Not implemented: Window's getComputedStyle() method: with pseudo-elements
+#13 35.17 Not implemented: Window's getComputedStyle() method: with pseudo-elements
+#13 35.82 Not implemented: Window's getComputedStyle() method: with pseudo-elements
+#13 40.17 Not implemented: Window's getComputedStyle() method: with pseudo-elements
+#13 41.33 Not implemented: Window's getComputedStyle() method: with pseudo-elements
+#13 46.70  ✓ src/SupportWorkbench.test.tsx (26 tests) 13945ms
+#13 46.70      ✓ 只在客服路由读取独立权威快照并呈现两种最小摘要  1155ms
+#13 46.70      ✓ 确认领取后才写入分配并分区呈现真实授权详情  879ms
+#13 46.70      ✓ assignment 失效后移除旧详情并重读权威详情  582ms
+#13 46.70      ✓ 从旧详情切换领取失败时立即移除不再监控的旧详情  1421ms
+#13 46.70      ✓ 异常断线也自动清除旧投影并重新读取权威快照  452ms
+#13 46.70      ✓ 刷新后从权威快照恢复当前负责工单详情  457ms
+#13 46.70      ✓ 刷新后恢复同一客服全部 ACTIVE 领取并可切换详情  674ms
+#13 46.70      ✓ 释放领取后清除详情并重新读取权威快照  774ms
+#13 46.70      ✓ HUMAN 模式下当前负责客服发送公开回复并使用稳定幂等键  1149ms
+#13 46.70      ✓ 发送结果不明确时只允许查询权威结果而不是重新发送  2199ms
+#13 46.70      ✓ AGENT 处理模式不展示人工公开回复 composer  308ms
+#13 46.70      ✓ 重新登录后不会沿用上一主体未确认发送请求  420ms
+#13 46.70      ✓ HUMAN 模式展示 Spring 计算的标准补偿并提交审批  375ms
+#13 46.70      ✓ 标准补偿提交结果未知时查询 Spring 权威结果  931ms
+#13 46.70      ✓ 查询 404 后可用同一请求身份重试提交  862ms
+#13 46.70      ✓ 没有标准方案时展示 empty，并允许独立例外补偿申请  327ms
+#13 49.76 stderr | src/Routing.test.tsx > Issue #73 静态路由与两个界面壳 > 根据当前身份接口为 { id: 'customer-demo', displayName: '演示客户', subjectType: 'CUSTOMER', roles: [ 'CUSTOMER' ], capabilities: [ 'CUSTOMER_HELP_ACCESS' ] } 选择静态默认落点
+#13 49.76 Warning: [antdx: XNotification] Notification API is not supported in this environment.
+#13 49.76 
+#13 54.56 stderr | src/Routing.test.tsx > Issue #191 状态画廊与独立错误路由 > 状态画廊展示全部约定状态且不请求业务数据
+#13 54.56 Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+#13 54.56 Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+#13 54.56 Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+#13 54.56 Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+#13 54.56 Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+#13 54.56 Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+#13 54.56 Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+#13 54.56 Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+#13 54.56 Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+#13 54.56 Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+#13 54.56 
+#13 57.77  ✓ src/Routing.test.tsx (33 tests) 9446ms
+#13 57.77      ✓ 根据当前身份接口为 { id: 'customer-demo', displayName: '演示客户', subjectType: 'CUSTOMER', roles: [ 'CUSTOMER' ], capabilities: [ 'CUSTOMER_HELP_ACCESS' ] } 选择静态默认落点  1434ms
+#13 57.77      ✓ 内部 Shell 明确当前工作人员且不混入客户导航  343ms
+#13 57.77      ✓ 内部菜单只投影 { id: 'internal-demo', displayName: '演示双角色工作人员', subjectType: 'INTERNAL', roles: [ 'SUPPORT', 'APPROVER' ], capabilities: [ 'SUPPORT_WORKBENCH_ACCESS', 'APPROVAL_WORKBENCH_ACCESS' ] } 当前拥有的 capability  714ms
+#13 57.77      ✓ 跨标签通知丢失时由 SSE 403 重校验 Session 并卸载旧客户投影  434ms
+#13 57.77      ✓ 状态画廊展示全部约定状态且不请求业务数据  1211ms
+#13 57.77      ✓ 帮助文档是客户壳一致入口，并连接真实说明页  730ms
+#13 57.77      ✓ 未实现帮助条目只显示开发中且不发出业务写请求  523ms
+#13 61.44  ✓ src/ApprovalWorkbench.test.tsx (13 tests) 2086ms
+#13 61.44      ✓ 连接期间租约被撤销后立即清除审批证据和操作并返回队列  398ms
+#13 61.44      ✓ 瞬时断线使用同一租约和游标重新读取权威快照而不暴露额外能力  330ms
+#13 64.11 stderr | src/Issue29.e2e.test.tsx
+#13 64.11 Warning: [antdx: XNotification] Notification API is not supported in this environment.
+#13 64.11 
+#13 64.14  ✓ src/Issue29.e2e.test.tsx (2 tests | 1 skipped) 4ms
+#13 66.38  ✓ src/IntakeAssistancePanel.test.tsx (3 tests) 716ms
+#13 66.38      ✓ 领取前只显示裁剪摘要，领取后修正候选并等待客户确认  470ms
+#13 69.56  ✓ src/LoginPage.test.tsx (4 tests) 1671ms
+#13 69.56      ✓ 刷新内部登录入口时从服务端 Session 恢复唯一当前主体  1095ms
+#13 71.78  ✓ src/OrderTicketGroups.test.tsx (8 tests) 705ms
+#13 71.78      ✓ 按订单展示独立工单、受控进度和多个待客户事项  320ms
+#13 74.45  ✓ src/KnowledgeWorkspace.test.tsx (5 tests) 1179ms
+#13 74.45      ✓ 读取中显示 loading，就绪后展示真实检索结果  316ms
+#13 74.45      ✓ 旧版本详情标明仅供审计，开发中入口不写入  555ms
+#13 77.02 stderr | src/AutoResolution.test.tsx
+#13 77.02 Warning: [antdx: XNotification] Notification API is not supported in this environment.
+#13 77.02 
+#13 77.57 stderr | src/AutoResolution.test.tsx > Issue #162 客户自动解决 > 取消带候选期限及 CSRF，响应 200 后重新读取权威状态
+#13 77.57 `NaN` is an invalid value for the `height` css style property.
+#13 77.57 
+#13 78.30  ✓ src/AutoResolution.test.tsx (5 tests) 1257ms
+#13 78.30      ✓ 取消带候选期限及 CSRF，响应 200 后重新读取权威状态  412ms
+#13 79.84  ↓ src/App.integration.test.tsx (2 tests | 2 skipped)
+#13 80.46  ✓ src/humanSessionLifecycle.test.ts (5 tests) 11ms
+#13 82.35  ✓ src/workspaces/CustomerHelpDocs.test.tsx (5 tests) 366ms
+#13 84.11  ✓ src/components/CustomerHelpTrust.test.tsx (2 tests) 285ms
+#13 84.12 
+#13 84.12  Test Files  13 passed | 1 skipped (14)
+#13 84.12       Tests  164 passed | 3 skipped (167)
+#13 84.12    Start at  16:32:01
+#13 84.12    Duration  66.28s (transform 1.11s, setup 1.27s, import 16.86s, tests 41.12s, environment 5.55s)
+#13 84.12 
+#13 84.29 
+#13 84.29 > customer-agent-frontend@0.1.0 build:bundle
+#13 84.29 > vite build
+#13 84.29 
+#13 84.44 vite v8.2.1 building client environment for production...
+#13 84.45 [2K
+transforming...✓ 6086 modules transformed.
+#13 85.06 rendering chunks...
+#13 85.20 computing gzip size...
+#13 85.21 dist/index.html                                  1.58 kB │ gzip:  0.57 kB
+#13 85.21 dist/.vite/manifest.json                        10.76 kB │ gzip:  1.34 kB
+#13 85.21 dist/assets/index-QkR9HVRx.css                  64.13 kB │ gzip: 12.49 kB
+#13 85.21 dist/assets/omit-CM_Et8lu.js                     0.11 kB │ gzip:  0.12 kB
+#13 85.21 dist/assets/csrf-CiJnUY0S.js                     0.38 kB │ gzip:  0.26 kB
+#13 85.21 dist/assets/useVariants-CqNXGrsu.js              0.44 kB │ gzip:  0.29 kB
+#13 85.21 dist/assets/rolldown-runtime-D2aABDIb.js         0.68 kB │ gzip:  0.41 kB
+#13 85.21 dist/assets/RightOutlined-BS4GEDyc.js            0.83 kB │ gzip:  0.57 kB
+#13 85.21 dist/assets/CustomerShell-Jbims7zS.js            0.88 kB │ gzip:  0.47 kB
+#13 85.21 dist/assets/streamProtocol-CMMm3Ko1.js           1.02 kB │ gzip:  0.59 kB
+#13 85.21 dist/assets/CloseOutlined-C7w4V8XU.js            1.31 kB │ gzip:  0.73 kB
+#13 85.21 dist/assets/InternalShell-COMi_e-p.js            1.48 kB │ gzip:  0.74 kB
+#13 85.21 dist/assets/style-Cvj32mD0.js                    1.97 kB │ gzip:  0.82 kB
+#13 85.21 dist/assets/SessionLogoutButton-B_tFD-6k.js      2.04 kB │ gzip:  1.12 kB
+#13 85.21 dist/assets/theme-BpPzi88F.js                    2.10 kB │ gzip:  1.03 kB
+#13 85.21 dist/assets/CustomerHelpDocs-ZNiDvmPg.js         2.98 kB │ gzip:  1.44 kB
+#13 85.21 dist/assets/PlusOutlined-B1W8MSKa.js             3.79 kB │ gzip:  1.75 kB
+#13 85.21 dist/assets/CustomerHelpTrust-CYm0a-j-.js        3.99 kB │ gzip:  1.62 kB
+#13 85.21 dist/assets/humanSessionLifecycle-DO2cRqVK.js    4.59 kB │ gzip:  1.61 kB
+#13 85.21 dist/assets/Sider-BOrRpxEw.js                    7.36 kB │ gzip:  3.04 kB
+#13 85.21 dist/assets/ContextIsolator-Delq7CPh.js          7.39 kB │ gzip:  2.68 kB
+#13 85.21 dist/assets/useSize-RAbyxlwP.js                  8.25 kB │ gzip:  3.56 kB
+#13 85.21 dist/assets/config-provider-mLSQG-zK.js         10.82 kB │ gzip:  4.23 kB
+#13 85.21 dist/assets/tooltip-wKhTRRtE.js                 14.82 kB │ gzip:  5.37 kB
+#13 85.21 dist/assets/ApprovalWorkspace-D_X8gefr.js       16.51 kB │ gzip:  5.03 kB
+#13 85.21 dist/assets/KnowledgeWorkspace-CK0cKjQt.js      19.11 kB │ gzip:  5.69 kB
+#13 85.21 dist/assets/menu-DTL9Rpzc.js                    23.90 kB │ gzip:  7.10 kB
+#13 85.21 dist/assets/EllipsisOutlined-BPs74lrM.js        29.00 kB │ gzip: 10.82 kB
+#13 85.21 dist/assets/workspaceRegistry-AaEyzxvp.js       39.60 kB │ gzip: 14.51 kB
+#13 85.21 dist/assets/SupportWorkspace-CYHJJUAX.js        44.81 kB │ gzip: 12.33 kB
+#13 85.21 dist/assets/modal-Bg2v8rC3.js                   54.60 kB │ gzip: 17.74 kB
+#13 85.21 dist/assets/SystemState-B_pCTC2z.js             62.63 kB │ gzip: 20.27 kB
+#13 85.21 dist/assets/index-ZqxrUx-M.js                   67.98 kB │ gzip: 21.76 kB
+#13 85.21 dist/assets/context-CRtSfo_u.js                 68.72 kB │ gzip: 23.66 kB
+#13 85.21 dist/assets/InternalLanding-B9DGO6z-.js         80.79 kB │ gzip: 27.38 kB
+#13 85.21 dist/assets/jsx-runtime-DzOhj3eh.js            268.37 kB │ gzip: 89.50 kB
+#13 85.21 dist/assets/CustomerWorkspace-NDT6GKhZ.js      287.15 kB │ gzip: 87.73 kB
+#13 85.21 
+#13 85.21 ✓ built in 768ms
+#13 85.38 
+#13 85.38 > customer-agent-frontend@0.1.0 bundle:evidence
+#13 85.38 > node scripts/assert-bundle-evidence.mjs
+#13 85.38 
+#13 85.52 {
+#13 85.52   "generatedFrom": "dist/.vite/manifest.json",
+#13 85.52   "productionEntry": {
+#13 85.52     "bytes": 630857,
+#13 85.52     "gzipBytes": 204379,
+#13 85.52     "files": [
+#13 85.52       "assets/CloseOutlined-C7w4V8XU.js",
+#13 85.52       "assets/EllipsisOutlined-BPs74lrM.js",
+#13 85.52       "assets/PlusOutlined-B1W8MSKa.js",
+#13 85.52       "assets/SystemState-B_pCTC2z.js",
+#13 85.52       "assets/config-provider-mLSQG-zK.js",
+#13 85.52       "assets/context-CRtSfo_u.js",
+#13 85.52       "assets/csrf-CiJnUY0S.js",
+#13 85.52       "assets/humanSessionLifecycle-DO2cRqVK.js",
+#13 85.52       "assets/index-QkR9HVRx.css",
+#13 85.52       "assets/index-ZqxrUx-M.js",
+#13 85.52       "assets/jsx-runtime-DzOhj3eh.js",
+#13 85.52       "assets/omit-CM_Et8lu.js",
+#13 85.52       "assets/rolldown-runtime-D2aABDIb.js",
+#13 85.52       "assets/useSize-RAbyxlwP.js",
+#13 85.52       "assets/useVariants-CqNXGrsu.js",
+#13 85.52       "assets/workspaceRegistry-AaEyzxvp.js"
+#13 85.52     ]
+#13 85.52   },
+#13 85.52   "customerFirstScreen": {
+#13 85.52     "bytes": 1038981,
+#13 85.52     "gzipBytes": 333486,
+#13 85.52     "files": [
+#13 85.52       "assets/CloseOutlined-C7w4V8XU.js",
+#13 85.52       "assets/ContextIsolator-Delq7CPh.js",
+#13 85.52       "assets/CustomerHelpTrust-CYm0a-j-.js",
+#13 85.52       "assets/CustomerShell-Jbims7zS.js",
+#13 85.52       "assets/CustomerWorkspace-NDT6GKhZ.js",
+#13 85.52       "assets/EllipsisOutlined-BPs74lrM.js",
+#13 85.52       "assets/PlusOutlined-B1W8MSKa.js",
+#13 85.52       "assets/RightOutlined-BS4GEDyc.js",
+#13 85.52       "assets/SessionLogoutButton-B_tFD-6k.js",
+#13 85.52       "assets/Sider-BOrRpxEw.js",
+#13 85.52       "assets/SystemState-B_pCTC2z.js",
+#13 85.52       "assets/config-provider-mLSQG-zK.js",
+#13 85.52       "assets/context-CRtSfo_u.js",
+#13 85.52       "assets/csrf-CiJnUY0S.js",
+#13 85.52       "assets/humanSessionLifecycle-DO2cRqVK.js",
+#13 85.52       "assets/index-QkR9HVRx.css",
+#13 85.52       "assets/index-ZqxrUx-M.js",
+#13 85.52       "assets/jsx-runtime-DzOhj3eh.js",
+#13 85.52       "assets/menu-DTL9Rpzc.js",
+#13 85.52       "assets/modal-Bg2v8rC3.js",
+#13 85.52       "assets/omit-CM_Et8lu.js",
+#13 85.52       "assets/rolldown-runtime-D2aABDIb.js",
+#13 85.52       "assets/streamProtocol-CMMm3Ko1.js",
+#13 85.52       "assets/style-Cvj32mD0.js",
+#13 85.52       "assets/theme-BpPzi88F.js",
+#13 85.52       "assets/tooltip-wKhTRRtE.js",
+#13 85.52       "assets/useSize-RAbyxlwP.js",
+#13 85.52       "assets/useVariants-CqNXGrsu.js",
+#13 85.52       "assets/workspaceRegistry-AaEyzxvp.js"
+#13 85.52     ]
+#13 85.52   },
+#13 85.52   "lazyInternalRoutes": {
+#13 85.52     "src/shells/InternalShell.tsx": {
+#13 85.52       "bytes": 688721,
+#13 85.52       "gzipBytes": 224949,
+#13 85.52       "files": [
+#13 85.52         "assets/CloseOutlined-C7w4V8XU.js",
+#13 85.52         "assets/ContextIsolator-Delq7CPh.js",
+#13 85.52         "assets/EllipsisOutlined-BPs74lrM.js",
+#13 85.52         "assets/InternalShell-COMi_e-p.js",
+#13 85.52         "assets/PlusOutlined-B1W8MSKa.js",
+#13 85.52         "assets/RightOutlined-BS4GEDyc.js",
+#13 85.52         "assets/SessionLogoutButton-B_tFD-6k.js",
+#13 85.52         "assets/Sider-BOrRpxEw.js",
+#13 85.52         "assets/SystemState-B_pCTC2z.js",
+#13 85.52         "assets/config-provider-mLSQG-zK.js",
+#13 85.52         "assets/context-CRtSfo_u.js",
+#13 85.52         "assets/csrf-CiJnUY0S.js",
+#13 85.52         "assets/humanSessionLifecycle-DO2cRqVK.js",
+#13 85.52         "assets/index-QkR9HVRx.css",
+#13 85.52         "assets/index-ZqxrUx-M.js",
+#13 85.52         "assets/jsx-runtime-DzOhj3eh.js",
+#13 85.52         "assets/menu-DTL9Rpzc.js",
+#13 85.52         "assets/omit-CM_Et8lu.js",
+#13 85.52         "assets/rolldown-runtime-D2aABDIb.js",
+#13 85.52         "assets/tooltip-wKhTRRtE.js",
+#13 85.52         "assets/useSize-RAbyxlwP.js",
+#13 85.52         "assets/useVariants-CqNXGrsu.js",
+#13 85.52         "assets/workspaceRegistry-AaEyzxvp.js"
+#13 85.52       ]
+#13 85.52     },
+#13 85.52     "src/workspaces/InternalLanding.tsx": {
+#13 85.52       "bytes": 738793,
+#13 85.52       "gzipBytes": 242122,
+#13 85.52       "files": [
+#13 85.52         "assets/CloseOutlined-C7w4V8XU.js",
+#13 85.52         "assets/ContextIsolator-Delq7CPh.js",
+#13 85.52         "assets/EllipsisOutlined-BPs74lrM.js",
+#13 85.52         "assets/InternalLanding-B9DGO6z-.js",
+#13 85.52         "assets/PlusOutlined-B1W8MSKa.js",
+#13 85.52         "assets/RightOutlined-BS4GEDyc.js",
+#13 85.52         "assets/SystemState-B_pCTC2z.js",
+#13 85.52         "assets/config-provider-mLSQG-zK.js",
+#13 85.52         "assets/context-CRtSfo_u.js",
+#13 85.52         "assets/csrf-CiJnUY0S.js",
+#13 85.52         "assets/humanSessionLifecycle-DO2cRqVK.js",
+#13 85.52         "assets/index-QkR9HVRx.css",
+#13 85.52         "assets/index-ZqxrUx-M.js",
+#13 85.52         "assets/jsx-runtime-DzOhj3eh.js",
+#13 85.52         "assets/omit-CM_Et8lu.js",
+#13 85.52         "assets/rolldown-runtime-D2aABDIb.js",
+#13 85.52         "assets/style-Cvj32mD0.js",
+#13 85.52         "assets/theme-BpPzi88F.js",
+#13 85.52         "assets/tooltip-wKhTRRtE.js",
+#13 85.52         "assets/useSize-RAbyxlwP.js",
+#13 85.52         "assets/useVariants-CqNXGrsu.js",
+#13 85.52         "assets/workspaceRegistry-AaEyzxvp.js"
+#13 85.52       ]
+#13 85.52     },
+#13 85.52     "src/workspaces/SupportWorkspace.tsx": {
+#13 85.52       "bytes": 535702,
+#13 85.52       "gzipBytes": 177085,
+#13 85.52       "files": [
+#13 85.52         "assets/CloseOutlined-C7w4V8XU.js",
+#13 85.52         "assets/ContextIsolator-Delq7CPh.js",
+#13 85.52         "assets/SupportWorkspace-CYHJJUAX.js",
+#13 85.52         "assets/SystemState-B_pCTC2z.js",
+#13 85.52         "assets/config-provider-mLSQG-zK.js",
+#13 85.52         "assets/context-CRtSfo_u.js",
+#13 85.52         "assets/csrf-CiJnUY0S.js",
+#13 85.52         "assets/humanSessionLifecycle-DO2cRqVK.js",
+#13 85.52         "assets/jsx-runtime-DzOhj3eh.js",
+#13 85.52         "assets/modal-Bg2v8rC3.js",
+#13 85.52         "assets/omit-CM_Et8lu.js",
+#13 85.52         "assets/rolldown-runtime-D2aABDIb.js",
+#13 85.52         "assets/streamProtocol-CMMm3Ko1.js",
+#13 85.52         "assets/style-Cvj32mD0.js",
+#13 85.52         "assets/useSize-RAbyxlwP.js"
+#13 85.52       ]
+#13 85.52     },
+#13 85.52     "src/workspaces/ApprovalWorkspace.tsx": {
+#13 85.52       "bytes": 363764,
+#13 85.52       "gzipBytes": 120911,
+#13 85.52       "files": [
+#13 85.52         "assets/ApprovalWorkspace-D_X8gefr.js",
+#13 85.52         "assets/CloseOutlined-C7w4V8XU.js",
+#13 85.52         "assets/SystemState-B_pCTC2z.js",
+#13 85.52         "assets/csrf-CiJnUY0S.js",
+#13 85.52         "assets/humanSessionLifecycle-DO2cRqVK.js",
+#13 85.52         "assets/jsx-runtime-DzOhj3eh.js",
+#13 85.52         "assets/rolldown-runtime-D2aABDIb.js",
+#13 85.52         "assets/streamProtocol-CMMm3Ko1.js",
+#13 85.52         "assets/useSize-RAbyxlwP.js"
+#13 85.52       ]
+#13 85.52     }
+#13 85.52   },
+#13 85.52   "modelBoundaryLeakage": {
+#13 85.52     "scannedFiles": 35,
+#13 85.52     "forbiddenMatches": 0
+#13 85.52   }
+#13 85.52 }
+#13 DONE 85.7s
+
+#14 exporting to image
+#14 exporting layers
+#14 exporting layers 0.2s done
+#14 writing image sha256:71de92cb8b94e8d1ee4d378599303f7d0e6da95dda8680a071f39dcc99a5b0aa done
+#14 naming to docker.io/customer-agent/frontend-test:gate-issue190-scope-runtime-20260901a done
+#14 DONE 0.2s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 877B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [runtime 1/5] FROM docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#5 DONE 0.0s
+
+#6 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 26.48kB 0.0s done
+#7 DONE 0.0s
+
+#8 [build 2/6] WORKDIR /workspace
+#8 CACHED
+
+#9 [build 5/6] COPY src ./src
+#9 CACHED
+
+#10 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#10 CACHED
+
+#11 [build 4/6] COPY config ./config
+#11 CACHED
+
+#12 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#12 CACHED
+
+#13 [runtime 3/5] RUN useradd --system --uid 10001 --create-home app
+#13 CACHED
+
+#14 [runtime 2/5] RUN apt-get update     && apt-get install --yes --no-install-recommends curl     && rm -rf /var/lib/apt/lists/*
+#14 CACHED
+
+#15 [runtime 4/5] WORKDIR /app
+#15 CACHED
+
+#16 [runtime 5/5] COPY --from=build /workspace/build/libs/customer-agent-backend-0.1.0-SNAPSHOT.jar app.jar
+#16 DONE 0.1s
+
+#17 exporting to image
+#17 exporting layers 0.1s done
+#17 writing image sha256:87915adc6aae85b3ac6b04d0bb8e39c63e39e01898edaffbac2666d2c3abcf03 done
+#17 naming to docker.io/customer-agent/backend:gate-issue190-scope-runtime-20260901a done
+#17 DONE 0.1s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.04kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.13.14-slim-bookworm
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 96B done
+#3 DONE 0.0s
+
+#4 [base 1/7] FROM docker.io/library/python:3.13.14-slim-bookworm
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 6.46kB 0.0s done
+#5 DONE 0.0s
+
+#6 [base 3/7] RUN apt-get update     && apt-get install --yes --no-install-recommends libatomic1     && rm -rf /var/lib/apt/lists/*     && pip install --no-cache-dir uv==0.8.22
+#6 CACHED
+
+#7 [base 6/7] COPY langgraph.json ./
+#7 CACHED
+
+#8 [base 2/7] WORKDIR /app
+#8 CACHED
+
+#9 [base 5/7] RUN uv sync --frozen
+#9 CACHED
+
+#10 [base 4/7] COPY pyproject.toml uv.lock ./
+#10 CACHED
+
+#11 [base 7/7] COPY src ./src
+#11 CACHED
+
+#12 [runtime 1/2] RUN uv sync --frozen --no-dev
+#12 0.409    Building customer-agent-baseline @ file:///app
+#12 2.129       Built customer-agent-baseline @ file:///app
+#12 2.133 Prepared 1 package in 1.72s
+#12 3.888 Uninstalled 13 packages in 1.75s
+#12 3.890 Installed 1 package in 1ms
+#12 3.890  ~ customer-agent-baseline==0.1.0 (from file:///app)
+#12 3.890  - iniconfig==2.3.0
+#12 3.890  - joblib==1.5.3
+#12 3.890  - nodeenv==1.10.0
+#12 3.890  - pluggy==1.6.0
+#12 3.890  - pygments==2.20.0
+#12 3.890  - pyright==1.1.411
+#12 3.890  - pytest==8.4.2
+#12 3.890  - pytest-asyncio==1.1.0
+#12 3.890  - ruff==0.16.2
+#12 3.890  - scikit-learn==1.7.2
+#12 3.891  - scipy==1.18.1
+#12 3.891  - threadpoolctl==3.6.0
+#12 DONE 3.9s
+
+#13 [runtime 2/2] RUN useradd --system --uid 10002 --create-home agent && chown -R agent:agent /app
+#13 0.401 useradd warning: agent's uid 10002 is greater than SYS_UID_MAX 999
+#13 DONE 37.3s
+
+#14 exporting to image
+#14 exporting layers
+#14 exporting layers 4.8s done
+#14 writing image sha256:91d04ce678d75b2d7c4d6fee985630ac0e668aae5d767bf86e4f15af0eee049f done
+#14 naming to docker.io/customer-agent/agent:gate-issue190-scope-runtime-20260901a done
+#14 DONE 4.8s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/nginx:1.29.4-alpine
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [build 1/8] FROM docker.io/library/node:24.19.0-bookworm-slim
+#5 DONE 0.0s
+
+#6 [runtime 1/3] FROM docker.io/library/nginx:1.29.4-alpine
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 3.31kB done
+#7 DONE 0.0s
+
+#8 [build 4/8] RUN npm ci
+#8 CACHED
+
+#9 [build 2/8] WORKDIR /app
+#9 CACHED
+
+#10 [build 7/8] COPY src ./src
+#10 CACHED
+
+#11 [build 6/8] COPY scripts ./scripts
+#11 CACHED
+
+#12 [build 3/8] COPY package.json package-lock.json ./
+#12 CACHED
+
+#13 [build 5/8] COPY tsconfig.json vite.config.ts index.html eslint.config.js .prettierrc.json .prettierignore ./
+#13 CACHED
+
+#14 [build 8/8] RUN npm run build
+#14 CACHED
+
+#15 [runtime 2/3] COPY nginx.conf /etc/nginx/conf.d/default.conf
+#15 CACHED
+
+#16 [runtime 3/3] COPY --from=build /app/dist /usr/share/nginx/html
+#16 DONE 0.0s
+
+#17 exporting to image
+#17 exporting layers 0.0s done
+#17 writing image sha256:e4b9aee858370deab00a44f0b43c25e697b28112291f8abced2b4e177038234e done
+#17 naming to docker.io/customer-agent/frontend:gate-issue190-scope-runtime-20260901a done
+#17 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [browser-test  1/10] FROM docker.io/library/node:24.19.0-bookworm-slim
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 172.44kB 0.0s done
+#5 DONE 0.0s
+
+#6 [browser-test  5/10] RUN rm -f /etc/apt/apt.conf.d/docker-clean     && printf 'Acquire::Retries "10";\nAcquire::http::Timeout "30";\nBinary::apt-get::APT::Keep-Downloaded-Packages "true";\n'     > /etc/apt/apt.conf.d/80-playwright-retries
+#6 CACHED
+
+#7 [browser-test  3/10] COPY package.json package-lock.json ./
+#7 CACHED
+
+#8 [browser-test  2/10] WORKDIR /app
+#8 CACHED
+
+#9 [browser-test  7/10] RUN for attempt in 1 2 3; do       npx playwright install chromium && exit 0;       echo "Playwright Chromium download attempt ${attempt} failed";     done;     exit 1
+#9 CACHED
+
+#10 [browser-test  4/10] RUN npm ci
+#10 CACHED
+
+#11 [browser-test  6/10] RUN --mount=type=cache,target=/var/cache/apt,sharing=locked     --mount=type=cache,target=/var/lib/apt,sharing=locked     for attempt in 1 2 3 4 5; do       npx playwright install-deps chromium         && apt-get install -y --no-install-recommends postgresql-client         && exit 0;       echo "Playwright system dependency attempt ${attempt} failed";     done;     exit 1
+#11 CACHED
+
+#12 [browser-test  8/10] COPY playwright.config.ts ./
+#12 CACHED
+
+#13 [browser-test  9/10] COPY e2e ./e2e
+#13 DONE 0.0s
+
+#14 [browser-test 10/10] COPY src/sensitive-content-patterns.json ./src/sensitive-content-patterns.json
+#14 DONE 0.0s
+
+#15 exporting to image
+#15 exporting layers 0.0s done
+#15 writing image sha256:421f690e1f6313fa909e11729d535c055b753ab31a10eafb7b209def9249affd done
+#15 naming to docker.io/customer-agent/frontend-browser-test:gate-issue190-scope-runtime-20260901a done
+#15 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/nginx:1.29.4-alpine
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [browser-server 1/4] FROM docker.io/library/nginx:1.29.4-alpine
+#5 DONE 0.0s
+
+#6 [build 1/8] FROM docker.io/library/node:24.19.0-bookworm-slim
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 644.96kB 0.0s done
+#7 DONE 0.0s
+
+#8 [build 5/8] COPY tsconfig.json vite.config.ts index.html eslint.config.js .prettierrc.json .prettierignore ./
+#8 CACHED
+
+#9 [build 4/8] RUN npm ci
+#9 CACHED
+
+#10 [build 3/8] COPY package.json package-lock.json ./
+#10 CACHED
+
+#11 [build 2/8] WORKDIR /app
+#11 CACHED
+
+#12 [build 7/8] COPY src ./src
+#12 CACHED
+
+#13 [build 6/8] COPY scripts ./scripts
+#13 CACHED
+
+#14 [build 8/8] RUN npm run build
+#14 CACHED
+
+#15 [browser-server 2/4] RUN apk add --no-cache openssl     && mkdir -p /etc/nginx/tls     && openssl req -x509 -newkey rsa:2048 -nodes -days 1        -subj '/CN=browser-frontend'        -addext 'subjectAltName=DNS:browser-frontend'        -keyout /etc/nginx/tls/key.pem        -out /etc/nginx/tls/cert.pem
+#15 CACHED
+
+#16 [browser-server 3/4] COPY nginx.browser.conf /etc/nginx/conf.d/default.conf
+#16 CACHED
+
+#17 [browser-server 4/4] COPY --from=build /app/dist /usr/share/nginx/html
+#17 DONE 0.0s
+
+#18 exporting to image
+#18 exporting layers 0.0s done
+#18 writing image sha256:be39b95b833010a5ee9fc507db41e0a25067e60f75e05c40a1ded43f79167b06 done
+#18 naming to docker.io/customer-agent/frontend-browser-server:gate-issue190-scope-runtime-20260901a done
+#18 DONE 0.0s
+ Network customer-agent-issue190-scope-runtime-20260901a_data  Creating
+ Network customer-agent-issue190-scope-runtime-20260901a_data  Created
+ Network customer-agent-issue190-scope-runtime-20260901a_services  Creating
+ Network customer-agent-issue190-scope-runtime-20260901a_services  Created
+ Network customer-agent-issue190-scope-runtime-20260901a_edge  Creating
+ Network customer-agent-issue190-scope-runtime-20260901a_edge  Created
+ Network customer-agent-issue190-scope-runtime-20260901a_provider-egress  Creating
+ Network customer-agent-issue190-scope-runtime-20260901a_provider-egress  Created
+ Volume "customer-agent-issue190-scope-runtime-20260901a_postgres-data"  Creating
+ Volume "customer-agent-issue190-scope-runtime-20260901a_postgres-data"  Created
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Creating
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Created
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Creating
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Creating
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Created
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Created
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Creating
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Created
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Creating
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Created
+ Container customer-agent-issue190-scope-runtime-20260901a-frontend-1  Creating
+ Container customer-agent-issue190-scope-runtime-20260901a-compensation-executor-1  Creating
+ Container customer-agent-issue190-scope-runtime-20260901a-frontend-1  Created
+ Container customer-agent-issue190-scope-runtime-20260901a-compensation-executor-1  Created
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Starting
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Started
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Healthy
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Healthy
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Starting
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Starting
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Started
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Started
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Exited
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Starting
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Started
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Exited
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Healthy
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Starting
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Started
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Healthy
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Healthy
+ Container customer-agent-issue190-scope-runtime-20260901a-frontend-1  Starting
+ Container customer-agent-issue190-scope-runtime-20260901a-compensation-executor-1  Starting
+ Container customer-agent-issue190-scope-runtime-20260901a-compensation-executor-1  Started
+ Container customer-agent-issue190-scope-runtime-20260901a-frontend-1  Started
+ Container customer-agent-issue190-scope-runtime-20260901a-compensation-executor-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-frontend-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Exited
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Healthy
+ Container customer-agent-issue190-scope-runtime-20260901a-compensation-executor-1  Healthy
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Healthy
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Healthy
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Exited
+ Container customer-agent-issue190-scope-runtime-20260901a-frontend-1  Healthy
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+DO
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-frontend-1  Creating
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-frontend-1  Created
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-frontend-1  Starting
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-frontend-1  Started
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-frontend-1  Waiting
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-frontend-1  Healthy
+ Volume "customer-agent-issue190-scope-runtime-20260901a_browser-artifacts"  Creating
+ Volume "customer-agent-issue190-scope-runtime-20260901a_browser-artifacts"  Created
+
+> customer-agent-frontend@0.1.0 test:browser
+> playwright test --workers=1 e2e/issue190.hybrid-retrieval.spec.ts
+
+
+Running 6 tests using 1 worker
+
+[1/6] e2e/issue190.hybrid-retrieval.spec.ts:10:3 › Issue #190 真实混合检索与失效状态 1440
+[2/6] e2e/issue190.hybrid-retrieval.spec.ts:10:3 › Issue #190 真实混合检索与失效状态 390
+[3/6] e2e/issue190.hybrid-retrieval.spec.ts:83:1 › Issue #190 真实会话拒绝客户与无知识读权限人员
+[4/6] e2e/issue190.hybrid-retrieval.spec.ts:103:1 › Issue #190 无答案问题仍可返回授权候选而不冒充充分性判断
+[5/6] e2e/issue190.hybrid-retrieval.spec.ts:124:1 › Issue #190 显式未授权范围返回权限错误而非空结果
+  1) e2e/issue190.hybrid-retrieval.spec.ts:124:1 › Issue #190 显式未授权范围返回权限错误而非空结果 ───────────────────
+
+    Test timeout of 30000ms exceeded.
+
+    Error: browserContext.close: Protocol error (Target.disposeBrowserContext): Failed to find context with id 6047973ECB0D914BD1C9CDDAC6378A5A
+
+      142 |     await expect(panel.getByRole("list", { name: "RRF 检索片段" })).toHaveCount(0);
+      143 |   } finally {
+    > 144 |     await context.close();
+          |     ^
+      145 |   }
+      146 | });
+      147 |
+        at /app/e2e/issue190.hybrid-retrieval.spec.ts:144:5
+
+    Error Context: test-results/issue190.hybrid-retrieval-Issue-190-显式未授权范围返回权限错误而非空结果/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/issue190.hybrid-retrieval-Issue-190-显式未授权范围返回权限错误而非空结果/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/issue190.hybrid-retrieval-Issue-190-显式未授权范围返回权限错误而非空结果/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[6/6] e2e/issue190.hybrid-retrieval.spec.ts:148:1 › Issue #190 两路排名前排除高分草稿和退役版本
+  1 failed
+    e2e/issue190.hybrid-retrieval.spec.ts:124:1 › Issue #190 显式未授权范围返回权限错误而非空结果 ────────────────────
+  5 passed (40.9s)
+
+浏览器聚焦失败: 1
+ Container customer-agent-issue190-scope-runtime-20260901a-frontend-1  Stopping
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-frontend-1  Stopping
+ Container customer-agent-issue190-scope-runtime-20260901a-compensation-executor-1  Stopping
+ Container customer-agent-issue190-scope-runtime-20260901a-frontend-1  Stopped
+ Container customer-agent-issue190-scope-runtime-20260901a-frontend-1  Removing
+ Container customer-agent-issue190-scope-runtime-20260901a-frontend-1  Removed
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-frontend-1  Stopped
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-frontend-1  Removing
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-frontend-1  Removed
+ Container customer-agent-issue190-scope-runtime-20260901a-compensation-executor-1  Stopped
+ Container customer-agent-issue190-scope-runtime-20260901a-compensation-executor-1  Removing
+ Container customer-agent-issue190-scope-runtime-20260901a-compensation-executor-1  Removed
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Stopping
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Stopped
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Removing
+ Container customer-agent-issue190-scope-runtime-20260901a-backend-1  Removed
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Stopping
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Stopping
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Stopped
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Removing
+ Container customer-agent-issue190-scope-runtime-20260901a-spring-migrate-1  Removed
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Stopped
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Removing
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-server-1  Removed
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Stopping
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Stopped
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Removing
+ Container customer-agent-issue190-scope-runtime-20260901a-agent-migrate-1  Removed
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Stopping
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Stopped
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Removing
+ Container customer-agent-issue190-scope-runtime-20260901a-postgres-1  Removed
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-evidence  Stopping
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-evidence  Stopped
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-evidence  Removing
+ Container customer-agent-issue190-scope-runtime-20260901a-browser-evidence  Removed
+ Volume customer-agent-issue190-scope-runtime-20260901a_browser-artifacts  Removing
+ Network customer-agent-issue190-scope-runtime-20260901a_services  Removing
+ Volume customer-agent-issue190-scope-runtime-20260901a_postgres-data  Removing
+ Network customer-agent-issue190-scope-runtime-20260901a_edge  Removing
+ Network customer-agent-issue190-scope-runtime-20260901a_data  Removing
+ Network customer-agent-issue190-scope-runtime-20260901a_provider-egress  Removing
+ Volume customer-agent-issue190-scope-runtime-20260901a_browser-artifacts  Removed
+ Volume customer-agent-issue190-scope-runtime-20260901a_postgres-data  Removed
+ Network customer-agent-issue190-scope-runtime-20260901a_services  Removed
+ Network customer-agent-issue190-scope-runtime-20260901a_provider-egress  Removed
+ Network customer-agent-issue190-scope-runtime-20260901a_edge  Removed
+ Network customer-agent-issue190-scope-runtime-20260901a_data  Removed

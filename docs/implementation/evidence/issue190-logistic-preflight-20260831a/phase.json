@@ -1,0 +1,11 @@
+{
+  "head_sha": "218091b552d84923fe4626a9a60f8dafcddae9c1",
+  "run_id": "issue190-logistic-preflight-20260831a",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "model_calibration_or_holdout_run": false,
+  "last_phase": "frontend-component",
+  "status": "PASS",
+  "elapsed_seconds": 177.6977645,
+  "paid_model_cost_cny": 0,
+  "working_tree_changed_by_format": true
+}

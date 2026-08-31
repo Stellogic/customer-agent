@@ -10,6 +10,14 @@ class CustomerReplySafetyPolicyTest {
     private static final List<String> EVIDENCE = List.of("order:ORDER-122", "logistics:ORDER-122");
 
     @Test
+    void neitherStreamingNorCompleteRepliesCanDeclareResolutionBeforeSpringDecides() {
+        String body = "经核验，订单 ORDER-122 的物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。";
+        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(body, ORDER, false)).isFalse();
+        assertThat(rejection(reply(body, EVIDENCE, ORDER), false))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
+    }
+
+    @Test
     void acceptsGroundedNaturalLanguageRepliesBeyondFixedTemplates() {
         assertThat(rejection(safeReply())).isNull();
         assertThat(
@@ -29,7 +37,7 @@ class CustomerReplySafetyPolicyTest {
         assertThat(
                         rejection(
                                 reply(
-                                        "经核验，订单 ORDER-122 的物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+                                        "经核验，订单 ORDER-122 的物流延迟不足 24 小时，当前不符合补偿条件，本次核对结论已给出，后续处理以页面状态为准。如仍有问题，请继续回复。",
                                         EVIDENCE,
                                         ORDER),
                                 false))
@@ -37,7 +45,7 @@ class CustomerReplySafetyPolicyTest {
         assertThat(
                         rejection(
                                 reply(
-                                        "经核验，订单 ORDER-122 的退款状态已核对完毕，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+                                        "经核验，订单 ORDER-122 的退款状态已核对完毕，当前不符合补偿条件，本次核对结论已给出，后续处理以页面状态为准。如仍有问题，请继续回复。",
                                         EVIDENCE,
                                         ORDER),
                                 false,

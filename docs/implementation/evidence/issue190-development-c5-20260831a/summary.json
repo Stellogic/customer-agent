@@ -1,0 +1,62 @@
+{
+  "run_id": "issue190-development-c5-20260831a",
+  "tested_head": "5402bd4c438ff68fc9bbc4a01e55080b12499ce9",
+  "base": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "attempted": 72,
+  "completed": 72,
+  "status": "PASS",
+  "metrics": {
+    "answered_recall_at_5": 0.9444444444444444,
+    "answered_mrr_at_5": 0.787037037037037,
+    "unanswered_precision": 0.9459459459459459,
+    "unanswered_recall": 0.9722222222222222,
+    "answerable_false_rejection": 0.05555555555555555,
+    "unanswerable_false_acceptance": 0.02777777777777779,
+    "counts": {
+      "answered": 36,
+      "unanswered": 36,
+      "true_abstentions": 35,
+      "false_abstentions": 2,
+      "recall_sum": 34.0,
+      "reciprocal_rank_sum": 28.333333333333332
+    }
+  },
+  "confusion_counts": {
+    "answerable_accepted": 34,
+    "answerable_rejected": 2,
+    "unanswerable_accepted": 1,
+    "unanswerable_rejected": 35
+  },
+  "contract_pass_counts": {
+    "json_syntax": 72,
+    "decision_schema": 72,
+    "evidence_fields": 72,
+    "cross_fields": 72,
+    "authorized_chunks": 72,
+    "verbatim_quotes": 72
+  },
+  "input_tokens": 57506.0,
+  "output_tokens": 1491.0,
+  "cached_tokens": 36480.0,
+  "reasoning_tokens": 0.0,
+  "new_upper_micro_cny": 185937.0,
+  "cost_totals": {
+    "settled_upper_micro_cny": 473070,
+    "unsettled_reserved_micro_cny": 0
+  },
+  "ledger_sha256": "045BD38D6BC2ED7DAA113DD95B09CFFBE8F5528E15C0FBB80665E6712B48157A",
+  "request_manifest_sha256": "703585AB58DE3C1DAA02096373275B4920C8698090A9F2B043CEB0DDCD048D45",
+  "asset_sha256": {
+    "prompt.txt": "86f99ff950f5482cf3b30e9946309f5592c86fc7f30d49b37764afa3fac52ab5",
+    "schema.json": "27ef4d19440b4279ac4b0426eb299e87445a455be5206716ad82c0da6f3733f4",
+    "config.json": "c4f798e19f33b0facad7482ecccc0bd3ab6288bebe66e08411dca093189347e1"
+  },
+  "prior_attempts_unchanged": true,
+  "prior_phases_unchanged": true,
+  "total_calls": 233,
+  "elapsed_seconds": 80.36936640000204,
+  "model_identity": [
+    "deepseek-v4-flash",
+    null
+  ]
+}

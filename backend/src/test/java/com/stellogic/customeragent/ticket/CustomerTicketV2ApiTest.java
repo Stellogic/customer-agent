@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.ticket;
 
 import static com.stellogic.customeragent.identity.HumanTestPrincipals.session;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -140,9 +141,71 @@ class CustomerTicketV2ApiTest {
                 .andExpect(jsonPath("$.ticket.createdAt").doesNotExist())
                 .andExpect(jsonPath("$.ticket.firstRespondedAt").doesNotExist())
                 .andExpect(jsonPath("$.messages.length()").value(2))
+                .andExpect(
+                        jsonPath("$.pendingCompensation").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.internalNotes").doesNotExist())
                 .andExpect(jsonPath("$.orderReference").doesNotExist())
                 .andExpect(jsonPath("$.threadId").doesNotExist());
+    }
+
+    @Test
+    void exposesOnlyPublicAutoResolutionStateAndAcceptsItsEvent() throws Exception {
+        Instant dueAt = Instant.parse("2026-08-28T01:00:00Z");
+        when(service.snapshot("customer-demo", TICKET_ID))
+                .thenReturn(snapshot(new CurrentAutoResolution("PENDING", dueAt)));
+
+        mvc.perform(
+                        get("/api/customer/v2/tickets/{ticketId}", TICKET_ID)
+                                .principal(customer("customer-demo")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.autoResolution.status").value("PENDING"))
+                .andExpect(jsonPath("$.autoResolution.dueAt").value("2026-08-28T01:00:00Z"))
+                .andExpect(jsonPath("$.autoResolution.generationId").doesNotExist())
+                .andExpect(jsonPath("$.autoResolution.evidence").doesNotExist());
+
+        var event =
+                CustomerTicketV2Controller.V2Event.from(
+                        new CustomerPublicEvent(
+                                "customer-public-v1",
+                                3,
+                                1,
+                                "AUTO_RESOLUTION_CHANGED",
+                                "{\"autoResolution\":{\"status\":\"CANCELLED\",\"dueAt\":null}}"));
+        assertThat(event.cursor()).isEqualTo("public-conversation-v2:3");
+        assertThat(event.publicData())
+                .contains("\"schema\":\"public-conversation-v2\"", "\"status\":\"CANCELLED\"");
+    }
+
+    @Test
+    void pendingCompensationProjectionOnlyExposesSafeTypeAmountAndReviewStatus() throws Exception {
+        when(service.snapshot("customer-demo", TICKET_ID))
+                .thenReturn(
+                        new CustomerPublicSnapshot(
+                                TICKET_ID,
+                                "INVESTIGATING",
+                                "HUMAN",
+                                Instant.parse("2026-08-28T00:00:00Z"),
+                                Instant.parse("2026-08-28T00:00:00Z"),
+                                "customer-public-v1",
+                                3,
+                                1,
+                                List.of(),
+                                null,
+                                null,
+                                null,
+                                new PendingCompensationProjection(
+                                        "COUPON", "10.00", "CNY", "PENDING_REVIEW")));
+
+        mvc.perform(
+                        get("/api/customer/v2/tickets/{ticketId}", TICKET_ID)
+                                .principal(customer("customer-demo")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendingCompensation.compensationMethod").value("COUPON"))
+                .andExpect(jsonPath("$.pendingCompensation.amount").value("10.00"))
+                .andExpect(jsonPath("$.pendingCompensation.currency").value("CNY"))
+                .andExpect(jsonPath("$.pendingCompensation.status").value("PENDING_REVIEW"))
+                .andExpect(jsonPath("$.pendingCompensation.approved").doesNotExist())
+                .andExpect(jsonPath("$.pendingCompensation.executed").doesNotExist());
     }
 
     @Test
@@ -206,6 +269,10 @@ class CustomerTicketV2ApiTest {
     }
 
     private CustomerPublicSnapshot snapshot() {
+        return snapshot(null);
+    }
+
+    private CustomerPublicSnapshot snapshot(CurrentAutoResolution autoResolution) {
         return new CustomerPublicSnapshot(
                 TICKET_ID,
                 "INVESTIGATING",
@@ -220,7 +287,8 @@ class CustomerTicketV2ApiTest {
                                 "CUSTOMER", "物流已经延迟多日", Instant.parse("2026-08-28T00:00:00Z")),
                         new PublicMessage("SUPPORT", "已受理", Instant.parse("2026-08-28T00:00:00Z"))),
                 null,
-                null);
+                null,
+                autoResolution);
     }
 
     private UsernamePasswordAuthenticationToken customer(String id) {

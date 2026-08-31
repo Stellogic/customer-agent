@@ -8,7 +8,7 @@ x-secrets: &local-secrets
 
 services:
   postgres:
-    image: postgres:18.4-bookworm
+    image: pgvector/pgvector:0.8.6-pg18-bookworm
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-local-postgres-superuser}
     volumes:
@@ -17,6 +17,7 @@ services:
       - ./agent/approval_queue_time_setup.sql:/smoke/approval_queue_time_setup.sql:ro
       - ./agent/approval_queue_time_cleanup.sql:/smoke/approval_queue_time_cleanup.sql:ro
       - ./scripts/fixtures/issue80-browser.sql:/acceptance/issue80-browser.sql:ro
+      - ./scripts/fixtures/issue165-order-allowance.sql:/smoke/issue165-order-allowance.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 2s
@@ -68,6 +69,7 @@ services:
       context: ./agent
       target: runtime
     environment:
+      KNOWLEDGE_MODEL_PATH: /models/bge-small-zh-v1.5
       AGENT_DATABASE_URI: postgresql://agent_runtime:local-agent-runtime@postgres:5432/agent_checkpoint
       SPRING_INTERNAL_URL: http://backend:8080
       SPRING_TO_AGENT_TOKEN: ${SPRING_TO_AGENT_TOKEN:-local-spring-to-agent}
@@ -86,6 +88,13 @@ services:
       DEEPSEEK_API_KEY:
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-}
       LOG_LEVEL: ERROR
+    volumes:
+      - type: bind
+        source: ${KNOWLEDGE_MODEL_HOST_PATH:-./.local/models/bge-small-zh-v1.5}
+        target: /models/bge-small-zh-v1.5
+        read_only: true
+        bind:
+          create_host_path: false
     command: ["--server-log-level", "ERROR"]
     # 私有编排运行时的第三方错误日志会携带 thread/run/checkpoint 标识；产品日志面不采集该流。
     logging:
@@ -165,6 +174,7 @@ services:
     entrypoint: ["python", "/smoke/smoke.py"]
     volumes:
       - ./agent/smoke.py:/smoke/smoke.py:ro
+      - ./agent/order_allowance_smoke.py:/smoke/order_allowance_smoke.py:ro
     environment:
       AGENT_SERVER_URL: http://agent-server:2024
       SPRING_INTERNAL_URL: http://backend:8080

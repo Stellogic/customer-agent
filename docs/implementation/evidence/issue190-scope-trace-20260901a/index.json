@@ -1,0 +1,47 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-scope-trace-20260901a",
+  "head_sha": "0527552d250f6c2a819cff6365ad8870268f7761",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Text workspace/user-home/machine prefixes only; original files retained locally. Browser synthetic screenshots are unchanged.",
+  "lock_release_observation": "Own lock released, one FREE read; coordinator notified. See phase cleanup_error separately.",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "compose.log",
+      "source_sha256": "b37c58ddab9b2e669a09fa9af1ef7d76208f7bfd78c84d0e792931e0e177312c",
+      "archived_sha256": "b37c58ddab9b2e669a09fa9af1ef7d76208f7bfd78c84d0e792931e0e177312c"
+    },
+    {
+      "file": "console.log",
+      "source_sha256": "8221b6ee90b5d8835285330362049a8316b4b0dc2b07298e22c128e6de0661d8",
+      "archived_sha256": "8221b6ee90b5d8835285330362049a8316b4b0dc2b07298e22c128e6de0661d8"
+    },
+    {
+      "file": "phase.json",
+      "source_sha256": "74687a7187c43758e0241088c6cfd53e0780ed691298cb811f3fc377ea1b503e",
+      "archived_sha256": "74687a7187c43758e0241088c6cfd53e0780ed691298cb811f3fc377ea1b503e"
+    },
+    {
+      "file": "runtime.log",
+      "source_sha256": "e320ca5990db496427481840e101e25142666b7c0ea7e4839637b86d5281ad52",
+      "archived_sha256": "789426e365ead7c3ced671a33064d055d84c70719008d2c9c62077eb4a7ad3dd"
+    },
+    {
+      "file": "trace-diagnosis.json",
+      "source_sha256": "9e8403860a1a8f649b87422ad1ed16523f53abd35b6c32581cee23b8bf957301",
+      "archived_sha256": "9e8403860a1a8f649b87422ad1ed16523f53abd35b6c32581cee23b8bf957301"
+    },
+    {
+      "file": "browser/.last-run.json",
+      "source_sha256": "7bb6cfaf95ba164d4eab35a05fd2f6a566ae2f99dfa66b95f64d2ce8028c4753",
+      "archived_sha256": "7bb6cfaf95ba164d4eab35a05fd2f6a566ae2f99dfa66b95f64d2ce8028c4753"
+    },
+    {
+      "file": "browser/issue190.hybrid-retrieval-Issue-190-显式未授权范围返回权限错误而非空结果/error-context.md",
+      "source_sha256": "20055d542860d5d3cca48ad39bf9db95d0a1f048da5b65a03f101b378672c3ec",
+      "archived_sha256": "20055d542860d5d3cca48ad39bf9db95d0a1f048da5b65a03f101b378672c3ec"
+    }
+  ]
+}

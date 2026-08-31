@@ -87,7 +87,9 @@ class CustomerTicketApiTest {
                                 new PublicMessage(
                                         "SUPPORT", "已受理", Instant.parse("2026-08-09T00:00:00Z"))),
                         null,
-                        null);
+                        null,
+                        new CurrentAutoResolution(
+                                "PENDING", Instant.parse("2026-08-09T01:00:00Z")));
         when(service.snapshot("customer-demo", TICKET_ID)).thenReturn(snapshot);
         when(service.snapshot("customer-other-demo", TICKET_ID))
                 .thenThrow(new TicketNotFoundException());
@@ -104,6 +106,7 @@ class CustomerTicketApiTest {
                 .andExpect(jsonPath("$.ticket.agentGeneration").value(1))
                 .andExpect(jsonPath("$.ticket.firstRespondedAt").exists())
                 .andExpect(jsonPath("$.messages.length()").value(2))
+                .andExpect(jsonPath("$.autoResolution").doesNotExist())
                 .andExpect(jsonPath("$.internalNotes").doesNotExist())
                 .andExpect(jsonPath("$.threadId").doesNotExist());
 
