@@ -1,10 +1,14 @@
 import pytest
 
-from baseline_agent.knowledge_resources import ResourceWorkload, measure_encoder, summarize_latencies
+from baseline_agent.knowledge_resources import (
+    ResourceWorkload,
+    measure_encoder,
+    summarize_latencies,
+)
 
 
 class SmallEncoder:
-    """仅验证进程/计数边界，不提供 BGE 性能或质量证据。"""
+    """仅验证进程/计数边界,不提供 BGE 性能或质量证据。"""
 
     def __init__(self, directory):
         pass
@@ -26,8 +30,11 @@ def test_nearest_rank_and_document_throughput_have_different_units():
 def test_fresh_process_records_peak_rss_and_excludes_warmup_from_latency_count(tmp_path):
     workload = ResourceWorkload((("甲", "乙"), ("丙",)), True, 2, 3)
     result = measure_encoder(
-        "test_knowledge_resources:SmallEncoder", tmp_path, workload,
-        timeout_seconds=30, hardware_id="synthetic-test-host",
+        "test_knowledge_resources:SmallEncoder",
+        tmp_path,
+        workload,
+        timeout_seconds=30,
+        hardware_id="synthetic-test-host",
     )
     assert result["status"] == "MEASURED"
     assert len(result["latencies_batch_ms"]) == 6
@@ -39,9 +46,11 @@ def test_fresh_process_records_peak_rss_and_excludes_warmup_from_latency_count(t
 
 def test_inference_failure_is_error_without_successful_resource_metrics(tmp_path):
     result = measure_encoder(
-        "test_knowledge_resources:BrokenEncoder", tmp_path,
+        "test_knowledge_resources:BrokenEncoder",
+        tmp_path,
         ResourceWorkload((("甲",),), False, 0, 1),
-        timeout_seconds=30, hardware_id="synthetic-test-host",
+        timeout_seconds=30,
+        hardware_id="synthetic-test-host",
     )
     assert result["status"] == "ERROR"
     assert result["metrics"] is None

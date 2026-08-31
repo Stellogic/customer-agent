@@ -321,7 +321,9 @@ def test_layered_adapter_propagates_service_failure(monkeypatch, tmp_path):
     )
     output = tmp_path / "layered-error.json"
     with pytest.raises(RuntimeError):
-        run_layered_ablation("http://reference.invalid", environment={}, parameters={}, output=output)
+        run_layered_ablation(
+            "http://reference.invalid", environment={}, parameters={}, output=output
+        )
     report = json.loads(output.read_text(encoding="utf-8"))
     assert report["status"] == "ERROR"
     assert report["modes"]["lexical"]["rows"] == []

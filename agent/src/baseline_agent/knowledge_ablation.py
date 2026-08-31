@@ -10,7 +10,12 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Literal
 
-from baseline_agent.rag_eval_v1 import AllowedHit, EvalQuery, compute_content_sha256, load_rag_eval_v1
+from baseline_agent.rag_eval_v1 import (
+    AllowedHit,
+    EvalQuery,
+    compute_content_sha256,
+    load_rag_eval_v1,
+)
 
 RetrievalMode = Literal["lexical", "dense", "rrf"]
 EvaluationProtocol = Literal["rag-eval-v1", "rag-layered-v2"]
@@ -175,6 +180,7 @@ def score_candidates(
     denied = (
         query.principal.subject_type != "INTERNAL"
         or "KNOWLEDGE_READ_ACCESS" not in query.principal.capabilities
+        or query.search_context == "CUSTOMER_PUBLIC"
     )
     if denied and hits:
         violations.add("unauthorized")
