@@ -4,7 +4,7 @@ import "./context-entries.css";
 // available 只接收宿主对当前授权投影的查看/定位操作，不承载业务写入。
 // 集成方必须明确区分尚无能力和当前无权访问，不能用默认占位覆盖既有能力。
 export type ContextEntry =
-  | { kind: "available"; onOpen: () => void }
+  | { kind: "available"; onOpen: () => void; description?: string }
   | { kind: "developing" }
   | { kind: "unavailable"; reason: string };
 
@@ -16,9 +16,12 @@ function EntryList({ entries }: { entries: Entry[] }) {
       {entries.map(({ label, action }) => (
         <li key={label}>
           {action.kind === "available" ? (
-            <button type="button" onClick={action.onOpen}>
-              {label}
-            </button>
+            <>
+              <button type="button" onClick={action.onOpen}>
+                {label}
+              </button>
+              {action.description && <small>{action.description}</small>}
+            </>
           ) : action.kind === "developing" ? (
             <DevelopmentNotice label={label} />
           ) : (

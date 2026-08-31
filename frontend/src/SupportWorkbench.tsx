@@ -12,6 +12,8 @@ import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import { IntakeAssistancePanel } from "./IntakeAssistancePanel";
 import { SupportCompensationPanel } from "./SupportCompensationPanel";
+import { SupportContextEntries } from "./components/internal/ContextEntries";
+import { focusContextTarget } from "./components/internal/focusContextTarget";
 import { clearPendingReply, readPendingReply, storePendingReply } from "./supportReplyStorage";
 
 const SUPPORT_SCHEMA = "support-workbench-v2" as const;
@@ -760,6 +762,9 @@ function TicketDetail({
   onRelease: () => void;
 }) {
   const storedPendingReply = readPendingReply(details.ticketId);
+  const orderRef = useRef<HTMLDivElement>(null);
+  const replyRef = useRef<HTMLElement>(null);
+  const factsRef = useRef<HTMLElement>(null);
   const [draft, setDraft] = useState(() => storedPendingReply?.body ?? "");
   const [replyState, setReplyState] = useState<
     "idle" | "sending" | "unknown" | "querying" | "error"
@@ -841,13 +846,36 @@ function TicketDetail({
         </div>
       </header>
 
+      <SupportContextEntries
+        projectionKey={`${details.ticketId}:${details.assignedSupportId ?? ""}:${details.handlingMode}`}
+        entries={{
+          transfer: { kind: "developing" },
+          more: { kind: "developing" },
+          order: {
+            kind: "available",
+            onOpen: () => focusContextTarget(orderRef.current),
+            description: "查看当前工单的订单引用，不额外读取订单详情。",
+          },
+          logistics: {
+            kind: "available",
+            onOpen: () => focusContextTarget(factsRef.current),
+            description: "查看现有调查事实，是否含物流信息以当前投影为准。",
+          },
+          contact: details.handlingMode === "HUMAN"
+            ? { kind: "available", onOpen: () => focusContextTarget(replyRef.current) }
+            : { kind: "unavailable", reason: "当前非人工处理模式，不能发送公开回复。" },
+          similarCases: { kind: "unavailable", reason: "相似案例检索尚未接入。" },
+          suggestedActions: { kind: "unavailable", reason: "客服辅助建议动作尚未接入。" },
+        }}
+      />
+
       <div className="support-detail-summary">
         <dl aria-label="工单基本信息">
           <div>
             <dt>客户标识</dt>
             <dd>{details.customerId}</dd>
           </div>
-          <div>
+          <div ref={orderRef} tabIndex={-1} className="context-entry-target">
             <dt>订单引用</dt>
             <dd>{details.orderReference}</dd>
           </div>
@@ -871,7 +899,12 @@ function TicketDetail({
       </div>
 
       {details.handlingMode === "HUMAN" && (
-        <section className="support-reply-composer" aria-labelledby="support-reply-title">
+        <section
+          ref={replyRef}
+          tabIndex={-1}
+          className="support-reply-composer context-entry-target"
+          aria-labelledby="support-reply-title"
+        >
           <div className="support-reply-heading">
             <div>
               <p className="eyebrow">客户可见</p>
@@ -948,6 +981,7 @@ function TicketDetail({
         />
         <DetailSection
           eyebrow="INTERNAL FACTS"
+          sectionRef={factsRef}
           title="调查事实"
           empty="暂无调查事实"
           items={details.investigationFacts.map((fact, index) => (
@@ -986,15 +1020,22 @@ function DetailSection({
   title,
   empty,
   items,
+  sectionRef,
 }: {
   eyebrow: string;
   title: string;
   empty: string;
   items: ReactNode[];
+  sectionRef?: React.RefObject<HTMLElement | null>;
 }) {
   const id = `support-${title}`;
   return (
-    <section className="support-detail-section" aria-labelledby={id}>
+    <section
+      ref={sectionRef}
+      tabIndex={sectionRef ? -1 : undefined}
+      className={`support-detail-section${sectionRef ? " context-entry-target" : ""}`}
+      aria-labelledby={id}
+    >
       <header>
         <p className="eyebrow">{eyebrow}</p>
         <h3 id={id}>{title}</h3>

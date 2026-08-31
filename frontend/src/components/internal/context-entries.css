@@ -64,3 +64,12 @@
   outline: 3px solid #3977c6;
   outline-offset: 3px;
 }
+
+.context-entry-target:focus {
+  outline: 3px solid #3977c6;
+  outline-offset: 3px;
+}
+
+.approval-context-entry-row {
+  grid-column: 1 / -1;
+}
