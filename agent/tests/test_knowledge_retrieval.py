@@ -26,18 +26,18 @@ def response(scope: str = "CUSTOMER_PUBLIC") -> dict:
                 "applicability": [scope],
                 "startLine": 12,
                 "endLine": 16,
-                "snippet": "一般规则（测试），不代表订单事实。",
+                "snippet": "一般规则（测试）：这里保留超过二十四个字符的完整授权片段，不代表订单事实或已经足够回答。",
             }
         ],
     }
 
 
 @pytest.mark.parametrize("scope", ["CUSTOMER_PUBLIC", "SUPPORT"])
-def test_both_consumers_share_one_controlled_dto(scope: str) -> None:
+def test_both_consumers_receive_candidates_without_an_answer_decision(scope: str) -> None:
     payload = response(scope)
     result = parse_knowledge_response(200, payload)
     source = result.sources[0]
-    assert result.status is KnowledgeResultStatus.AVAILABLE
+    assert result.status is KnowledgeResultStatus.CANDIDATES_AVAILABLE
     assert result.index_generation == 7
     assert (source.article_id, source.version, source.chunk_id) == (
         "delivery-rules",
@@ -47,6 +47,7 @@ def test_both_consumers_share_one_controlled_dto(scope: str) -> None:
     assert source.updated_at == "2026-08-01T00:00:00Z"
     assert source.applicability == (scope,)
     assert (source.start_line, source.end_line) == (12, 16)
+    assert source.snippet == payload["results"][0]["snippet"]
     # DTO 脱离原始可变 JSON。消费者不能把响应对象后续变更当新授权。
     payload["results"][0]["applicability"].clear()
     payload["results"].clear()
@@ -57,11 +58,11 @@ def test_both_consumers_share_one_controlled_dto(scope: str) -> None:
         source.title = "被修改"  # pyright: ignore[reportAttributeAccessIssue]
 
 
-def test_empty_formal_results_are_no_answer_without_invented_source() -> None:
+def test_empty_formal_results_are_no_match_not_a_model_refusal() -> None:
     payload = response()
     payload["results"] = []
     result = parse_knowledge_response(200, payload)
-    assert result.status is KnowledgeResultStatus.NO_ANSWER
+    assert result.status is KnowledgeResultStatus.NO_MATCH
     assert result.sources == ()
 
 
@@ -111,7 +112,7 @@ def test_invalid_success_schema_generation_or_top_five_contract_fails() -> None:
         (400, None, KnowledgeFailureCode.INVALID_QUERY),
         (409, None, KnowledgeFailureCode.REQUEST_CONFLICT),
         (503, "INDEX_STALE", KnowledgeFailureCode.INDEX_STALE),
-        (503, "CALIBRATION_REQUIRED", KnowledgeFailureCode.CALIBRATION_REQUIRED),
+        (503, "CALIBRATION_REQUIRED", KnowledgeFailureCode.RETRIEVAL_UNAVAILABLE),
         (503, "MODEL_UNAVAILABLE", KnowledgeFailureCode.MODEL_UNAVAILABLE),
         (503, "FUSION_UNAVAILABLE", KnowledgeFailureCode.RETRIEVAL_UNAVAILABLE),
         (500, "internal-trace", KnowledgeFailureCode.RETRIEVAL_UNAVAILABLE),

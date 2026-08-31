@@ -2,6 +2,8 @@
 
 > 后续状态：已获明确授权并完成[独立模块聚焦验证](issue-169-focused-validation.md)，41 项测试通过。下文保留各静态阶段的历史 NOT_RUN 记录，真实集成和完整门禁仍未完成。
 
+> 当前修订：以 #149/#169/#190 正式 `rag-layered-v2` 为准，详见[回答层承接](issue-169-rag-layered-v2.md)。本次更改共享解析状态，尚未执行验证；上述 41 项仅是 `575d10a` 的历史证据，不覆盖本次差异。旧固定 PR 源码与失败记录保留，但“检索空结果等于拒答”和“检索层判断可回答性”不再作为实施契约。
+
 ## 状态及结论
 
 2026-08-31，基于最新 `origin/main` **c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472**，保留 #169 既有组件提交并合并该 main；没有重做 UI。
@@ -32,7 +34,7 @@
 
 ## 拟议接缝 A：授权后的检索核心，#190 只需一个接缝
 
-#190 owner 与协调已原则确认以下最小接缝，尚未在本分支实现，#169 不改其文件：在 KnowledgeRetrievalService 内，将现有“按 principal 求 scopes”之后的检索代码提取成**包内** `searchAuthorizedScopes(query, allowedScopes)`；原内部 search 保留身份/能力校验及 scope 选择后委派。接缝必须覆盖检索前权限/版本过滤、两路/RRF及**最终可回答性判定，返回正式 results**，不能只抽 retrieve 后把候选当答案。新可信入口范围为空直接拒绝；不新增 HTTP 路由、不复制引擎，也不让 Agent 指定索引 generation、模型 revision 或 threshold。现有事务注解只在 search 上，新包内方法不会自动继承该事务。旧 PR203 的 CALIBRATED/数值 threshold 只作历史源码证据，不指定为后续正式产品策略；冻结 c5 仍只是合成实验，不能据此新增云判定或真实消费。
+以下是旧阶段原则讨论过、当前仍待落实的接缝需求，**不是已存在的方法**：由 #190 在 KnowledgeRetrievalService 提供接受可信授权范围的包内入口（此前提议名 `searchAuthorizedScopes(query, allowedScopes)`），原内部 search 保留身份/能力校验及 scope 选择后委派。#190 owner 本次明确目前只有内部 search，未承诺已实现包内入口；#169 不预写依赖不存在方法的适配。该入口只需覆盖权限/发布/版本/范围过滤、两路检索及 RRF Top-5，**不判断可回答性**。条目是供同次 DeepSeek 判断和回答的资料，不能直接当答案或已接受引用。新 Agent 可信入口无授权范围应拒绝；这与现有内部页面有效 scope 的空交集返回 200 空列表不同，不能擅改 #190 内部接口行为。不复制引擎，不让 Agent 指定索引 generation、模型 revision 或阈值。包内方法不会自动继承原 search 的事务。旧 CALIBRATED/评分、c5 及所有失败仅作为历史，不进入默认回答路径。
 
 #169 拟新增同 knowledge 包的 `AgentKnowledgeRetrievalAdapter.java`：
 
@@ -40,7 +42,7 @@
 - `searchSupport(principalId, query)` 复用 requireScopes(principalId)，只保留 INTERNAL/SUPPORT 交集，不能借审批角色扩大辅助范围；调用前后由 #170 验证当前领取关系。
 - **已对齐、待实施的事务安排**：适配 public 方法 searchCustomer/searchSupport 经 Spring 代理开启只读 REPEATABLE_READ，覆盖共享核心检索及 canonical 元数据补读；原内部 search 的事务不变。外层编排必须**无事务**，前置授权事务先结束，检索事务结束后才进入接受结果事务；仅“不持业务锁”不够，因为默认 REQUIRED 会加入外层事务而忽略本地隔离级别。无需 REQUIRES_NEW/新租约/通用框架。不得用另一版本的标题或更新时间填补。[Spring REQUIRED 官方说明](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html)、[代理与自调用说明](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html)。
 - 返回给 Agent 的受控条目拟为 `articleId, version, chunkId, title, updatedAt, applicability, startLine, endLine, snippet`。sourceFile、分数、候选和模型配置留在 #190 内部诊断；Agent 不需要它们。
-- 拟议响应 `schema=agent-knowledge-v1, indexGeneration, results`；空结果就是 NO_ANSWER，不另外猜测“低分”或“无语料”。quality policy/revision 可在内部回执留存，但不把它们作为权限。
+- 拟议响应仍为 `schema=agent-knowledge-v1, indexGeneration, results`，这是 #169 自有受控投影而非 #190 内部响应。非空派生 CANDIDATES_AVAILABLE，空派生 NO_MATCH；二者只表达授权片段有无，不表达充分性、模型拒答或安全引用。#190 新版移除 policy，不能要求默认校准字段；revision 可作内部追溯元数据，不作为授权。
 
 这不是增加第二个检索引擎。接缝实现仍归 #190 并等待其独立验证与协调窗口，#169 本轮不预写或挂载依赖该尚未落地方法的 Spring 适配类。
 
@@ -64,12 +66,12 @@ HUMAN 通道由 #170 自有辅助请求入口验证 SUPPORT 会话、HUMAN、当
 
 | 现有证据 | 拟议适配归类与消费者动作 |
 | --- | --- |
-| PR203 results=[] | NO_ANSWER；不使用候选、不补写无来源规则。若只是无需规则的业务回复，仍只用 Spring 事实；需要知识才能回答时停下该知识答复。 |
-| PR203 KnowledgeAnswerabilityPolicy：CALIBRATION_REQUIRED | 保留受控码并停止知识消费；不由 #169 调整门槛。#190 正式质量 PASS 是另一个必须满足的交付条件，配置 CALIBRATED 本身不是证明。 |
+| rag-layered-v2 results=[] | NO_MATCH，仅无匹配资料，不能记正常拒答；资料不足判断和说明/必要追问由同一次 DeepSeek 回答形成。不补写无来源规则，也不仅因此自动转人工。无需知识的业务回复仍只用 Spring 事实。 |
+| 旧 PR203 CALIBRATION_REQUIRED | 新默认检索不依赖校准。若收到旧服务该错误，按 RETRIEVAL_UNAVAILABLE 失败，不重试校准、不当正常拒答；旧实验与 FAIL 不追改。#190 新检索质量与完整门禁仍为前置。 |
 | PR203 KnowledgeRetrievalService：INDEX_STALE | INDEX_STALE；不使用旧缓存。 |
 | PR203 KnowledgeEmbeddingGateway：MODEL_UNAVAILABLE | MODEL_UNAVAILABLE（这里特指 Embedding）；保留原码，不伪造独立“Embedding错误”实现。 |
 | PR203 FUSION_UNAVAILABLE / RETRIEVAL_UNAVAILABLE、HTTP 超时/非预期载荷 | 对 Agent 归一 RETRIEVAL_UNAVAILABLE，内部保留受控诊断，不转发异常正文。 |
-| 现有 generation 403；客服无当前 assignment；知识范围为空 | ACCESS_DENIED；不重试越权。客服返回授权资源的 404 语义由 #170 保留，不据此泄露工单存在。范围失败不能伪装 NO_ANSWER。 |
+| 现有 generation 403；客服无当前 assignment；Agent 授权范围为空 | ACCESS_DENIED；不重试越权。客服返回授权资源的 404 语义由 #170 保留，不据此泄露工单存在。授权失败不能伪装无匹配或正常拒答；#190 内部页面有效 scope 的空交集语义不因此改变。 |
 | 拟议引用身份/版本/片段/范围或检索回执不匹配 | INVALID_KNOWLEDGE_CITATION；不发布该知识答复/来源。纯模块抛 IllegalArgumentException，未来入口映射该码；本轮没有新 HTTP handler。 |
 | 拟议知识与已核验事实冲突 / 注入或无依据规则结论 | KNOWLEDGE_CONFLICT / UNSAFE_KNOWLEDGE；记录受控事件与引用，不写入原始 prompt。客户只获得安全状态/人工处理提示；客服辅助失败不影响继续人工回复。 |
 
@@ -122,9 +124,9 @@ HUMAN 通道由 #170 自有辅助请求入口验证 SUPPORT 会话、HUMAN、当
 | `parse_knowledge_response(status_code, payload)` | 输入 HTTP 状态码与已解码 JSON；不执行 HTTP、JSON 解码、鉴权、重试、缓存或清屏。未来传输/JSON 解码异常由调用者归为 RETRIEVAL_UNAVAILABLE。 |
 | 成功载荷 | 仅 HTTP 200；精确字段 schema=agent-knowledge-v1、indexGeneration（非负整数，非业务 generation UUID）、results（0–5 条最终结果）。不接受 knowledge-hybrid-v1、两路候选、policy 或多余载荷字段。 |
 | 每条 results | 精确字段 articleId/version/chunkId/title/updatedAt/applicability/startLine/endLine/snippet。文本非空，updatedAt 是带时区 ISO 时间，scope 使用现有四范围词汇且非空，行号为正且 endLine≥startLine；范围是否获授权仍由 Spring 决定。 |
-| Python DTO | frozen KnowledgeSource 使用对应 snake_case 属性；KnowledgeRetrievalResult(index_generation, sources)，集合复制成 tuple，status 由是否有 sources 派生 AVAILABLE 或 NO_ANSWER。不把畸形响应降成空结果。 |
+| Python DTO | frozen KnowledgeSource 使用对应 snake_case 属性；KnowledgeRetrievalResult(index_generation, sources)，集合复制成 tuple。本次 rag-layered-v2 将 status 从旧 AVAILABLE/NO_ANSWER 改为 CANDIDATES_AVAILABLE/NO_MATCH，仅表示片段有无。不把畸形响应降成空结果，也不把有片段当充分回答。 |
 | HTTP 401/403/404；400；409 | 依次映射 ACCESS_DENIED、INVALID_QUERY、REQUEST_CONFLICT。权限优先于错误正文自称的 code。 |
-| HTTP 503 | 仅保留 CALIBRATION_REQUIRED/INDEX_STALE/MODEL_UNAVAILABLE；FUSION_UNAVAILABLE、其他码或未知失败一律 RETRIEVAL_UNAVAILABLE。这里只约定消费者对已知受控错误的兼容，不要求 #190 采用旧阈值策略。 |
+| HTTP 503 | 仅保留 INDEX_STALE/MODEL_UNAVAILABLE；FUSION_UNAVAILABLE、旧 CALIBRATION_REQUIRED、其他码或未知失败一律 RETRIEVAL_UNAVAILABLE。不将实验评分/校准作为默认依赖。 |
 | HTTP 422 | 仅保留 INVALID_KNOWLEDGE_CITATION/KNOWLEDGE_CONFLICT/UNSAFE_KNOWLEDGE；这些仍是消费者约定，未新增 Spring handler 或语义检测。 |
 | 其他 HTTP 错误、畸形 200 | 抛 KnowledgeRetrievalFailure(RETRIEVAL_UNAVAILABLE)，不透传异常正文/原始 payload。 |
 

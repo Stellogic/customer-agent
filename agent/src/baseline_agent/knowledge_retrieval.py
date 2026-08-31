@@ -14,15 +14,16 @@ KNOWLEDGE_SCHEMA = "agent-knowledge-v1"
 
 
 class KnowledgeResultStatus(StrEnum):
-    AVAILABLE = "AVAILABLE"
-    NO_ANSWER = "NO_ANSWER"
+    """仅表示授权片段有无。充分性与回答由消费路径的同次 DeepSeek 调用形成。"""
+
+    CANDIDATES_AVAILABLE = "CANDIDATES_AVAILABLE"
+    NO_MATCH = "NO_MATCH"
 
 
 class KnowledgeFailureCode(StrEnum):
     ACCESS_DENIED = "ACCESS_DENIED"
     INVALID_QUERY = "INVALID_QUERY"
     REQUEST_CONFLICT = "REQUEST_CONFLICT"
-    CALIBRATION_REQUIRED = "CALIBRATION_REQUIRED"
     INDEX_STALE = "INDEX_STALE"
     MODEL_UNAVAILABLE = "MODEL_UNAVAILABLE"  # 指 Embedding 而不是辅助生成模型。
     RETRIEVAL_UNAVAILABLE = "RETRIEVAL_UNAVAILABLE"
@@ -57,13 +58,18 @@ class KnowledgeRetrievalResult:
 
     @property
     def status(self) -> KnowledgeResultStatus:
-        return KnowledgeResultStatus.AVAILABLE if self.sources else KnowledgeResultStatus.NO_ANSWER
+        return (
+            KnowledgeResultStatus.CANDIDATES_AVAILABLE
+            if self.sources
+            else KnowledgeResultStatus.NO_MATCH
+        )
 
 
 def parse_knowledge_response(status_code: int, payload: object) -> KnowledgeRetrievalResult:
     """解析已解码的 JSON 值。不重试、不缓存且不把错误正文放入异常。
 
-    200 的空 results 是 NO_ANSWER。HTTP 错误或畸形成功载荷必须失败而不能降为无答案。
+    200 的空 results 仅表示 NO_MATCH。有片段不代表足够回答或可公开引用。
+    HTTP 错误或畸形成功载荷必须失败而不能降为正常无匹配或模型拒答。
     调用方仍须把 JSON 解码失败/传输异常归为 RETRIEVAL_UNAVAILABLE。
     """
     if status_code != 200:
@@ -87,7 +93,6 @@ def _failure_code(status_code: int, payload: object) -> KnowledgeFailureCode:
         return KnowledgeFailureCode.REQUEST_CONFLICT
     allowed = {
         503: {
-            KnowledgeFailureCode.CALIBRATION_REQUIRED,
             KnowledgeFailureCode.INDEX_STALE,
             KnowledgeFailureCode.MODEL_UNAVAILABLE,
         },
