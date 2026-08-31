@@ -16,7 +16,7 @@ $env:HF_HUB_OFFLINE = '1'
 $env:TRANSFORMERS_OFFLINE = '1'
 $root = Split-Path -Parent $PSScriptRoot
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
-foreach ($mode in @('development', 'diagnostic', 'remaining', 'c-v2', 'versioned')) {
+foreach ($mode in @('development', 'diagnostic', 'remaining', 'c-v2', 'versioned', 'beta-strict')) {
     $env:KNOWLEDGE_SUFFICIENCY_EXPERIMENT = if ($mode -eq 'diagnostic') {
         'issue-190-fifth-request-diagnostic-once'
     } else { 'issue-190-synthetic-sufficiency-c-once' }
@@ -26,7 +26,7 @@ foreach ($mode in @('development', 'diagnostic', 'remaining', 'c-v2', 'versioned
     if ($mode -eq 'c-v2') {
         $env:KNOWLEDGE_SUFFICIENCY_EXPERIMENT = 'issue-190-c-v2-whole-development-once'
     }
-    if ($mode -eq 'versioned') {
+    if ($mode -in @('versioned', 'beta-strict')) {
         $env:KNOWLEDGE_SUFFICIENCY_EXPERIMENT = 'issue-190-versioned-synthetic-development'
     }
     [string[]]$entryArgs = @(
@@ -39,6 +39,7 @@ foreach ($mode in @('development', 'diagnostic', 'remaining', 'c-v2', 'versioned
     if ($mode -eq 'remaining') { $entryArgs += '-DiagnoseRemainingOnce' }
     if ($mode -eq 'c-v2') { $entryArgs += '-CV2WholeOnce' }
     if ($mode -eq 'versioned') { $entryArgs += @('-DevelopmentVersion', 'c3') }
+    if ($mode -eq 'beta-strict') { $entryArgs += @('-DevelopmentVersion', 'c6') }
     $log = Join-Path $OutputDirectory "$mode.log"
     & pwsh @entryArgs *> $log
     $exitCode = $LASTEXITCODE

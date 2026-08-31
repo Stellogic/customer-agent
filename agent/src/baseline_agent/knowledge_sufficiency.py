@@ -36,6 +36,8 @@ CONTRACT_CHECK_LAYERS = (
     "authorized_chunks",
     "verbatim_quotes",
 )
+BETA_CHAT_TRANSPORT = "chat-beta-strict-v1"
+SUFFICIENCY_FUNCTION = "submit_sufficiency"
 
 
 class SufficiencyBlocked(ValueError):
@@ -100,20 +102,46 @@ def request_body(row: dict[str, Any], frozen: dict[str, Any]) -> dict[str, Any]:
     if any(hit["applicability"] != ["INTERNAL"] for hit in hits):
         raise SufficiencyBlocked("ARCHIVE_SCOPE_MISMATCH")
     config = frozen["config"]
+    # Chat与Responses使用同一问题/完整Top5，不加入标签、答案或特征。
+    input_text = json.dumps(
+        {
+            "question": row["text"],
+            "chunks": [
+                {"chunk": index, "text": hit["snippet"]} for index, hit in enumerate(hits, 1)
+            ],
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    if config.get("transport") == BETA_CHAT_TRANSPORT:
+        return {
+            "model": config["model"],
+            "messages": [
+                {"role": "system", "content": frozen["prompt"]},
+                {"role": "user", "content": input_text},
+            ],
+            "thinking": config["thinking"],
+            "temperature": config["temperature"],
+            "max_tokens": config["max_output_tokens"],
+            "stream": config["stream"],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": SUFFICIENCY_FUNCTION,
+                        "description": "提交本次上下文充分性判定；仅结构化输出，不执行外部操作。",
+                        "strict": True,
+                        "parameters": frozen["schema"],
+                    },
+                }
+            ],
+            "tool_choice": {"type": "function", "function": {"name": SUFFICIENCY_FUNCTION}},
+        }
     return {
         "model": config["model"],
         "instructions": frozen["prompt"],
         # 只有问题和完整片段正文外发: 不传标签、支持答案、特征、分数或真实身份。
-        "input": json.dumps(
-            {
-                "question": row["text"],
-                "chunks": [
-                    {"chunk": index, "text": hit["snippet"]} for index, hit in enumerate(hits, 1)
-                ],
-            },
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
+        "input": input_text,
         "reasoning": config["reasoning"],
         "temperature": config["temperature"],
         "max_output_tokens": config["max_output_tokens"],
@@ -162,7 +190,9 @@ def budget_plan(frozen: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def response_observation(payload: dict[str, Any], duration_ms: int) -> dict[str, Any]:
+def response_observation(
+    payload: dict[str, Any], duration_ms: int, *, chat: bool = False
+) -> dict[str, Any]:
     observation: dict[str, Any] = {
         key: payload.get(source) if isinstance(payload.get(source), str) else None
         for key, source in (
@@ -179,6 +209,36 @@ def response_observation(payload: dict[str, Any], duration_ms: int) -> dict[str,
     usage = payload.get("usage")
     if not isinstance(usage, dict):
         return observation
+    if chat:
+        choices = payload.get("choices")
+        choice = choices[0] if isinstance(choices, list) and len(choices) == 1 else None
+        observation.update(
+            wire_format=BETA_CHAT_TRANSPORT,
+            response_status=choice.get("finish_reason") if isinstance(choice, dict) else None,
+            wire_usage={
+                key: usage[key]
+                for key in (
+                    "prompt_tokens", "completion_tokens", "total_tokens",
+                    "prompt_cache_hit_tokens", "prompt_cache_miss_tokens",
+                )
+                if type(usage.get(key)) is int
+            },
+        )
+        cached = usage.get("prompt_cache_hit_tokens")
+        missed = usage.get("prompt_cache_miss_tokens")
+        if missed is not None and (
+            type(missed) is not int
+            or missed < 0
+            or (type(cached) is int and cached + missed != usage.get("prompt_tokens"))
+        ):
+            return observation
+        usage = {
+            "input_tokens": usage.get("prompt_tokens"),
+            "output_tokens": usage.get("completion_tokens"),
+            "total_tokens": usage.get("total_tokens"),
+            "input_tokens_details": {"cached_tokens": usage.get("prompt_cache_hit_tokens")},
+            "output_tokens_details": usage.get("completion_tokens_details"),
+        }
     keys = ("input_tokens", "output_tokens", "total_tokens")
     counts = [usage.get(key) for key in keys]
     observation["usage"] = {key: usage[key] for key in keys if type(usage.get(key)) is int}
@@ -194,8 +254,10 @@ def response_observation(payload: dict[str, Any], duration_ms: int) -> dict[str,
     cached = cache.get("cached_tokens") if isinstance(cache, dict) else None
     observation.update(reasoning_tokens=reasoning, cached_tokens=cached)
     if (
-        type(reasoning) is not int
-        or not 0 <= reasoning <= outputs
+        (
+            not (chat and reasoning is None)
+            and (type(reasoning) is not int or not 0 <= reasoning <= outputs)
+        )
         or (cached is not None and (type(cached) is not int or not 0 <= cached <= inputs))
     ):
         return observation
@@ -204,28 +266,45 @@ def response_observation(payload: dict[str, Any], duration_ms: int) -> dict[str,
     return observation
 
 
-def parse_response(
-    payload: dict[str, Any],
-    row: dict[str, Any],
-    *,
-    expected_identity: tuple[str, str | None] | None,
-    duration_ms: int,
-    c_v2: bool = False,
-) -> dict[str, Any]:
-    """供应商契约解析;首次实返标识由实验账本持久化,后续逐次比较。"""
-    model = payload.get("model")
-    fingerprint = payload.get("system_fingerprint")
-    observation = response_observation(payload, duration_ms)
-    checks: dict[str, str] = dict.fromkeys(CONTRACT_CHECK_LAYERS, "NOT_EVALUATED")
-    if c_v2:
-        observation["contract_checks"] = checks
-
-    def check_layer(name: str, valid: bool, code: str) -> None:
-        if c_v2:
-            checks[name] = "PASS" if valid else "FAIL"
-        if not valid:
-            raise SufficiencyBlocked(code, observation)
-
+def decision_text(
+    payload: dict[str, Any], observation: dict[str, Any], *, chat: bool = False
+) -> str:
+    """只提取一个完整响应中的原始判定文本，不执行函数或修复内容。"""
+    if chat:
+        choices = payload.get("choices")
+        if (
+            payload.get("object") != "chat.completion"
+            or payload.get("error") is not None
+            or not observation["response_id"]
+            or not isinstance(choices, list)
+            or len(choices) != 1
+            or not isinstance(choices[0], dict)
+            or choices[0].get("finish_reason") != "tool_calls"
+        ):
+            raise SufficiencyBlocked("PROVIDER_RESPONSE_NOT_COMPLETED", observation)
+        message = choices[0].get("message")
+        if (
+            not isinstance(message, dict)
+            or message.get("role") != "assistant"
+            or message.get("content") not in (None, "")
+            or message.get("reasoning_content") not in (None, "")
+        ):
+            raise SufficiencyBlocked("OUTPUT_CONTRACT_INVALID", observation)
+        calls = message.get("tool_calls")
+        if not isinstance(calls, list) or len(calls) != 1 or not isinstance(calls[0], dict):
+            raise SufficiencyBlocked("OUTPUT_CONTRACT_INVALID", observation)
+        call = calls[0]
+        function = call.get("function")
+        if (
+            call.get("type") != "function"
+            or not isinstance(call.get("id"), str)
+            or not call["id"]
+            or not isinstance(function, dict)
+            or function.get("name") != SUFFICIENCY_FUNCTION
+            or not isinstance(function.get("arguments"), str)
+        ):
+            raise SufficiencyBlocked("OUTPUT_CONTRACT_INVALID", observation)
+        return function["arguments"]
     if (
         payload.get("object") != "response"
         or payload.get("status") != "completed"
@@ -234,18 +313,6 @@ def parse_response(
         or not observation["response_id"]
     ):
         raise SufficiencyBlocked("PROVIDER_RESPONSE_NOT_COMPLETED", observation)
-    if (
-        not isinstance(model, str)
-        or not re.fullmatch(r"deepseek-v4-flash(?:-[0-9]{4,8})?", model)
-        or (fingerprint is not None and not isinstance(fingerprint, str))
-    ):
-        raise SufficiencyBlocked("PROVIDER_IDENTITY_INVALID", observation)
-    if expected_identity is not None and (model, fingerprint) != expected_identity:
-        raise SufficiencyBlocked("PROVIDER_IDENTITY_DRIFT", observation)
-    if not observation["usage_trusted"]:
-        raise SufficiencyBlocked("USAGE_UNTRUSTED", observation)
-    if observation["reasoning_tokens"] != 0:
-        raise SufficiencyBlocked("TOKEN_CONTRACT_INVALID", observation)
     output = payload.get("output")
     if not isinstance(output, list) or len(output) != 1:
         raise SufficiencyBlocked("OUTPUT_CONTRACT_INVALID", observation)
@@ -266,8 +333,57 @@ def parse_response(
         or not isinstance(content[0].get("text"), str)
     ):
         raise SufficiencyBlocked("OUTPUT_CONTRACT_INVALID", observation)
+    return content[0]["text"]
+
+
+def parse_response(
+    payload: dict[str, Any],
+    row: dict[str, Any],
+    *,
+    expected_identity: tuple[str, str | None] | None,
+    duration_ms: int,
+    c_v2: bool = False,
+    chat: bool = False,
+) -> dict[str, Any]:
+    """供应商契约解析;首次实返标识由实验账本持久化,后续逐次比较。"""
+    model = payload.get("model")
+    fingerprint = payload.get("system_fingerprint")
+    observation = response_observation(payload, duration_ms, chat=chat)
+    checks: dict[str, str] = dict.fromkeys(CONTRACT_CHECK_LAYERS, "NOT_EVALUATED")
+    if c_v2:
+        observation["contract_checks"] = checks
+
+    def check_layer(name: str, valid: bool, code: str) -> None:
+        if c_v2:
+            checks[name] = "PASS" if valid else "FAIL"
+        if not valid:
+            raise SufficiencyBlocked(code, observation)
+
+    if not chat and (
+        payload.get("object") != "response"
+        or payload.get("status") != "completed"
+        or payload.get("error") is not None
+        or payload.get("incomplete_details") is not None
+        or not observation["response_id"]
+    ):
+        raise SufficiencyBlocked("PROVIDER_RESPONSE_NOT_COMPLETED", observation)
+    if (
+        not isinstance(model, str)
+        or not re.fullmatch(r"deepseek-v4-flash(?:-[0-9]{4,8})?", model)
+        or (fingerprint is not None and not isinstance(fingerprint, str))
+    ):
+        raise SufficiencyBlocked("PROVIDER_IDENTITY_INVALID", observation)
+    if expected_identity is not None and (model, fingerprint) != expected_identity:
+        raise SufficiencyBlocked("PROVIDER_IDENTITY_DRIFT", observation)
+    if not observation["usage_trusted"]:
+        raise SufficiencyBlocked("USAGE_UNTRUSTED", observation)
+    # Chat文档将reasoning明细列为可选；缺失记None，不伪报0。
+    # 非思考请求还须没有reasoning_content；总completion费用仍全部计入。
+    if observation["reasoning_tokens"] not in ((None, 0) if chat else (0,)):
+        raise SufficiencyBlocked("TOKEN_CONTRACT_INVALID", observation)
+    text = decision_text(payload, observation, chat=chat)
     try:
-        decision = json.loads(content[0]["text"])
+        decision = json.loads(text)
     except json.JSONDecodeError:
         if c_v2:
             checks["json_syntax"] = "FAIL"

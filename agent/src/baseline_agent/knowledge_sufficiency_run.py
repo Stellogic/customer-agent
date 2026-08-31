@@ -18,6 +18,7 @@ import httpx
 from baseline_agent.knowledge_answerability import QUALITY
 from baseline_agent.knowledge_sufficiency import (
     ARCHIVE_SHA256,
+    BETA_CHAT_TRANSPORT,
     CONTRACT_CHECK_LAYERS,
     DATA_SHA256,
     REPO,
@@ -26,6 +27,7 @@ from baseline_agent.knowledge_sufficiency import (
     SufficiencyBlocked,
     budget_plan,
     contract,
+    decision_text,
     development_rows,
     parse_response,
     replay_metrics,
@@ -403,6 +405,7 @@ async def run_development(
         ledger.begin(report["run_id"], frozen["asset_sha256"])
     report["rows"] = []
     config = frozen["config"]
+    chat = config.get("transport") == BETA_CHAT_TRANSPORT
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(15, connect=3),
         transport=transport,
@@ -439,7 +442,7 @@ async def run_development(
                 if not isinstance(payload, dict):
                     raise SufficiencyBlocked("PROVIDER_INVALID_SHAPE", observation)
                 elapsed = round((time.perf_counter() - started) * 1000)
-                observation = response_observation(payload, elapsed)
+                observation = response_observation(payload, elapsed, chat=chat)
                 observation["http_status"] = response.status_code
                 identity = ledger.state["identity"]
                 try:
@@ -451,6 +454,7 @@ async def run_development(
                         else None,
                         duration_ms=elapsed,
                         c_v2=modern_contract,
+                        chat=chat,
                     )
                 except SufficiencyBlocked as error:
                     if modern_contract:
@@ -460,10 +464,10 @@ async def run_development(
                         "INVALID_DECISION_SCHEMA",
                         "INVALID_EVIDENCE",
                     }:
-                        # 仅在固定envelope/单个output_text检查通过后取证。
+                        # 仅在固定envelope/单个判定文本检查通过后取证。
                         # 不复制error正文/请求头,仍由外层finally结算并抛原错。
                         observation["decision_diagnostic"] = decision_diagnostic(
-                            payload["output"][0]["content"][0]["text"], api_key
+                            decision_text(payload, observation, chat=chat), api_key
                         )
                     raise
                 if modern_contract:
