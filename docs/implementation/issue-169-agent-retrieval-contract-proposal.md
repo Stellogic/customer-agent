@@ -7,7 +7,7 @@
 下文“现有”均有这两个 SHA 的源码依据；标为“拟议”的路径、方法、字段、失败码和存储用法均未接线、未获集成放行，不是现行 API。
 
 建议采用**两个授权入口、一个检索适配**：客户 Agent 沿现有 ticket/generation 栅栏；HUMAN 辅助沿客服会话与当前 assignment 栅栏。两者在 Spring 内调用同一 #190 检索核心，由 #169 实现公共适配与引用校验。不要把内部知识页面 API 授予客户，也不要为 HUMAN 辅助复活 Agent generation。
-本轮新增的只有纯引用校验/投影及测试源码和本方案；无网络、SQL、模型、公共入口或迁移改动。#190 原生质量前置、串行验证窗口及协调放行要求不变。
+前一阶段新增纯引用校验/投影及测试源码和本方案；本次追加共用 DTO/纯响应解析（见文末对齐记录）。无网络、SQL、模型、公共入口或迁移改动。#190 原生质量前置、串行验证窗口及协调放行要求不变。
 
 ## 现有契约：明确能复用什么
 
@@ -30,17 +30,17 @@
 
 ## 拟议接缝 A：授权后的检索核心，#190 只需一个接缝
 
-请协调把以下最小变更交给 #190 owner 评估，#169 本轮不改其文件：在 KnowledgeRetrievalService 内，将现有“按 principal 求 scopes”之后的检索代码提取成**包内** `searchAuthorizedScopes(query, allowedScopes)`；原内部 search 仍先 requireScopes 并调它。该方法只接收服务端求出的非空范围，不增加 HTTP 路由、不复制 SQL/编码/阈值/融合，也不让 Agent 指定索引 generation、模型 revision 或 threshold。现有事务注解只在 search 上，新包内方法不会自动继承该事务。
+#190 owner 与协调已原则确认以下最小接缝，尚未在本分支实现，#169 不改其文件：在 KnowledgeRetrievalService 内，将现有“按 principal 求 scopes”之后的检索代码提取成**包内** `searchAuthorizedScopes(query, allowedScopes)`；原内部 search 保留身份/能力校验及 scope 选择后委派。接缝必须覆盖检索前权限/版本过滤、两路/RRF及**最终可回答性判定，返回正式 results**，不能只抽 retrieve 后把候选当答案。新可信入口范围为空直接拒绝；不新增 HTTP 路由、不复制引擎，也不让 Agent 指定索引 generation、模型 revision 或 threshold。现有事务注解只在 search 上，新包内方法不会自动继承该事务。旧 PR203 的 CALIBRATED/数值 threshold 只作历史源码证据，不指定为后续正式产品策略；冻结 c5 仍只是合成实验，不能据此新增云判定或真实消费。
 
 #169 拟新增同 knowledge 包的 `AgentKnowledgeRetrievalAdapter.java`：
 
 - `searchCustomer(query)` 固定范围 CUSTOMER_PUBLIC，仅由已验证客户 Agent 工单授权的 Spring 入口调用。
 - `searchSupport(principalId, query)` 复用 requireScopes(principalId)，只保留 INTERNAL/SUPPORT 交集，不能借审批角色扩大辅助范围；调用前后由 #170 验证当前领取关系。
-- **新增事务安排（拟议）**：适配的 searchCustomer/searchSupport 经 Spring 代理开启只读 REPEATABLE_READ 事务，覆盖包内共享核心检索及后续元数据补读；原内部 search 的事务仍保持不变。然后从 #190 的 **results** 提取命中引用，在该事务同一知识快照内按 articleId/version/chunkId 读取 title/updated_at 和 canonical chunk，保持发布/当前/范围检查。不得用另一个版本的标题或更新时间填补；不得在调用适配的外层已持有工单业务锁。
+- **已对齐、待实施的事务安排**：适配 public 方法 searchCustomer/searchSupport 经 Spring 代理开启只读 REPEATABLE_READ，覆盖共享核心检索及 canonical 元数据补读；原内部 search 的事务不变。外层编排必须**无事务**，前置授权事务先结束，检索事务结束后才进入接受结果事务；仅“不持业务锁”不够，因为默认 REQUIRED 会加入外层事务而忽略本地隔离级别。无需 REQUIRES_NEW/新租约/通用框架。不得用另一版本的标题或更新时间填补。[Spring REQUIRED 官方说明](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html)、[代理与自调用说明](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html)。
 - 返回给 Agent 的受控条目拟为 `articleId, version, chunkId, title, updatedAt, applicability, startLine, endLine, snippet`。sourceFile、分数、候选和模型配置留在 #190 内部诊断；Agent 不需要它们。
 - 拟议响应 `schema=agent-knowledge-v1, indexGeneration, results`；空结果就是 NO_ANSWER，不另外猜测“低分”或“无语料”。quality policy/revision 可在内部回执留存，但不把它们作为权限。
 
-这不是增加第二个检索引擎。若 #190 不采用该方法名，可以只调整包内接缝名；明确的要求是**共享原检索核心并保持检索前过滤**。本轮不预写依赖该未接受方法的适配类。
+这不是增加第二个检索引擎。接缝实现仍归 #190 并等待其独立验证与协调窗口，#169 本轮不预写或挂载依赖该尚未落地方法的 Spring 适配类。
 
 ## 拟议接缝 B：Agent 如何调用，怎样撤销
 
@@ -56,7 +56,7 @@
 
 HUMAN 通道由 #170 自有辅助请求入口验证 SUPPORT 会话、HUMAN、当前 ACTIVE assignment（包括 assignment id，防止撤回后重新领取同一人的旧辅助结果重新有效）。#170 保存稳定辅助请求与 assignment 绑定，不能往需要 generation 外键的 agent_command_request 塞假 UUID。辅助 worker 的知识调用须经 Spring 按该辅助请求重新解出 ticket/当前负责客服/允许范围；发起、取结果、返回浏览器时都复核。其路由和请求记录仍由 #170 决定，不在本方案冒称为已有接口。
 
-#169 拟新增 `agent/src/baseline_agent/knowledge_retrieval.py` 作为两通道唯一的响应解析/HTTP错误归类代码；认证与已授权请求上下文由各入口传入，不接收模型给出的 URL/headers，不自建 retriever、模型或 provider 切换。客户侧选择动作的枚举及 graph 调度由 #169 在放行后接线；#170 仅调用同一适配，不实现第二份检索。
+#169 已新增独立 `agent/src/baseline_agent/knowledge_retrieval.py` 作为两通道唯一的 DTO/响应解析/HTTP错误归类代码，当前只接收状态码和已解码 JSON，不发请求或接收 URL/headers。未来认证与已授权上下文由各入口提供，不自建 retriever、模型或 provider 切换。客户侧选择动作及 graph 仍等待放行；#170 仅消费同一 DTO，不实现第二份检索解析。
 
 ## 拟议失败契约与输出规则
 
@@ -94,14 +94,14 @@ HUMAN 通道由 #170 自有辅助请求入口验证 SUPPORT 会话、HUMAN、当
 
 | 区域 | 唯一 owner / 本轮处理 |
 | --- | --- |
-| KnowledgeCitationProjection.java、测试；AgentKnowledgeRetrievalAdapter.java；agent/.../knowledge_retrieval.py；客户来源 UI | #169；本轮只实现前两项现有模型纯投影文件，其余路径拟议。 |
+| KnowledgeCitationProjection.java、测试；AgentKnowledgeRetrievalAdapter.java；agent/.../knowledge_retrieval.py；客户来源 UI | #169；纯投影、共用 Python DTO/解析与各自测试源码已写，Spring adapter 仍待实施。 |
 | KnowledgeRetrievalService.java 的包内共享方法，以及检索模型/编码/依赖/Compose/校准与质量 | #190；#169 只提出最小接缝，不修改、不复制实现。 |
 | AgentInvestigationController/Service、JdbcAgentInvestigationService 的新增知识方法；客户 graph/动作选择/回复协议；CustomerPublicProjectionAppender/客户快照与 App.tsx | 拟议集成修改由 #169 单独承担，需协调开放共享文件窗口；本轮均不修改，不触碰 JdbcCompensationProposalStore 等 #165 补偿区域。 |
 | HUMAN 辅助入口/请求绑定、当前领取校验、结果访问/撤权、composer/草稿发送衔接 | #170；引用共用适配，不委托 #169 修改其文件。 |
 | 内部 shell/页面导航 | #193；本轮与本接入方案均不需要修改。 |
 
 可执行顺序：①协调确认 #190 包内范围接缝与以上归属；②#190 质量 PASS、合入关票后读取正式接口；③#169 落地共用适配、customer 授权前后复核和引用回执，#170 对接自己的 assignment 请求；④#169 完成回复语义校验/投影持久化和版本协议再接 UI，双方补足真实故障与撤权测试；⑤按协调串行窗口验证、增量双 CR 与正式交付。
-本轮无需等待①才能保存独立纯模块和具体方案；①未批准也不能把拟议接口当现有事实编码到公共入口。
+①的原则接缝已对齐，但尚无正式实现或真实集成许可；不能据此把未来接口当已上线 API 接到公共入口。
 
 ## 贡献与验证记录
 
@@ -110,3 +110,26 @@ HUMAN 通道由 #170 自有辅助请求入口验证 SUPPORT 会话、HUMAN、当
 **NOT_RUN**：测试、格式化/格式检查、lint、类型检查、构建、模型、评测、Docker/Compose、浏览器、测试锁、check.ps1。未合入、未关闭 Issue；CI 保持关闭。
 
 静态双 CR（2026-08-31）：固定比较 `git diff --cached c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`，复审完整七文件 597 新增行（含旧 UI）；增量四文件 317 行。首轮 Standards/Spec 均指出同一 P2：包内检索方法不自动继承原 search 事务。已明确新增适配事务经 Spring 代理覆盖检索与元数据补读，再重审完整暂存差异，两轴均 **PASS，0 项未解决发现**。本段只补记审查结果；所有运行验证仍 NOT_RUN。
+
+## 本次 #169/#170 消费者字段对齐与纯解析（2026-08-31）
+
+由协调任务 `01a043aa-d724-7353-b6c5-9266277846d6` 限定静态授权，直接与 #170 任务 `01a053ab-74a9-72e3-aeb2-87bc6e09139f` 对齐；#190 接缝意见来自 owner 任务 `01a051b6-257f-7230-a04e-a2f6a112e921`。未因对齐增加测试/真实集成许可。
+
+| 共用解析输入/输出 | 已收敛的静态契约，不代表已有 HTTP endpoint |
+| --- | --- |
+| `parse_knowledge_response(status_code, payload)` | 输入 HTTP 状态码与已解码 JSON；不执行 HTTP、JSON 解码、鉴权、重试、缓存或清屏。未来传输/JSON 解码异常由调用者归为 RETRIEVAL_UNAVAILABLE。 |
+| 成功载荷 | 仅 HTTP 200；精确字段 schema=agent-knowledge-v1、indexGeneration（非负整数，非业务 generation UUID）、results（0–5 条最终结果）。不接受 knowledge-hybrid-v1、两路候选、policy 或多余载荷字段。 |
+| 每条 results | 精确字段 articleId/version/chunkId/title/updatedAt/applicability/startLine/endLine/snippet。文本非空，updatedAt 是带时区 ISO 时间，scope 使用现有四范围词汇且非空，行号为正且 endLine≥startLine；范围是否获授权仍由 Spring 决定。 |
+| Python DTO | frozen KnowledgeSource 使用对应 snake_case 属性；KnowledgeRetrievalResult(index_generation, sources)，集合复制成 tuple，status 由是否有 sources 派生 AVAILABLE 或 NO_ANSWER。不把畸形响应降成空结果。 |
+| HTTP 401/403/404；400；409 | 依次映射 ACCESS_DENIED、INVALID_QUERY、REQUEST_CONFLICT。权限优先于错误正文自称的 code。 |
+| HTTP 503 | 仅保留 CALIBRATION_REQUIRED/INDEX_STALE/MODEL_UNAVAILABLE；FUSION_UNAVAILABLE、其他码或未知失败一律 RETRIEVAL_UNAVAILABLE。这里只约定消费者对已知受控错误的兼容，不要求 #190 采用旧阈值策略。 |
+| HTTP 422 | 仅保留 INVALID_KNOWLEDGE_CITATION/KNOWLEDGE_CONFLICT/UNSAFE_KNOWLEDGE；这些仍是消费者约定，未新增 Spring handler 或语义检测。 |
+| 其他 HTTP 错误、畸形 200 | 抛 KnowledgeRetrievalFailure(RETRIEVAL_UNAVAILABLE)，不透传异常正文/原始 payload。 |
+
+#170 确认现 UI 的 title/version/articleId/chunkId/snippet/applicability 是共用条目的显示子集，后续由其增加 updatedAt/startLine/endLine。Agent 内 DTO 不是浏览器授权结果，#170 不复制 Python DTO/HTTP解析。
+HUMAN 自有绑定为 ticketId + assignmentId + requestId + assistanceType（服务端再保存输入摘要）；principal 从会话取得。新类型/输入用新 requestId，重试同身份同参数，异参 409 REQUEST_CONFLICT。发起/取结果/返回前均复核 SUPPORT/HUMAN/ACTIVE assignment；这些仍由 #170 在后续真正入口实现。
+只有匹配当前绑定的 ACCESS_DENIED/受保护资源404 才清理该 assignment 的授权内容/草稿并停重试；旧 assignment/request 的迟到结果（含拒绝）不得清理新的绑定。其余知识失败保留人工编辑；辅助生成模型失败与 MODEL_UNAVAILABLE（Embedding）分开。#170 本轮仅实现自有客户端绑定状态，路由/请求持久化/真实授权仍后置。
+
+消费者测试源码在 `agent/tests/test_knowledge_retrieval.py`：双方 scope 共用 DTO、规范结果与空结果、私有字段/内部候选拒绝、引用字段约束、错误类别及不透传原始载荷。fixture 仅在测试文件，不向任何 endpoint 发请求。所有验证 **NOT_RUN**；该解析器不能宣称已经完成注入防护、当前版本复核或回复依据校验。
+
+本次静态双 CR：固定比较 `git diff --cached 6e343df0367cd81382d71cb327fc07eddb0a512a`（三文件，317 新增／7 删除），Standards **PASS，0 项发现**；Spec **PASS，0 项发现**。本段仅补记结果，未改被审阅的解析实现；测试及全部运行验证仍 NOT_RUN。
