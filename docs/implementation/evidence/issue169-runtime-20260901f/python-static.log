@@ -1,0 +1,68 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> agent\tests\issue169_customer_answer_run.py:3:1
+   |
+ 1 |   """#169 冻结客户集调用真实产品回答接缝;沿唯一累计账本,不是独立充分性模型。"""
+ 2 |
+ 3 | / import asyncio
+ 4 | | import hashlib
+ 5 | | import json
+ 6 | | import os
+ 7 | | from dataclasses import asdict
+ 8 | | from pathlib import Path
+ 9 | |
+10 | | import httpx
+11 | | from issue169_customer_knowledge_acceptance import ORDER, prepare, retrieve, submit
+12 | |
+13 | | from baseline_agent.customer_communication_model import (
+14 | |     CustomerCommunicationFailure,
+15 | |     CustomerCommunicationFailureCode,
+16 | |     CustomerCommunicationInput,
+17 | | )
+18 | | from baseline_agent.deepseek_customer_communication_model import (
+19 | |     DeepSeekCustomerCommunicationConfig,
+20 | |     DeepSeekResponsesCustomerCommunicationModel,
+21 | | )
+22 | | from baseline_agent.knowledge_retrieval import parse_knowledge_response
+23 | | from baseline_agent.knowledge_sufficiency_run import write_json
+   | |_______________________________________________________________^
+help: Organize imports
+   |
+10 | import httpx
+   - from issue169_customer_knowledge_acceptance import ORDER, prepare, retrieve, submit
+   -
+11 | from baseline_agent.customer_communication_model import (
+--------------------------------------------------------------------------------
+21 | from baseline_agent.knowledge_sufficiency_run import write_json
+22 + from issue169_customer_knowledge_acceptance import ORDER, prepare, retrieve, submit
+23 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> agent\tests\issue169_customer_knowledge_acceptance.py:3:1
+   |
+ 1 |   """#169 隔离 Spring/PostgreSQL 客户知识验收,显式合成fixture不是真实模型质量。"""
+ 2 |
+ 3 | / import json
+ 4 | | import os
+ 5 | | import time
+ 6 | | import uuid
+ 7 | | from concurrent.futures import ThreadPoolExecutor
+ 8 | | from pathlib import Path
+ 9 | |
+10 | | import httpx
+11 | | import psycopg
+12 | |
+13 | | from smoke import collect_investigation_facts, customer_reply, evidence_sufficiency
+   | |___________________________________________________________________________________^
+14 |
+15 |   ORDER = "ORDER-DELAY-UNDER-24"
+   |
+help: Organize imports
+   |
+11 | import psycopg
+   -
+12 | from smoke import collect_investigation_facts, customer_reply, evidence_sufficiency
+   |
+
+Found 2 errors.
+[*] 2 fixable with the `--fix` option.
