@@ -1,0 +1,50 @@
+{
+  "run_id": "issue190-c-offline-20260831c",
+  "head_sha": "b9c46a932267bf1264dfbe1ed81950dfc3e17d72",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "ERROR",
+  "phases": [
+    {
+      "name": "httpx-init-probe",
+      "exit_code": 0,
+      "elapsed_seconds": 3.0785751
+    },
+    {
+      "name": "focused",
+      "exit_code": 0,
+      "elapsed_seconds": 3.1674472
+    },
+    {
+      "name": "format",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0585737
+    },
+    {
+      "name": "lint",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0682901
+    },
+    {
+      "name": "format-check",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0662293
+    },
+    {
+      "name": "types",
+      "exit_code": 0,
+      "elapsed_seconds": 16.3523439
+    },
+    {
+      "name": "offline-component",
+      "exit_code": 1,
+      "elapsed_seconds": 31.6293446
+    }
+  ],
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "development_replay_run": false,
+  "holdout_or_frozen_evaluation_run": false,
+  "failure": "offline-component failed: 1",
+  "elapsed_seconds": 54.5187248,
+  "working_tree_changed": false
+}

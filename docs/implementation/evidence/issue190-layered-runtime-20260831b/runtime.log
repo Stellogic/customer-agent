@@ -1,0 +1,30 @@
+**********************
+PowerShell transcript start
+Start time: 20260831234642
+Username: <HOST>\lz
+RunAs User: <HOST>\lz
+Configuration Name: 
+Machine: <HOST> (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\Program Files\PowerShell\7\pwsh.dll -NoProfile -File .local/issue190-layered-runtime.ps1 -RunId issue190-layered-runtime-20260831b
+Process ID: 41424
+PSVersion: 7.6.5
+PSEdition: Core
+GitCommitId: 7.6.5
+OS: Microsoft Windows 10.0.26200
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+PS>TerminatingError(): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: Program "docker.exe" ended with non-zero exit code: 1 (0x00000001)."
+>> TerminatingError(): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: Program "docker.exe" ended with non-zero exit code: 1 (0x00000001)."
+Program "docker.exe" ended with non-zero exit code: 1 (0x00000001).
+
+Error response from daemon: No such image: customer-agent/agent-test:gate-issue190-layered-runtime-20260831b
+>> TerminatingError(): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: Program "docker.exe" ended with non-zero exit code: 1 (0x00000001)."
+>> TerminatingError(): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: Program "docker.exe" ended with non-zero exit code: 1 (0x00000001)."
+**********************
+PowerShell transcript end
+End time: 20260831234816
+**********************

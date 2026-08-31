@@ -1,0 +1,4155 @@
+{
+  "dataset_id": "knowledge-calibration-v1",
+  "dataset_sha256": "d07cbea9ec854a34a702f9fe38eb147ccf6de0ddc619248a8201b77a97bd397a",
+  "source_sha256": {
+    "calibrator": "ed7ab25586637496ae2ef1fdd3075d2b61729d92d478aa7f75a6876089e1148c",
+    "encoder": "f8b7b5f7aa13b0d0b0632c7720fe1fef76c6b4f23a51bd66c3aa6183d4c3693c",
+    "dataset_loader": "f5df762b3e2de0f7caa141a1baa042c7fa5d0e1d1f1d64dc5d5ea9582170a5c7"
+  },
+  "run_id": "issue190-calibration-20260831a",
+  "head_sha": "0a6e528af679b3558c9554171d15ecfcb4a49ca1",
+  "base_sha": "efbdb8348dc9c12f259c69d9e8c16de5e4d3994c",
+  "working_tree_dirty": false,
+  "status": "MEASURED",
+  "paid_model_cost_cny": 0,
+  "environment": {
+    "python": "3.13.13",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "torch": "2.10.0+cpu",
+    "transformers": "4.57.6",
+    "safetensors": "0.7.0"
+  },
+  "selection": "calibration-only max(min(class recalls)), then balanced accuracy, then higher threshold",
+  "rows": [
+    {
+      "id": "library-answerable-1",
+      "split": "calibration",
+      "text": "书还没看完，网上怎么延长借阅？",
+      "expected_chunks": [
+        "library-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6305864985305464,
+      "candidates": [
+        {
+          "chunk_id": "library-p1",
+          "score": 0.6305864985305464
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.5747283065679406
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.5561819570025688
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.42357207499429345
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.40544450019290973
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.39454431674480006
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3804312687794558
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.36246241755112113
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.3579441246557858
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3510064263226978
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.3448187743930781
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.34330168843058495
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.32020800827296725
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.3024727050782019
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.27519353095652227
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2588388577082256
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.23850909504495504
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.21818280017725092
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "library-answerable-2",
+      "split": "calibration",
+      "text": "别人预订了我借的书，还能再续一次吗？",
+      "expected_chunks": [
+        "library-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.7329178155686401,
+      "candidates": [
+        {
+          "chunk_id": "library-p1",
+          "score": 0.7329178155686401
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.5758843423017628
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.5201839809465143
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.4369604546067915
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3941911906007037
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.3847230988502325
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3761568623764235
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.35923063421628326
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.35663429694132315
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.3534728702036881
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.32894625414802836
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3035414989756916
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2821550939394895
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.27538577573437967
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.2648146832014351
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.263597883112353
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.24907776158722442
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.17973164650019904
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "library-answerable-3",
+      "split": "calibration",
+      "text": "自助机器还书要先扫码还是直接放进去？",
+      "expected_chunks": [
+        "library-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6898021226655878,
+      "candidates": [
+        {
+          "chunk_id": "library-p2",
+          "score": 0.6898021226655878
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.5281082323650292
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.49856437124798764
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.4523788650904757
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.4468560680232073
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.4399198524624476
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.42049955725772187
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.40653105912171683
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.3949798057509946
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3940046253839719
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.34351747655661335
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.33877815235255376
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.2729016685748241
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.25896361007707525
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2458104796782879
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2333779989656761
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.20524845247373555
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.18890027331186104
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "library-answerable-4",
+      "split": "calibration",
+      "text": "还书机扫完条码后要等什么提示？",
+      "expected_chunks": [
+        "library-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.7168930840824138,
+      "candidates": [
+        {
+          "chunk_id": "library-p2",
+          "score": 0.7168930840824138
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.5426201935466093
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.5371191794465476
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.46194991268497865
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.4263942663801551
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.387502285004603
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3734171735151109
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3731669205452124
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.34859965176769164
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.3382100674517593
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.32819333168003645
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.3068302351812039
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.292241997049376
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.248526614410293
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.24031635491183265
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.22175250934100763
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.20538254770651307
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.19708574113648392
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "library-unanswerable-1",
+      "split": "calibration",
+      "text": "图书逾期一天要交多少罚金？",
+      "expected_chunks": [],
+      "reason": "正文未规定逾期费用。",
+      "score": 0.584546245577127,
+      "candidates": [
+        {
+          "chunk_id": "library-p1",
+          "score": 0.584546245577127
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.5542294191315343
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.47001472405555744
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.35062058639235216
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.34475101282618387
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3288315826707296
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.3072021463677766
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.30495157318476246
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.2963426333283709
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.2958426067742353
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.2750525490258565
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.267384896724327
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.26203639868751766
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.259675736539427
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.25081711282194363
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.20744700705350697
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2023167424621318
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.1983408613467273
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "library-unanswerable-2",
+      "split": "calibration",
+      "text": "可不可以把借来的书邮寄回图书馆？",
+      "expected_chunks": [],
+      "reason": "正文未规定邮寄服务。",
+      "score": 0.6716416613859528,
+      "candidates": [
+        {
+          "chunk_id": "library-title",
+          "score": 0.6716416613859528
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.6426677126615195
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.6000062562949269
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.4916211181672709
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.46528136332669595
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.4495831556162107
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3945174784868027
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3491768720005802
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.3429554306889082
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.3279471590403554
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.28179662890225143
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.2733756990939489
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.27086191736143067
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.23407074971585298
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.21591039304332713
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.19135367778177045
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.18381281235334762
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.14571780697120756
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "library-unanswerable-3",
+      "split": "calibration",
+      "text": "电子杂志的阅读账号在哪里申请？",
+      "expected_chunks": [],
+      "reason": "语料没有电子资源账号规则。",
+      "score": 0.43127371864152886,
+      "candidates": [
+        {
+          "chunk_id": "library-p1",
+          "score": 0.43127371864152886
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.4124946439620651
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.37145405258057507
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.3074721475060112
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.3017185002410689
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.2880821263634486
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.28184555927708277
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.27331543638635025
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.2601590271682028
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.2532412600656094
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.2417712710401005
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.23376350451858147
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.19659201158621914
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.19584854507347005
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.18967374116043714
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.1727615258882924
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.17057206392111987
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.13499562962756834
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "library-unanswerable-4",
+      "split": "calibration",
+      "text": "周末的作者讲座几点开始？",
+      "expected_chunks": [],
+      "reason": "语料没有活动日程。",
+      "score": 0.4691165986977741,
+      "candidates": [
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.4691165986977741
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.44782497904723323
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.4179013328830942
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.38212079915032554
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.3338621496776539
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.33272094779583267
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3046164728404767
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.29223855011659716
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.29120284239092925
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2899037837577016
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.285690722263866
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.26947216505621197
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2683043169905481
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.25049290261324353
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.23592116270674174
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.23505313171237677
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.23126974321915006
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.184854209070472
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "greenhouse-answerable-1",
+      "split": "calibration",
+      "text": "育苗房太热了应该开哪个窗通风？",
+      "expected_chunks": [
+        "greenhouse-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.7069416918001885,
+      "candidates": [
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.7069416918001885
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.48732206703821285
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.4209055488581852
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.41289348472505955
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.4003343734279476
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.38271429994582373
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.35925619137613624
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.35519837832539114
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.34550398549690614
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.32957006216382334
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.3052566321480105
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.29947291753299243
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.2598650323526317
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.2531892280796772
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.24262773179738542
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.1920547013130202
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.17745650616526454
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.15005424542924567
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "greenhouse-answerable-2",
+      "split": "calibration",
+      "text": "温室降温后侧窗还一直开着吗？",
+      "expected_chunks": [
+        "greenhouse-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.5846626103254386,
+      "candidates": [
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.5846626103254386
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.5301243630504817
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.4135815799144038
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.40756969787402814
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.39864609542107626
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.37899501061737584
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.36986376925032566
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.3634015337785016
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3469644073932281
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.3459611125861774
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.3338713171852862
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.30565050800318255
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.2951528629002806
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.24708525790957295
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.2345377880327904
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.23287839358561035
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.23164707787732092
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.22867269830356193
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "greenhouse-answerable-3",
+      "split": "calibration",
+      "text": "我怎么判断盆里的苗该不该浇水？",
+      "expected_chunks": [
+        "greenhouse-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6692559609674993,
+      "candidates": [
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.6692559609674993
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.5414934792328694
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.42903503350294453
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.35412165676751306
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3513265391208739
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.3506481293122005
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3448006902174288
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3382008261775088
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.3322677785924576
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.28822159809275777
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.2862412494151833
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.2695209028275741
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.2634848889312157
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.23637625421469852
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.22315934456964326
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.19836273710459468
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.19661805117056688
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.19001008927187846
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "greenhouse-answerable-4",
+      "split": "calibration",
+      "text": "小苗叶子冒黄斑了，先放哪里？",
+      "expected_chunks": [
+        "greenhouse-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6904588461765044,
+      "candidates": [
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.6904588461765044
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.5399610709157765
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.38773902116547665
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.36915312409521794
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3517042998560536
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.34913506232937647
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.3433239316763625
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.34186836066455883
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.34041559739098537
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.3120497628503738
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.2960990474518252
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.2816842218604056
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.27019248578044797
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2536281280288423
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.23772870426683604
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.22064162645533777
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.2140538268317289
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.19727104565294876
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "greenhouse-unanswerable-1",
+      "split": "calibration",
+      "text": "这批小苗要施多少克氮肥？",
+      "expected_chunks": [],
+      "reason": "正文没有施肥剂量。",
+      "score": 0.4824738287188227,
+      "candidates": [
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.4824738287188227
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.48101309988605573
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.34619245996877207
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3298180546671133
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.2947248928071718
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2821855968341556
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.26191238452953375
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2387677181882443
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.23089673599216773
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.21872568699417194
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.2001370859877312
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.1886199617702566
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.18347447344545867
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.18175844847892497
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.17374751179833076
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.16661027353802577
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.16326714495176564
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.13965151455162417
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "greenhouse-unanswerable-2",
+      "split": "calibration",
+      "text": "温室侧窗电机坏了找哪家维修？",
+      "expected_chunks": [],
+      "reason": "正文没有设备维修信息。",
+      "score": 0.4749346774868357,
+      "candidates": [
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.4749346774868357
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.4719575372720691
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3985022613437097
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.3908670738163929
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.3868317721331812
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.38241538447453916
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.37775089743821155
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.3554206852693998
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3419706162124482
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.33138392569537034
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.31251913238235773
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.300627171932895
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.2729580793207288
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.2441886118559452
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.242172012965707
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.23617827122616217
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.2343424984964272
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.20323971003115984
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "greenhouse-unanswerable-3",
+      "split": "calibration",
+      "text": "叶片黄斑到底是哪种真菌引起的？",
+      "expected_chunks": [],
+      "reason": "观察建议不能诊断病原。",
+      "score": 0.6151026248996199,
+      "candidates": [
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.6151026248996199
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.3799144712642529
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.30222833717776515
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.29087348364519994
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.28750322348101787
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.25680506486876975
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.24203552394183026
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.23710274590066638
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.23162675192032706
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.2165691694295252
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.21457789838624514
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.2006058577823805
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.1835236588402571
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.17794992406642776
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.17390818642965153
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.16062553228723875
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.152985372521233
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.15255809474473428
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "greenhouse-unanswerable-4",
+      "split": "calibration",
+      "text": "番茄从播种到收获需要几天？",
+      "expected_chunks": [],
+      "reason": "正文没有作物生长周期。",
+      "score": 0.44299702269778607,
+      "candidates": [
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.44299702269778607
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.4403039516252222
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.3956195571727224
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.36820883725090114
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.35373593637210116
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3422276160280221
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3346004886799984
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.32826123020524334
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.3097935481167427
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.2951664131905083
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2728076701167559
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.2688620370832839
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.25499481731004986
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.24603683525947084
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.23547204043338066
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.2185700460857611
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.18928375181634974
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.18677511960715107
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "gallery-answerable-1",
+      "split": "calibration",
+      "text": "进展馆背的大包在哪里存？",
+      "expected_chunks": [
+        "gallery-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6872073295849683,
+      "candidates": [
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.6872073295849683
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.5505264783316645
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.42415303833030327
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3803565263642026
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.37752266342575264
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.35364657728971466
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3524352083643083
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.3333933031492674
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.32900682500139694
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3239799532743472
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.28518396626171083
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.272282073540772
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.26624678099808863
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.24229954757928215
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.23914141768056993
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2249374107093432
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.18006023542415503
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.17137088284060675
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "gallery-answerable-2",
+      "split": "calibration",
+      "text": "寄存柜关上以后靠什么把包取出来？",
+      "expected_chunks": [
+        "gallery-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6803288074422685,
+      "candidates": [
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.6803288074422685
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.5267796351639537
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.5035711820379439
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.5009674121737144
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.49324231742112196
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.49249757601970356
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.4446741100668427
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.40333174316481885
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.3706707871604963
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.3435295317965652
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.31610650000508644
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.306747066170036
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.26300779578868877
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.25264841314036507
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.23996474327612582
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.22018571832759862
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.189320112296714
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.1825452273994517
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "gallery-answerable-3",
+      "split": "calibration",
+      "text": "拿着开封的饮料能直接放自助柜吗？",
+      "expected_chunks": [
+        "gallery-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6646612584872537,
+      "candidates": [
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.6646612584872537
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.4606848880474245
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.4168402805806689
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.4146832662611187
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.408009692400714
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3980978910943771
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.36305810888694695
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.36161525566126257
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.3504795067125873
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.3491649941379983
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.3116244699564798
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2981280942009747
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.27302703344363455
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.25882641970448117
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2587561155590891
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2569064383336125
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.25347649224271646
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.22979143318956166
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "gallery-answerable-4",
+      "split": "calibration",
+      "text": "带了玻璃杯，寄存前应该找谁问？",
+      "expected_chunks": [
+        "gallery-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6347131476326932,
+      "candidates": [
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.6347131476326932
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.4783890111776001
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.46426399597093887
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.43320335266785115
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.40438638835514623
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.40315300187638536
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.3853212803092835
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.3819754715774086
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.3779921193723836
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.37749764909582595
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.36659735170555835
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.29763964153569383
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.29393598116944775
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2915266218867742
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.28908929765165237
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.2666713032340614
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.2428719882195562
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2404754393630816
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "gallery-unanswerable-1",
+      "split": "calibration",
+      "text": "展馆寄存柜每小时收费多少钱？",
+      "expected_chunks": [],
+      "reason": "正文未规定寄存价格。",
+      "score": 0.5678539322462636,
+      "candidates": [
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.5678539322462636
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.5562215945823727
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.477406021877428
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.38818040181814506
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.3740780326432257
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.37175022620721154
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3669075219817269
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.36663206285691985
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.3459037286114379
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.32509104278312073
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.31772685297135794
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.30879061130312657
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2817123521619863
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.27435996002612817
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.22771214511715018
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.22217467854584483
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.19451194080455483
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.17692473575357567
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "gallery-unanswerable-2",
+      "split": "calibration",
+      "text": "取物码丢失后要提供什么身份证件？",
+      "expected_chunks": [],
+      "reason": "正文没有取物码遗失流程。",
+      "score": 0.6099839428216847,
+      "candidates": [
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.6099839428216847
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.507978367484608
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.5031668430373025
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.46828888580623795
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.45927378377371003
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.3864535172640491
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.3334493674848986
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3264636181738043
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.31588298929223413
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3156919245572474
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.3123280908888392
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.31124788604508147
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2980806863281776
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.24529248396508233
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.2337488072853208
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.22201408536993444
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.18566355153644123
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.16141626884939173
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "gallery-unanswerable-3",
+      "split": "calibration",
+      "text": "展馆里面能租到儿童推车吗？",
+      "expected_chunks": [],
+      "reason": "语料没有推车服务。",
+      "score": 0.4496959775132744,
+      "candidates": [
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.4496959775132744
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.43085082140813324
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.41820797043714114
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.40880283009701956
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.4042971674752235
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.40295961505845623
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.382814413528992
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3606884428010871
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.33619047789620443
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3354919727713408
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.3175986619863456
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.3041537594111433
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2920982364694541
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.2864238398315001
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.27362809086957735
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.27128861691070333
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.23938176347157666
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.21615538088941139
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "gallery-unanswerable-4",
+      "split": "calibration",
+      "text": "现在二楼正在展出哪位画家的作品？",
+      "expected_chunks": [],
+      "reason": "语料没有展览名录。",
+      "score": 0.35895251582991433,
+      "candidates": [
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.35895251582991433
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.3473466466090049
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.3405821617588093
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.3405344059257748
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.31908539155630455
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.29229562838051226
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.29207548572391756
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.2837217121491434
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.2780733126620144
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.26848917138889117
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.25003354751695
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.23306673571286832
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.22862714435203899
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.22787999087539404
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.21588373681334883
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.215181851097833
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.20621801797869524
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.16919852454035106
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "swimming-answerable-1",
+      "split": "calibration",
+      "text": "订了泳道，检票时需要出示什么？",
+      "expected_chunks": [
+        "swimming-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6386490953537963,
+      "candidates": [
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.6386490953537963
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.58656428100554
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.5408861071389139
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.4242313914070382
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.38226302462996853
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.3799985853618338
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.3532144131904431
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.3456844848851916
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.32995619800714343
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.32680981085736127
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.31521238463500667
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.29647978354080184
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.2894399247939762
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.28217998079656065
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.2819130119500225
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.273545665471294
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.2341689751841172
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.19703394828980314
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "swimming-answerable-2",
+      "split": "calibration",
+      "text": "我游完四十五分钟可以直接占着下一场吗？",
+      "expected_chunks": [
+        "swimming-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6006147941455101,
+      "candidates": [
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.6006147941455101
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.4873382993681056
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.4071929661640365
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.4001323700792362
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.380645541318221
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.37683403144267613
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.3707828017330483
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.3617899092803838
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.3580733388454837
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.3346736437857393
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.32634327705598065
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.3194955369651753
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.3154296132089974
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.27015175857068263
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.26540466906306015
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.2448355835167077
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.17434413482270378
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.17185811682697363
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "swimming-answerable-3",
+      "split": "calibration",
+      "text": "小孩学游泳应该去哪个区，谁陪着？",
+      "expected_chunks": [
+        "swimming-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6072239829935709,
+      "candidates": [
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.6072239829935709
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.49507582537732425
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.4769003030925898
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.3414152557558621
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.32982808265964125
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.31421896831294016
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.30527532808930113
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.29217057124847945
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.28693610552688026
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.27158570341090277
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.2614137092260592
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.24493662987985296
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.2403558763975248
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.22776433319980577
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.22718891871428729
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.21575606525107835
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.2065347678101416
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.18027976296570655
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "swimming-answerable-4",
+      "split": "calibration",
+      "text": "家长一起下水就能不测评直接去深水道吗？",
+      "expected_chunks": [
+        "swimming-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6749346796203541,
+      "candidates": [
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.6749346796203541
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.47071510018551704
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.4527292285563046
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.38898104696924585
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.38534603280702423
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.36951889790586284
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.3647117103038078
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.35698876841836724
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.32517943763973295
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.28021160297012676
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.2646675004364486
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.26216315974583526
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.26207299747400364
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.26063016416014856
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.2532137122633186
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.24821655067913903
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.1914983547682451
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.13328473400778634
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "swimming-unanswerable-1",
+      "split": "calibration",
+      "text": "私人游泳教练的一节课多少钱？",
+      "expected_chunks": [],
+      "reason": "正文没有教练课程价格。",
+      "score": 0.4944230597639144,
+      "candidates": [
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.4944230597639144
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.48108100492440015
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.45401543339674016
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3165483934498563
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.27692888445877784
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.2660069489031231
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.2519157458238076
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.24491982194552364
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.23810698827532228
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.2341510433655463
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.23308653756729364
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.23097611686306208
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.20996513930164726
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.20977202612305676
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.20838487898345556
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.18971263259641186
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.1875791611218209
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.183981853090684
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "swimming-unanswerable-2",
+      "split": "calibration",
+      "text": "深水泳道的水深具体有几米？",
+      "expected_chunks": [],
+      "reason": "正文没有泳池尺寸。",
+      "score": 0.59089046243936,
+      "candidates": [
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.59089046243936
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.5129556994704916
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.4991773824548562
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.3637922818837588
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.3389882553460518
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.29944334337548595
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.29581374393234966
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.27706162946950164
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.2720514506492467
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2652254022711178
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.2578002456104216
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.24675934641075242
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.24387183735216486
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.2277809795692498
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.19077337096177865
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.18427323688222308
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.15389214587601133
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.15013740347307483
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "swimming-unanswerable-3",
+      "split": "calibration",
+      "text": "泳池这周哪一天换水？",
+      "expected_chunks": [],
+      "reason": "正文没有维护日程。",
+      "score": 0.548639330052852,
+      "candidates": [
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.548639330052852
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.5411166684745804
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.4414293524712009
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.33687203939104493
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.31790697285244424
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.306588654025893
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2969806410795415
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.28923931770331945
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.2793878499385676
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.2763018696972952
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2667138902217242
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.26464325107733494
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.2533235618676862
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.2407919635402859
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.2231544393882742
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.20424143245403129
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.18239292307629978
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.1797234175674466
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "swimming-unanswerable-4",
+      "split": "calibration",
+      "text": "游泳能力测评具体考哪些动作？",
+      "expected_chunks": [],
+      "reason": "正文只要求测评，未列测评内容。",
+      "score": 0.5938999538086287,
+      "candidates": [
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.5938999538086287
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.4957097110186593
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.4717004982685523
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.33115453319359156
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.3013581799020156
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.29314492573013246
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.29185812088261565
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.28568181905487955
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2786194851065646
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.27743015082449846
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2701140417361498
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.23563629665569988
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.22847163569124232
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.20949544343586873
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.2024039749633827
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.19951099326349223
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.19863647344875915
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.18927561904506554
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "camping-answerable-1",
+      "split": "audit",
+      "text": "领帐蓬的时候要跟工作人员核对哪些配件？",
+      "expected_chunks": [
+        "camping-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6096648422542454,
+      "candidates": [
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.6096648422542454
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.48552726122324824
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.4352233119153733
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3992312307567339
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.36655232911578106
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.3620929612981706
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.34319351729724334
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.34110056552463663
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.3121255043445829
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2998151745888351
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.29188824460681306
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.28064628724638296
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.26673676431625165
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.2640740350638954
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.24000778285300445
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.20223930102381663
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.20109459811133185
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.1865957742399384
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "camping-answerable-2",
+      "split": "audit",
+      "text": "发现少了几根地钉，离开前要做什么？",
+      "expected_chunks": [
+        "camping-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.5362815543268288,
+      "candidates": [
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.5362815543268288
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.3943862244175909
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.38997656788222873
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.37904848340772523
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.3492256145562566
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.3416707522142414
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.31620000645578006
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.31527963390308106
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.30661427231341426
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.30020965542338496
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.28220797264527603
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.27958656823747435
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.2794525732322595
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.24555695150464055
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.20699526111758051
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.19683542074025523
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.19034933240577898
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.14936351192080627
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "camping-answerable-3",
+      "split": "audit",
+      "text": "帐篷还回去之前，湿篷布和泥沙怎么弄？",
+      "expected_chunks": [
+        "camping-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6797912337571629,
+      "candidates": [
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.6797912337571629
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.5658567698562006
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.4446673646049642
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.38865338574440056
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.380063403277548
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.36649838928192946
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.34923978877090833
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.3480316424503678
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3430568214488681
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.3383739258562575
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.3330691157964493
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.33246989271229044
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.3321594815914276
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.3079629687750757
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.28690089481642156
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.2762247792288371
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.24531966680303727
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.23832388368444246
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "camping-answerable-4",
+      "split": "audit",
+      "text": "燃气罐能和帐篷一起塞收纳袋吗？",
+      "expected_chunks": [
+        "camping-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.7103993960610804,
+      "candidates": [
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.7103993960610804
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.5026475281034543
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.4755667513471726
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.38936315834984403
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.3636179860581993
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.30347155622988375
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.299783281112758
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.2945160161477849
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.2812882538162173
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.2759091434651449
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.26368649731649
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.2549163143702533
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.24760660228212586
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.2475485657164217
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.24522501131599944
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2271428640535664
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.22486828231482403
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.16899293007290886
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "camping-unanswerable-1",
+      "split": "audit",
+      "text": "这款帐篷的防水指数是多少毫米？",
+      "expected_chunks": [],
+      "reason": "正文未给出器材性能参数。",
+      "score": 0.4800188806729544,
+      "candidates": [
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.4800188806729544
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.46418597757913804
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3991992152847636
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.3348948514584086
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.2976677414909787
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.2756468634227015
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.26294340920157944
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.26140009339416226
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.26112432813232833
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.25650674630324216
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.24341423000341642
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.21024773010817016
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.1902270927717794
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.18257711602797322
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.1786824132805235
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.1702717478656428
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.14476717160533992
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.14243029606688143
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "camping-unanswerable-2",
+      "split": "audit",
+      "text": "双人帐篷延期借一天收费多少？",
+      "expected_chunks": [],
+      "reason": "正文没有租借价格规则。",
+      "score": 0.5335615875329554,
+      "candidates": [
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.5335615875329554
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.4816575965677362
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.46826752798433535
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.4274981521493739
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.3854786166193669
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.36321196518216947
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.32433237521909414
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.3234622446657032
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.31941039111310293
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.3088462973715496
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2986577218462184
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.28672667525158396
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.263948515291995
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.2543971890051948
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.24330014620878085
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.22832233484278183
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.20014016360593223
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.1873648604104632
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "camping-unanswerable-3",
+      "split": "audit",
+      "text": "断掉的支杆属于哪个厂家的型号？",
+      "expected_chunks": [],
+      "reason": "正文没有厂家或型号。",
+      "score": 0.42821492486302803,
+      "candidates": [
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.42821492486302803
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3626187855246452
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.35352074368230574
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.3244967179998052
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.31835257336327344
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.2743795721149554
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.2621307279666617
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2509690094792528
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.24858226399933414
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.24010663531778118
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.2191755299637067
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.21408395601661492
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.21407452840651264
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.20994138001814
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.20104243845079908
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.18841339086824474
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.1624553494839024
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.1206413946906745
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "camping-unanswerable-4",
+      "split": "audit",
+      "text": "营地今晚会不会下雷阵雨？",
+      "expected_chunks": [],
+      "reason": "语料没有实时天气。",
+      "score": 0.3952285133455276,
+      "candidates": [
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.3952285133455276
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.381436958391568
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.353034658877522
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3402426984956402
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3350828366636239
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.3318773338511141
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.3244044835736677
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.29940223057223736
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2783692216313115
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.2602824333947849
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.25823302270584364
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.2527770202458994
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2499119610253811
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.21774936256903654
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.21735666277207383
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.1809857093334827
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.1714202620529719
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.16655580706380846
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "planetarium-answerable-1",
+      "split": "audit",
+      "text": "预约了星空讲解，提前多久去检票？",
+      "expected_chunks": [
+        "planetarium-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.7201106500966498,
+      "candidates": [
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.7201106500966498
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.539090942290657
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.46871123341021176
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.45567804574606147
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.43202630762173366
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.4261716332790742
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.4244805152889993
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.4001853580877491
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.37493904217503
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.3615763582051597
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.3411608096392746
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.337020532264646
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.32670776873530327
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.2819728126668249
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.2814447226121174
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.27471858027807633
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2727886331065041
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.1986554008498802
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "planetarium-answerable-2",
+      "split": "audit",
+      "text": "放映已经开始关门了，我迟到还能中途进去吗？",
+      "expected_chunks": [
+        "planetarium-p1"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.5977451180418144,
+      "candidates": [
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.5977451180418144
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.5314110534468809
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.4604670728230193
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.45386291156322156
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.4500833036141717
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.44610374529981595
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.41965066090306624
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.41688219527523107
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3974815224017858
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.37036360350350483
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.35842387700699807
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.3115446049957895
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3000387103955002
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.29435598463860985
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.2862011275986863
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.2763570268215836
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.2657449142902212
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.24029066775090735
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "planetarium-answerable-3",
+      "split": "audit",
+      "text": "听讲解时手机需要怎么设置？",
+      "expected_chunks": [
+        "planetarium-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.6058920920805704,
+      "candidates": [
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.6058920920805704
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.4931498432197765
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.4134680828730672
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.40357178610784844
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.37482589283180295
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3637162902046603
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3616810939007749
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.34099633999111034
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.34045817101233067
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.31397009604118425
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.2955440058099346
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.2943891976996319
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2828444701807371
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2794161523211212
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.27911427956414625
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.2775936662280579
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.2504492303268135
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.23716659743366886
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "planetarium-answerable-4",
+      "split": "audit",
+      "text": "在星空放映厅拍照能开闪光吗？",
+      "expected_chunks": [
+        "planetarium-p2"
+      ],
+      "reason": "指定段落直接支持回答",
+      "score": 0.616651139507478,
+      "candidates": [
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.616651139507478
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.5780317482727485
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.38037195436396526
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.3723876269248302
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.36962212916917825
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.3674689653486396
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.3363878233723782
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.32615686805037303
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.31917129971490305
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.31395481050120255
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2856008532470267
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.2831182267453381
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.2785789033613083
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.2701505901603612
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.21196698042584244
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.19897175836159967
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.1946446390553517
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.17635459029547856
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "planetarium-unanswerable-1",
+      "split": "audit",
+      "text": "今年下一次流星雨的峰值是哪一天？",
+      "expected_chunks": [],
+      "reason": "正文没有天象预报。",
+      "score": 0.3672251603124053,
+      "candidates": [
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.3672251603124053
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.31861464278800056
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.3180041720909136
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.317143859268771
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.29112728102796925
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.2864734581861879
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.2636725779596381
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.2562059621418969
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.255340914790601
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.24740812226075307
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.24034044859159825
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.23923750296914373
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.21685276995926053
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.20999563087463924
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.20910058389566974
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.19138247162587058
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.1672202318424382
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.13252861256761658
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "planetarium-unanswerable-2",
+      "split": "audit",
+      "text": "预约二维码删除了要在哪里补办？",
+      "expected_chunks": [],
+      "reason": "正文没有补办流程。",
+      "score": 0.525836393537947,
+      "candidates": [
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.525836393537947
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.5077860624248528
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.47930490243169366
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.4760200386848025
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.45051003464343575
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.4497416631780146
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.4191306411893845
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.4105042850483911
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.39943957345724945
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.3507338947176433
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.35047221176069115
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.330489954661867
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.32154637574100886
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.31358483510754204
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.2712700756126459
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.257615824484698
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2375678044972503
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.22097673734233966
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "planetarium-unanswerable-3",
+      "split": "audit",
+      "text": "天文馆学生票多少钱一张？",
+      "expected_chunks": [],
+      "reason": "正文没有票价。",
+      "score": 0.6101288163409376,
+      "candidates": [
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.6101288163409376
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.44706201764655745
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.375706106691366
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.36362711556490224
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.36170886083713044
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.32888963258701565
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.3194863879192428
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.3144744555857797
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.30608211523064677
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.27400917414923714
+        },
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.2601709055387212
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.2596070702821717
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.239246902326338
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.23480148529782657
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.2140111660281904
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.1825192724894383
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.17610270064853434
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.1720446730094625
+        }
+      ],
+      "required_chunks_in_top5": true
+    },
+    {
+      "id": "planetarium-unanswerable-4",
+      "split": "audit",
+      "text": "放映厅有没有轮椅专用座位？",
+      "expected_chunks": [],
+      "reason": "正文没有无障碍设施信息。",
+      "score": 0.49702140382897003,
+      "candidates": [
+        {
+          "chunk_id": "planetarium-p2",
+          "score": 0.49702140382897003
+        },
+        {
+          "chunk_id": "planetarium-p1",
+          "score": 0.4581571645844807
+        },
+        {
+          "chunk_id": "gallery-p1",
+          "score": 0.3627306877340544
+        },
+        {
+          "chunk_id": "camping-p1",
+          "score": 0.35790635925973563
+        },
+        {
+          "chunk_id": "gallery-p2",
+          "score": 0.35358430594619417
+        },
+        {
+          "chunk_id": "gallery-title",
+          "score": 0.3492264293677732
+        },
+        {
+          "chunk_id": "camping-title",
+          "score": 0.3399886003264715
+        },
+        {
+          "chunk_id": "swimming-p1",
+          "score": 0.3359630719378074
+        },
+        {
+          "chunk_id": "library-p2",
+          "score": 0.3303729106613875
+        },
+        {
+          "chunk_id": "camping-p2",
+          "score": 0.32952101583080545
+        },
+        {
+          "chunk_id": "planetarium-title",
+          "score": 0.31019920137858886
+        },
+        {
+          "chunk_id": "greenhouse-p2",
+          "score": 0.2729634550935229
+        },
+        {
+          "chunk_id": "swimming-p2",
+          "score": 0.2637406943043267
+        },
+        {
+          "chunk_id": "swimming-title",
+          "score": 0.24461339417792538
+        },
+        {
+          "chunk_id": "greenhouse-title",
+          "score": 0.2409000139193738
+        },
+        {
+          "chunk_id": "greenhouse-p1",
+          "score": 0.24083498387362054
+        },
+        {
+          "chunk_id": "library-p1",
+          "score": 0.23000538505822565
+        },
+        {
+          "chunk_id": "library-title",
+          "score": 0.2041533699509986
+        }
+      ],
+      "required_chunks_in_top5": true
+    }
+  ],
+  "proposed_policy": {
+    "id": "independent-cosine-v1",
+    "status": "CALIBRATED",
+    "modelRevision": "7999e1d3359715c523056ef9478215996d62a620",
+    "calibrationDatasetSha256": "d07cbea9ec854a34a702f9fe38eb147ccf6de0ddc619248a8201b77a97bd397a",
+    "threshold": 0.6228445617150831
+  },
+  "model": {
+    "name": "BAAI/bge-small-zh-v1.5",
+    "revision": "7999e1d3359715c523056ef9478215996d62a620",
+    "license": "MIT",
+    "query_instruction": "为这个句子生成表示以用于检索相关文章：",
+    "document_instruction": "",
+    "pooling": "cls",
+    "pooling_source": "1_Pooling/config.json pooling_mode_cls_token=true",
+    "normalize": "l2",
+    "normalize_source": "modules.json sentence_transformers.models.Normalize",
+    "max_seq_length": 512,
+    "tokenizer_do_lower_case": false,
+    "tokenize_chinese_chars": true,
+    "truncation": true,
+    "truncation_strategy": "longest_first",
+    "truncation_side": "right",
+    "padding": true,
+    "output_dimensions": 512,
+    "backend": "cpu_pytorch_safetensors",
+    "weights_not_in_git": true,
+    "offline_load_only": true,
+    "fail_closed_on_missing_or_checksum_mismatch": true,
+    "files": {
+      "model.safetensors": {
+        "sha256": "354763b9b1357bc9c44f62c6be2276321081ed2567773608c0d0785b61d5a026",
+        "size_bytes": 95827648,
+        "required_at_runtime": true
+      },
+      "config.json": {
+        "git_blob_sha1": "f79ec8dfc5812a1d5d7d2e69253eb9054be2246d",
+        "size_bytes": 776,
+        "required_at_runtime": true
+      },
+      "tokenizer.json": {
+        "git_blob_sha1": "cdb3043fc938fc918c06e66cf704c2ba58f88747",
+        "size_bytes": 439125,
+        "required_at_runtime": true
+      },
+      "tokenizer_config.json": {
+        "git_blob_sha1": "3a59388f0fd1bd22dec2ce7902c1be8e1fb84107",
+        "size_bytes": 367,
+        "required_at_runtime": true
+      },
+      "vocab.txt": {
+        "git_blob_sha1": "ca4f9781030019ab9b253c6dcb8c7878b6dc87a5",
+        "size_bytes": 109540,
+        "required_at_runtime": true
+      },
+      "special_tokens_map.json": {
+        "git_blob_sha1": "a8b3208c2884c4efb86e49300fdd3dc877220cdf",
+        "size_bytes": 125,
+        "required_at_runtime": true
+      },
+      "modules.json": {
+        "git_blob_sha1": "952a9b81c0bfd99800fabf352f69c7ccd46c5e43",
+        "size_bytes": 349,
+        "required_at_runtime": true
+      },
+      "1_Pooling/config.json": {
+        "git_blob_sha1": "e25f4f3261cf0c6156611f5b5fdba0825859f4f3",
+        "size_bytes": 190,
+        "required_at_runtime": true
+      },
+      "sentence_bert_config.json": {
+        "git_blob_sha1": "ea85692bff64b0d1917833c31ddbca8ab10f5455",
+        "size_bytes": 52,
+        "required_at_runtime": true
+      },
+      "config_sentence_transformers.json": {
+        "git_blob_sha1": "dcb0c0d97d09b930d13600b1a773ddb27e441aab",
+        "size_bytes": 124,
+        "required_at_runtime": true
+      }
+    }
+  },
+  "threshold": 0.6228445617150831,
+  "splits": {
+    "calibration": {
+      "count": 32,
+      "answerable_acceptance": 0.8125,
+      "unanswerable_rejection": 0.9375,
+      "answerable_recall_at_5": 1.0
+    },
+    "audit": {
+      "count": 16,
+      "answerable_acceptance": 0.375,
+      "unanswerable_rejection": 1.0,
+      "answerable_recall_at_5": 1.0
+    }
+  },
+  "elapsed_seconds": 39.58086660000845
+}

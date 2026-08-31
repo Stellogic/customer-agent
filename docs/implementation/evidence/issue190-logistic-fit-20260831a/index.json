@@ -1,0 +1,51 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-logistic-fit-20260831a",
+  "head_sha": "1c7b8a8a584ee919c52de52d2ddf73c2b7474768",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "PRECONDITION_FAIL",
+  "fit_count": 0,
+  "calibration_selection_count": 0,
+  "holdout_read": false,
+  "raw_log_sha256": "d2cd9fa80dda536f851c2bea0be164def88102f0871458ca34c29676000d663f",
+  "redaction": "run日志仅工作树绝对路径替换，其余报告和XML保持原字节",
+  "artifacts": [
+    {
+      "file": "calibration-prepare.json",
+      "sha256": "6a5f5a7a162aa8d1a5bd98090a161d96214a05743cd5394cbcf5ef27568e9880"
+    },
+    {
+      "file": "numeric-java.log",
+      "sha256": "ba6ebc53a164978170d003bd04625e42e1f802560e458de6ad026e563c561155"
+    },
+    {
+      "file": "numeric-python.log",
+      "sha256": "a23e4e23ff133452cbbea2116bde11299e8cd6492bc70e3d90b69afbfa735e28"
+    },
+    {
+      "file": "phase.json",
+      "sha256": "0a135fd48ce263ca6a8175d74c64bc9ca28a6287c08cb869b38a10aea74ee9e8"
+    },
+    {
+      "file": "run.redacted.log",
+      "sha256": "b5851f7bf2dea4c8b6a2637c5d1b725c0046f0a5c825678974aa1f6ed3dca777"
+    },
+    {
+      "file": "safety-db.json",
+      "sha256": "f8817e196d3c21aaf5156cdffc11c9be4f43467fba917482e2004e19eef4608e"
+    },
+    {
+      "file": "TEST-com.stellogic.customeragent.knowledge.KnowledgeAnswerabilityFeaturesTest.xml",
+      "sha256": "8396163abe023ba7d3c3599bbec15247d75087bde8af52ca641a89dd090583d3"
+    },
+    {
+      "file": "TEST-com.stellogic.customeragent.knowledge.KnowledgeAnswerabilityPolicyTest.xml",
+      "sha256": "e9746256ef97a5518b79517ad6fe51ebaebb3e6c56762f8704391b96ebc46e90"
+    },
+    {
+      "file": "training-prepare.json",
+      "sha256": "16fecf64a17519b3b373d8d0ee39ccb066cee3d86028590462c38bc645c6376c"
+    }
+  ]
+}

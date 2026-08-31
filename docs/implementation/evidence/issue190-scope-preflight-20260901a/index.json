@@ -1,0 +1,67 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-scope-preflight-20260901a",
+  "head_sha": "2a37d882d2f311f03e7a19b5a0e99182df25000f",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Text workspace/user-home/machine prefixes only; original files retained locally. Browser synthetic screenshots are unchanged.",
+  "lock_release_observation": "Own lock released, one FREE read; coordinator notified. See phase cleanup_error separately.",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "focused.log",
+      "source_sha256": "8e468a552f50c069dbc25f1865054c32ecd38e14a26bc6aedce2d1bf22a8ed72",
+      "archived_sha256": "aa747e31cff8b9081a98d1fc7c9cdba1ea5a93ec5fadf148e9b2b23ba86ee5cb"
+    },
+    {
+      "file": "focused.xml",
+      "source_sha256": "0fd1dbad756ee9e8f269a4435aef8108283d3282be1ad597a9e24ea71597b955",
+      "archived_sha256": "91a3204ac96e4eed92f864d1a5ce617430078f68d414cee9ec7405826610dd0c"
+    },
+    {
+      "file": "java-format.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "offline-regression.log",
+      "source_sha256": "bf68233d349837e67be2f91f8323494d52aef51e5d831eb9e5fd07128380fe75",
+      "archived_sha256": "5ff91552cba8d8e6b2be230228cdb78f4410a0eeaccfcff76d08f6163d411324"
+    },
+    {
+      "file": "offline-regression.xml",
+      "source_sha256": "2d242c42d010766b224d9b4f2ee2089f7c7b91e4d031d68a8de7155d805f2d1b",
+      "archived_sha256": "d256997697403df80e3d84c6ca5fb0d91148955bf3b12ff554f03152b20493a0"
+    },
+    {
+      "file": "phase.json",
+      "source_sha256": "bcd2be3e073261844c0389d66f8b922c67f9320052c0b5eee45c546b9d53a06e",
+      "archived_sha256": "bcd2be3e073261844c0389d66f8b922c67f9320052c0b5eee45c546b9d53a06e"
+    },
+    {
+      "file": "prettier.log",
+      "source_sha256": "a7d6ea53ec6f7c3e33ac6480257a928c06095d0345fbfefc6d1409bc2cda0014",
+      "archived_sha256": "a7d6ea53ec6f7c3e33ac6480257a928c06095d0345fbfefc6d1409bc2cda0014"
+    },
+    {
+      "file": "pyright.log",
+      "source_sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14",
+      "archived_sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14"
+    },
+    {
+      "file": "ruff-format-check.log",
+      "source_sha256": "d0215df7ee165fc2412d931b3322fa6b1b3632163bb4e42ca29538c2a7c9d660",
+      "archived_sha256": "d0215df7ee165fc2412d931b3322fa6b1b3632163bb4e42ca29538c2a7c9d660"
+    },
+    {
+      "file": "ruff-format.log",
+      "source_sha256": "b203c69c7638b47e44a4ac280f899f03ed4c1d1c5acca8f4841a1c545bf46b30",
+      "archived_sha256": "b203c69c7638b47e44a4ac280f899f03ed4c1d1c5acca8f4841a1c545bf46b30"
+    },
+    {
+      "file": "ruff.log",
+      "source_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0",
+      "archived_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0"
+    }
+  ]
+}

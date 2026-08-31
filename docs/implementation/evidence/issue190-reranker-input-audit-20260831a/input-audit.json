@@ -1,0 +1,2529 @@
+{
+  "status": "INPUT_AUDIT_COMPLETED",
+  "model_scoring_run": false,
+  "pair_count": 360,
+  "max_untruncated_pair_tokens": 62,
+  "changed_pairs": 0,
+  "observations": [
+    {
+      "query_id": "weaving-direct-1",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-1",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-1",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-1",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-1",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-1",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 53,
+      "actual_tokens": 53,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-1",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 58,
+      "actual_tokens": 58,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-1",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 53,
+      "actual_tokens": 53,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-1",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 52,
+      "actual_tokens": 52,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-1",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 52,
+      "actual_tokens": 52,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-2",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-2",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-2",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-2",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-2",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-2",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 54,
+      "actual_tokens": 54,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-2",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 54,
+      "actual_tokens": 54,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-2",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 59,
+      "actual_tokens": 59,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-2",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 53,
+      "actual_tokens": 53,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-2",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 53,
+      "actual_tokens": 53,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-3",
+      "chunk_id": "chunk-f2f99ef7fd9a98304cf509bc0c9db38b7981f257444dadd800c79f3e45d12a72",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-3",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-3",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-3",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-3",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-3",
+      "chunk_id": "chunk-f2f99ef7fd9a98304cf509bc0c9db38b7981f257444dadd800c79f3e45d12a72",
+      "untruncated_tokens": 54,
+      "actual_tokens": 54,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-3",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 55,
+      "actual_tokens": 55,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-3",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-3",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-3",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-4",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-4",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-4",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-4",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-4",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-4",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 52,
+      "actual_tokens": 52,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-4",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 51,
+      "actual_tokens": 51,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-4",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 57,
+      "actual_tokens": 57,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-4",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 51,
+      "actual_tokens": 51,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-4",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 52,
+      "actual_tokens": 52,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-5",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 51,
+      "actual_tokens": 51,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-5",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-5",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-5",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-5",
+      "chunk_id": "chunk-f2f99ef7fd9a98304cf509bc0c9db38b7981f257444dadd800c79f3e45d12a72",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-5",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 54,
+      "actual_tokens": 54,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-5",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-5",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-5",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-5",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-6",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-6",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-6",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-6",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-direct-6",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-6",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 55,
+      "actual_tokens": 55,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-6",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-6",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-6",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-paraphrase-6",
+      "chunk_id": "chunk-f2f99ef7fd9a98304cf509bc0c9db38b7981f257444dadd800c79f3e45d12a72",
+      "untruncated_tokens": 54,
+      "actual_tokens": 54,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-1",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-1",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-1",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-1",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-1",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-2",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-2",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-2",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-2",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-2",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-3",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-3",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-3",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-3",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-3",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-4",
+      "chunk_id": "chunk-f2f99ef7fd9a98304cf509bc0c9db38b7981f257444dadd800c79f3e45d12a72",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-4",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-4",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-4",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-4",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-5",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-5",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-5",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-5",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-5",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-6",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-6",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-6",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-6",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-6",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-7",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-7",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-7",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-7",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-7",
+      "chunk_id": "chunk-f2f99ef7fd9a98304cf509bc0c9db38b7981f257444dadd800c79f3e45d12a72",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-8",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-8",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-8",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-8",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-8",
+      "chunk_id": "chunk-f2f99ef7fd9a98304cf509bc0c9db38b7981f257444dadd800c79f3e45d12a72",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-9",
+      "chunk_id": "chunk-f2f99ef7fd9a98304cf509bc0c9db38b7981f257444dadd800c79f3e45d12a72",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-9",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-9",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-9",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-9",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-10",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-10",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-10",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-10",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-10",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-11",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-11",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-11",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-11",
+      "chunk_id": "chunk-f2f99ef7fd9a98304cf509bc0c9db38b7981f257444dadd800c79f3e45d12a72",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-11",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-12",
+      "chunk_id": "chunk-9354e07af28b16811d3ee1f0c7c1fbee970060e17559bf9ad780a2160fc79d33",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-12",
+      "chunk_id": "chunk-04ade7137061ccac3131be9c912801aff249cd5ee81646d28787edba435c93cd",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-12",
+      "chunk_id": "chunk-8c3b797ebf7b3c53ab22bfc8a764bc9b8f0fd37b12ea57a336154c7d4bac077f",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-12",
+      "chunk_id": "chunk-7d9c610b5d4b9f069e6dac06b0c445004bfa72bc21412bfc22e3b0a62a315146",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "weaving-negative-12",
+      "chunk_id": "chunk-e4ab4ce44ef400d9c18f9fd6d3c9dbd85f60a1fc29ce7ea4134426b0c09101b4",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-1",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-1",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-1",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 52,
+      "actual_tokens": 52,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-1",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-1",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 37,
+      "actual_tokens": 37,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-1",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 59,
+      "actual_tokens": 59,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-1",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 62,
+      "actual_tokens": 62,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-1",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 57,
+      "actual_tokens": 57,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-1",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 53,
+      "actual_tokens": 53,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-1",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 53,
+      "actual_tokens": 53,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-2",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-2",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-2",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-2",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-2",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-2",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 52,
+      "actual_tokens": 52,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-2",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 55,
+      "actual_tokens": 55,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-2",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-2",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-2",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-3",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 33,
+      "actual_tokens": 33,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-3",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-3",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-3",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-3",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-3",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-3",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 54,
+      "actual_tokens": 54,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-3",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 57,
+      "actual_tokens": 57,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-3",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-3",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-4",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-4",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-4",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-4",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-4",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-4",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 56,
+      "actual_tokens": 56,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-4",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-4",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 59,
+      "actual_tokens": 59,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-4",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-4",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-5",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-5",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-5",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 34,
+      "actual_tokens": 34,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-5",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-5",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-5",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 56,
+      "actual_tokens": 56,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-5",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-5",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-5",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 59,
+      "actual_tokens": 59,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-5",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-6",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-6",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-6",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 36,
+      "actual_tokens": 36,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-6",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 30,
+      "actual_tokens": 30,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-direct-6",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-6",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-6",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 52,
+      "actual_tokens": 52,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-6",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 37,
+      "actual_tokens": 37,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-6",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-paraphrase-6",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-1",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-1",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-1",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-1",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-1",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-2",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-2",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-2",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-2",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-2",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-3",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 38,
+      "actual_tokens": 38,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-3",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-3",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 32,
+      "actual_tokens": 32,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-3",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-3",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-4",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-4",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 33,
+      "actual_tokens": 33,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-4",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-4",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-4",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-5",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 51,
+      "actual_tokens": 51,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-5",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-5",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-5",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-5",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 36,
+      "actual_tokens": 36,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-6",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-6",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-6",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 34,
+      "actual_tokens": 34,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-6",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-6",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-7",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-7",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-7",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-7",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 53,
+      "actual_tokens": 53,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-7",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 38,
+      "actual_tokens": 38,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-8",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 33,
+      "actual_tokens": 33,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-8",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-8",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-8",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-8",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-9",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-9",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-9",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 36,
+      "actual_tokens": 36,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-9",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-9",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-10",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-10",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-10",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 33,
+      "actual_tokens": 33,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-10",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-10",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-11",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-11",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-11",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-11",
+      "chunk_id": "chunk-54090f8cba34ef5725827662e7d1e814c7e02bfa87b16f4c7fda3939589ff4ca",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-11",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-12",
+      "chunk_id": "chunk-5e097232d4088743822212663c4b20a557fac4a03986132cadabecfafc9ba5d0",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-12",
+      "chunk_id": "chunk-ec2c20e6ccfce485ee64af4e7f6ed8d228cf7dc1f2e0c2e7eec2fdc5779648c0",
+      "untruncated_tokens": 37,
+      "actual_tokens": 37,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-12",
+      "chunk_id": "chunk-3c6e9740a41b6e9f8bc84beb441bfad261ac362450c6f7c2025c6544c1eab288",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-12",
+      "chunk_id": "chunk-99664eaaf81688be65226c120bd6cb6b16fda8dd9710fd2419d13ebad3189670",
+      "untruncated_tokens": 52,
+      "actual_tokens": 52,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "leather-negative-12",
+      "chunk_id": "chunk-74d4890b254a6549200a7b522c1eb6f5ed2e1a1cdcf6abef5d7a0b8830e528d2",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-1",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-1",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 38,
+      "actual_tokens": 38,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-1",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-1",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-1",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-1",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 51,
+      "actual_tokens": 51,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-1",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 51,
+      "actual_tokens": 51,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-1",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-1",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 58,
+      "actual_tokens": 58,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-1",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 53,
+      "actual_tokens": 53,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-2",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 37,
+      "actual_tokens": 37,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-2",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-2",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-2",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-2",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-2",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-2",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-2",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-2",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-2",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 52,
+      "actual_tokens": 52,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-3",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-3",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-3",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 36,
+      "actual_tokens": 36,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-3",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-3",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-3",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 58,
+      "actual_tokens": 58,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-3",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 51,
+      "actual_tokens": 51,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-3",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 51,
+      "actual_tokens": 51,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-3",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 53,
+      "actual_tokens": 53,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-3",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-4",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-4",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-4",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 51,
+      "actual_tokens": 51,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-4",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-4",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-4",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-4",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-4",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 52,
+      "actual_tokens": 52,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-4",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-4",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 57,
+      "actual_tokens": 57,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-5",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-5",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-5",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-5",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 38,
+      "actual_tokens": 38,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-5",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-5",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-5",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-5",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-5",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-5",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 51,
+      "actual_tokens": 51,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-6",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-6",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 37,
+      "actual_tokens": 37,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-6",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-6",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-direct-6",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-6",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-6",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-6",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-6",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 46,
+      "actual_tokens": 46,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-paraphrase-6",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 55,
+      "actual_tokens": 55,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-1",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-1",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-1",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 37,
+      "actual_tokens": 37,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-1",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 49,
+      "actual_tokens": 49,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-1",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 44,
+      "actual_tokens": 44,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-2",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-2",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-2",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 52,
+      "actual_tokens": 52,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-2",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-2",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-3",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-3",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 36,
+      "actual_tokens": 36,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-3",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-3",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-3",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-4",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-4",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 36,
+      "actual_tokens": 36,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-4",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-4",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-4",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-5",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-5",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-5",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 38,
+      "actual_tokens": 38,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-5",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 38,
+      "actual_tokens": 38,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-5",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 33,
+      "actual_tokens": 33,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-6",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-6",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-6",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-6",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-6",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 35,
+      "actual_tokens": 35,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-7",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-7",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-7",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 38,
+      "actual_tokens": 38,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-7",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-7",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 50,
+      "actual_tokens": 50,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-8",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 36,
+      "actual_tokens": 36,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-8",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 48,
+      "actual_tokens": 48,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-8",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-8",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-8",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 39,
+      "actual_tokens": 39,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-9",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-9",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-9",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-9",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-9",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-10",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-10",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-10",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-10",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 35,
+      "actual_tokens": 35,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-10",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-11",
+      "chunk_id": "chunk-ec276de1b2d35ccd1378e912dfc4e5d95dc02ab787d1a7bc62bff43812b25f64",
+      "untruncated_tokens": 41,
+      "actual_tokens": 41,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-11",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-11",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 43,
+      "actual_tokens": 43,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-11",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 38,
+      "actual_tokens": 38,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-11",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 45,
+      "actual_tokens": 45,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-12",
+      "chunk_id": "chunk-29ccb2cf09d57a835a280137abcf66e59d4ab7f15069f1ad11d2ee672a5a35ac",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-12",
+      "chunk_id": "chunk-3a86d34c41faa53bc62d3b12ef6a98266dd4da6c6faa399bfd2261dd51a5279e",
+      "untruncated_tokens": 40,
+      "actual_tokens": 40,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-12",
+      "chunk_id": "chunk-b6639cd9dc5b5b97020e56db90da2f9ad66f354c895757fc4f4a2457112b4b06",
+      "untruncated_tokens": 35,
+      "actual_tokens": 35,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-12",
+      "chunk_id": "chunk-e29c90a28fc5851f483bd7f24e0efe91c80f63ed71c39b162d7a65932253000f",
+      "untruncated_tokens": 42,
+      "actual_tokens": 42,
+      "identical_input_ids": true
+    },
+    {
+      "query_id": "rainfall-negative-12",
+      "chunk_id": "chunk-c61d9776731733c286e4a439ffa11863adeb3af2317015293d2f2a9601b7f267",
+      "untruncated_tokens": 47,
+      "actual_tokens": 47,
+      "identical_input_ids": true
+    }
+  ]
+}

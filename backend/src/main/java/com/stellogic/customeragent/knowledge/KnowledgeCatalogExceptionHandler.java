@@ -9,6 +9,21 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public final class KnowledgeCatalogExceptionHandler {
+    @ExceptionHandler(KnowledgeRetrievalUnavailableException.class)
+    ResponseEntity<Map<String, String>> retrievalUnavailable(
+            KnowledgeRetrievalUnavailableException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .cacheControl(CacheControl.noStore())
+                .body(
+                        Map.of(
+                                "code",
+                                exception.code(),
+                                "message",
+                                "INDEX_STALE".equals(exception.code())
+                                        ? "混合检索索引过期，请重新准备索引"
+                                        : "混合检索暂时不可用，未返回知识结果"));
+    }
+
     @ExceptionHandler(KnowledgeAccessDeniedException.class)
     ResponseEntity<Map<String, String>> forbidden() {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)

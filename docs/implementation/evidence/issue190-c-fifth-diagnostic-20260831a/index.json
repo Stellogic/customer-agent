@@ -1,0 +1,26 @@
+{
+  "schema": "issue190-c-fifth-diagnostic-precondition-evidence-v1",
+  "run_id": "issue190-c-fifth-diagnostic-20260831a",
+  "status": "PRECONDITION_FAIL",
+  "failure": "ARGPARSE_MODE_ARGUMENT_SPLIT",
+  "actual_api_requests": 0,
+  "diagnostic_completed": 0,
+  "metrics": null,
+  "new_paid_cost_micro_cny": 0,
+  "settled_upper_micro_cny": 9084,
+  "unsettled_reserved_micro_cny": 0,
+  "shared_ledger_unchanged_sha256": "5cd9e0ef8ee6977f0897db31d4c00bfee498194b9456bc437ffe0776b79e8507",
+  "python_report_created": false,
+  "evidence": [
+    {
+      "path": "launch.json",
+      "source_sha256": "acd82d096d33f8372f1a708c45dc033a1bd6f346f570c393fdd0b909acc6b488",
+      "archived_sha256": "acd82d096d33f8372f1a708c45dc033a1bd6f346f570c393fdd0b909acc6b488"
+    },
+    {
+      "path": "launch.log",
+      "source_sha256": "ad74038c63daf6dc9dfa7b3ac87cdad37082f2e6eb0bf3e6f1078e85209abd96",
+      "archived_sha256": "ad74038c63daf6dc9dfa7b3ac87cdad37082f2e6eb0bf3e6f1078e85209abd96"
+    }
+  ]
+}

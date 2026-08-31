@@ -1,0 +1,29 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-logistic-preflight-20260831a",
+  "start_head": "218091b552d84923fe4626a9a60f8dafcddae9c1",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "post_format_source_commit": "c1a33d018d4dc23a19219e90cc1e6923002e504e",
+  "note": "运行中生成锁和格式；检查针对各阶段格式完成后的工作树，不声称运行起点是受测干净HEAD。前端构建/check命中缓存，无本次重新执行。",
+  "raw_log_sha256": "b63dd4be21c47e3700c9da9da64f1bba7397a5067a09bd3c0d973fa978be1238",
+  "redaction": "仅将工作树/用户名绝对路径替换占位符；runner为实际脚本的脱敏文本快照。",
+  "artifacts": [
+    {
+      "file": "run.redacted.log",
+      "sha256": "5e114eeb9770e20261fd25cd91c5f2e704f1db83ebc24f2820103c9424c9e862"
+    },
+    {
+      "file": "phase.json",
+      "sha256": "477de4ddfe803671869e00b9acb3822db00b61b66527a72de35dd753fccae065"
+    },
+    {
+      "file": "runner.ps1.txt",
+      "sha256": "fb8998f99f1332d28f6341cbec2db0aab94f89747dde1ac452d3245ae8aac3dd"
+    },
+    {
+      "file": "Dockerfile.formatter.txt",
+      "sha256": "4f1798c560b968259458cf50fbe9f7459aa84e501906ec70ed1f8ff20adbcc6e"
+    }
+  ]
+}

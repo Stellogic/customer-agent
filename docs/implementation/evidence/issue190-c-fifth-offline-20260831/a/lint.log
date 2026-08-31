@@ -1,0 +1,12 @@
+RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+   --> tests\test_knowledge_sufficiency.py:106:50
+    |
+104 |         )
+105 |     assert calls == 1 and path.read_bytes() == before_retry
+106 |     with pytest.raises(SufficiencyBlocked, match="ALREADY_STARTED|UNSETTLED_COST"):
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+107 |         resumed.begin("must-not-resume-development", frozen["asset_sha256"])
+    |
+help: Use a raw string or `re.escape()` to make the intention explicit
+
+Found 1 error.

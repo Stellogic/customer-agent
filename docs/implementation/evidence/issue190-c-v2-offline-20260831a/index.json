@@ -1,0 +1,40 @@
+{
+  "run_id": "issue190-c-v2-offline-20260831a",
+  "kind": "OFFLINE_ENGINEERING_NOT_MODEL_QUALITY",
+  "paid_api_calls": 0,
+  "shared_ledger_sha256": "c11630710263c473fbf938b60e789b33ef93b776021e258976825fdf47206a50",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da"
+    },
+    {
+      "path": "focused.log",
+      "sha256": "8b59b1eab9559cd10945a24b061c767c21dfa18710b3dd01ab601d19d25ed772"
+    },
+    {
+      "path": "focused.xml",
+      "sha256": "e2562dc335f5c6a771d0a95f345013f3c81be4d8a4ff71e6170e7bc4cef71b22"
+    },
+    {
+      "path": "format.log",
+      "sha256": "f3cc81e086fa17c679444578c083e0c016641279ac44bc6ad8d39e9dd13dccd0"
+    },
+    {
+      "path": "lint.log",
+      "sha256": "aa13d5b94a01e72c83d6c353b334d068a947bef5c8b55b7dc8e772df9adcf5ca"
+    },
+    {
+      "path": "materialize-requests.log",
+      "sha256": "4a35c49eb62e852452dd24a4476350fc8ff47ec9d39f2b98eccfacf9bd32ca2e"
+    },
+    {
+      "path": "phase.json",
+      "sha256": "12c37ba96f945122311d78b9f1065349955283b83739ff339a4ae4c0f3004ac3"
+    },
+    {
+      "path": "requests.json",
+      "sha256": "7234a4f5812e976f3e3efc594fc3e2b0760b46b760b0f2a8d403525fbfd5cd91"
+    }
+  ]
+}

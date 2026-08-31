@@ -1,0 +1,71 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-logistic-fit-20260831b",
+  "head_sha": "98b49949d6d835d510c4959d787b443fa95bc794",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "INFEASIBLE",
+  "fit_count": 1,
+  "calibration_selection_count": 1,
+  "threshold_candidates": 73,
+  "feasible_candidates": 0,
+  "proposed_policy": null,
+  "holdout_read": false,
+  "raw_log_sha256": "32d127a74c5a131176bd24bbf26fc86197f77e8e7be6fbd426172a4f34749f7a",
+  "redaction": "run日志仅工作树绝对路径替换；采集/拟合报告、安全报告和XML保持原字节，仅包含合成开发资料，无会话令牌",
+  "java_contract": "同一源码/构建输入命中a轮缓存，未声明b轮实际重跑Java测试",
+  "artifacts": [
+    {
+      "file": "answerability-fit.json",
+      "sha256": "645b8c19c68b73385591a8c9d6b9dc57a717bfe02943e9778907088626b36f3d"
+    },
+    {
+      "file": "calibration-collect.json",
+      "sha256": "b4ec9872012c90c795b0356a74f9ac3f4f7343bff207a76b16d9185265b06387"
+    },
+    {
+      "file": "calibration-prepare.json",
+      "sha256": "d0690c8275ceb5ce8a3618b23fd2b7ef2b5de2850e0db042f5a825dc0b160177"
+    },
+    {
+      "file": "numeric-java.log",
+      "sha256": "ddf52440ff1dcbc5e93d948978954b6e041fba38415b3148be6b83e3b9210856"
+    },
+    {
+      "file": "numeric-python.log",
+      "sha256": "a23e4e23ff133452cbbea2116bde11299e8cd6492bc70e3d90b69afbfa735e28"
+    },
+    {
+      "file": "phase.json",
+      "sha256": "95e8c234ab89f2377f774e508a7e90d670bac5de9cb2eb1a61b1c0625bf2a4de"
+    },
+    {
+      "file": "run.redacted.log",
+      "sha256": "dcc425ede5efe7de1c0954c6784247fee12b889aac065b9311f36ce971a05a1b"
+    },
+    {
+      "file": "safety-db.json",
+      "sha256": "16174230c20f82cb951c507a1f09f40cec6c1cbc9c6b4e7aa9364bc7347bc02e"
+    },
+    {
+      "file": "safety.json",
+      "sha256": "b7126e2e63854664f63c2e2f332d3d1656f8210cab2d0700b02240fbb665b00b"
+    },
+    {
+      "file": "TEST-com.stellogic.customeragent.knowledge.KnowledgeAnswerabilityFeaturesTest.xml",
+      "sha256": "8396163abe023ba7d3c3599bbec15247d75087bde8af52ca641a89dd090583d3"
+    },
+    {
+      "file": "TEST-com.stellogic.customeragent.knowledge.KnowledgeAnswerabilityPolicyTest.xml",
+      "sha256": "e9746256ef97a5518b79517ad6fe51ebaebb3e6c56762f8704391b96ebc46e90"
+    },
+    {
+      "file": "training-collect.json",
+      "sha256": "0d6b2b60f18323f9ceb175c3386a526337132d0c8a9f1a679510a92359191f1a"
+    },
+    {
+      "file": "training-prepare.json",
+      "sha256": "3913204de1a268fe6c669a0f77f9366ec8d4a3fd50e695f6287291d0fbdbacdb"
+    }
+  ]
+}

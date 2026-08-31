@@ -1,0 +1,99 @@
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+ --> src\baseline_agent\knowledge_reranker.py:1:13
+  |
+1 | """一次开发可行性候选；不接入默认检索、不训练分类器、不调用云模型。"""
+  |                      ^^
+2 |
+3 | from __future__ import annotations
+  |
+
+RUF003 Comment contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+  --> src\baseline_agent\knowledge_reranker.py:45:25
+   |
+43 |     def __init__(self, directory: Path):
+44 |         path = verify_directory(directory)
+45 |         # 模型文件校验通过后才导入框架；运行阶段不能下载模型。
+   |                                       ^^
+46 |         import torch
+47 |         from transformers import AutoModelForSequenceClassification, AutoTokenizer
+   |
+
+RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+   --> src\baseline_agent\knowledge_reranker.py:100:15
+    |
+ 98 |     report: dict[str, Any],
+ 99 | ) -> None:
+100 |     """保留原候选顺序，只选择一次整体接受/拒答界限；不导出产品参数。"""
+    |                      ^^
+101 |     report["rows"] = []
+102 |     maximum_scores = []
+    |
+
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+   --> src\baseline_agent\knowledge_reranker.py:100:30
+    |
+ 98 |     report: dict[str, Any],
+ 99 | ) -> None:
+100 |     """保留原候选顺序，只选择一次整体接受/拒答界限；不导出产品参数。"""
+    |                                                   ^^
+101 |     report["rows"] = []
+102 |     maximum_scores = []
+    |
+
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+ --> src\baseline_agent\knowledge_reranker_run.py:1:19
+  |
+1 | """固定72题的单次本地可行性入口；不提供留出、冻结集或续跑模式。"""
+  |                                ^^
+2 |
+3 | from __future__ import annotations
+  |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_reranker_run.py:34:23
+   |
+33 | def prepare(directory: Path) -> None:
+34 |     # 仅显式 prepare 阶段下载，不由评分器触发，也不生成新依赖锁。
+   |                              ^^
+35 |     import httpx
+   |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_reranker_run.py:34:31
+   |
+33 | def prepare(directory: Path) -> None:
+34 |     # 仅显式 prepare 阶段下载，不由评分器触发，也不生成新依赖锁。
+   |                                              ^^
+35 |     import httpx
+   |
+
+RUF003 Comment contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+  --> src\baseline_agent\knowledge_reranker_run.py:93:32
+   |
+91 |     }
+92 |     args.output.parent.mkdir(parents=True, exist_ok=True)
+93 |     # 正式入口给 development 固定的共享路径；换 RunId 不会重启终结阶段。
+   |                                            ^^
+94 |     with args.output.open("x", encoding="utf-8") as output:
+95 |         json.dump(report, output, ensure_ascii=False, indent=2)
+   |
+
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+ --> tests\test_knowledge_reranker.py:1:15
+  |
+1 | """开发评分/选择公共接缝；人工分数只验证编排，不代表真实模型质量。"""
+  |                         ^^
+2 |
+3 | from __future__ import annotations
+  |
+
+RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+ --> tests\test_knowledge_reranker.py:1:25
+  |
+1 | """开发评分/选择公共接缝；人工分数只验证编排，不代表真实模型质量。"""
+  |                                             ^^
+2 |
+3 | from __future__ import annotations
+  |
+
+Found 10 errors.

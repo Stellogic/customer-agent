@@ -1,0 +1,37 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-layered-runtime-20260831c",
+  "head_sha": "359c3eda59c66ea46beb6b6e8cfc2513b4725bea",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Text workspace/user-home/machine prefixes only; original files retained locally. Browser synthetic screenshots are unchanged.",
+  "lock_release_observation": "Own lock released, one FREE read; coordinator notified. See phase cleanup_error separately.",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "compose.log",
+      "source_sha256": "2d2e4e2c65acb1ed8d7d9496f37d4ff84d80e16a8eb9a972f81df777093177c2",
+      "archived_sha256": "2d2e4e2c65acb1ed8d7d9496f37d4ff84d80e16a8eb9a972f81df777093177c2"
+    },
+    {
+      "file": "console.log",
+      "source_sha256": "88595d98986cb0b684597902ff1aa807ca8f84666e14570b31fdb728b3592d39",
+      "archived_sha256": "f57a03890ddd5ff5ab808e331830bfd3cb3d0fc772e628d2fc1c427e42ef0eb1"
+    },
+    {
+      "file": "phase.json",
+      "source_sha256": "8d370473259aa6eb06c1402085da7dcdc26ee4db06526b1712323130709ce580",
+      "archived_sha256": "8d370473259aa6eb06c1402085da7dcdc26ee4db06526b1712323130709ce580"
+    },
+    {
+      "file": "rag-layered-v2-retrieval-result.json",
+      "source_sha256": "1f5e6906bca017f54fc7707d2cca80d2baa29e59ed55cd30cdd51997b58ff3c2",
+      "archived_sha256": "1f5e6906bca017f54fc7707d2cca80d2baa29e59ed55cd30cdd51997b58ff3c2"
+    },
+    {
+      "file": "runtime.log",
+      "source_sha256": "41776a60ca8ba1ae73d0b5cf3ba8219d5ffee34308df61df1fc305df9f889729",
+      "archived_sha256": "7f5c69a13e79876024ca368f77b3f3b6905295deb01aa0cac8c872b10a5ae00b"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "schema": "issue190-reranker-feasibility-v1",
+  "phase": "preflight",
+  "status": "PREFLIGHT_ONLY",
+  "run_id": "issue190-reranker-entry-20260831a",
+  "head_sha": "04d7ee9c7129e00741db22f04ccc72492253738e",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "protocol": {
+    "id": "reranker-max-logit-development-v1",
+    "model": "BAAI/bge-reranker-base",
+    "revision": "2cfc18c9415c912f9d8155881c133215df768a70",
+    "metadata_source": "https://huggingface.co/api/models/BAAI/bge-reranker-base?blobs=true",
+    "metadata_observed_date": "2026-08-31",
+    "license": "MIT",
+    "files": {
+      "config.json": {
+        "size_bytes": 799,
+        "git_blob_sha1": "ff248a5f7d76e27b10778b3c593c9fba1df4c448"
+      },
+      "model.safetensors": {
+        "size_bytes": 1112206140,
+        "sha256": "ced967c45fd1902eb92716c9ceeca7c95a936770ea9db611f5a841b926e33fbd"
+      },
+      "special_tokens_map.json": {
+        "size_bytes": 279,
+        "git_blob_sha1": "68171d1ff68b731a33d119708476692c094a466b"
+      },
+      "tokenizer.json": {
+        "size_bytes": 17098107,
+        "sha256": "9eb652ac4e40cc093272bbbe0f55d521cf67570060227109b5cdc20945a4489e"
+      },
+      "tokenizer_config.json": {
+        "size_bytes": 443,
+        "git_blob_sha1": "059214673d9d6d2ee319411e2ffec8c024b816d5"
+      }
+    },
+    "device": "cpu",
+    "dtype": "float32",
+    "batch_size": 1,
+    "torch_threads": 1,
+    "max_length": 512,
+    "truncation": "longest_first",
+    "truncation_side": "right",
+    "query_instruction": "",
+    "score": "maximum raw single logit over original authorized RRF Top5; no sigmoid",
+    "selection": "existing knowledge_answerability.select_threshold: min, nextafter(max,+inf), adjacent midpoints; feasible four gates; max(recall,unanswered_precision,threshold)",
+    "data": "existing reviewed synthetic calibration archive: 72 seen queries, 36 answerable and 36 unanswerable",
+    "quality_thresholds": {
+      "answered_recall_at_5": 0.9,
+      "answered_mrr_at_5": 0.75,
+      "unanswered_precision": 0.9,
+      "unanswered_recall": 0.85
+    },
+    "default_product_policy_changed": false,
+    "independent_validation": "NOT_AUTHORIZED_NOT_READ"
+  },
+  "protocol_sha256": "5f9b0bed409771c9d45360e7400775be077e87d5afd48c51c8a49c448bb520e9",
+  "source_archive": "docs/implementation/evidence/issue190-logistic-fit-20260831b/calibration-collect.json",
+  "source_archive_sha256": "b4ec9872012c90c795b0356a74f9ac3f4f7343bff207a76b16d9185265b06387",
+  "source_dataset_sha256": "4ba56767f8729ba064f614c856076c30f08e5852bad0255c2bf6b443c31014b6",
+  "source_head_sha": "98b49949d6d835d510c4959d787b443fa95bc794",
+  "quality_scope": "SEEN_DEVELOPMENT_NOT_HOLDOUT_OR_DELIVERY",
+  "permission_validation": "NOT_RERUN_ARCHIVE_ONLY",
+  "product_validation": "NOT_RUN",
+  "paid_model_cost_cny": 0,
+  "metrics": null,
+  "environment": {
+    "python": "3.13.13",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "libraries": {
+      "torch": "2.10.0+cpu",
+      "transformers": "4.57.6",
+      "safetensors": "0.7.0"
+    }
+  },
+  "source_query_count": 72,
+  "model_directory": "<WORKTREE>\\.local\\models\\offline preflight no weights",
+  "duration_seconds": 0.011020599980838597,
+  "completed_queries": 0
+}
