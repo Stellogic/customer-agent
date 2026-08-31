@@ -1,9 +1,10 @@
 import json
 from dataclasses import asdict
+from types import SimpleNamespace
 
 import pytest
 
-from baseline_agent.knowledge_ablation import MODES, report_template, run_ablation
+from baseline_agent.knowledge_ablation import MODES, report_template, run_ablation, run_reference_rrf
 from baseline_agent.rag_eval_v1 import load_rag_eval_v1
 
 
@@ -71,3 +72,58 @@ def test_mismatched_query_is_not_accepted_as_frozen_evidence(tmp_path):
             lambda mode, query: {"id": "wrong", "kind": query.kind, "results": []},
             lambda rows: {}, environment={}, parameters={}, output=tmp_path / "report.json",
         )
+
+
+def test_reference_rrf_delegates_scoring_without_relabeling_candidates(monkeypatch, tmp_path):
+    dataset = load_rag_eval_v1()
+    rows = []
+    measured = asdict(dataset.thresholds)
+    measured.pop("k")
+
+    def upstream_query(base_url, query):
+        assert base_url == "http://reference.invalid"
+        row = {
+            "id": query.id, "kind": query.kind, "results": [],
+            "lexicalCandidates": [{"chunkId": "lexical-only"}],
+            "vectorCandidates": [{"chunkId": "dense-only"}],
+            "recall": 0.0, "reciprocal_rank": 0.0,
+        }
+        rows.append(row)
+        return row
+
+    def upstream_metrics(received):
+        assert len(received) == len(dataset.queries)
+        assert all(actual is expected for actual, expected in zip(received, rows, strict=True))
+        return measured
+
+    def import_evaluation(name):
+        assert name == "baseline_agent.knowledge_evaluation"
+        return SimpleNamespace(run_query=upstream_query, metrics=upstream_metrics)
+
+    monkeypatch.setattr("baseline_agent.knowledge_ablation.import_module", import_evaluation)
+    report = run_reference_rrf(
+        "http://reference.invalid", environment={"evidence": "synthetic-test"},
+        parameters={}, output=tmp_path / "rrf.json",
+    )
+    assert [row["id"] for row in rows] == [query.id for query in dataset.queries]
+    assert report["status"] == "PARTIAL"
+    assert report["modes"]["rrf"]["metrics"] == measured
+    for mode in ("lexical", "dense"):
+        assert report["modes"][mode] == {"rows": [], "metrics": None, "status": "NOT_RUN"}
+
+
+def test_reference_rrf_error_leaves_single_routes_unrun(monkeypatch, tmp_path):
+    def unavailable(base_url, query):
+        raise RuntimeError("reference unavailable")
+
+    monkeypatch.setattr(
+        "baseline_agent.knowledge_ablation.import_module",
+        lambda name: SimpleNamespace(run_query=unavailable, metrics=lambda rows: {}),
+    )
+    output = tmp_path / "rrf-error.json"
+    with pytest.raises(RuntimeError):
+        run_reference_rrf("http://reference.invalid", environment={}, parameters={}, output=output)
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["status"] == report["modes"]["rrf"]["status"] == "ERROR"
+    assert report["modes"]["rrf"]["metrics"] is None
+    assert report["modes"]["lexical"]["status"] == report["modes"]["dense"]["status"] == "NOT_RUN"

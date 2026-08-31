@@ -5,9 +5,9 @@
 ## 基线、归属与事实源
 
 - 当前开发起点：`origin/main` = `2ca9d097da1f93d4cdf3eeef347c62cf51f0e058`。
-- 最新任务边界：[Issue #168](https://github.com/Stellogic/customer-agent/issues/168)，读取于 2026-08-30；本文件补充阶段说明，不改写原始验收条件。
+- 最新任务边界：[Issue #168](https://github.com/Stellogic/customer-agent/issues/168)，再次读取于 2026-08-31；本文件补充阶段说明，不改写原始验收条件。
 - 冻结资产来自已在 main 的 #189：[`rag-eval-v1.md`](rag-eval-v1.md)。查询、答案、模型 revision、编码协议和质量阈值均未修改。
-- 前置只读参考：[PR203](https://github.com/Stellogic/customer-agent/pull/203) 固定 `4317fd35897d2b2665dff0d21219a16cd23ad5d6`。不检出/复制其实现，不访问编码器私有成员。
+- 前置只读参考：[PR203](https://github.com/Stellogic/customer-agent/pull/203) 本轮固定 `5402bd4c438ff68fc9bbc4a01e55080b12499ce9`，替代首轮参考 `4317fd35897d2b2665dff0d21219a16cd23ad5d6`。本分支沿用原起点，未集成该前置。不检出/复制其实现，不访问编码器私有成员。
 - #190 继续独占 `knowledge_embedding.py`、`knowledge_evaluation.py`、默认检索、模型准备、`pyproject.toml`、`uv.lock`、Compose 和门禁入口；本阶段不改这些文件。
 - #168 只新增 `knowledge_ablation.py`、`knowledge_onnx.py`、`knowledge_consistency.py`、`knowledge_resources.py`、对应独立测试和本说明/报告模板。
 
@@ -24,6 +24,28 @@
 以上缺口已通知协调任务 `01a043aa-d724-7353-b6c5-9266277846d6`。输入契约是 #168 的独立适配要求，不冒充 #190 已承诺的新接口。本阶段不补共享接线，剩余独立工作可以继续。
 
 消融适配器返回字段沿用 #190：`id/kind/results/recall/reciprocal_rank/checked_prohibitions/violations`，可保留候选及 HTTP 状态。`results` 必须来自各自完成权限、版本、发布状态、适用范围过滤及拒答判定后的该模式；服务异常必须抛出。汇总直接传 #190 `metrics`，不得改冻结门槛。环境记录应含实际代码 SHA、前置 SHA、PostgreSQL/pgvector、硬件和依赖版本；参数记录每路候选数、RRF 常数、拒答阈值、排序/同分规则和重复运行标识。当前编排只报告每路质量是否达到 #189 阈值，不宣布混合收益可复现。
+
+## 2026-08-31 固定接口复核与有限适配
+
+本轮唯一运行代码增量是 `run_reference_rrf(base_url, environment, parameters, output)`：延迟导入 #190 的 `knowledge_evaluation`，把冻结查询原样交给公开 `run_query(base_url, query)`，再直接调用其 `metrics(rows)`。不重算评分、不截取候选、不把融合分数改名为单路分数。主分支尚无该前置模块时，调用会因缺少模块失败；不加载固定提交文件作为运行代码，也不复制前置。
+
+`run_ablation` 仍默认执行完整三路；新参数 `modes` 允许显式选择已具备接口的模式。RRF 适配只传 `("rrf",)`，即使所选模式执行完成，报告整体也只能为 `PARTIAL`，词法和稠密两路的 `rows=[] / metrics=null / status=NOT_RUN` 不变。异常时 RRF 和整体为 `ERROR`。这些是将来调用后的行为约定；本轮未实际调用，真实状态仍为 `NOT_RUN`。
+
+固定提交的接缝证据如下：
+
+| 源文件/公开接口 | 只读确认 | 本票边界 |
+| --- | --- | --- |
+| `knowledge_evaluation.run_query(base_url, query)`、`metrics(rows)` | 仍只对 `results` 评分，未接受模式参数；评分仍内嵌在 `run_query` | 只完成 RRF 调用适配，不将 `lexicalCandidates/vectorCandidates` 继承融合 recall/MRR |
+| `KnowledgeRetrievalService.developmentCandidates` 和 `/api/internal/knowledge/development-candidates` | 有分路与融合候选、特征；线上 `search` 另做 answerability 判定后才返回最终 `results` | 候选不是各路独立最终答案/拒答，不能直接拿来声称三路无答案评测已接通 |
+| `knowledge_embedding.load_model_protocol()` | 新公开接口只读取原始 `model` 配置，包含 tokenizer 大小写和中文切分设置 | 可作为后续完整模型元数据来源；配置不能替代分词器或 feature model，不因此声称 ONNX 文本适配完成 |
+| `OfflineBgeEncoder.encode(texts, query=bool)`、`knowledge_embedding_graph.embed` | 只返回向量；模型与分词器仍为私有成员 | 不访问 `_model/_tokenizer`，本轮 ONNX 运行实现保持不变 |
+
+尚缺的最小接口需求（**仅为请求，未实现或依赖这些假定签名**）：
+
+1. #190 提供公开的模式执行/评分入口，例如扩展 `run_query(base_url, query, mode=...)`，返回该路实际排序、独立拒答、recall/MRR 和违规字段，保留现有融合默认；或公开独立的 `score_results(query, hits)`，同时明确单路最终候选与拒答接缝。单独一个评分函数不能解决拒答来源问题。无需另造检索器或改变现有默认。
+2. 从现有编码实现提取可共用的本地加载/分词函数：分词器加载与 `tokenize(tokenizer, texts, query, return_tensors)`、CPU/eager feature model 加载。ONNX 文本运行端应能只加载分词器，不能为了调用分词而同时加载整份 PyTorch 模型，污染资源比较。具体签名由 #190/协调任务确认；当前只保留既有显式输入契约，不自行写私有适配器。
+
+新增测试源码只验证公开调用委派、结果行不改写、未执行模式保持空以及错误传播；stub 仅用于单元测试，不能视作真实分路验证。模板参考 SHA 已更新，指标仍为空。协调任务提到的 c5 开发 PASS 不构成 #190 冻结质量或正式交付通过；本轮没有运行或独立复核 c5 评测。
 
 ## 导出实现选择和依赖
 

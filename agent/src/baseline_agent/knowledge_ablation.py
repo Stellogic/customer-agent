@@ -6,6 +6,7 @@ import json
 import math
 from collections.abc import Callable
 from dataclasses import asdict
+from importlib import import_module
 from pathlib import Path
 from typing import Any, Literal
 
@@ -47,15 +48,18 @@ def run_ablation(
     environment: dict[str, Any],
     parameters: dict[str, Any],
     output: Path,
+    modes: tuple[RetrievalMode, ...] = MODES,
 ) -> dict[str, Any]:
     """显式执行入口；失败保存已有逐题证据，绝不把异常当作正确拒答。"""
+    if not modes or len(set(modes)) != len(modes) or any(mode not in MODES for mode in modes):
+        raise ValueError("必须显式选择非空、不重复的已知检索模式")
     report = report_template(environment, parameters)
     dataset = load_rag_eval_v1()
     thresholds = asdict(dataset.thresholds)
     thresholds.pop("k")
     active: dict[str, Any] | None = None
     try:
-        for mode in MODES:
+        for mode in modes:
             active = report["modes"][mode]
             active["status"] = "RUNNING"
             for query in dataset.queries:
@@ -76,7 +80,7 @@ def run_ablation(
                 for name, value in measured.items()
             ) else "FAIL"
         # 三路执行完不代表每路合格，更不代表收益可复现或允许切默认。
-        report["status"] = "MEASURED"
+        report["status"] = "MEASURED" if set(modes) == set(MODES) else "PARTIAL"
     except Exception as error:
         report["status"] = "ERROR"
         report["error_type"] = type(error).__name__
@@ -87,3 +91,22 @@ def run_ablation(
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
     return report
+
+
+def run_reference_rrf(
+    base_url: str,
+    *,
+    environment: dict[str, Any],
+    parameters: dict[str, Any],
+    output: Path,
+) -> dict[str, Any]:
+    """适配 PR203 的公开融合评分接口；两条单路保持 NOT_RUN，不冒充完整消融。"""
+    evaluation = import_module("baseline_agent.knowledge_evaluation")
+    return run_ablation(
+        lambda _mode, query: evaluation.run_query(base_url, query),
+        evaluation.metrics,
+        environment=environment,
+        parameters=parameters,
+        output=output,
+        modes=("rrf",),
+    )
