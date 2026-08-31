@@ -88,8 +88,13 @@ try {
 
     Invoke-PlaywrightGroup -Files $plan.ParallelSafe -Workers 2 -RepeatCount 3 -Runner $playwrightRunner
 
-    $regularSerial = @($plan.Serial | Where-Object { $_ -ne 'e2e/issue80.session-restart-expiry.spec.ts' })
+    $regularSerial = @($plan.Serial | Where-Object {
+        $_ -notin @('e2e/issue80.session-restart-expiry.spec.ts', 'e2e/issue173.auto-resolution-clock.spec.ts')
+    })
     Invoke-PlaywrightGroup -Files $regularSerial -Workers 1 -Runner $playwrightRunner
+
+    # #173 复用本次隔离栈推进业务时钟；恢复后继续原 #80 Session 阶段。
+    & "$PSScriptRoot/issue173-clock-acceptance.ps1" -ProjectName $projectName
 
     $sessionFile = @('e2e/issue80.session-restart-expiry.spec.ts')
     $env:ISSUE80_SESSION_PHASE = 'restart-prepare'

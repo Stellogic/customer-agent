@@ -1,47 +1,10 @@
-import { expect, test, type Page } from "@playwright/test";
-import { continueAsNewIfDuplicate, login } from "./support/auth";
+import { expect, test } from "@playwright/test";
+import { login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
-import { executeFixtureSql, queryFixtureSql } from "./support/database";
+import { queryFixtureSql } from "./support/database";
+import { createSingleTicket, intakeReply, prepareOrder } from "./support/issue173-intake";
 
-// 隔离静态准备，尚未运行或登记公共门禁；完整 AC 与待接线项见 issue-173-acceptance-plan.md。
-// SQL 只准备独有订单，不预造工单、回复、代次、领取、提案或审批结果。
-function prepareOrder({ delayHours = 80, allowance = 268 } = {}) {
-  const reference = `ORDER-ISSUE-173-${crypto.randomUUID()}`;
-  executeFixtureSql(`
-    INSERT INTO synthetic_order (
-      order_reference, customer_id, paid_amount, currency, delay_hours, delay_seconds,
-      paid, cancelled, fully_refunded, existing_compensation, policy_version,
-      available_compensation_amount
-    ) VALUES (
-      '${reference}', 'customer-demo', 268.00, 'CNY', ${delayHours}, ${delayHours * 3600},
-      true, false, false, false, 'delay-policy-v1', ${allowance}
-    );
-  `);
-  return reference;
-}
-
-function intakeReply(page: Page) {
-  return page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(new URL(response.url()).pathname),
-  );
-}
-
-async function createSingleTicket(page: Page, reference: string, description: string) {
-  await page.getByLabel("订单编号").fill(reference);
-  await page.getByLabel("问题描述").fill(description);
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
-  await continueAsNewIfDuplicate(page);
-  const confirmed = intakeReply(page);
-  await page.getByRole("button", { name: "确认，就是这个问题" }).click();
-  const response = await confirmed;
-  expect(response.status()).toBe(201);
-  const result = (await response.json()) as { ticketId: string; confirmed: boolean };
-  expect(result.confirmed).toBe(true);
-  expect(result.ticketId).toMatch(/^[0-9a-f-]{36}$/i);
-  return result.ticketId;
-}
+// 已登记串行门禁，仍未运行；完整 AC 与待接线项见 issue-173-acceptance-plan.md。
 
 test("Issue #173 A：自然语言多问题澄清、一次建单与订单分组恢复", async ({ browser }) => {
   test.setTimeout(90_000);
