@@ -1,6 +1,46 @@
 # #193 内部壳与非核心入口：隔离静态预开发
 
-## 第二阶段：现有授权内容接线（2026-08-31，当前范围）
+## 第三阶段：前端聚焦验证与修复（2026-08-31，当前状态）
+
+当前为 **FOCUSED_VALIDATION_PENDING**：已有运行证据，但聚焦验证尚未全部通过；不能继续笼统称为“从未测试”，也不能称整票完成。第二阶段的禁测和 CODE_READY_NO_TESTS 是历史窗口记录，已由本次明确授权取代。
+
+### 授权、基线与源码
+
+- 协调任务明确给出必要前端格式、类型、聚焦组件测试及合理复验窗口。仍不授权构建、浏览器、Docker、模型、评测或完整门禁，不修改 App、Session/route、公共验收注册、业务核心或 #170 区域。
+- 基线保持 `origin/main@c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`。本轮没有再次改变集成范围，无迁移；#170 仍阻塞整票最终集成与交付。
+- `a853cf90ad4d79519a8a30dddf90a8d48d98c8d3`：去掉 Testing Library getByRole 不支持的五处 exact 选项（字符串 name 本身仍为严格匹配），格式化本票相关文件。Playwright 的 exact 保留。业务源码仅 SupportWorkbench 的等价格式调整。
+- 当前实现/测试修复提交 `df2da9e8e34d0e50b19b93088252bf9200c0a132`：三个专属测试通过局部 ConfigProvider 禁用 motion，保留真实 Modal；将多弹窗循环拆成独立参数化用例，保留严格可访问名称、关闭、无请求与撤权断言。未修改生产弹窗、全局测试配置或超时。
+
+### 实际运行证据
+
+所有运行通过仓库 Enter-TestGateLock / Exit-TestGateLock 获取和释放默认权威锁；每次 finally 后读回 TEST_GATE_FREE，并向协调任务发送 LOCK_RELEASED。没有绕锁、轮询或运行完整 check.ps1。
+
+| RunId | 范围与结果 | 证据边界 |
+| --- | --- | --- |
+| issue193-20260831-focus1 | 离线缓存安装依赖（ignore-scripts）；限定 12 个文件格式化完成；类型检查因 5 个 exact 选项失败；测试未启动 | 默认 Node 22.15.0 与仓库要求不符，本次不是合格运行环境证据；随后改用 bundled Node 24.19.0 |
+| issue193-20260831-focus2 | Node 24.19.0；限定格式、全前端 tsc --noEmit 通过；6 文件 88 项：83 PASS、5 FAIL | 客服/审批既有套件通过。4 项新增用例停在关闭动画；Routing 客户页用例等待 CustomerShell 超时，DOM 仍为加载态，原因未证实 |
+| issue193-20260831-focus3 | Node 24.19.0；限定格式、类型通过；本票 3 文件 16 项：14 PASS、2 FAIL | 局部禁 motion 后 InternalShell 6/6 通过，关闭断言已通过；另 2 项在打开第二弹窗时名称查询失败。后续客户路由单项复验因前一步失败未执行 |
+
+运行使用本地 Prettier 3.9.6、TypeScript 6.0.3、Vitest 4.1.0，单 worker、文件串行。原始日志保留在当前 worktree 的忽略目录 `.local/issue193-focus1.log`、`issue193-focus2.log`、`issue193-focus3.log`，不作为最终完整门禁证据。
+
+focus2 调用：`node node_modules/vitest/vitest.mjs run src/shells/InternalShell.test.tsx src/components/internal/ContextEntries.test.tsx src/WorkbenchContextEntries.integration.test.tsx src/SupportWorkbench.test.tsx src/ApprovalWorkbench.test.tsx src/Routing.test.tsx --maxWorkers=1`。focus3 仅复验前三个本票文件，没有重跑已通过的客服/审批套件。
+
+### 失败定位、已修复与仍待复验
+
+- 动画：focus2 日志显示 ant-zoom-leave-active；测试局部关闭 motion 后，focus3 的关闭断言通过。不改生产动画，不能据此证明浏览器动画与焦点效果。
+- 标题 ID：focus3 日志显示隐藏旧弹层和可见新弹层都引用 `test-id`。锁定依赖 `@rc-component/util/es/hooks/useId.js` 在 NODE_ENV=test 下固定返回该 ID，生产使用 React useId。独立参数化用例避免这种测试模式的跨实例 ID 冲突，不放宽名称断言，也不通过新增生产销毁行为掩盖问题。同次挂载连续打开不同弹窗的覆盖转为待浏览器验证，不声称参数化用例覆盖该序列。
+- 最后的参数化调整发生在 focus3 释放锁之后，**尚未运行格式、类型或测试复验**。不能把前一版本的类型/格式结果算到最终 HEAD，也不能把 14/16 推断为最终全部通过。
+- 客户路由首次失败仍保留，未改 RootApplication/App/Session；没有证据将其定性为产品缺陷或单纯环境抖动。下一次窗口先做必要定向复验，若仍失败再报告证据。
+- 后续仍需真实浏览器宽窄屏、Session/SSE 撤权联动、键盘和视觉证据，以及前置正式交付后的 main 同步、迁移核对、增量 CR 与明确放行的完整门禁。CI 关闭，PR 保持 Draft，Issue 保持 OPEN。
+
+### 窗口与静态审查
+
+`issue193-20260831-focus3` 已释放锁，运行窗口已正式归还协调任务，优先供 #190 下游验证。进入纯静态收尾，**等待重新分配前不再查询锁或运行验证**。
+
+本轮类型选项/格式修复与测试环境修复分别经过独立 Standards / Spec 增量审查；最终修复范围 `a853cf9..df2da9e`：**Standards PASS / Spec PASS**，各 0 项有效问题。两轴均只读源码与证据，确认未修改生产行为、未放宽断言，并明确最后修复和 Routing 失败尚未复验。此静态结论不替代尚未通过的运行验证；后续仅更新交接记录的提交不改变该源码审查范围。
+
+
+## 第二阶段：现有授权内容接线（2026-08-31，历史静态记录）
 
 协调任务已明确允许修改 SupportWorkbench / ApprovalWorkbench 中本票入口挂载与定位现有内容的最小区域。#163/#164/#166 已交付；#170 只继续阻塞其辅助 composer、建议动作实际行为与检索接线，不再阻塞本轮普通入口。
 
