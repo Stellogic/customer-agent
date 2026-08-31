@@ -29,9 +29,7 @@ class KnowledgeRetrievalService {
     private final KnowledgeEmbeddingGateway embedding;
 
     KnowledgeRetrievalService(
-            JdbcTemplate jdbc,
-            KnowledgeAccessPolicy access,
-            KnowledgeEmbeddingGateway embedding) {
+            JdbcTemplate jdbc, KnowledgeAccessPolicy access, KnowledgeEmbeddingGateway embedding) {
         this.jdbc = jdbc;
         this.access = access;
         this.embedding = embedding;
