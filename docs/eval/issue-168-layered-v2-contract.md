@@ -2,6 +2,8 @@
 
 状态：**CODE_READY_NO_TESTS，仅本轮静态增量。** 2026-08-31 读取正式 [#149](https://github.com/Stellogic/customer-agent/issues/149)、[#168](https://github.com/Stellogic/customer-agent/issues/168)、[#190](https://github.com/Stellogic/customer-agent/issues/190) 后承接。规范来源是三张票据的正式分层修订；这不是重新设计检索或回答模型。
 
+独立 Standards / Spec 静态审查均 PASS，0 项发现，详见 [双轴记录](../delivery/issue-168-layered-v2-review.md)。
+
 本轮从本票已有提交 `facfd84632a0b2a23f500c48c4a432610e70597e` 继续，不复制前置，不同步尚未交付的 #190，不改其他 owner。当前只读参考 PR203 固定 `802a34310d4c01991ea480082a6025372da016a8` 的 `docs/implementation/issue-190-layered-interface.md`、`docs/eval/rag-layered-v2.md` 与 `knowledge_evaluation.py`，不是动态跟随前置分支。旧 [静态协议](issue-168-static-contract.md)、[v1 模板](issue-168-report-template.json)、#189 冻结资产、原始失败及 [11 项纯逻辑历史实测](../delivery/issue-168-pure-focused-plan.md) 均保留；历史实测只覆盖旧受测提交 `0ec0fb7`，不为本轮新代码背书。未回算或重标任何旧成绩。
 
 ## 检索和回答分别验收
