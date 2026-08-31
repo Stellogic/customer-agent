@@ -20,7 +20,7 @@ from baseline_agent.knowledge_sufficiency_run import (
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("version", ["c3", "c4"])
+@pytest.mark.parametrize("version", ["c3", "c4", "c5"])
 async def test_development_version_preserves_history_and_counts_one_whole_run(
     tmp_path: Path, version: str
 ) -> None:

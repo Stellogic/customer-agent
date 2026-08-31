@@ -29,3 +29,11 @@ c3 RunId `issue190-development-c3-20260831a`，受测提交 `ff29761d85ef5249124
 c4仅在c3提示末尾补充正/负JSON实例形状，明确不输出Schema定义，格式占位必须替换成当前真实片段，绝不把占位当证据。依据[供应商JSON Output指引](https://api-docs.deepseek.com/zh-cn/guides/json_mode/)要求明确输出格式样例；[Responses兼容文档](https://api-docs.deepseek.com/zh-cn/guides/responses_api/)声明支持text.format，但本次实返仍不遵约，因此保留所有本地校验。模型、schema、数值边界、数据及门槛不变。新版完整72题单独验证，不续c3、不拼分。
 
 c4增量Standards/Spec均PASS，0缺陷。`issue190-development-c4-offline-20260831a`：3项版本化离线回归、Ruff/格式/Pyright PASS，23.7218885秒，API=0、账本hash前后相同；复用已通过的入口/旧组件，不无故重跑。运行起始ff29761加本次未提交c4资产/测试增量，随后提交的源码即本次受测内容，不能把起始HEAD当作纯净受测HEAD。原始日志见[evidence](evidence/issue190-development-c4-offline-20260831a/)。
+
+### c4 实际结果与 c5 短摘录提示
+
+`issue190-development-c4-20260831a`，受测SHA `dc6c71250a3d1cbf101720616f7a6039f186f763`，36请求、35/72完成后STOPPED，metrics=null。第36次模型给出25字符真实原文摘录，超过既有24字符合同，evidence_fields FAIL（协调初报误写26，现按原字符串长度更正）；没有静默截断或继续。输入25969、输出749 token，新增84648微元，累计上界0.287133元、未结算0；Python38.6486183秒，入口42.1395718秒。原始报告/共享账本见[evidence](evidence/issue190-development-c4-20260831a/)，旧阶段不变；未计算任何部分样本质量分数。
+
+c5保留c4全部方法与校验，仅补充原文短语优先、不必复制完整长句、长摘录拆成同来源多段，以及逐条检查标点计数。建议长度12是输出指导，不是改动24字符合同或质量门槛。无题目/答案/领域例外；独立完整72题，不续c4、不拼分。没有更改产品策略。
+
+c5增量双轴静态CR均PASS、0缺陷。`issue190-development-c5-offline-20260831a`在dc6c712加当前资产/测试增量上4项回归、Ruff/格式PASS，8.8149764秒；产品源码未变，复用已通过类型/入口/组件。API=0，共享账本hash前后相同。原始日志见[evidence](evidence/issue190-development-c5-offline-20260831a/)。
