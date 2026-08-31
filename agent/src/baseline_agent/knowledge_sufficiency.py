@@ -121,7 +121,8 @@ def request_body(row: dict[str, Any], frozen: dict[str, Any]) -> dict[str, Any]:
         "text": {
             "format": {
                 "type": "json_schema",
-                "name": config.get("response_schema_name") or (
+                "name": config.get("response_schema_name")
+                or (
                     "knowledge_sufficiency_c_v2"
                     if config["method"] == "context-sufficiency-c-v2"
                     else "knowledge_sufficiency_c_v1"

@@ -11,3 +11,11 @@
 方法依据：[充分上下文研究](https://research.google/blog/deeper-insights-into-retrieval-augmented-generation-the-role-of-sufficient-context/)区分相关性与足够回答，并采用提示式判定；不借其准确率充当本项目结果。[官方计费](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)本次重核仍按Flash高峰未缓存3元/百万输入、9元/百万输出。共用累计≤6元账本，起点上界0.195579元、未结算0，hash `0800a19d7111b2838d7131734a62cdf6a64be48dcac1fc8c9b44d3435b9646f0`；逐请求预留3.148032元、可信usage结算释放差额，费用不足即停止。
 
 源码/资产提交后受锁做离线契约、实际入口、格式/类型及相关组件检查，双轴CR；之后按已有授权验证完整开发集。每阶段RunId/受测SHA、指标及费用另记于本文件，未知写未采集。模型别名不代表不可变权重；旧#189失败与冻结标准不变，开发PASS也不是独立验证或交付PASS。
+
+### c3 离线预检与审查
+
+RunId `issue190-development-offline-20260831a`：[原始证据](evidence/issue190-development-offline-20260831a/phase.json)。起始代码 `ff4958165453c230e8a3c1aaad3c4081d0b4d305`，base `c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`。同一持锁进程先格式化三个Python文件，随后14项聚焦、56项相关组件（包含聚焦）、五模式实际PowerShell→Python入口、Ruff及Pyright全部PASS，耗时69.3156588秒。测试覆盖的是格式化后源码；本次提交保留这些纯排版差异，不把起始HEAD表述为字节完全相同的受测源码。
+
+API调用0，费用0；共享账本前后SHA256均为 `0800a19d7111b2838d7131734a62cdf6a64be48dcac1fc8c9b44d3435b9646f0`。进程释放后宿主单次回读FREE并已通知协调。随后协调再次明确恢复自主开发窗口；未重复执行已通过的离线项目。
+
+Standards PASS：独立静态审查 `ff49581`，0缺陷；原有runner/账本复用、历史不覆盖，无新增题目特例。Spec PASS：独立静态审查 `ff49581`及格式增量，0缺陷；72题整批、顺序hash、预算和旧阶段保留符合恢复授权。两项均不是质量通过。以上由Codex实现及Agent审查，不声称用户逐行手写、生产规模或线上收益。真实c3结果尚未运行。

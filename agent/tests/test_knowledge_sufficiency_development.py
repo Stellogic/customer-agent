@@ -20,7 +20,9 @@ from baseline_agent.knowledge_sufficiency_run import (
 
 
 @pytest.mark.asyncio
-async def test_development_version_preserves_history_and_counts_one_whole_run(tmp_path: Path) -> None:
+async def test_development_version_preserves_history_and_counts_one_whole_run(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "cost.json"
     path.write_bytes(DEVELOPMENT_ANCHOR.read_bytes())
     frozen = contract(development_version="c3")
@@ -41,8 +43,14 @@ async def test_development_version_preserves_history_and_counts_one_whole_run(tm
         return httpx.Response(200, json=response)
 
     report: dict[str, Any] = {"run_id": "development-offline", "metrics": None}
-    await run_development(report, ledger, frozen, api_key="offline-only",
-                          development_version="c3", transport=httpx.MockTransport(handle))
+    await run_development(
+        report,
+        ledger,
+        frozen,
+        api_key="offline-only",
+        development_version="c3",
+        transport=httpx.MockTransport(handle),
+    )
     ledger.finish(report["status"])
     assert calls == len(report["rows"]) == 72
     assert report["contract_validation"] == "PASS_72_OF_72"
@@ -62,7 +70,9 @@ def test_development_version_keeps_budget_and_old_history(tmp_path: Path) -> Non
     path = tmp_path / "cost.json"
     path.write_bytes(DEVELOPMENT_ANCHOR.read_bytes())
     ledger = ExperimentLedger(path, frozen)
-    ledger.begin_version("c3", "budget", frozen["asset_sha256"], [{"query_id":"one", "request_sha256":"hash"}])
+    ledger.begin_version(
+        "c3", "budget", frozen["asset_sha256"], [{"query_id": "one", "request_sha256": "hash"}]
+    )
     ledger.plan["total_budget_micro_cny"] = 195579 + 3148032 - 1
     with pytest.raises(SufficiencyBlocked, match="BUDGET_INCOMPLETE"):
         ledger.reserve("one", "hash")
