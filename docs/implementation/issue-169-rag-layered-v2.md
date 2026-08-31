@@ -25,10 +25,16 @@ main 为 `c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`，本轮起始 HEAD 为 `575
 | 顶层 | schema=knowledge-hybrid-v2；query/generation/revision/lexicalCandidates/vectorCandidates/results，无 policy/answerable。 |
 | hit | chunkId/articleId/version/title/applicability/sourceFile/startLine/endLine/snippet/score/lexicalScore/vectorScore；仍无 updatedAt。 |
 | results | 排名前硬过滤后的授权 RRF Top-5；分数只排序。空列表仅无匹配资料，不是语义拒答。只消费最终 results，不把内部两路诊断列表当作绕过最终排序的结果。 |
-| 范围 | 有效 scope 与员工授权范围交集为空时返回 200 空列表；缺 capability 或客户走内部接口为 403 KNOWLEDGE_ACCESS_DENIED。不是 Agent 获取客户知识的授权入口。 |
+| 范围 | 按下述修复 SHA：显式有效 scope 未授权时返回 403 KNOWLEDGE_ACCESS_DENIED，且在编码/检索前拒绝；无效 scope 为 400，合法授权范围无匹配才是 200 空列表。缺 capability 或客户走内部接口也为 403。不是 Agent 获取客户知识的授权入口。 |
 | 故障 | 400 INVALID_KNOWLEDGE_QUERY；503 INDEX_STALE/MODEL_UNAVAILABLE/RETRIEVAL_UNAVAILABLE/FUSION_UNAVAILABLE。默认路径解除评分/校准依赖。 |
 
 `updatedAt` 需要与同 articleId/version 的 canonical 元数据一致；不能冒用内部身份去目录 HTTP 补读。此前讨论的包内可信范围入口、#169 受控投影和其事务/授权接线仍待集成阶段落实。不得复制检索实现来填空。
+
+2026-09-01 更正：#190 owner 已交接固定修复 **`0527552d250f6c2a819cff6365ad8870268f7761`**。只读核对该 SHA 的 `docs/implementation/issue-190-layered-interface.md` 与 `KnowledgeRetrievalService.retrieve`：先校验 scope 词汇，再以 `!allowed.contains(scope)` 拒绝显式未授权范围，之后才进入索引读取/编码/检索。旧 `802a343` 的 200 空交集属于已确认权限错误，保留其历史但不再作为授权契约；schema/结果字段不变。回读 PR203 与 #190 仍 OPEN，旧门禁证据不代表修复后的正式交付。
+
+#169 共用解析已有 HTTP 403 → ACCESS_DENIED，测试源码已有对应分支；本次只更正文档，不新增重复测试或扩展实现。已同步 #170：403 不能进入 NO_MATCH 或正常拒答，HUMAN 撤权仍按其责任绑定处理。未执行任何验证，未占用 #190 运行窗口。
+
+本次更正的增量静态双 CR 固定比较 `git diff --cached 4337d89fc01d4f993395a2cf2c09b05cdb49768d`（两文件 7 新增／3 删除）：Standards PASS、Spec PASS，均 0 项发现。仅补记审查结论，未运行检查。
 
 ## 唯一共享解析的最小修订
 

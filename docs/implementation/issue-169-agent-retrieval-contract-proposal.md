@@ -34,7 +34,7 @@
 
 ## 拟议接缝 A：授权后的检索核心，#190 只需一个接缝
 
-以下是旧阶段原则讨论过、当前仍待落实的接缝需求，**不是已存在的方法**：由 #190 在 KnowledgeRetrievalService 提供接受可信授权范围的包内入口（此前提议名 `searchAuthorizedScopes(query, allowedScopes)`），原内部 search 保留身份/能力校验及 scope 选择后委派。#190 owner 本次明确目前只有内部 search，未承诺已实现包内入口；#169 不预写依赖不存在方法的适配。该入口只需覆盖权限/发布/版本/范围过滤、两路检索及 RRF Top-5，**不判断可回答性**。条目是供同次 DeepSeek 判断和回答的资料，不能直接当答案或已接受引用。新 Agent 可信入口无授权范围应拒绝；这与现有内部页面有效 scope 的空交集返回 200 空列表不同，不能擅改 #190 内部接口行为。不复制引擎，不让 Agent 指定索引 generation、模型 revision 或阈值。包内方法不会自动继承原 search 的事务。旧 CALIBRATED/评分、c5 及所有失败仅作为历史，不进入默认回答路径。
+以下是旧阶段原则讨论过、当前仍待落实的接缝需求，**不是已存在的方法**：由 #190 在 KnowledgeRetrievalService 提供接受可信授权范围的包内入口（此前提议名 `searchAuthorizedScopes(query, allowedScopes)`），原内部 search 保留身份/能力校验及 scope 选择后委派。#190 owner 本次明确目前只有内部 search，未承诺已实现包内入口；#169 不预写依赖不存在方法的适配。该入口只需覆盖权限/发布/版本/范围过滤、两路检索及 RRF Top-5，**不判断可回答性**。条目是供同次 DeepSeek 判断和回答的资料，不能直接当答案或已接受引用。新 Agent 可信入口无授权范围应拒绝；内部页面在固定修复 `0527552d250f6c2a819cff6365ad8870268f7761` 中也于编码/检索前拒绝显式未授权 scope（403），旧 200 空交集不是合法授权契约。不复制引擎，不让 Agent 指定索引 generation、模型 revision 或阈值。包内方法不会自动继承原 search 的事务。旧 CALIBRATED/评分、c5 及所有失败仅作为历史，不进入默认回答路径。
 
 #169 拟新增同 knowledge 包的 `AgentKnowledgeRetrievalAdapter.java`：
 
@@ -71,7 +71,7 @@ HUMAN 通道由 #170 自有辅助请求入口验证 SUPPORT 会话、HUMAN、当
 | PR203 KnowledgeRetrievalService：INDEX_STALE | INDEX_STALE；不使用旧缓存。 |
 | PR203 KnowledgeEmbeddingGateway：MODEL_UNAVAILABLE | MODEL_UNAVAILABLE（这里特指 Embedding）；保留原码，不伪造独立“Embedding错误”实现。 |
 | PR203 FUSION_UNAVAILABLE / RETRIEVAL_UNAVAILABLE、HTTP 超时/非预期载荷 | 对 Agent 归一 RETRIEVAL_UNAVAILABLE，内部保留受控诊断，不转发异常正文。 |
-| 现有 generation 403；客服无当前 assignment；Agent 授权范围为空 | ACCESS_DENIED；不重试越权。客服返回授权资源的 404 语义由 #170 保留，不据此泄露工单存在。授权失败不能伪装无匹配或正常拒答；#190 内部页面有效 scope 的空交集语义不因此改变。 |
+| 现有 generation 403；客服无当前 assignment；Agent 授权范围为空；显式未授权 scope | ACCESS_DENIED；不重试越权。客服返回授权资源的 404 语义由 #170 保留，不据此泄露工单存在。授权失败不能伪装无匹配或正常拒答；只有成功授权但无匹配才使用 200 空结果。 |
 | 拟议引用身份/版本/片段/范围或检索回执不匹配 | INVALID_KNOWLEDGE_CITATION；不发布该知识答复/来源。纯模块抛 IllegalArgumentException，未来入口映射该码；本轮没有新 HTTP handler。 |
 | 拟议知识与已核验事实冲突 / 注入或无依据规则结论 | KNOWLEDGE_CONFLICT / UNSAFE_KNOWLEDGE；记录受控事件与引用，不写入原始 prompt。客户只获得安全状态/人工处理提示；客服辅助失败不影响继续人工回复。 |
 
