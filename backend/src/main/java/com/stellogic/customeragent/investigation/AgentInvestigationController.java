@@ -1,5 +1,7 @@
 package com.stellogic.customeragent.investigation;
 
+import com.stellogic.customeragent.knowledge.AgentKnowledgeResult;
+import com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Set;
@@ -22,12 +24,39 @@ import tools.jackson.databind.JsonNode;
 public final class AgentInvestigationController {
     private final AgentInvestigationService service;
     private final byte[] agentToken;
+    private final AgentKnowledgeRetrievalAdapter knowledge;
 
     AgentInvestigationController(
             AgentInvestigationService service,
-            @Value("${baseline.identity.agent-token}") String agentToken) {
+            @Value("${baseline.identity.agent-token}") String agentToken,
+            AgentKnowledgeRetrievalAdapter knowledge) {
         this.service = service;
         this.agentToken = agentToken.getBytes(StandardCharsets.UTF_8);
+        this.knowledge = knowledge;
+    }
+
+    @PostMapping("/knowledge/search")
+    AgentKnowledgeResult searchKnowledge(
+            @PathVariable UUID ticketId,
+            @PathVariable UUID generationId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @RequestHeader(value = "X-Agent-Generation-Id", required = false) UUID scopedGenerationId,
+            @RequestHeader(value = "X-Agent-Operation", required = false) String operation,
+            @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
+            @RequestBody JsonNode payload) {
+        requireScope(ticketId, generationId, scopedGenerationId, operation, "SEARCH_KNOWLEDGE", authorization);
+        if (requestId == null || requestId.isBlank() || requestId.length() > 200
+                || !payload.isObject() || !properties(payload).equals(Set.of("query"))
+                || !payload.path("query").isString()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid knowledge request");
+        }
+        String query = payload.get("query").asString().trim();
+        if (query.isEmpty() || query.length() > 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid knowledge query");
+        }
+        AgentKnowledgeResult receipt = service.authorizeKnowledgeSearch(ticketId, generationId, requestId, query);
+        AgentKnowledgeResult result = receipt == null ? knowledge.searchCustomer(query) : knowledge.revalidateCustomer(receipt);
+        return service.acceptKnowledgeSearch(ticketId, generationId, requestId, query, result);
     }
 
     @GetMapping("/capabilities")

@@ -1,6 +1,7 @@
 package com.stellogic.customeragent.investigation;
 
 import com.stellogic.customeragent.compensation.DelayCompensationPolicy;
+import com.stellogic.customeragent.knowledge.AgentKnowledgeResult;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
@@ -60,6 +61,55 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 java.util.Arrays.stream(InvestigationCapability.values())
                         .map(InvestigationCapability::definition)
                         .toList());
+    }
+
+    @Override
+    @Transactional
+    public AgentKnowledgeResult authorizeKnowledgeSearch(
+            UUID ticketId, UUID generationId, String requestId, String query) {
+        authorityLock.acquire(ticketId);
+        requireActiveGeneration(ticketId, generationId);
+        return knowledgeReceipt(generationId, requestId, query);
+    }
+
+    @Override
+    @Transactional
+    public AgentKnowledgeResult acceptKnowledgeSearch(
+            UUID ticketId, UUID generationId, String requestId, String query, AgentKnowledgeResult result) {
+        authorityLock.acquire(ticketId);
+        requireActiveGeneration(ticketId, generationId);
+        AgentKnowledgeResult previous = knowledgeReceipt(generationId, requestId, query);
+        if (previous != null) {
+            if (!previous.equals(result)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "knowledge receipt changed during concurrent request");
+            }
+            return previous;
+        }
+        jdbc.update(
+                "insert into agent_command_request (generation_id,request_id,operation,parameter_digest,response_payload,created_at) "
+                        + "values (?,?,'SEARCH_KNOWLEDGE',?,?::jsonb,?)",
+                generationId, requestId, knowledgeQueryDigest(query),
+                json.writeValueAsString(result), Timestamp.from(clock.instant()));
+        return result;
+    }
+
+    private AgentKnowledgeResult knowledgeReceipt(UUID generationId, String requestId, String query) {
+        return jdbc.query(
+                "select operation,parameter_digest,response_payload::text from agent_command_request "
+                        + "where generation_id=? and request_id=?",
+                (rs, row) -> {
+                    if (!"SEARCH_KNOWLEDGE".equals(rs.getString(1))
+                            || !knowledgeQueryDigest(query).equals(rs.getString(2))) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "knowledge request identity reused");
+                    }
+                    return json.readValue(rs.getString(3), AgentKnowledgeResult.class);
+                }, generationId, requestId).stream().findFirst().orElse(null);
+    }
+
+    private static String knowledgeQueryDigest(String query) {
+        // 复用现有请求表必需的参数摘要，不另建知识请求身份机制。
+        return StableParameterDigest.sha256("SEARCH_KNOWLEDGE", query, "CUSTOMER_PUBLIC");
     }
 
     @Override

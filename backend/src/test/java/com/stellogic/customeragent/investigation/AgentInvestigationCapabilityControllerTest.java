@@ -2,6 +2,7 @@ package com.stellogic.customeragent.investigation;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -24,7 +25,8 @@ class AgentInvestigationCapabilityControllerTest {
             org.mockito.Mockito.mock(AgentInvestigationService.class);
     private final MockMvc mvc =
             MockMvcBuilders.standaloneSetup(
-                            new AgentInvestigationController(service, "agent-token"))
+                            new AgentInvestigationController(service, "agent-token",
+                                    mock(com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter.class)))
                     .build();
 
     @Test
