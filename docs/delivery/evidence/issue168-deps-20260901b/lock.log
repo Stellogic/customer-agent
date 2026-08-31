@@ -1,0 +1,6 @@
+Using CPython 3.13.13 interpreter at: C:\Users\lizhuo\AppData\Local\Programs\Python\Python313\python.exe
+Resolved 115 packages in 5.60s
+Added flatbuffers v25.12.19
+Added ml-dtypes v0.6.0
+Added onnx v1.20.1
+Added onnxruntime v1.24.2

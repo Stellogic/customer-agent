@@ -1,0 +1,25 @@
+unformatted: File would be reformatted
+  --> src\baseline_agent\knowledge_onnx.py:15:49
+   |
+14 |
+   - from baseline_agent.knowledge_embedding import (
+15 + from baseline_agent.knowledge_embedding import (
+16 |     TOKENIZER_FILES,
+17 |     load_feature_model,
+18 |     load_tokenizer,
+   -     tokenize_texts,
+   - )
+   - from baseline_agent.knowledge_embedding import (
+   -     verify_model_directory as verify_bge_directory,
+   - )
+   - from baseline_agent.rag_eval_v1 import load_rag_eval_v1
+19 +     tokenize_texts,
+20 + )
+21 + from baseline_agent.knowledge_embedding import (
+22 +     verify_model_directory as verify_bge_directory,
+23 + )
+24 + from baseline_agent.rag_eval_v1 import load_rag_eval_v1
+25 |
+   |
+
+1 file would be reformatted, 11 files already formatted
