@@ -6,10 +6,28 @@
   "plan": "issue-174-live-acceptance-plan.md",
   "description": "独立合成场景候选清单；不是 runner 配置、产品协议、运行许可或运行证据。",
   "executionAuthorized": false,
+  "qualityProtocol": "rag-layered-v2",
+  "evidenceResponsibilities": {
+    "retrieval": "#190：有答案 Recall@5 >= 0.90、MRR@5 >= 0.75；错误版本/范围/越权 Top-5 命中率各为0；无答案题完整执行，候选不决定拒答。",
+    "customerAnswer": "#169：自身真实回答路径的拒答 precision >= 0.90、recall >= 0.85，结构/引用/语义分别报告。",
+    "supportAnswer": "#170：自身真实 HUMAN 辅助路径的同一回答门槛，不以客户成绩替代，不自动发送或产生副作用。",
+    "release": "#174：核对上游版本化证据并承接真实浏览器发布；#173 保留确定性全栈前置。",
+    "dependencyDirection": "#190 独立交付后由 #169/#170 消费；#173/#174 后续汇总，不反向阻塞上游，不增加独立充分性模型。",
+    "evidenceStatus": "NOT_VERIFIED"
+  },
+  "sharedProjectBudget": {
+    "currency": "CNY",
+    "cumulativeLimit": 6,
+    "historicalSpent": null,
+    "remaining": null,
+    "ledgerReference": null,
+    "policy": "沿用项目原账本累计，含既往失败/STOPPED、重试和在途费用。协议/场景/run 换名不重置、不重复入账；此6元不是本票新增额度，剩余未核对不可付费。USD micro 须按冻结计价/换算并入同一上限。"
+  },
   "currentStage": {
     "logicalCalls": 0,
     "providerAttempts": 0,
     "costMicrosUsd": 0,
+    "costScope": "仅本静态阶段新增消耗，不代表全项目历史累计为0",
     "metricsStatus": "NOT_RUN"
   },
   "freezeStatus": "PENDING",
@@ -32,12 +50,16 @@
   "nullMeaning": "待冻结或未知，不是无限预算、零费用或通过。",
   "prerequisites": [
     "#173 正式完成并重新核对 #150 与原生前置",
+    "核对 #190 检索层及 #169/#170 各自真实回答拒答门的完整证据、数据哈希与版本，不以规格发布当 PASS",
+    "项目历史原账本、在途费用及6元共享余额已对齐；本票只能在剩余额度内冻结子上限",
     "最终模型、prompt、schema、场景、调用/尝试/token/成本/时间上限在调用前冻结",
     "受理及调查全链计量和事前预算控制已接好，涵盖并行工单及在途取消",
     "协调任务另行明确授权运行及费用，按既有规范使用隔离资源和合法锁入口"
   ],
   "fixturePolicy": "仅描述合成输入事实；订单引用占位符待映射为本次隔离栈独有订单。只准备订单/支付/物流/知识输入，不预写工单、消息、代次、提案、审批、执行或 HUMAN 结果。",
   "observationPolicy": "真实 Chromium 可见 UI 发起业务，只观察同源 Spring 产品 API/SSE/页面；不直接请求 provider/Agent，不 mock 成功，不通过内部 publish 或 SQL 制造业务结果。",
+  "answerEvidencePolicy": "同一次 DeepSeek 调用判断知识资料充分性并回答，不新增默认独立充分性调用。仅检索/模型/解析成功且合法说明资料不足才算正常拒答，允许必要追问、不仅因此转人工；故障分类单列且保留完整分母。结构/引用/语义独立报告，不新设单条引文24字符限制；不保存原始prompt/response/思维链/key。",
+  "historyPolicy": "保留 #189 原资产/标签/数值目标、旧协议与 FAIL/STOPPED，不回算旧成绩、不读验收错题调prompt或选参、不复制 #190 账本。",
   "scenarios": [
     {
       "id": "L174-01",
@@ -129,27 +151,43 @@
     },
     {
       "id": "L174-04",
-      "title": "真实知识引用与授权来源回读",
+      "title": "客户与客服回答、正常拒答及真实引用的分层承接",
       "status": "NOT_RUN",
+      "upstreamEvidence": {
+        "retrievalReport": null,
+        "customerAnswerReport": null,
+        "supportAnswerReport": null,
+        "frozenSampleBindings": null,
+        "bindingPolicy": "绑定 #169/#170 各自已冻结的有答案/无答案产品样本，不新增题集或重测上游质量门；本候选组不代表完整统计分母。"
+      },
       "fixture": {
         "orderAlias": "ORDER-L174-04-<run>",
         "facts": [
           "当前客户的物流延迟订单，其适用规则可在真实知识目录查到",
-          "唯一已发布、当前有效且对客户可见的匹配条目，具有版本、标题和更新时间"
+          "有答案样本绑定当前有效授权条目，具有版本、标题和更新时间",
+          "无答案样本采用上游冻结的问题和授权候选，资料不足但检索正常，不能用空候选或基础设施故障假造正常拒答",
+          "客服样本使用通过产品流程转入 HUMAN 且由当前负责客服领取的工单，不预写人工状态或领取结果"
         ],
-        "bindingStatus": "PENDING_169_190"
+        "bindingStatus": "PENDING_190_169_170"
       },
       "customerInputs": ["ORDER-L174-04-<run> 这次延迟适用什么规则？请告诉我依据，我想查看来源。"],
-      "actions": ["自然受理确认并等待实际调查回复", "点击真实回复引用，查看授权来源，再刷新工单"],
+      "actions": [
+        "客户路径自然受理确认，分别绑定上游有答案/无答案样本，经实际调查读取回答或资料不足说明",
+        "有来源的客户回答点击真实引用并刷新回读；无答案补充问题按上游冻结输入绑定，不现场编题",
+        "客服路径经真实UI转人工并由负责客服领取，绑定其冻结样本请求知识建议或草稿，查看授权引用或资料不足说明，不发送草稿"
+      ],
       "expectedObservations": [
-        "回复含受真实检索支持的规则含义，不以检索替代业务事实核验",
+        "有答案回复含受真实检索支持的规则含义，不以检索替代业务事实核验",
         "客户看到条目的真实友好标题与更新时间，可打开授权来源",
         "引用与实际采用条目版本一致，刷新后仍能核对；不暴露内部路径、原始工具数据或无权限内容",
-        "当前固定 Sources 文案不能作为本场景通过证据"
+        "当前固定 Sources 文案不能作为本场景通过证据",
+        "合法资料不足回答可说明或追问，不仅因此转人工；检索/模型/格式故障单列，不算正确拒答",
+        "客服建议只供当前负责客服审阅，不自动发送公开消息，不改变处理模式或产生补偿等副作用",
+        "客户与客服路径分别核对结构合法性、引用真实性、语义充分性与拒答门证据，不合并成绩掩盖未达标"
       ],
-      "countingNote": "计入生成检索行动、判断及沟通等真实 DeepSeek 调用；不混入 #190 检索实验指标。",
-      "pending": ["#169/#190/#173 集成", "真实来源路由与公开字段绑定，不能编造 API"],
-      "sourceReferences": ["frontend/src/App.tsx", "docs/tickets/spec-149/issue-174.md"]
+      "countingNote": "已有上游费用关联原记录不重复计费，新浏览器场景调用计入项目历史累计共享6元；不新增充分性调用或复制 #190 实验指标。",
+      "pending": ["#190/#169/#170 分层真实报告与 #173 集成", "客服辅助与来源真实路由、字段及冻结有答案/无答案样本绑定，不编造 API", "场景子预算只能来自已对账的项目共享余额"],
+      "sourceReferences": ["frontend/src/App.tsx", "https://github.com/Stellogic/customer-agent/issues/149", "https://github.com/Stellogic/customer-agent/issues/174", "https://github.com/Stellogic/customer-agent/issues/169", "https://github.com/Stellogic/customer-agent/issues/170", "https://github.com/Stellogic/customer-agent/issues/190"]
     },
     {
       "id": "L174-05",
@@ -169,7 +207,8 @@
         "Spring 不接受事实不足的自动结论，工单进入 HUMAN 并保留可理解的安全说明",
         "不因客户催促或模型置信度扩大补偿权限，无待审批或执行成功投影",
         "刷新后仍为人工处理，不预写 HUMAN，不用点击人工按钮替代失败转人工",
-        "供应商异常、预算耗尽或 schema 错误须单独判运行失败，不能冒充本场景预期冲突"
+        "供应商异常、预算耗尽或 schema 错误须单独判运行失败，不能冒充本场景预期冲突",
+        "本场景是权威业务事实冲突，不是 L174-04 的正常知识资料不足；不计为回答层正确拒答"
       ],
       "countingNote": "包括失败行动/判断及取消在途请求；缺失 usage 为未知，不记零费用。",
       "pending": ["#160/#161/#173 的真实冲突输入与公开失败路径", "冻结观测时限与计量"],
