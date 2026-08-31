@@ -14,9 +14,29 @@ const assignment: SupportAssignment = {
 };
 const request: AssistanceRequest = { assignment, requestId: "request-a", kind: "knowledge" };
 const initial = createSupportAssistanceState(assignment);
-const empty = { status: "empty", kind: "knowledge" } as const;
+const insufficient = { status: "insufficient", kind: "knowledge", requestId: "request-a", explanation: "现有资料不足。", followUp: null } as const;
 
 describe("HUMAN 辅助 assignment 与请求绑定", () => {
+  it("无匹配只是检索中间状态，同请求仍可接受生成的资料不足说明", () => {
+    const pending = reduceSupportAssistance(initial, { type: "start", request });
+    const noMatch = reduceSupportAssistance(pending, { type: "noMatch", request });
+    expect(noMatch.view.status).toBe("empty");
+    expect(noMatch.assignment).toEqual(assignment);
+    const done = reduceSupportAssistance(noMatch, { type: "complete", request, view: insufficient });
+    expect(done.view.status).toBe("insufficient");
+    expect(reduceSupportAssistance(done, { type: "noMatch", request })).toBe(done);
+  });
+
+  it("迟到无匹配和错误请求身份的资料不足说明不能覆盖当前请求", () => {
+    const pending = reduceSupportAssistance(initial, { type: "start", request });
+    expect(reduceSupportAssistance(pending, {
+      type: "noMatch", request: { ...request, requestId: "old-request" },
+    })).toBe(pending);
+    expect(reduceSupportAssistance(pending, {
+      type: "complete", request, view: { ...insufficient, requestId: "wrong-request" },
+    })).toBe(pending);
+  });
+
   it("同参数重试保留请求身份与回执，复用 ID 改类型快速失败", () => {
     const loading = reduceSupportAssistance(initial, { type: "start", request });
     expect(reduceSupportAssistance(loading, { type: "start", request: { ...request } })).toBe(
@@ -25,7 +45,7 @@ describe("HUMAN 辅助 assignment 与请求绑定", () => {
     expect(() =>
       reduceSupportAssistance(loading, { type: "start", request: { ...request, kind: "policy" } }),
     ).toThrow("REQUEST_CONFLICT");
-    const done = reduceSupportAssistance(loading, { type: "complete", request, view: empty });
+    const done = reduceSupportAssistance(loading, { type: "complete", request, view: insufficient });
     expect(done.request?.requestId).toBe("request-a");
     expect(reduceSupportAssistance(done, { type: "start", request })).toBe(done);
     expect(
@@ -41,7 +61,7 @@ describe("HUMAN 辅助 assignment 与请求绑定", () => {
     const loading = reduceSupportAssistance(initial, { type: "start", request });
     const newer = { ...request, requestId: "request-b", kind: "policy" } as const;
     const pending = reduceSupportAssistance(loading, { type: "start", request: newer });
-    expect(reduceSupportAssistance(pending, { type: "complete", request, view: empty })).toBe(
+    expect(reduceSupportAssistance(pending, { type: "complete", request, view: insufficient })).toBe(
       pending,
     );
     expect(
@@ -55,9 +75,9 @@ describe("HUMAN 辅助 assignment 与请求绑定", () => {
       reduceSupportAssistance(pending, {
         type: "complete",
         request: newer,
-        view: { status: "empty", kind: "policy" },
+        view: { ...insufficient, kind: "policy", requestId: "request-b" },
       }).view.status,
-    ).toBe("empty");
+    ).toBe("insufficient");
   });
 
   it("同请求身份不能接受不同辅助类型的内容", () => {
@@ -66,14 +86,14 @@ describe("HUMAN 辅助 assignment 与请求绑定", () => {
       reduceSupportAssistance(loading, {
         type: "complete",
         request: { ...request, kind: "draft" },
-        view: { status: "empty", kind: "draft" },
+        view: { ...insufficient, kind: "draft" },
       }),
     ).toBe(loading);
     expect(
       reduceSupportAssistance(loading, {
         type: "complete",
         request,
-        view: { status: "empty", kind: "policy" },
+        view: { ...insufficient, kind: "policy", requestId: "request-b" },
       }),
     ).toBe(loading);
   });
@@ -82,7 +102,7 @@ describe("HUMAN 辅助 assignment 与请求绑定", () => {
     const loading = reduceSupportAssistance(initial, { type: "start", request });
     const denied = reduceSupportAssistance(loading, { type: "accessDenied", assignment });
     expect(denied).toEqual({ assignment: null, request: null, view: { status: "idle" } });
-    expect(reduceSupportAssistance(denied, { type: "complete", request, view: empty })).toBe(
+    expect(reduceSupportAssistance(denied, { type: "complete", request, view: insufficient })).toBe(
       denied,
     );
     expect(reduceSupportAssistance(denied, { type: "start", request })).toBe(denied);
@@ -105,7 +125,7 @@ describe("HUMAN 辅助 assignment 与请求绑定", () => {
     expect(reduceSupportAssistance(reclaimed, { type: "accessDenied", assignment })).toBe(
       reclaimed,
     );
-    expect(reduceSupportAssistance(reclaimed, { type: "complete", request, view: empty })).toBe(
+    expect(reduceSupportAssistance(reclaimed, { type: "complete", request, view: insufficient })).toBe(
       reclaimed,
     );
   });
@@ -120,3 +140,4 @@ describe("HUMAN 辅助 assignment 与请求绑定", () => {
     );
   });
 });
+

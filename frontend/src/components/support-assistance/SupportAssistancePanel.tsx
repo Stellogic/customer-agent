@@ -89,7 +89,16 @@ function AuthorizedAssistance({
         {view.status === "idle" && <p>暂无辅助结果，可继续人工编辑回复。</p>}
         {view.status === "loading" && <p role="status">正在准备{assistanceLabels[view.kind]}…</p>}
         {view.status === "empty" && (
-          <p role="status">{assistanceLabels[view.kind]}暂无可用答案，请人工核实。</p>
+          <p role="status">暂无匹配的授权片段；尚未形成回答充分性判断，人工编辑可继续。</p>
+        )}
+        {view.status === "insufficient" && (
+          <section aria-label="资料不足说明">
+            <h4>资料不足</h4>
+            <small>请求标识：{view.requestId}</small>
+            <p className="support-assistance__text">{view.explanation}</p>
+            {view.followUp && <p>可补充确认：{view.followUp}</p>}
+            <p className="support-assistance__hint">这是本次辅助生成给出的不足说明，不会自动发送或改变人工处理模式。</p>
+          </section>
         )}
         {view.status === "error" && (
           <p role="alert">
@@ -101,6 +110,7 @@ function AuthorizedAssistance({
                 model: "回复生成模型暂不可用。",
                 retrieval: "知识检索暂不可用。",
                 request: "辅助请求未被接受，请核实输入和请求身份。",
+                format: "辅助回答格式无效，未作为资料不足或有效草稿展示。",
               }[view.reason]
             }
             人工处理不受影响。

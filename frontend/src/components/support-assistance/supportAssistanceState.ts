@@ -4,10 +4,18 @@ export type AssistanceKind = "summary" | "knowledge" | "policy" | "draft";
 export type AssistanceView =
   | { status: "idle" }
   | { status: "loading"; kind: AssistanceKind }
+  // empty 仅表示检索无匹配，不能作为回答充分性或正常拒答。
   | { status: "empty"; kind: AssistanceKind }
   | {
+      status: "insufficient";
+      kind: AssistanceKind;
+      requestId: string;
+      explanation: string;
+      followUp: string | null;
+    }
+  | {
       status: "error";
-      reason: "conflict" | "index" | "embedding" | "model" | "retrieval" | "request";
+      reason: "conflict" | "index" | "embedding" | "model" | "retrieval" | "request" | "format";
     }
   | {
       status: "ready";
@@ -47,10 +55,11 @@ export type SupportAssistanceState = Readonly<{
   view: AssistanceView;
 }>;
 
-type CompletedView = Exclude<AssistanceView, { status: "idle" | "loading" }>;
+type CompletedView = Exclude<AssistanceView, { status: "idle" | "loading" | "empty" }>;
 export type SupportAssistanceEvent =
   | { type: "authorize"; assignment: SupportAssignment | null }
   | { type: "start"; request: AssistanceRequest }
+  | { type: "noMatch"; request: AssistanceRequest }
   | { type: "complete"; request: AssistanceRequest; view: CompletedView }
   | { type: "accessDenied"; assignment: SupportAssignment };
 
@@ -104,9 +113,12 @@ export function reduceSupportAssistance(
     state.request.kind !== event.request.kind
   )
     return state;
-  if (state.view.status !== "loading") return state;
+  if (state.view.status !== "loading" && state.view.status !== "empty") return state;
+  if (event.type === "noMatch") {
+    return { ...state, view: { status: "empty", kind: event.request.kind } };
+  }
   if ("kind" in event.view && event.view.kind !== event.request.kind) return state;
-  if (event.view.status === "ready" && event.view.requestId !== event.request.requestId)
+  if ("requestId" in event.view && event.view.requestId !== event.request.requestId)
     return state;
   return { ...state, view: event.view };
 }

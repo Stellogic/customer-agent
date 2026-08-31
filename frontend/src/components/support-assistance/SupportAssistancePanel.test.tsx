@@ -40,11 +40,12 @@ function props(content: AssistanceView = fixture): SupportAssistancePanelProps {
   if (content.status !== "idle") {
     const request = {
       assignment,
-      requestId: content.status === "ready" ? content.requestId : "fixture-request-1",
+      requestId: "requestId" in content ? content.requestId : "fixture-request-1",
       kind: "kind" in content ? content.kind : ("draft" as const),
     };
     state = reduceSupportAssistance(state, { type: "start", request });
-    if (content.status !== "loading")
+    if (content.status === "empty") state = reduceSupportAssistance(state, { type: "noMatch", request });
+    else if (content.status !== "loading")
       state = reduceSupportAssistance(state, { type: "complete", request, view: content });
   }
   return { state, onReviewDraft: null };
@@ -199,6 +200,7 @@ describe("独立客服辅助展示与草稿", () => {
     { status: "error", reason: "embedding" },
     { status: "error", reason: "retrieval" },
     { status: "error", reason: "request" },
+    { status: "error", reason: "format" },
   ])("辅助状态 $status 不阻止人工继续编辑", (content) => {
     const { rerender } = render(<SupportAssistancePanel {...props()} />);
     fireEvent.change(editor(), { target: { value: "保留人工回复" } });
@@ -216,6 +218,31 @@ describe("独立客服辅助展示与草稿", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("知识向量模型暂不可用");
     rerender(<SupportAssistancePanel {...props({ status: "error", reason: "model" })} />);
     expect(screen.getByRole("alert")).toHaveTextContent("回复生成模型暂不可用");
+  });
+
+  it("检索无匹配不冒称正常拒答，模型资料不足说明保留人工编辑", () => {
+    const onReviewDraft = vi.fn();
+    const { rerender } = render(<SupportAssistancePanel {...props()} onReviewDraft={onReviewDraft} />);
+    fireEvent.change(editor(), { target: { value: "已有人工草稿" } });
+    rerender(<SupportAssistancePanel {...props({ status: "empty", kind: "draft" })} onReviewDraft={onReviewDraft} />);
+    expect(screen.getByRole("status")).toHaveTextContent("尚未形成回答充分性判断");
+    expect(screen.queryByRole("heading", { name: "资料不足" })).not.toBeInTheDocument();
+    rerender(<SupportAssistancePanel {...props({
+      status: "insufficient", kind: "draft", requestId: "fixture-request-1",
+      explanation: "现有资料未说明该情形的处理规则，不能据此给出结论。",
+      followUp: "请确认您希望了解的是哪项规则。",
+    })} onReviewDraft={onReviewDraft} />);
+    expect(screen.getByRole("heading", { name: "资料不足" })).toBeInTheDocument();
+    expect(screen.getByText(/可补充确认/)).toBeInTheDocument();
+    expect(editor()).toHaveValue("已有人工草稿");
+    expect(onReviewDraft).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "插入回复草稿" })).not.toBeInTheDocument();
+  });
+
+  it("引用超过24字符仍完整展示，不实施单条截断", () => {
+    const snippet = "这是一段超过二十四个字符的合成政策引用，用于核实片段完整展示而非产品知识质量。";
+    render(<SupportAssistancePanel {...props({ ...fixture, citations: [{ ...fixture.citations[0], snippet }] })} />);
+    expect(screen.getByText(snippet)).toBeInTheDocument();
   });
 
   it("未接线/人工发送未确认时不能移交；空白与超长草稿不能插入", () => {
