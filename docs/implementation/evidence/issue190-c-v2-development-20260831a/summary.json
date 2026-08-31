@@ -1,0 +1,64 @@
+{
+  "run_id": "issue190-c-v2-development-20260831a",
+  "head_sha": "07566be1a1f8d0505bd55d012ffbb34c9103352b",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "FAIL",
+  "contract_validation": "PASS_72_OF_72",
+  "semantic_validation": "FAIL",
+  "actual_requests": 72,
+  "completed_rows": 72,
+  "trusted_usage_count": 72,
+  "input_tokens": 34034.0,
+  "output_tokens": 1506.0,
+  "total_tokens": 35540.0,
+  "cached_input_tokens": 17920.0,
+  "reasoning_tokens": 0.0,
+  "new_settled_upper_micro_cny": 115656.0,
+  "cost_totals": {
+    "settled_upper_micro_cny": 195579,
+    "unsettled_reserved_micro_cny": 0
+  },
+  "model_values": [
+    "deepseek-v4-flash"
+  ],
+  "non_null_fingerprint_count": 0,
+  "contract_layer_pass_counts": {
+    "json_syntax": 72,
+    "decision_schema": 72,
+    "evidence_fields": 72,
+    "cross_fields": 72,
+    "authorized_chunks": 72,
+    "verbatim_quotes": 72
+  },
+  "metrics": {
+    "answered_recall_at_5": 0.8055555555555556,
+    "answered_mrr_at_5": 0.7037037037037037,
+    "unanswered_precision": 0.8333333333333334,
+    "unanswered_recall": 0.9722222222222222,
+    "answerable_false_rejection": 0.19444444444444445,
+    "unanswerable_false_acceptance": 0.02777777777777779,
+    "counts": {
+      "answered": 36,
+      "unanswered": 36,
+      "true_abstentions": 35,
+      "false_abstentions": 7,
+      "recall_sum": 29.0,
+      "reciprocal_rank_sum": 25.333333333333332
+    }
+  },
+  "confusion_counts": {
+    "answerable_accepted": 29,
+    "answerable_rejected": 7,
+    "unanswerable_accepted": 1,
+    "unanswerable_rejected": 35
+  },
+  "original_phases_unchanged": true,
+  "original_50_attempts_unchanged": true,
+  "full_request_manifest_matches": true,
+  "actual_72_order_and_hashes_match": true,
+  "python_elapsed_seconds": 78.57019339999533,
+  "environment": {
+    "python": "3.13.13",
+    "platform": "Windows-11-10.0.26200-SP0"
+  }
+}

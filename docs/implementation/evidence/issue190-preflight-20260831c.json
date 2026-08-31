@@ -1,0 +1,10 @@
+{
+  "status": "FAIL",
+  "elapsed_seconds": 77.8290469,
+  "working_tree_changed_by_format": true,
+  "last_phase": "backend-component",
+  "base_sha": "efbdb8348dc9c12f259c69d9e8c16de5e4d3994c",
+  "run_id": "issue190-preflight-20260831c",
+  "head_sha": "e71e11512259c3640203d426860b23de466497dd",
+  "paid_model_cost_cny": 0
+}

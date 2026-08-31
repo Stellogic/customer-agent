@@ -1,0 +1,37 @@
+[
+  {
+    "source": "docs/implementation/evidence/issue190-logistic-fit-20260831b/calibration-collect.json",
+    "file": "issue190-logistic-fit-20260831b/calibration-collect.json",
+    "sha256": "b4ec9872012c90c795b0356a74f9ac3f4f7343bff207a76b16d9185265b06387"
+  },
+  {
+    "source": "docs/implementation/evidence/issue190-c-development-20260831a/cost-ledger.json",
+    "file": "issue190-c-development-20260831a/cost-ledger.json",
+    "sha256": "5cd9e0ef8ee6977f0897db31d4c00bfee498194b9456bc437ffe0776b79e8507"
+  },
+  {
+    "source": "docs/implementation/evidence/issue190-c-fifth-diagnostic-20260831b/cost-ledger.json",
+    "file": "issue190-c-fifth-diagnostic-20260831b/cost-ledger.json",
+    "sha256": "0bd04be15c1c6e1eeb96f96cdadf994aa14b5a0f2d894e38c3426193896b40f8"
+  },
+  {
+    "source": "docs/implementation/evidence/issue190-c-remaining-diagnostic-20260831a/cost-ledger.json",
+    "file": "issue190-c-remaining-diagnostic-20260831a/cost-ledger.json",
+    "sha256": "c11630710263c473fbf938b60e789b33ef93b776021e258976825fdf47206a50"
+  },
+  {
+    "source": "docs/implementation/evidence/issue190-c-v2-development-20260831a/cost-ledger.json",
+    "file": "issue190-c-v2-development-20260831a/cost-ledger.json",
+    "sha256": "0800a19d7111b2838d7131734a62cdf6a64be48dcac1fc8c9b44d3435b9646f0"
+  },
+  {
+    "source": "docs/implementation/evidence/issue190-development-c5-20260831a/cost-ledger.json",
+    "file": "issue190-development-c5-20260831a/cost-ledger.json",
+    "sha256": "045bd38d6bc2ed7daa113dd95b09cffbe8f5528e15c0fbb80665e6712b48157a"
+  },
+  {
+    "source": "docs/implementation/evidence/issue190-development-c5-20260831a/requests.json",
+    "file": "issue190-development-c5-20260831a/requests.json",
+    "sha256": "703585ab58de3c1daa02096373275b4920c8698090a9f2b043ceb0ddcd048d45"
+  }
+]

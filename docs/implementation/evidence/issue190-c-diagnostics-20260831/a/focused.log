@@ -1,0 +1,43 @@
+......F....                                                              [100%]
+================================== FAILURES ===================================
+_____ test_invalid_decision_is_preserved_redacted_settled_and_not_retried _____
+
+tmp_path = WindowsPath('C:/Users/lizhuo/AppData/Local/Temp/pytest-of-lz/pytest-13/test_invalid_decision_is_prese0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001B7F6319E00>
+
+    @pytest.mark.asyncio
+    async def test_invalid_decision_is_preserved_redacted_settled_and_not_retried(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(runner, "development_rows", lambda: [row(i) for i in range(72)])
+        calls = 0
+        secret = "offline-secret-must-not-leak"
+        invalid = json.dumps({"sufficient": "false", "evidence": [], "extra": secret})
+    
+        def handle(_: httpx.Request) -> httpx.Response:
+            nonlocal calls
+            calls += 1
+            response = payload()
+            response["output"][0]["content"][0]["text"] = invalid
+            return httpx.Response(200, json=response)
+    
+        frozen = contract()
+        path = tmp_path / "cost.json"
+        ledger = ExperimentLedger(path, frozen)
+        report: dict[str, Any] = {"run_id": "invalid-decision-test", "metrics": None}
+        with pytest.raises(SufficiencyBlocked, match="INVALID_DECISION_SCHEMA"):
+            await run_development(
+                report, ledger, frozen, api_key=secret, transport=httpx.MockTransport(handle)
+            )
+        persisted = json.loads(path.read_text(encoding="utf-8"))
+        observation = persisted["attempts"][0]["observation"]
+>       diagnostic = observation["decision_diagnostic"]
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'decision_diagnostic'
+
+tests\test_knowledge_sufficiency.py:197: KeyError
+- generated xml file: <WORKTREE>\.local\gate-evidence\issue190-c-diagnostics-20260831a\focused.xml -
+=========================== short test summary info ===========================
+FAILED tests/test_knowledge_sufficiency.py::test_invalid_decision_is_preserved_redacted_settled_and_not_retried
+1 failed, 10 passed in 1.32s

@@ -1,0 +1,27 @@
+{
+  "run_id": "issue190-layered-preflight-20260831b",
+  "head_sha": "495d3d1f91d170c618364c8105e966a3dacff820",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "ERROR",
+  "phases": [
+    {
+      "name": "focused",
+      "exit_code": 0
+    },
+    {
+      "name": "ruff-format",
+      "exit_code": 0
+    },
+    {
+      "name": "ruff",
+      "exit_code": 1
+    }
+  ],
+  "paid_model_calls": 0,
+  "model_loaded": false,
+  "frozen_quality_run": false,
+  "prior_owned_images": "ABSENT",
+  "failure": "ruff failed: 1",
+  "elapsed_seconds": 7.34263,
+  "working_tree_dirty": true
+}

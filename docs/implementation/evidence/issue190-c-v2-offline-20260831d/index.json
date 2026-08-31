@@ -1,0 +1,73 @@
+{
+  "run_id": "issue190-c-v2-offline-20260831d",
+  "kind": "OFFLINE_ENGINEERING_NOT_MODEL_QUALITY",
+  "launch_arguments": [
+    "-RunId",
+    "issue190-c-v2-offline-20260831d",
+    "-FinalOnly"
+  ],
+  "paid_api_calls": 0,
+  "post_run_shared_ledger_sha256": "c11630710263c473fbf938b60e789b33ef93b776021e258976825fdf47206a50",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da"
+    },
+    {
+      "path": "entry-argv.log",
+      "sha256": "19f72d999cfcdc4255566678908e2731b331f27bcc0f02c4ffd612a5aaf7344f"
+    },
+    {
+      "path": "focused.log",
+      "sha256": "f47c3f24837bcb9715fd8f2a6c14552d6f4bd927e1ee8cce0e3b5b04a1951e99"
+    },
+    {
+      "path": "focused.xml",
+      "sha256": "95135e627cee102f1a3be5b1c89be00a7d9d30e5032f04ef71bcb3ac55eed282"
+    },
+    {
+      "path": "format-check.log",
+      "sha256": "870d56ea1dd9e0c036cfe62581f12c237a5daf761f1bd1bd846e4b922d8777c0"
+    },
+    {
+      "path": "lint.log",
+      "sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0"
+    },
+    {
+      "path": "offline-component.log",
+      "sha256": "af6d51fe3661bb691796e6a00f93a2cec9fc813234b482801395db9fdd367c7e"
+    },
+    {
+      "path": "offline-component.xml",
+      "sha256": "31e22eb379fd4f185fe3ee6ce414fbfc55584ea6b4fdf54a59e91a3f1efb9baa"
+    },
+    {
+      "path": "phase.json",
+      "sha256": "108bcb1d9f09e383e418af2bfcb0501c50feeaccc535058d7b82bbfde63dc6f3"
+    },
+    {
+      "path": "preflight.ps1",
+      "sha256": "1a89df2bcf0d05281d5da4174f288949bf763f2c2e62f2ef3ebe2cc088e7806d"
+    },
+    {
+      "path": "types.log",
+      "sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14"
+    },
+    {
+      "path": "argv/c-v2.log",
+      "sha256": "45d0eda809cf3631e5db192d6a37162050d34a45a7656dd936a8381a9d382581"
+    },
+    {
+      "path": "argv/development.log",
+      "sha256": "80c2511006911aeb8b1b20aa40f857f181ff51c0d1a533471c7d24ea31f45ef0"
+    },
+    {
+      "path": "argv/diagnostic.log",
+      "sha256": "1db837401a27229628f8f8a9ae24c0df2d7cb70db8d55ff154bc7c61f57a6597"
+    },
+    {
+      "path": "argv/remaining.log",
+      "sha256": "52caa00f027103c43a2962761e165534a4c79963b9e830e92572c4d97efdbaa5"
+    }
+  ]
+}

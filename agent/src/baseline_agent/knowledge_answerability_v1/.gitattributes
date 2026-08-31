@@ -1,0 +1,4 @@
+# 静态数据manifest使用原始文件字节SHA256，跨平台检出不转换换行。
+training.json -text
+calibration.json -text
+manifest.json -text

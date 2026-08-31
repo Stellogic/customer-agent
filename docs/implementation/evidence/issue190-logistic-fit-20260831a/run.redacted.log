@@ -1,0 +1,481 @@
+阶段已记录：<WORKTREE>\.local\gate-evidence\issue190-logistic-fit-20260831a-training-prepare；不是冻结质量或完整门禁PASS。
+阶段已记录：<WORKTREE>\.local\gate-evidence\issue190-logistic-fit-20260831a-calibration-prepare；不是冻结质量或完整门禁PASS。
+.                                                                        [100%]
+1 passed in 0.04s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.numeric
+#1 transferring dockerfile: 1.13kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 26.48kB 0.0s done
+#5 DONE 0.0s
+
+#6 [build 4/6] COPY config ./config
+#6 CACHED
+
+#7 [build 2/6] WORKDIR /workspace
+#7 CACHED
+
+#8 [build 5/6] COPY src ./src
+#8 CACHED
+
+#9 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#9 CACHED
+
+#10 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#10 CACHED
+
+#11 [numeric-test 1/1] RUN --mount=type=cache,target=/home/gradle/.gradle gradle --init-script config/gradle-proxy.init.gradle.kts test --tests '*KnowledgeAnswerabilityPolicyTest' --tests '*KnowledgeAnswerabilityFeaturesTest' --no-daemon
+#11 1.459 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+#11 2.758 Daemon will be stopped at the end of the build 
+#11 7.158 > Task :compileJava UP-TO-DATE
+#11 7.158 > Task :processResources UP-TO-DATE
+#11 7.158 > Task :classes UP-TO-DATE
+#11 10.26 
+#11 10.26 > Task :compileTestJava
+#11 10.26 Note: Some input files use or override a deprecated API.
+#11 10.26 Note: Recompile with -Xlint:deprecation for details.
+#11 10.26 Note: Some input files use unchecked or unsafe operations.
+#11 10.26 Note: Recompile with -Xlint:unchecked for details.
+#11 10.66 
+#11 10.66 > Task :processTestResources NO-SOURCE
+#11 10.66 > Task :testClasses
+#11 12.46 OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+#11 13.44 > Task :test
+#11 13.44 
+#11 13.44 [Incubating] Problems report is available at: file:///workspace/build/reports/problems/problems-report.html
+#11 13.44 
+#11 13.44 BUILD SUCCESSFUL in 13s
+#11 13.44 4 actionable tasks: 2 executed, 2 up-to-date
+#11 13.44 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+#11 DONE 13.7s
+
+#12 exporting to image
+#12 exporting layers 0.0s done
+#12 writing image sha256:f87607a4b74aac01caddfb7ff671757b4a967ca807a7fa8ccb9e167ee20026c3 done
+#12 naming to docker.io/customer-agent/numeric:gate-issue190-logistic-fit-20260831a done
+#12 DONE 0.1s
+customer-agent-gate-issue190-logistic-fit-20260831a-numeric
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 877B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [runtime 1/5] FROM docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#5 DONE 0.0s
+
+#6 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 26.48kB 0.0s done
+#7 DONE 0.0s
+
+#8 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#8 CACHED
+
+#9 [build 5/6] COPY src ./src
+#9 CACHED
+
+#10 [build 4/6] COPY config ./config
+#10 CACHED
+
+#11 [build 2/6] WORKDIR /workspace
+#11 CACHED
+
+#12 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#12 CACHED
+
+#13 [runtime 2/5] RUN apt-get update     && apt-get install --yes --no-install-recommends curl     && rm -rf /var/lib/apt/lists/*
+#13 CACHED
+
+#14 [runtime 3/5] RUN useradd --system --uid 10001 --create-home app
+#14 CACHED
+
+#15 [runtime 4/5] WORKDIR /app
+#15 CACHED
+
+#16 [runtime 5/5] COPY --from=build /workspace/build/libs/customer-agent-backend-0.1.0-SNAPSHOT.jar app.jar
+#16 DONE 0.1s
+
+#17 exporting to image
+#17 exporting layers 0.1s done
+#17 writing image sha256:2ba81596149f270d840e0f4a5659b9bc7caf8a72520e00813adc2f9c7cc568a4 done
+#17 naming to docker.io/customer-agent/backend:gate-issue190-logistic-fit-20260831a done
+#17 DONE 0.1s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 968B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.13.14-slim-bookworm
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [base 1/8] FROM docker.io/library/python:3.13.14-slim-bookworm
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 1.16MB 0.0s done
+#5 DONE 0.1s
+
+#6 [base 2/8] WORKDIR /app
+#6 CACHED
+
+#7 [base 3/8] RUN apt-get update     && apt-get install --yes --no-install-recommends libatomic1     && rm -rf /var/lib/apt/lists/*     && pip install --no-cache-dir uv==0.8.22
+#7 CACHED
+
+#8 [base 4/8] COPY pyproject.toml uv.lock ./
+#8 DONE 0.0s
+
+#9 [base 5/8] RUN uv sync --frozen
+#9 0.500 Using CPython 3.13.14 interpreter at: /usr/local/bin/python3
+#9 0.502 Creating virtual environment at: .venv
+#9 0.556    Building customer-agent-baseline @ file:///app
+#9 1.397 Downloading torch (180.2MiB)
+#9 2.014 Downloading tokenizers (3.1MiB)
+#9 2.312 Downloading pydantic-core (2.0MiB)
+#9 2.375 Downloading numpy (15.9MiB)
+#9 3.347 Downloading sympy (6.0MiB)
+#9 3.347 Downloading scikit-learn (9.0MiB)
+#9 3.349 Downloading networkx (2.0MiB)
+#9 3.349 Downloading psycopg-binary (4.2MiB)
+#9 3.351 Downloading hf-xet (4.3MiB)
+#9 3.352 Downloading pygments (1.2MiB)
+#9 3.353 Downloading jsonschema-rs (3.7MiB)
+#9 3.354 Downloading grpcio (6.5MiB)
+#9 3.355 Downloading pyright (5.9MiB)
+#9 3.358 Downloading transformers (11.4MiB)
+#9 3.359 Downloading grpcio-tools (2.5MiB)
+#9 3.363 Downloading cryptography (4.5MiB)
+#9 3.364 Downloading uvloop (4.2MiB)
+#9 3.365 Downloading scipy (33.7MiB)
+#9 3.366 Downloading zstandard (5.3MiB)
+#9 3.884 Downloading ruff (10.9MiB)
+#9 26.00    Building forbiddenfruit==0.1.4
+#9 32.33       Built forbiddenfruit==0.1.4
+#9 33.14       Built customer-agent-baseline @ file:///app
+#9 36.78  Downloading pygments
+#9 44.01  Downloading pydantic-core
+#9 53.80  Downloading networkx
+#9 65.86  Downloading grpcio-tools
+#9 78.15  Downloading tokenizers
+#9 89.32  Downloading jsonschema-rs
+#9 96.53  Downloading uvloop
+#9 97.24  Downloading psycopg-binary
+#9 99.74  Downloading hf-xet
+#9 100.9  Downloading cryptography
+#9 109.6  Downloading zstandard
+#9 113.6  Downloading torch
+#9 114.4  Downloading pyright
+#9 115.4  Downloading sympy
+#9 116.7  Downloading grpcio
+#9 123.7  Downloading scikit-learn
+#9 126.6  Downloading ruff
+#9 126.9  Downloading transformers
+#9 130.5  Downloading numpy
+#9 137.1  Downloading scipy
+#9 137.1 Prepared 109 packages in 2m 16s
+#9 137.8 Installed 109 packages in 692ms
+#9 137.8  + annotated-types==0.8.0
+#9 137.8  + anyio==4.14.2
+#9 137.8  + blockbuster==1.5.26
+#9 137.8  + certifi==2026.7.22
+#9 137.8  + cffi==2.1.1
+#9 137.8  + charset-normalizer==3.4.9
+#9 137.8  + click==8.4.2
+#9 137.8  + cloudpickle==3.1.2
+#9 137.8  + croniter==6.2.4
+#9 137.8  + cryptography==50.0.0
+#9 137.8  + customer-agent-baseline==0.1.0 (from file:///app)
+#9 137.8  + distro==1.9.0
+#9 137.8  + filelock==3.32.4
+#9 137.8  + forbiddenfruit==0.1.4
+#9 137.8  + fsspec==2026.7.0
+#9 137.8  + googleapis-common-protos==1.75.1
+#9 137.8  + grpcio==1.80.0
+#9 137.8  + grpcio-health-checking==1.80.0
+#9 137.8  + grpcio-tools==1.80.0
+#9 137.8  + h11==0.16.0
+#9 137.8  + hf-xet==1.6.0
+#9 137.8  + httpcore==1.0.9
+#9 137.8  + httptools==0.8.0
+#9 137.8  + httpx==0.28.1
+#9 137.8  + huggingface-hub==0.36.2
+#9 137.8  + idna==3.18
+#9 137.8  + importlib-metadata==8.7.1
+#9 137.8  + iniconfig==2.3.0
+#9 137.8  + jinja2==3.1.6
+#9 137.8  + joblib==1.5.3
+#9 137.8  + jsonpatch==1.33
+#9 137.8  + jsonpointer==3.1.1
+#9 137.8  + jsonschema-rs==0.44.1
+#9 137.8  + langchain-core==1.5.3
+#9 137.8  + langchain-protocol==0.0.18
+#9 137.8  + langgraph==1.2.10
+#9 137.8  + langgraph-api==0.11.2
+#9 137.8  + langgraph-checkpoint==4.2.0
+#9 137.8  + langgraph-checkpoint-postgres==3.1.2
+#9 137.8  + langgraph-cli==0.4.30
+#9 137.8  + langgraph-prebuilt==1.1.0
+#9 137.8  + langgraph-runtime-inmem==0.31.2
+#9 137.8  + langgraph-sdk==0.4.2
+#9 137.8  + langsmith==0.10.17
+#9 137.8  + markupsafe==3.0.3
+#9 137.8  + mpmath==1.3.0
+#9 137.8  + networkx==3.6.1
+#9 137.8  + nodeenv==1.10.0
+#9 137.8  + numpy==2.5.2
+#9 137.8  + opentelemetry-api==1.37.0
+#9 137.8  + opentelemetry-exporter-otlp-proto-common==1.37.0
+#9 137.8  + opentelemetry-exporter-otlp-proto-http==1.37.0
+#9 137.8  + opentelemetry-exporter-prometheus==0.58b0
+#9 137.8  + opentelemetry-proto==1.37.0
+#9 137.8  + opentelemetry-sdk==1.37.0
+#9 137.8  + opentelemetry-semantic-conventions==0.58b0
+#9 137.8  + orjson==3.11.9
+#9 137.8  + ormsgpack==1.12.2
+#9 137.8  + packaging==26.3
+#9 137.8  + pathspec==1.1.1
+#9 137.8  + pluggy==1.6.0
+#9 137.8  + prometheus-client==0.26.0
+#9 137.8  + protobuf==6.33.6
+#9 137.8  + psycopg==3.2.13
+#9 137.8  + psycopg-binary==3.2.13
+#9 137.8  + psycopg-pool==3.3.1
+#9 137.8  + pycparser==3.0
+#9 137.8  + pydantic==2.13.4
+#9 137.8  + pydantic-core==2.46.4
+#9 137.8  + pygments==2.20.0
+#9 137.8  + pyjwt==2.13.0
+#9 137.8  + pyright==1.1.411
+#9 137.8  + pytest==8.4.2
+#9 137.8  + pytest-asyncio==1.1.0
+#9 137.8  + python-dateutil==2.9.0.post0
+#9 137.8  + python-dotenv==1.2.2
+#9 137.8  + pyyaml==6.0.3
+#9 137.8  + regex==2026.7.19
+#9 137.8  + requests==2.34.2
+#9 137.8  + requests-toolbelt==1.0.0
+#9 137.8  + ruff==0.16.2
+#9 137.8  + safetensors==0.7.0
+#9 137.8  + scikit-learn==1.7.2
+#9 137.8  + scipy==1.18.1
+#9 137.8  + setuptools==84.0.0
+#9 137.8  + six==1.17.0
+#9 137.8  + sniffio==1.3.1
+#9 137.8  + sse-starlette==3.3.4
+#9 137.8  + starlette==1.6.0
+#9 137.8  + structlog==25.5.0
+#9 137.8  + sympy==1.14.0
+#9 137.8  + tenacity==9.1.4
+#9 137.8  + threadpoolctl==3.6.0
+#9 137.8  + tokenizers==0.22.2
+#9 137.8  + torch==2.10.0+cpu
+#9 137.8  + tqdm==4.70.0
+#9 137.8  + transformers==4.57.6
+#9 137.8  + truststore==0.10.4
+#9 137.8  + typing-extensions==4.16.0
+#9 137.8  + typing-inspection==0.4.2
+#9 137.8  + urllib3==2.7.0
+#9 137.8  + uuid-utils==0.17.0
+#9 137.8  + uvicorn==0.52.1
+#9 137.8  + uvloop==0.22.1
+#9 137.8  + watchfiles==1.2.0
+#9 137.8  + websockets==15.0.1
+#9 137.8  + xxhash==3.8.1
+#9 137.8  + zipp==4.1.0
+#9 137.8  + zstandard==0.25.0
+#9 DONE 138.2s
+
+#10 [base 6/8] COPY langgraph.json ./
+#10 DONE 0.0s
+
+#11 [base 7/8] COPY src ./src
+#11 DONE 0.0s
+
+#12 [base 8/8] COPY tests ./tests
+#12 DONE 0.0s
+
+#13 [runtime 1/2] RUN uv sync --frozen --no-dev
+#13 0.406    Building customer-agent-baseline @ file:///app
+#13 1.189       Built customer-agent-baseline @ file:///app
+#13 1.193 Prepared 1 package in 788ms
+#13 2.735 Uninstalled 13 packages in 1.54s
+#13 2.737 Installed 1 package in 1ms
+#13 2.737  ~ customer-agent-baseline==0.1.0 (from file:///app)
+#13 2.737  - iniconfig==2.3.0
+#13 2.737  - joblib==1.5.3
+#13 2.737  - nodeenv==1.10.0
+#13 2.737  - pluggy==1.6.0
+#13 2.737  - pygments==2.20.0
+#13 2.737  - pyright==1.1.411
+#13 2.737  - pytest==8.4.2
+#13 2.737  - pytest-asyncio==1.1.0
+#13 2.737  - ruff==0.16.2
+#13 2.737  - scikit-learn==1.7.2
+#13 2.738  - scipy==1.18.1
+#13 2.738  - threadpoolctl==3.6.0
+#13 DONE 2.8s
+
+#14 [runtime 2/2] RUN useradd --system --uid 10002 --create-home agent && chown -R agent:agent /app
+#14 0.386 useradd warning: agent's uid 10002 is greater than SYS_UID_MAX 999
+#14 DONE 33.3s
+
+#15 exporting to image
+#15 exporting layers
+#15 exporting layers 6.9s done
+#15 writing image sha256:277dbae6d5aae6c4612a6974d03396a10899341157c0bda167454fdf266bdd58 done
+#15 naming to docker.io/customer-agent/agent:gate-issue190-logistic-fit-20260831a done
+#15 DONE 6.9s
+Destructive Compose gate 隔离配置读回通过。
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_data  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_data  Created
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_services  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_services  Created
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_provider-egress  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_provider-egress  Created
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_edge  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_edge  Created
+ Volume "customer-agent-gate-issue190-logistic-fit-20260831a_postgres-data"  Creating
+ Volume "customer-agent-gate-issue190-logistic-fit-20260831a_postgres-data"  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-backend-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-backend-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-backend-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-backend-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-backend-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-backend-1  Healthy
+backend-1  | 
+backend-1  |   .   ____          _            __ _ _
+backend-1  |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+backend-1  | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+backend-1  |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+backend-1  |   '  |____| .__|_| |_|_| |_\__, | / / / /
+backend-1  |  =========|_|==============|___/=/_/_/_/
+backend-1  | 
+backend-1  |  :: Spring Boot ::                (v4.1.0)
+backend-1  | 
+backend-1  | 2026-08-30T19:03:47.660Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Starting CustomerAgentApplication v0.1.0-SNAPSHOT using Java 25.0.3 with PID 1 (/app/app.jar started by app in /app)
+backend-1  | 2026-08-30T19:03:47.666Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : The following 2 profiles are active: "local-demo", "knowledge-development"
+backend-1  | 2026-08-30T19:03:49.188Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+backend-1  | 2026-08-30T19:03:49.200Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+backend-1  | 2026-08-30T19:03:49.201Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.22]
+backend-1  | 2026-08-30T19:03:49.227Z  INFO 1 --- [customer-agent-backend] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 1497 ms
+backend-1  | 2026-08-30T19:03:50.065Z  INFO 1 --- [customer-agent-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name localDemoHumanUsers
+backend-1  | 2026-08-30T19:03:50.577Z  INFO 1 --- [customer-agent-backend] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+backend-1  | 2026-08-30T19:03:50.638Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+backend-1  | 2026-08-30T19:03:50.649Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Started CustomerAgentApplication in 3.463 seconds (process running for 3.954)
+backend-1  | 2026-08-30T19:03:50.660Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+backend-1  | 2026-08-30T19:03:50.765Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@780e0e51
+backend-1  | 2026-08-30T19:03:50.769Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+backend-1  | 2026-08-30T19:03:52.932Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+backend-1  | 2026-08-30T19:03:52.932Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+backend-1  | 2026-08-30T19:03:52.934Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
+backend-1  | 2026-08-30T19:04:04.315Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-7] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1  | 2026-08-30T19:04:04.382Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-9] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-backend-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-backend-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-backend-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-backend-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-spring-migrate-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-server-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-agent-migrate-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831a-postgres-1  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_services  Removing
+ Volume customer-agent-gate-issue190-logistic-fit-20260831a_postgres-data  Removing
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_provider-egress  Removing
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_data  Removing
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_edge  Removing
+ Volume customer-agent-gate-issue190-logistic-fit-20260831a_postgres-data  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_services  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_data  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_edge  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831a_provider-egress  Removed
+Untagged: customer-agent/backend:gate-issue190-logistic-fit-20260831a
+Deleted: sha256:2ba81596149f270d840e0f4a5659b9bc7caf8a72520e00813adc2f9c7cc568a4
+Untagged: customer-agent/agent:gate-issue190-logistic-fit-20260831a
+Deleted: sha256:277dbae6d5aae6c4612a6974d03396a10899341157c0bda167454fdf266bdd58
+Untagged: customer-agent/numeric:gate-issue190-logistic-fit-20260831a
+Deleted: sha256:f87607a4b74aac01caddfb7ff671757b4a967ca807a7fa8ccb9e167ee20026c3
+OWN_LOCK_RELEASED issue190-logistic-fit-20260831a FAIL
+TEST_GATE_FREE
+status=FREE
+测试门禁空闲。
+NativeCommandExitException: <WORKTREE>\.local\logistic-run-plan\run.ps1:101
+Line |
+ 101 |              docker compose -p $project exec -T agent-server python /t …
+     |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Program "docker.exe" ended with non-zero exit code: 1 (0x00000001).

@@ -1,0 +1,40 @@
+{
+  "run_id": "issue190-c-offline-20260831a",
+  "head_sha": "a4093028ef7baa7095ba372e7474f25d2c4bfacd",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "ERROR",
+  "phases": [
+    {
+      "name": "focused",
+      "exit_code": 0,
+      "elapsed_seconds": 3.3190084
+    },
+    {
+      "name": "format",
+      "exit_code": 0,
+      "elapsed_seconds": 0.1230121
+    },
+    {
+      "name": "lint",
+      "exit_code": 0,
+      "elapsed_seconds": 0.111224
+    },
+    {
+      "name": "format-check",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0960204
+    },
+    {
+      "name": "types",
+      "exit_code": 1,
+      "elapsed_seconds": 5.6812884
+    }
+  ],
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "development_replay_run": false,
+  "holdout_or_frozen_evaluation_run": false,
+  "failure": "types failed: 1",
+  "elapsed_seconds": 9.4270146,
+  "working_tree_changed": true
+}

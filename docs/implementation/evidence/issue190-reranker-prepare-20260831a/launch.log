@@ -1,0 +1,67 @@
+TEST_GATE_INHERITED
+Traceback (most recent call last):
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpx\_transports\default.py", line 127, in __iter__
+    for part in self._httpcore_stream:
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpcore\_sync\connection_pool.py", line 407, in __iter__
+    raise exc from None
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpcore\_sync\connection_pool.py", line 403, in __iter__
+    for part in self._stream:
+                ^^^^^^^^^^^^
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpcore\_sync\http11.py", line 342, in __iter__
+    raise exc
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpcore\_sync\http11.py", line 334, in __iter__
+    for chunk in self._connection._receive_response_body(**kwargs):
+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpcore\_sync\http11.py", line 203, in _receive_response_body
+    event = self._receive_event(timeout=timeout)
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpcore\_sync\http11.py", line 213, in _receive_event
+    with map_exceptions({h11.RemoteProtocolError: RemoteProtocolError}):
+         ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<USER_HOME>\AppData\Local\Programs\Python\Python313\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.RemoteProtocolError: peer closed connection without sending complete message body (received 204766396 bytes, expected 1112206140)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "<WORKTREE>\agent\src\baseline_agent\knowledge_reranker_run.py", line 124, in <module>
+    main()
+    ~~~~^^
+  File "<WORKTREE>\agent\src\baseline_agent\knowledge_reranker_run.py", line 106, in main
+    prepare(args.model_directory)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "<WORKTREE>\agent\src\baseline_agent\knowledge_reranker_run.py", line 47, in prepare
+    for chunk in response.iter_bytes():
+                 ~~~~~~~~~~~~~~~~~~~^^
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpx\_models.py", line 897, in iter_bytes
+    for raw_bytes in self.iter_raw():
+                     ~~~~~~~~~~~~~^^
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpx\_models.py", line 951, in iter_raw
+    for raw_stream_bytes in self.stream:
+                            ^^^^^^^^^^^
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpx\_client.py", line 153, in __iter__
+    for chunk in self._stream:
+                 ^^^^^^^^^^^^
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpx\_transports\default.py", line 126, in __iter__
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "<USER_HOME>\AppData\Local\Programs\Python\Python313\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "<WORKTREE>\agent\.venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.RemoteProtocolError: peer closed connection without sending complete message body (received 204766396 bytes, expected 1112206140)
+Exception: <WORKTREE>\scripts\knowledge-reranker.ps1:39
+Line |
+  39 |          if ($LASTEXITCODE -ne 0) { throw "阶段停止，保留$output；不重选或自动重跑。" }
+     |                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     |
+     | 阶段停止，保留<WORKTREE>\.local\gate-evidence\issue190-reranker-prepare-20260831a\reranker-prepare.json；不重选或自动重跑。

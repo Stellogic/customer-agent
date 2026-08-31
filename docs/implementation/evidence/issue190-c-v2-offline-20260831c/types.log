@@ -1,0 +1,10 @@
+c:\Users\lizhuo\.codex\worktrees\808f\customer-agent\agent\src\baseline_agent\knowledge_sufficiency.py
+  c:\Users\lizhuo\.codex\worktrees\808f\customer-agent\agent\src\baseline_agent\knowledge_sufficiency.py:216:13 - error: Argument of type "str" cannot be assigned to parameter "key" of type "Literal['json_syntax', 'decision_schema', 'evidence_fields', 'cross_fields', 'authorized_chunks', 'verbatim_quotes']" in function "__setitem__"
+    Type "str" is not assignable to type "Literal['json_syntax', 'decision_schema', 'evidence_fields', 'cross_fields', 'authorized_chunks', 'verbatim_quotes']"
+      "str" is not assignable to type "Literal['json_syntax']"
+      "str" is not assignable to type "Literal['decision_schema']"
+      "str" is not assignable to type "Literal['evidence_fields']"
+      "str" is not assignable to type "Literal['cross_fields']"
+      "str" is not assignable to type "Literal['authorized_chunks']"
+      "str" is not assignable to type "Literal['verbatim_quotes']" (reportArgumentType)
+1 error, 0 warnings, 0 informations

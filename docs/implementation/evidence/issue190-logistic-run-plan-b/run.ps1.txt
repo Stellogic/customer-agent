@@ -1,0 +1,146 @@
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+. ./scripts/test-gate-lock.ps1
+. ./scripts/gate-resources.ps1
+$runId = 'issue190-logistic-fit-20260831b'
+$tag = "gate-$runId"
+$project = "customer-agent-$tag"
+$headSha = (git rev-parse HEAD).Trim()
+$baseSha = (git rev-parse origin/main).Trim()
+if (git status --porcelain) { throw '运行前必须提交全部源码、数据、seal。' }
+$holder = Enter-TestGateLock -Issue 190 -RunId $runId -CommandType 'answerability-one-fit' -BaseSha $baseSha -HeadSha $headSha -ComposeProject $project -ImageTag $tag
+$root = (Get-Location).Path
+$directory = Join-Path $root ".local/gate-evidence/$runId"
+$images = @("customer-agent/backend:$tag", "customer-agent/agent:$tag", "customer-agent/numeric:$tag")
+$ownNamespace = $false
+$composeOwned = $false
+$numericContainer = $false
+$outcome = 'FAIL'
+$phase = 'prepare'
+$watch = [Diagnostics.Stopwatch]::StartNew()
+try {
+    if (Test-Path $directory) { throw 'RunId输出已存在，不覆盖。' }
+    New-Item -ItemType Directory $directory | Out-Null
+    $existing = @(docker image ls --format '{{.Repository}}:{{.Tag}}')
+    if (@($images | Where-Object { $existing -contains $_ }).Count) { throw '本RunId镜像已存在。' }
+    if (docker ps -aq --filter "name=^$project-numeric`$") { throw '数值检查容器已存在。' }
+    Assert-ComposeProjectResourcesEmpty -ProjectName $project -Phase 'before trial'
+    $ownNamespace = $true
+    $env:COMPOSE_PROJECT_NAME = $project
+    $env:CUSTOMER_AGENT_IMAGE_TAG = $tag
+    $env:CUSTOMER_AGENT_GATE_RUN_ID = $runId
+    $env:DEEPSEEK_API_KEY = ''
+    $env:POSTGRES_SUPERUSER_PASSWORD = 'local-postgres-superuser'
+    $env:KNOWLEDGE_MODEL_HOST_PATH = (Resolve-Path .local/models/bge-small-zh-v1.5).Path
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
+    $listener.Start()
+    $backendPort = [string]$listener.LocalEndpoint.Port
+    $listener.Stop()
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
+    $listener.Start()
+    $env:CUSTOMER_AGENT_FRONTEND_PORT = [string]$listener.LocalEndpoint.Port
+    $listener.Stop()
+    $uv = Join-Path $root '.local/tools/uv/uv.exe'
+    $seal = Join-Path $root 'docs/implementation/evidence/issue190-holdout-seal-v1.json'
+    foreach ($split in @('training','calibration')) {
+        & ./scripts/knowledge-answerability.ps1 -Phase prepare -RunId "$runId-$split-prepare" -HoldoutSeal $seal -Split $split -Dataset "agent/src/baseline_agent/knowledge_answerability_v1/$split.json" -Uv $uv
+    }
+    $phase = 'numeric-contract'
+    Push-Location agent
+    try {
+        & .venv/Scripts/python.exe -m pytest tests/test_knowledge_answerability.py::test_linear_export_matches_java_hand_calculated_contract -q 2>&1 | Tee-Object -FilePath "$directory/numeric-python.log"
+    } finally { Pop-Location }
+    $dockerfile = Get-Content -Raw backend/Dockerfile
+    $dockerfile += @'
+
+FROM build AS numeric-test
+RUN --mount=type=cache,target=/home/gradle/.gradle gradle --init-script config/gradle-proxy.init.gradle.kts test --tests '*KnowledgeAnswerabilityPolicyTest' --tests '*KnowledgeAnswerabilityFeaturesTest' --no-daemon
+'@
+    $dockerfile | Set-Content "$directory/Dockerfile.numeric" -Encoding utf8
+    docker build -f "$directory/Dockerfile.numeric" --target numeric-test --tag "customer-agent/numeric:$tag" backend 2>&1 | Tee-Object -FilePath "$directory/numeric-java.log"
+    docker create --name "$project-numeric" "customer-agent/numeric:$tag" | Out-Null
+    $numericContainer = $true
+    docker cp "${project}-numeric:/workspace/build/test-results/test" "$directory/numeric-java-results"
+    docker rm -v "$project-numeric"
+    $numericContainer = $false
+    $phase = 'runtime-build'
+    docker build --target runtime --tag "customer-agent/backend:$tag" backend
+    docker build --target runtime --tag "customer-agent/agent:$tag" agent
+    foreach ($split in @('training','calibration')) {
+        $phase = "$split-stack"
+        $corpus = (Resolve-Path ".local/gate-evidence/$runId-$split-prepare/corpus-$split").Path.Replace('\','/')
+        $outMount = $directory.Replace('\','/')
+        $safetySource = (Resolve-Path '.local/logistic-run-plan-b/safety.py').Path.Replace('\','/')
+        $override = @{
+            services = @{
+                backend = @{
+                    environment = @{SPRING_PROFILES_ACTIVE='local-demo,knowledge-development'; BASELINE_KNOWLEDGE_DEVELOPMENT_PROBE_ENABLED='true'; BASELINE_KNOWLEDGE_RESOURCE_PATTERN='file:/development-knowledge/*.md'}
+                    volumes = @(@{type='bind';source=$corpus;target='/development-knowledge';read_only=$true})
+                    ports = @("127.0.0.1:${backendPort}:8080")
+                }
+                'agent-server' = @{
+                    environment = @{SOURCE_SHA=$headSha;RUN_ID=$runId}
+                    volumes = @(@{type='bind';source=$outMount;target='/run-evidence'},@{type='bind';source=$safetySource;target='/trial/safety.py';read_only=$true})
+                }
+            }
+        }
+        $override | ConvertTo-Json -Depth 8 | Set-Content "$directory/compose-$split.json" -Encoding utf8
+        $env:COMPOSE_FILE = "$root/compose.yaml;$directory/compose-$split.json"
+        & ./scripts/confirm-compose-reset-isolation.ps1
+        $effective = docker compose -p $project config --format json | ConvertFrom-Json
+        Assert-ComposeResourcesOwned -ProjectName $project -EffectiveConfig $effective
+        if ([string]$effective.services.backend.ports[0].published -ne $backendPort -or $effective.services.backend.ports[0].host_ip -ne '127.0.0.1') { throw '后端端口未隔离。' }
+        $binding = @($effective.services.backend.volumes | Where-Object { $_.target -eq '/development-knowledge' })
+        if ($binding.Count -ne 1 -or -not $binding[0].read_only -or $binding[0].source.Replace('\','/') -cne $corpus) { throw '语料绑定不符。' }
+        @{project=$effective.name;split=$split;backend_port=$backendPort;corpus=$corpus;read_only=$binding[0].read_only;head_sha=$headSha} | ConvertTo-Json | Set-Content "$directory/isolation-$split.json" -Encoding utf8
+        Assert-ComposeProjectResourcesEmpty -ProjectName $project -Phase "before $split database"
+        $composeOwned = $true
+        docker compose -p $project up --detach --no-build --wait postgres spring-migrate agent-migrate agent-server backend
+        if ($split -eq 'training') {
+            $phase = 'real-db-safety'
+            docker compose -p $project exec -T agent-server python /trial/safety.py
+            $safety = Get-Content -Raw "$directory/safety-db.json" | ConvertFrom-Json
+            if ($safety.status -ne 'PASS') { throw '实际硬过滤失败，禁止拟合。' }
+            $xmls = @(Get-ChildItem "$directory/numeric-java-results/TEST-*.xml")
+            if ($xmls.Count -ne 2) { throw 'Java数值契约结果缺失。' }
+            foreach ($file in $xmls) {
+                [xml]$result = Get-Content -Raw $file.FullName
+                if ([int]$result.testsuite.failures -ne 0 -or [int]$result.testsuite.errors -ne 0 -or [int]$result.testsuite.tests -eq 0) { throw 'Java契约没有通过。' }
+            }
+            if ((Get-Content -Raw "$directory/numeric-python.log") -notmatch '1 passed') { throw 'Python契约没有通过。' }
+            $safety.checks | Add-Member -NotePropertyName numeric_parity -NotePropertyValue PASS
+            $safety | Add-Member -NotePropertyName numeric_contract -NotePropertyValue 'Java/Python同一手算score=3及边界；实际拟合导出与sklearn一致性由fit_once检查。'
+            $safety | Add-Member -NotePropertyName evidence_files -NotePropertyValue @('numeric-python.log','numeric-java.log','numeric-java-results','safety-db.json')
+            $safety | ConvertTo-Json -Depth 15 | Set-Content "$directory/safety.json" -Encoding utf8
+        }
+        $phase = "$split-collect"
+        & ./scripts/knowledge-answerability.ps1 -Phase collect -RunId "$runId-$split" -HoldoutSeal $seal -Split $split -Dataset "agent/src/baseline_agent/knowledge_answerability_v1/$split.json" -BaseUrl "http://127.0.0.1:$backendPort" -Uv $uv
+        docker compose -p $project down --volumes --remove-orphans
+        Assert-ComposeProjectResourcesEmpty -ProjectName $project -Phase "after $split database"
+        $composeOwned = $false
+    }
+    $phase = 'one-fit-one-selection'
+    & ./scripts/knowledge-answerability.ps1 -Phase fit -RunId $runId -HoldoutSeal $seal -TrainingReport ".local/gate-evidence/$runId-training/answerability-collect.json" -CalibrationReport ".local/gate-evidence/$runId-calibration/answerability-collect.json" -SafetyReport "$directory/safety.json" -Uv $uv
+    $outcome = 'PASS'
+} finally {
+    try {
+        if ($numericContainer) { docker rm -v "$project-numeric" }
+        if ($composeOwned) {
+            docker compose -p $project logs --no-color --tail 60 backend
+            docker compose -p $project down --volumes --remove-orphans
+            Assert-ComposeProjectResourcesEmpty -ProjectName $project -Phase 'final trial cleanup'
+        }
+        if ($ownNamespace) {
+            $existing = @(docker image ls --format '{{.Repository}}:{{.Tag}}')
+            foreach ($image in $images) { if ($existing -contains $image) { docker image rm $image } }
+        }
+        $watch.Stop()
+        if (Test-Path $directory) {
+            @{run_id=$runId;head_sha=$headSha;base_sha=$baseSha;status=$outcome;last_phase=$phase;elapsed_seconds=$watch.Elapsed.TotalSeconds;paid_model_cost_cny=0;holdout_read=$false;frozen_evaluation_run=$false} | ConvertTo-Json | Set-Content "$directory/phase.json" -Encoding utf8
+        }
+    } finally {
+        Exit-TestGateLock $holder
+        Write-Output "OWN_LOCK_RELEASED $runId $outcome"
+        Show-TestGateStatus
+    }
+}

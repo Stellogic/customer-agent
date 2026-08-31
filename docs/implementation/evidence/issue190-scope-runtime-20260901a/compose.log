@@ -1,0 +1,463 @@
+browser-frontend-1  | /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+browser-frontend-1  | /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+backend-1           | 
+spring-migrate-1    | 
+spring-migrate-1    |   .   ____          _            __ _ _
+frontend-1          | /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+frontend-1          | /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+backend-1           |   .   ____          _            __ _ _
+backend-1           |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+backend-1           | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+backend-1           |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+spring-migrate-1    |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+spring-migrate-1    | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+spring-migrate-1    |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+browser-frontend-1  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+browser-frontend-1  | 10-listen-on-ipv6-by-default.sh: info: Getting the checksum of /etc/nginx/conf.d/default.conf
+spring-migrate-1    |   '  |____| .__|_| |_|_| |_\__, | / / / /
+browser-frontend-1  | 10-listen-on-ipv6-by-default.sh: info: /etc/nginx/conf.d/default.conf differs from the packaged version
+spring-migrate-1    |  =========|_|==============|___/=/_/_/_/
+browser-frontend-1  | /docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
+postgres-1          | The files belonging to this database system will be owned by user "postgres".
+frontend-1          | /docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+frontend-1          | 10-listen-on-ipv6-by-default.sh: info: Getting the checksum of /etc/nginx/conf.d/default.conf
+frontend-1          | 10-listen-on-ipv6-by-default.sh: info: /etc/nginx/conf.d/default.conf differs from the packaged version
+frontend-1          | /docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
+frontend-1          | /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+backend-1           |   '  |____| .__|_| |_|_| |_\__, | / / / /
+backend-1           |  =========|_|==============|___/=/_/_/_/
+frontend-1          | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+backend-1           | 
+frontend-1          | /docker-entrypoint.sh: Configuration complete; ready for start up
+spring-migrate-1    | 
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: using the "epoll" event method
+spring-migrate-1    |  :: Spring Boot ::                (v4.1.0)
+spring-migrate-1    | 
+postgres-1          | This user must also own the server process.
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: nginx/1.29.4
+browser-frontend-1  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+spring-migrate-1    | 2026-08-31T16:34:16.157Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Starting CustomerAgentApplication v0.1.0-SNAPSHOT using Java 25.0.3 with PID 1 (/app/app.jar started by app in /app)
+backend-1           |  :: Spring Boot ::                (v4.1.0)
+backend-1           | 
+spring-migrate-1    | 2026-08-31T16:34:16.161Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : No active profile set, falling back to 1 default profile: "default"
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: built by gcc 15.2.0 (Alpine 15.2.0) 
+browser-frontend-1  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+browser-frontend-1  | /docker-entrypoint.sh: Configuration complete; ready for start up
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: using the "epoll" event method
+postgres-1          | 
+spring-migrate-1    | 2026-08-31T16:34:17.747Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: nginx/1.29.4
+spring-migrate-1    | 2026-08-31T16:34:17.758Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+spring-migrate-1    | 2026-08-31T16:34:17.758Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.22]
+postgres-1          | The database cluster will be initialized with locale "en_US.utf8".
+postgres-1          | The default database encoding has accordingly been set to "UTF8".
+postgres-1          | The default text search configuration will be set to "english".
+postgres-1          | 
+postgres-1          | Data page checksums are enabled.
+postgres-1          | 
+postgres-1          | fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+spring-migrate-1    | 2026-08-31T16:34:17.781Z  INFO 1 --- [customer-agent-backend] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 1554 ms
+backend-1           | 2026-08-31T16:34:23.082Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Starting CustomerAgentApplication v0.1.0-SNAPSHOT using Java 25.0.3 with PID 1 (/app/app.jar started by app in /app)
+spring-migrate-1    | 2026-08-31T16:34:19.746Z  INFO 1 --- [customer-agent-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name productionHumanUsers
+spring-migrate-1    | 2026-08-31T16:34:20.286Z  INFO 1 --- [customer-agent-backend] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+spring-migrate-1    | 2026-08-31T16:34:20.350Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+spring-migrate-1    | 2026-08-31T16:34:20.361Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Started CustomerAgentApplication in 4.724 seconds (process running for 5.254)
+spring-migrate-1    | 2026-08-31T16:34:20.370Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+backend-1           | 2026-08-31T16:34:23.087Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : The following 1 profile is active: "local-demo"
+backend-1           | 2026-08-31T16:34:24.602Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+backend-1           | 2026-08-31T16:34:24.613Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+backend-1           | 2026-08-31T16:34:24.614Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.22]
+postgres-1          | creating subdirectories ... ok
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: OS: Linux 6.6.87.2-microsoft-standard-WSL2
+backend-1           | 2026-08-31T16:34:24.638Z  INFO 1 --- [customer-agent-backend] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 1488 ms
+backend-1           | 2026-08-31T16:34:25.429Z  INFO 1 --- [customer-agent-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name localDemoHumanUsers
+spring-migrate-1    | 2026-08-31T16:34:20.390Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@38e42c57
+postgres-1          | selecting dynamic shared memory implementation ... posix
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1048576:1048576
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker processes
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 29
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: built by gcc 15.2.0 (Alpine 15.2.0) 
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: OS: Linux 6.6.87.2-microsoft-standard-WSL2
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1048576:1048576
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker processes
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 29
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 30
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 31
+backend-1           | 2026-08-31T16:34:25.951Z  INFO 1 --- [customer-agent-backend] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 32
+spring-migrate-1    | 2026-08-31T16:34:20.395Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+spring-migrate-1    | 2026-08-31T16:34:20.437Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+spring-migrate-1    | 2026-08-31T16:34:20.440Z  INFO 1 --- [customer-agent-backend] [tomcat-shutdown] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+spring-migrate-1    | 2026-08-31T16:34:20.446Z  INFO 1 --- [customer-agent-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+backend-1           | 2026-08-31T16:34:26.014Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+backend-1           | 2026-08-31T16:34:26.026Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Started CustomerAgentApplication in 3.457 seconds (process running for 3.988)
+backend-1           | 2026-08-31T16:34:26.038Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+backend-1           | 2026-08-31T16:34:26.155Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@74cbd816
+backend-1           | 2026-08-31T16:34:26.161Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+backend-1           | 2026-08-31T16:34:28.222Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+backend-1           | 2026-08-31T16:34:28.223Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 30
+spring-migrate-1    | 2026-08-31T16:34:20.449Z  INFO 1 --- [customer-agent-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 31
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 32
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 33
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 33
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 34
+postgres-1          | selecting default "max_connections" ... 100
+postgres-1          | selecting default "shared_buffers" ... 128MB
+postgres-1          | selecting default time zone ... Etc/UTC
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 34
+postgres-1          | creating configuration files ... ok
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 35
+backend-1           | 2026-08-31T16:34:28.224Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+postgres-1          | running bootstrap script ... ok
+postgres-1          | performing post-bootstrap initialization ... ok
+backend-1           | 2026-08-31T16:34:50.773Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-6] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+postgres-1          | initdb: warning: enabling "trust" authentication for local connections
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 36
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 37
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 38
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 39
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 40
+postgres-1          | initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+postgres-1          | syncing data to disk ... ok
+postgres-1          | 
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 41
+postgres-1          | 
+postgres-1          | Success. You can now start the database server using:
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 35
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 42
+postgres-1          | 
+postgres-1          |     pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+postgres-1          | 
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 36
+postgres-1          | waiting for server to start....2026-08-31 16:34:12.805 UTC [53] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 43
+browser-frontend-1  | 2026/08/31 16:34:44 [notice] 1#1: start worker process 44
+postgres-1          | 2026-08-31 16:34:12.808 UTC [53] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 37
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 38
+backend-1           | 2026-08-31T16:34:54.205Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-5] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1           | 2026-08-31T16:34:56.651Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-9] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+backend-1           | 2026-08-31T16:34:56.751Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-2] security.human-session                   : security_event=human_login outcome=success subject_id=support-no-knowledge
+backend-1           | 2026-08-31T16:34:56.840Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] security.human-session                   : security_event=human_login outcome=success subject_id=approver-no-knowledge
+backend-1           | 2026-08-31T16:34:57.198Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-6] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1           | 2026-08-31T16:34:58.413Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-9] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1           | 2026-08-31T16:35:29.189Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-9] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 39
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 40
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:34:47 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 41
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 42
+browser-frontend-1  | 2026/08/31 16:34:47 [notice] 1#1: signal 17 (SIGCHLD) received from 52
+browser-frontend-1  | 2026/08/31 16:34:47 [notice] 1#1: unknown process 52 exited with code 0
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:34:50 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+postgres-1          | 2026-08-31 16:34:12.816 UTC [59] LOG:  database system was shut down at 2026-08-31 16:34:12 UTC
+browser-frontend-1  | 2026/08/31 16:34:50 [notice] 1#1: signal 17 (SIGCHLD) received from 59
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 43
+browser-frontend-1  | 2026/08/31 16:34:50 [notice] 1#1: unknown process 59 exited with code 0
+time="2026-09-01T00:35:31+08:00" level=warning msg="Can't retrieve logs for \"customer-agent-issue190-scope-runtime-20260901a-agent-server-1\": Error response from daemon: configured logging driver does not support reading"
+frontend-1          | 2026/08/31 16:34:38 [notice] 1#1: start worker process 44
+postgres-1          | 2026-08-31 16:34:12.820 UTC [53] LOG:  database system is ready to accept connections
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:34:42 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /internal/login HTTP/1.1" 200 1581 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          |  done
+postgres-1          | server started
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/index-ZqxrUx-M.js HTTP/1.1" 200 67983 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/index-QkR9HVRx.css HTTP/1.1" 200 64136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/PlusOutlined-B1W8MSKa.js HTTP/1.1" 200 3795 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:34:45 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:34:48 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+postgres-1          | 
+postgres-1          | /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/001-databases.sql
+postgres-1          | CREATE ROLE
+postgres-1          | CREATE ROLE
+postgres-1          | CREATE ROLE
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:34:51 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:34:54 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+postgres-1          | CREATE ROLE
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:34:57 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:35:00 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:35:03 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/useSize-RAbyxlwP.js HTTP/1.1" 200 8254 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/context-CRtSfo_u.js HTTP/1.1" 200 68720 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:35:06 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/omit-CM_Et8lu.js HTTP/1.1" 200 112 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | CREATE ROLE
+postgres-1          | CREATE DATABASE
+postgres-1          | CREATE DATABASE
+postgres-1          | REVOKE
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/EllipsisOutlined-BPs74lrM.js HTTP/1.1" 200 29007 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/config-provider-mLSQG-zK.js HTTP/1.1" 200 10828 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | REVOKE
+postgres-1          | GRANT
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/CloseOutlined-C7w4V8XU.js HTTP/1.1" 200 1311 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:35:09 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+postgres-1          | GRANT
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:35:12 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+postgres-1          | You are now connected to database "customer_agent" as user "postgres".
+postgres-1          | REVOKE
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:35:15 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:35:18 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:35:22 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/SystemState-B_pCTC2z.js HTTP/1.1" 200 62635 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | GRANT
+postgres-1          | You are now connected to database "agent_checkpoint" as user "postgres".
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:35:25 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:35:28 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/useVariants-CqNXGrsu.js HTTP/1.1" 200 448 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/workspaceRegistry-AaEyzxvp.js HTTP/1.1" 200 39600 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/csrf-CiJnUY0S.js HTTP/1.1" 200 381 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+frontend-1          | 127.0.0.1 - - [31/Aug/2026:16:35:31 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/humanSessionLifecycle-DO2cRqVK.js HTTP/1.1" 200 4591 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/rolldown-runtime-D2aABDIb.js HTTP/1.1" 200 680 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | REVOKE
+postgres-1          | GRANT
+postgres-1          | 
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/jsx-runtime-DzOhj3eh.js HTTP/1.1" 200 268376 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /api/auth/session HTTP/1.1" 401 0 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /api/auth/demo-accounts HTTP/1.1" 200 482 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | 
+postgres-1          | /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/002-knowledge-vector.sql
+postgres-1          | You are now connected to database "customer_agent" as user "postgres".
+postgres-1          | CREATE EXTENSION
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "POST /api/auth/login HTTP/1.1" 204 0 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | 
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/InternalShell-COMi_e-p.js HTTP/1.1" 200 1481 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/menu-DTL9Rpzc.js HTTP/1.1" 200 23909 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/tooltip-wKhTRRtE.js HTTP/1.1" 200 14828 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | 
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/ContextIsolator-Delq7CPh.js HTTP/1.1" 200 7399 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/Sider-BOrRpxEw.js HTTP/1.1" 200 7363 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/RightOutlined-BS4GEDyc.js HTTP/1.1" 200 838 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/SessionLogoutButton-B_tFD-6k.js HTTP/1.1" 200 2046 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/SupportWorkspace-CYHJJUAX.js HTTP/1.1" 200 44810 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/modal-Bg2v8rC3.js HTTP/1.1" 200 54609 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | 2026-08-31 16:34:13.217 UTC [53] LOG:  received fast shutdown request
+postgres-1          | waiting for server to shut down....2026-08-31 16:34:13.219 UTC [53] LOG:  aborting any active transactions
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/style-Cvj32mD0.js HTTP/1.1" 200 1972 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | 2026-08-31 16:34:13.221 UTC [53] LOG:  background worker "logical replication launcher" (PID 62) exited with exit code 1
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/streamProtocol-CMMm3Ko1.js HTTP/1.1" 200 1024 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /internal/knowledge HTTP/1.1" 200 1581 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | 2026-08-31 16:34:13.221 UTC [57] LOG:  shutting down
+postgres-1          | 2026-08-31 16:34:13.222 UTC [57] LOG:  checkpoint starting: shutdown immediate
+postgres-1          | 2026-08-31 16:34:13.362 UTC [57] LOG:  checkpoint complete: wrote 1910 buffers (11.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.046 s, sync=0.089 s, total=0.142 s; sync files=608, longest=0.008 s, average=0.001 s; distance=9063 kB, estimate=9063 kB; lsn=0/2033100, redo lsn=0/2033100
+postgres-1          | 2026-08-31 16:34:13.382 UTC [53] LOG:  database system is shut down
+postgres-1          |  done
+postgres-1          | server stopped
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | 
+postgres-1          | PostgreSQL init process complete; ready for start up.
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:50 +0000] "GET /assets/KnowledgeWorkspace-CK0cKjQt.js HTTP/1.1" 200 19116 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:51 +0000] "GET /api/internal/knowledge?q=&limit=20 HTTP/1.1" 200 1523 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | 
+postgres-1          | 2026-08-31 16:34:13.452 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:52 +0000] "GET /api/internal/knowledge/search?q=%E7%89%A9%E6%B5%81%E8%8A%82%E7%82%B9%E8%B6%85%E8%BF%87%E6%89%BF%E8%AF%BA%E6%97%B6%E9%97%B4%E6%B2%A1%E6%9C%89%E6%9B%B4%E6%96%B0%E6%97%B6%EF%BC%8C%E5%85%88%E6%A0%B8%E5%AF%B9%E8%AE%A2%E5%8D%95%E4%B8%8E%E7%89%A9%E6%B5%81%E7%9A%84%E5%BD%93%E5%89%8D%E6%9D%83%E5%A8%81%E7%8A%B6%E6%80%81&scope=INTERNAL HTTP/1.1" 200 9498 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:52 +0000] "GET /api/internal/knowledge/search?q=%E7%89%A9%E6%B5%81%E8%8A%82%E7%82%B9%E8%B6%85%E8%BF%87%E6%89%BF%E8%AF%BA%E6%97%B6%E9%97%B4%E6%B2%A1%E6%9C%89%E6%9B%B4%E6%96%B0%E6%97%B6%EF%BC%8C%E5%85%88%E6%A0%B8%E5%AF%B9%E8%AE%A2%E5%8D%95%E4%B8%8E%E7%89%A9%E6%B5%81%E7%9A%84%E5%BD%93%E5%89%8D%E6%9D%83%E5%A8%81%E7%8A%B6%E6%80%81&scope=INTERNAL HTTP/1.1" 503 94 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | 2026-08-31 16:34:13.463 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /internal/login HTTP/1.1" 200 1581 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/index-ZqxrUx-M.js HTTP/1.1" 200 67983 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | 2026-08-31 16:34:13.474 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+postgres-1          | 2026-08-31 16:34:13.484 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+postgres-1          | 2026-08-31 16:34:13.493 UTC [80] LOG:  database system was shut down at 2026-08-31 16:34:13 UTC
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/omit-CM_Et8lu.js HTTP/1.1" 200 112 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/EllipsisOutlined-BPs74lrM.js HTTP/1.1" 200 29007 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/index-QkR9HVRx.css HTTP/1.1" 200 64136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/config-provider-mLSQG-zK.js HTTP/1.1" 200 10828 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/useVariants-CqNXGrsu.js HTTP/1.1" 200 448 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+postgres-1          | 2026-08-31 16:34:13.498 UTC [1] LOG:  database system is ready to accept connections
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/PlusOutlined-B1W8MSKa.js HTTP/1.1" 200 3795 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/csrf-CiJnUY0S.js HTTP/1.1" 200 381 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/humanSessionLifecycle-DO2cRqVK.js HTTP/1.1" 200 4591 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/jsx-runtime-DzOhj3eh.js HTTP/1.1" 200 268376 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/useSize-RAbyxlwP.js HTTP/1.1" 200 8254 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/context-CRtSfo_u.js HTTP/1.1" 200 68720 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/CloseOutlined-C7w4V8XU.js HTTP/1.1" 200 1311 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/SystemState-B_pCTC2z.js HTTP/1.1" 200 62635 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/workspaceRegistry-AaEyzxvp.js HTTP/1.1" 200 39600 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /assets/rolldown-runtime-D2aABDIb.js HTTP/1.1" 200 680 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /api/auth/session HTTP/1.1" 401 0 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:53 +0000] "GET /api/auth/demo-accounts HTTP/1.1" 200 482 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:34:53 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:34:53 [notice] 1#1: signal 17 (SIGCHLD) received from 66
+browser-frontend-1  | 2026/08/31 16:34:53 [notice] 1#1: unknown process 66 exited with code 0
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "POST /api/auth/login HTTP/1.1" 204 0 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /assets/InternalShell-COMi_e-p.js HTTP/1.1" 200 1481 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /assets/menu-DTL9Rpzc.js HTTP/1.1" 200 23909 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /assets/tooltip-wKhTRRtE.js HTTP/1.1" 200 14828 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /assets/ContextIsolator-Delq7CPh.js HTTP/1.1" 200 7399 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /assets/Sider-BOrRpxEw.js HTTP/1.1" 200 7363 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /assets/RightOutlined-BS4GEDyc.js HTTP/1.1" 200 838 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /assets/SessionLogoutButton-B_tFD-6k.js HTTP/1.1" 200 2046 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /internal/knowledge HTTP/1.1" 200 1581 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /assets/KnowledgeWorkspace-CK0cKjQt.js HTTP/1.1" 200 19116 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:54 +0000] "GET /api/internal/knowledge?q=&limit=20 HTTP/1.1" 200 1523 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:55 +0000] "GET /api/internal/knowledge/search?q=%E7%89%A9%E6%B5%81%E8%8A%82%E7%82%B9%E8%B6%85%E8%BF%87%E6%89%BF%E8%AF%BA%E6%97%B6%E9%97%B4%E6%B2%A1%E6%9C%89%E6%9B%B4%E6%96%B0%E6%97%B6%EF%BC%8C%E5%85%88%E6%A0%B8%E5%AF%B9%E8%AE%A2%E5%8D%95%E4%B8%8E%E7%89%A9%E6%B5%81%E7%9A%84%E5%BD%93%E5%89%8D%E6%9D%83%E5%A8%81%E7%8A%B6%E6%80%81&scope=INTERNAL HTTP/1.1" 200 9498 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /api/internal/knowledge/search?q=%E7%89%A9%E6%B5%81%E8%8A%82%E7%82%B9%E8%B6%85%E8%BF%87%E6%89%BF%E8%AF%BA%E6%97%B6%E9%97%B4%E6%B2%A1%E6%9C%89%E6%9B%B4%E6%96%B0%E6%97%B6%EF%BC%8C%E5%85%88%E6%A0%B8%E5%AF%B9%E8%AE%A2%E5%8D%95%E4%B8%8E%E7%89%A9%E6%B5%81%E7%9A%84%E5%BD%93%E5%89%8D%E6%9D%83%E5%A8%81%E7%8A%B6%E6%80%81&scope=INTERNAL HTTP/1.1" 503 94 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:34:56 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:34:56 [notice] 1#1: signal 17 (SIGCHLD) received from 73
+browser-frontend-1  | 2026/08/31 16:34:56 [notice] 1#1: unknown process 73 exited with code 0
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "POST /api/auth/login HTTP/1.1" 204 0 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /api/internal/knowledge/search?q=%E7%89%A9%E6%B5%81%E5%BB%B6%E8%BF%9F HTTP/1.1" 403 124 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "POST /api/auth/login HTTP/1.1" 204 0 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /api/internal/knowledge/search?q=%E7%89%A9%E6%B5%81%E5%BB%B6%E8%BF%9F HTTP/1.1" 403 94 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "POST /api/auth/login HTTP/1.1" 204 0 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /api/internal/knowledge/search?q=%E7%89%A9%E6%B5%81%E5%BB%B6%E8%BF%9F HTTP/1.1" 403 94 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /internal/login HTTP/1.1" 200 1581 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/index-ZqxrUx-M.js HTTP/1.1" 200 67983 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/config-provider-mLSQG-zK.js HTTP/1.1" 200 10828 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/PlusOutlined-B1W8MSKa.js HTTP/1.1" 200 3795 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/index-QkR9HVRx.css HTTP/1.1" 200 64136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/useSize-RAbyxlwP.js HTTP/1.1" 200 8254 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/omit-CM_Et8lu.js HTTP/1.1" 200 112 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/context-CRtSfo_u.js HTTP/1.1" 200 68720 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/jsx-runtime-DzOhj3eh.js HTTP/1.1" 200 268376 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/EllipsisOutlined-BPs74lrM.js HTTP/1.1" 200 29007 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/CloseOutlined-C7w4V8XU.js HTTP/1.1" 200 1311 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/SystemState-B_pCTC2z.js HTTP/1.1" 200 62635 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/useVariants-CqNXGrsu.js HTTP/1.1" 200 448 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/workspaceRegistry-AaEyzxvp.js HTTP/1.1" 200 39600 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/csrf-CiJnUY0S.js HTTP/1.1" 200 381 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/humanSessionLifecycle-DO2cRqVK.js HTTP/1.1" 200 4591 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:56 +0000] "GET /assets/rolldown-runtime-D2aABDIb.js HTTP/1.1" 200 680 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /api/auth/session HTTP/1.1" 401 0 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /api/auth/demo-accounts HTTP/1.1" 200 482 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "POST /api/auth/login HTTP/1.1" 204 0 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /assets/InternalShell-COMi_e-p.js HTTP/1.1" 200 1481 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /assets/menu-DTL9Rpzc.js HTTP/1.1" 200 23909 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /assets/tooltip-wKhTRRtE.js HTTP/1.1" 200 14828 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /assets/ContextIsolator-Delq7CPh.js HTTP/1.1" 200 7399 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /assets/Sider-BOrRpxEw.js HTTP/1.1" 200 7363 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /assets/RightOutlined-BS4GEDyc.js HTTP/1.1" 200 838 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /assets/SessionLogoutButton-B_tFD-6k.js HTTP/1.1" 200 2046 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /assets/SupportWorkspace-CYHJJUAX.js HTTP/1.1" 200 44810 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /assets/streamProtocol-CMMm3Ko1.js HTTP/1.1" 200 1024 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /assets/modal-Bg2v8rC3.js HTTP/1.1" 200 54609 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /assets/style-Cvj32mD0.js HTTP/1.1" 200 1972 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /api/support/workbench/snapshot?schema=support-workbench-v2 HTTP/1.1" 200 565 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:57 +0000] "GET /api/internal/knowledge/search?q=%E6%B8%A9%E5%AE%A4%E9%87%8C%E9%A9%AC%E9%93%83%E8%96%AF%E6%AF%8F%E5%91%A8%E5%BA%94%E8%AF%A5%E6%B5%87%E5%87%A0%E6%AC%A1%E6%B0%B4&scope=INTERNAL HTTP/1.1" 200 6863 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /api/support/workbench/events HTTP/1.1" 200 17 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /internal/login HTTP/1.1" 200 1581 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/index-ZqxrUx-M.js HTTP/1.1" 200 67983 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/CloseOutlined-C7w4V8XU.js HTTP/1.1" 200 1311 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/PlusOutlined-B1W8MSKa.js HTTP/1.1" 200 3795 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/index-QkR9HVRx.css HTTP/1.1" 200 64136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/workspaceRegistry-AaEyzxvp.js HTTP/1.1" 200 39600 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/useSize-RAbyxlwP.js HTTP/1.1" 200 8254 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/context-CRtSfo_u.js HTTP/1.1" 200 68720 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/omit-CM_Et8lu.js HTTP/1.1" 200 112 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/EllipsisOutlined-BPs74lrM.js HTTP/1.1" 200 29007 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/config-provider-mLSQG-zK.js HTTP/1.1" 200 10828 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/jsx-runtime-DzOhj3eh.js HTTP/1.1" 200 268376 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/useVariants-CqNXGrsu.js HTTP/1.1" 200 448 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/SystemState-B_pCTC2z.js HTTP/1.1" 200 62635 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/csrf-CiJnUY0S.js HTTP/1.1" 200 381 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/humanSessionLifecycle-DO2cRqVK.js HTTP/1.1" 200 4591 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/rolldown-runtime-D2aABDIb.js HTTP/1.1" 200 680 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /api/auth/session HTTP/1.1" 401 0 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /api/auth/demo-accounts HTTP/1.1" 200 482 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "POST /api/auth/login HTTP/1.1" 204 0 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/InternalShell-COMi_e-p.js HTTP/1.1" 200 1481 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/menu-DTL9Rpzc.js HTTP/1.1" 200 23909 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/tooltip-wKhTRRtE.js HTTP/1.1" 200 14828 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/ContextIsolator-Delq7CPh.js HTTP/1.1" 200 7399 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/Sider-BOrRpxEw.js HTTP/1.1" 200 7363 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/RightOutlined-BS4GEDyc.js HTTP/1.1" 200 838 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/SessionLogoutButton-B_tFD-6k.js HTTP/1.1" 200 2046 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /internal/knowledge HTTP/1.1" 200 1581 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /assets/KnowledgeWorkspace-CK0cKjQt.js HTTP/1.1" 200 19116 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:58 +0000] "GET /api/internal/knowledge?q=&limit=20 HTTP/1.1" 200 1523 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:59 +0000] "GET /api/internal/knowledge/search?q=%E7%89%A9%E6%B5%81%E5%BB%B6%E8%BF%9F&scope=APPROVER HTTP/1.1" 403 94 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:34:59 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/knowledge" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:34:59 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:34:59 [notice] 1#1: signal 17 (SIGCHLD) received from 80
+browser-frontend-1  | 2026/08/31 16:34:59 [notice] 1#1: unknown process 80 exited with code 0
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:35:02 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:35:02 [notice] 1#1: signal 17 (SIGCHLD) received from 87
+browser-frontend-1  | 2026/08/31 16:35:02 [notice] 1#1: unknown process 87 exited with code 0
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:35:05 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:35:05 [notice] 1#1: signal 17 (SIGCHLD) received from 94
+browser-frontend-1  | 2026/08/31 16:35:05 [notice] 1#1: unknown process 94 exited with code 0
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:35:08 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:35:08 [notice] 1#1: signal 17 (SIGCHLD) received from 101
+browser-frontend-1  | 2026/08/31 16:35:08 [notice] 1#1: unknown process 101 exited with code 0
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:35:11 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:35:11 [notice] 1#1: signal 17 (SIGCHLD) received from 108
+browser-frontend-1  | 2026/08/31 16:35:11 [notice] 1#1: unknown process 108 exited with code 0
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:35:14 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:35:14 [notice] 1#1: signal 17 (SIGCHLD) received from 115
+browser-frontend-1  | 2026/08/31 16:35:14 [notice] 1#1: unknown process 115 exited with code 0
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:35:18 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:35:18 [notice] 1#1: signal 17 (SIGCHLD) received from 122
+browser-frontend-1  | 2026/08/31 16:35:18 [notice] 1#1: unknown process 122 exited with code 0
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:35:21 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:35:21 [notice] 1#1: signal 17 (SIGCHLD) received from 129
+browser-frontend-1  | 2026/08/31 16:35:21 [notice] 1#1: unknown process 129 exited with code 0
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:35:24 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:35:24 [notice] 1#1: signal 17 (SIGCHLD) received from 136
+browser-frontend-1  | 2026/08/31 16:35:24 [notice] 1#1: unknown process 136 exited with code 0
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:35:27 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:35:27 [notice] 1#1: signal 17 (SIGCHLD) received from 143
+browser-frontend-1  | 2026/08/31 16:35:27 [notice] 1#1: unknown process 143 exited with code 0
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /internal/login HTTP/1.1" 200 1581 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/index-ZqxrUx-M.js HTTP/1.1" 200 67983 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/omit-CM_Et8lu.js HTTP/1.1" 200 112 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/EllipsisOutlined-BPs74lrM.js HTTP/1.1" 200 29007 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/config-provider-mLSQG-zK.js HTTP/1.1" 200 10828 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/PlusOutlined-B1W8MSKa.js HTTP/1.1" 200 3795 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/csrf-CiJnUY0S.js HTTP/1.1" 200 381 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/humanSessionLifecycle-DO2cRqVK.js HTTP/1.1" 200 4591 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/useSize-RAbyxlwP.js HTTP/1.1" 200 8254 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/index-QkR9HVRx.css HTTP/1.1" 200 64136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/jsx-runtime-DzOhj3eh.js HTTP/1.1" 200 268376 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/CloseOutlined-C7w4V8XU.js HTTP/1.1" 200 1311 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/context-CRtSfo_u.js HTTP/1.1" 200 68720 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/useVariants-CqNXGrsu.js HTTP/1.1" 200 448 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/SystemState-B_pCTC2z.js HTTP/1.1" 200 62635 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/workspaceRegistry-AaEyzxvp.js HTTP/1.1" 200 39600 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:28 +0000] "GET /assets/rolldown-runtime-D2aABDIb.js HTTP/1.1" 200 680 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /api/auth/session HTTP/1.1" 401 0 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /api/auth/demo-accounts HTTP/1.1" 200 482 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "POST /api/auth/login HTTP/1.1" 204 0 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /api/auth/csrf HTTP/1.1" 200 136 "https://browser-frontend:8443/internal/login" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /api/auth/session HTTP/1.1" 200 163 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /assets/InternalShell-COMi_e-p.js HTTP/1.1" 200 1481 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /assets/menu-DTL9Rpzc.js HTTP/1.1" 200 23909 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /assets/tooltip-wKhTRRtE.js HTTP/1.1" 200 14828 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /assets/ContextIsolator-Delq7CPh.js HTTP/1.1" 200 7399 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /assets/Sider-BOrRpxEw.js HTTP/1.1" 200 7363 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /assets/RightOutlined-BS4GEDyc.js HTTP/1.1" 200 838 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /assets/SessionLogoutButton-B_tFD-6k.js HTTP/1.1" 200 2046 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /assets/SupportWorkspace-CYHJJUAX.js HTTP/1.1" 200 44810 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /assets/style-Cvj32mD0.js HTTP/1.1" 200 1972 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /assets/modal-Bg2v8rC3.js HTTP/1.1" 200 54609 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /assets/streamProtocol-CMMm3Ko1.js HTTP/1.1" 200 1024 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:29 +0000] "GET /api/support/workbench/snapshot?schema=support-workbench-v2 HTTP/1.1" 200 565 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:30 +0000] "GET /api/internal/knowledge/search?q=%E7%89%A9%E6%B5%81%E5%BB%B6%E8%BF%9F HTTP/1.1" 200 7576 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 172.28.0.5 - - [31/Aug/2026:16:35:30 +0000] "GET /api/support/workbench/events HTTP/1.1" 200 17 "https://browser-frontend:8443/internal/support" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36" "-"
+browser-frontend-1  | 127.0.0.1 - - [31/Aug/2026:16:35:30 +0000] "GET /api/system/status HTTP/1.1" 200 71 "-" "Wget" "-"
+browser-frontend-1  | 2026/08/31 16:35:30 [notice] 1#1: signal 17 (SIGCHLD) received from 150
+browser-frontend-1  | 2026/08/31 16:35:30 [notice] 1#1: unknown process 150 exited with code 0

@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\lizhuo\.codex\worktrees\808f\customer-agent\agent\src\baseline_agent\knowledge_sufficiency_run.py", line 609, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\lizhuo\.codex\worktrees\808f\customer-agent\agent\src\baseline_agent\knowledge_sufficiency_run.py", line 527, in main
+    raise SufficiencyBlocked("MISSING_API_KEY")
+baseline_agent.knowledge_sufficiency.SufficiencyBlocked: MISSING_API_KEY
+Exception: C:\Users\lizhuo\.codex\worktrees\808f\customer-agent\scripts\knowledge-sufficiency.ps1:49
+Line |
+  49 |  … $LASTEXITCODE -ne 0) { throw "C阶段停止，证据：$output；不重试、不切方法、不进入留出或冻结门。" }
+     |                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     |
+     | C阶段停止，证据：C:\Users\lizhuo\.codex\worktrees\808f\customer-agent\.local\gate-evidence\issue190-c-v2-offline-20260831c-remaining\sufficiency-remaining-diagnostic.json；不重试、不切方法、不进入留出或冻结门。

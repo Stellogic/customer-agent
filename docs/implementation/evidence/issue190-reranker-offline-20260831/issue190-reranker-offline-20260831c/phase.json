@@ -1,0 +1,46 @@
+{
+  "run_id": "issue190-reranker-offline-20260831c",
+  "head_sha": "04d7ee9c7129e00741db22f04ccc72492253738e",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "PASS",
+  "phases": [
+    {
+      "name": "focused",
+      "exit_code": 0,
+      "elapsed_seconds": 2.7037047
+    },
+    {
+      "name": "lint",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0698968
+    },
+    {
+      "name": "format",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0591278
+    },
+    {
+      "name": "format-check",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0687666
+    },
+    {
+      "name": "types",
+      "exit_code": 0,
+      "elapsed_seconds": 17.6901361
+    },
+    {
+      "name": "related-components",
+      "exit_code": 0,
+      "elapsed_seconds": 5.4921772
+    }
+  ],
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "model_downloaded": false,
+  "model_loaded": false,
+  "development_scoring_run": false,
+  "holdout_or_frozen_evaluation_run": false,
+  "elapsed_seconds": 26.1762503,
+  "working_tree_changed": false
+}

@@ -1,0 +1,11 @@
+{
+  "run_id": "issue190-reranker-entry-20260831a",
+  "head_sha": "04d7ee9c7129e00741db22f04ccc72492253738e",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "PASS",
+  "model_loaded": false,
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "exit_code": 0,
+  "elapsed_seconds": 4.8292234
+}

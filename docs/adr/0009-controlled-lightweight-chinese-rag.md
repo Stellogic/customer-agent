@@ -11,3 +11,5 @@ status: accepted
 混合检索首选 PostgreSQL 全文检索、pgvector 稠密向量检索和 RRF 融合，不先引入独立搜索服务。PostgreSQL 内建全文检索是最小基线，但不预先承诺连续中文自然语言的分词与召回质量；必须使用项目客服语料评测词法、向量和混合方案。若基线不达标，再根据证据选择 `pg_trgm`、写入前中文分词或 PGroonga。编辑、审核和发布后台第一阶段按原型保留并明确显示“开发中”，不得伪造成功；查看、检索、版本和引用必须连接真实数据。
 
 证据与尚待实测边界见 [`docs/research/lightweight-chinese-rag-evaluation.md`](../research/lightweight-chinese-rag-evaluation.md)。
+
+2026-08-31 用户确认补充：检索分数只负责候选排序，不再作为语义可回答性的门控。问题和授权片段交给负责生成回答的同一次 DeepSeek 调用判断充分性并回复；默认不增加独立判断模型或调用。检索与回答分别验收，实施归属和新旧口径边界见 [rag-layered-v2](../eval/rag-layered-v2.md) 及正式 #149。此修订保留旧冻结资产与失败证据，不表示旧质量门已通过。

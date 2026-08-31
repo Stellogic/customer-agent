@@ -76,6 +76,7 @@ class HumanApiNegativeMatrixTest {
     private static final List<ApiRequest> KNOWLEDGE_APIS =
             List.of(
                     getApi("/api/internal/knowledge"),
+                    getApi("/api/internal/knowledge/search?q=logistics"),
                     getApi("/api/internal/knowledge/index"),
                     getApi("/api/internal/knowledge/articles/refund-policy"),
                     postApi("/api/internal/knowledge/index/rebuild"));

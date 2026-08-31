@@ -1,0 +1,45 @@
+{
+  "schema": "knowledge-sufficiency-development-v1",
+  "method": "context-sufficiency-c6",
+  "endpoint": "https://api.deepseek.com/beta/chat/completions",
+  "model": "deepseek-v4-flash",
+  "thinking": {
+    "type": "disabled"
+  },
+  "temperature": 0,
+  "max_output_tokens": 256,
+  "stream": false,
+  "attempts_per_query": 1,
+  "call_deadline_seconds": 20,
+  "development_query_count": 72,
+  "quality_thresholds": {
+    "answered_recall_at_5": 0.9,
+    "answered_mrr_at_5": 0.75,
+    "unanswered_precision": 0.9,
+    "unanswered_recall": 0.85
+  },
+  "data_boundary": "fixed-reviewed-synthetic-development-archive-only",
+  "product_policy_changed": false,
+  "pricing_observed_date": "2026-08-31",
+  "pricing_cny_per_million": {
+    "uncached_input": 3,
+    "output": 9
+  },
+  "input_bound": {
+    "tokens": 1048576,
+    "basis": "published-full-context-upper-bound-not-request-token-count",
+    "smaller_responses_billing_bound_verified": false
+  },
+  "total_budget_micro_cny": 6000000,
+  "validation_call_plan": {
+    "seen_development": 72,
+    "independent_if_authorized": 72,
+    "remaining_gates_if_authorized": 160
+  },
+  "forecast_input_tokens_per_call": 4096,
+  "forecast_is_not_input_limit": true,
+  "complete_validation_inventory_verified": false,
+  "budget_admission": "reserve-full-context-per-call-settle-trusted-usage-stop-on-insufficient",
+  "live_transport_scope": "standalone-synthetic-development-only-not-product",
+  "transport": "chat-beta-strict-v1"
+}

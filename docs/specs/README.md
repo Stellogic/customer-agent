@@ -26,3 +26,5 @@
 ```powershell
 pwsh ./scripts/sync-spec-docs.ps1
 ```
+
+- [#149 规格 重塑自然语言多工单客服 Agent 与知识工作台](./issue-149.md) — OPEN，最后更新于 08/31/2026 15:19:32
