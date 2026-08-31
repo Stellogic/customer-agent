@@ -1,0 +1,155 @@
+{
+  "schema": "issue190-c-diagnostics-offline-evidence-v1",
+  "date": "2026-08-31",
+  "issue": 190,
+  "pr": 203,
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "final_code_sha": "9301bc55ee9ba47a434072c5659c8b9e381a51c2",
+  "paid_model_calls": 0,
+  "shared_cost_ledger_modified": false,
+  "source_files": [
+    {
+      "path": "agent/src/baseline_agent/knowledge_sufficiency_run.py",
+      "sha256": "8ecf5a005fffbd826c0f8fb59cada91cee7d210762a62eb8c37c843a509037d6"
+    },
+    {
+      "path": "agent/tests/test_knowledge_sufficiency.py",
+      "sha256": "a6087c6bbd08562982a2e2b4b9b4fa751a42bef531e9eb33debb938688ee6d61"
+    }
+  ],
+  "evidence": [
+    {
+      "run_id": "issue190-c-diagnostics-20260831a",
+      "path": "a/focused.log",
+      "source_sha256": "7d41f633abebc6ee43511c7c06ad3b2f01ee55a98f503257e77370d6589c8d39",
+      "archived_sha256": "31773ee6457bcfeb08e0465f3dee75ce627a64bd137635e9e5c108264cc06197",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831a",
+      "path": "a/focused.xml",
+      "source_sha256": "16621ad8da854fa8797ca3ad881d48b45967f4897b03593560f494763879e927",
+      "archived_sha256": "16621ad8da854fa8797ca3ad881d48b45967f4897b03593560f494763879e927",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831a",
+      "path": "a/phase.json",
+      "source_sha256": "53de7dc8ae98fb8c12df7111527be805698693446c4c26b28376b4e380dade48",
+      "archived_sha256": "53de7dc8ae98fb8c12df7111527be805698693446c4c26b28376b4e380dade48",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831b",
+      "path": "b/focused.log",
+      "source_sha256": "8c383e56c1684e00348fb5cfd0360412029303a6cedabfb1809e014cc0b8b211",
+      "archived_sha256": "2eb1473a72b8029c9a75284e2fec8132314c3957e7e227f4c9c12c9874429bdb",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831b",
+      "path": "b/focused.xml",
+      "source_sha256": "631107948b9c836e9766d8d7ef06a8d8e17a058208b074d42fbb813b32eaa415",
+      "archived_sha256": "631107948b9c836e9766d8d7ef06a8d8e17a058208b074d42fbb813b32eaa415",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831b",
+      "path": "b/format-check.log",
+      "source_sha256": "3f6f054a01559f492f8b48142f182876dce5da1f261615b5664acd1ff26f03dc",
+      "archived_sha256": "3f6f054a01559f492f8b48142f182876dce5da1f261615b5664acd1ff26f03dc",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831b",
+      "path": "b/format.log",
+      "source_sha256": "4ff602b2974286b6f88d1a149695a2af88dd9bc8cdcdee7bc1e7938723cb5620",
+      "archived_sha256": "4ff602b2974286b6f88d1a149695a2af88dd9bc8cdcdee7bc1e7938723cb5620",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831b",
+      "path": "b/lint.log",
+      "source_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0",
+      "archived_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831b",
+      "path": "b/phase.json",
+      "source_sha256": "bb6e8b7dc685509f64f4284a9dda05a842259e6c467a55a51b4070f8707cd664",
+      "archived_sha256": "bb6e8b7dc685509f64f4284a9dda05a842259e6c467a55a51b4070f8707cd664",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831b",
+      "path": "b/types.log",
+      "source_sha256": "9a73c9e3dab6ba4bf42418e91c61be2511f664d1bb3e23ffcd5bafa664a0cfb6",
+      "archived_sha256": "a9cf27526e17dbe113aef2cc6081d08fd90a662c34e51baf4702343ed855f37f",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831c",
+      "path": "c/focused.log",
+      "source_sha256": "ef24bfeef3e16237fbd608a59b32c7bee6737e5170fa0d970fbd9d5dd10abfab",
+      "archived_sha256": "e890ae988cd6782368b786686f13776bcafca0e620fa1f75e5d029a5f975ee5e",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831c",
+      "path": "c/focused.xml",
+      "source_sha256": "6592e809c0626b79552a115b29f71eeb8d330f6e5b734537677f015cd40aff57",
+      "archived_sha256": "6592e809c0626b79552a115b29f71eeb8d330f6e5b734537677f015cd40aff57",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831c",
+      "path": "c/format-check.log",
+      "source_sha256": "3f6f054a01559f492f8b48142f182876dce5da1f261615b5664acd1ff26f03dc",
+      "archived_sha256": "3f6f054a01559f492f8b48142f182876dce5da1f261615b5664acd1ff26f03dc",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831c",
+      "path": "c/format.log",
+      "source_sha256": "4ff602b2974286b6f88d1a149695a2af88dd9bc8cdcdee7bc1e7938723cb5620",
+      "archived_sha256": "4ff602b2974286b6f88d1a149695a2af88dd9bc8cdcdee7bc1e7938723cb5620",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831c",
+      "path": "c/lint.log",
+      "source_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0",
+      "archived_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831c",
+      "path": "c/offline-component.log",
+      "source_sha256": "2d983e53150fc23d594b004e2eed4f13b32d6edfcc168b9dbb7ddf9645e7687e",
+      "archived_sha256": "7c9b4f6f7d88d196f80526e464dcc9709d87da20831067cef5482c5a7f028052",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831c",
+      "path": "c/offline-component.xml",
+      "source_sha256": "0e33cdd1c02dc846fc504770dd5aa6e78e22210de0ba26d873e41b50027a2d42",
+      "archived_sha256": "0e33cdd1c02dc846fc504770dd5aa6e78e22210de0ba26d873e41b50027a2d42",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831c",
+      "path": "c/phase.json",
+      "source_sha256": "9a4a7aa9f4453f960e0b5816c2cf64d9078ba79dcbb4690bb05e823a810d191c",
+      "archived_sha256": "9a4a7aa9f4453f960e0b5816c2cf64d9078ba79dcbb4690bb05e823a810d191c",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    },
+    {
+      "run_id": "issue190-c-diagnostics-20260831c",
+      "path": "c/types.log",
+      "source_sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14",
+      "archived_sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14",
+      "redaction": "literal worktree path only; offline test credential literals are synthetic"
+    }
+  ]
+}

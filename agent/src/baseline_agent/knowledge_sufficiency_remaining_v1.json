@@ -1,0 +1,283 @@
+{
+  "schema": "issue190-remaining67-diagnostic-manifest-v1",
+  "archive_sha256": "b4ec9872012c90c795b0356a74f9ac3f4f7343bff207a76b16d9185265b06387",
+  "dataset_sha256": "4ba56767f8729ba064f614c856076c30f08e5852bad0255c2bf6b443c31014b6",
+  "asset_sha256": {
+    "prompt.txt": "38d163c700dbdd5d39872864d781f573d06c05d23439f17044685dda201fd494",
+    "schema.json": "27ef4d19440b4279ac4b0426eb299e87445a455be5206716ad82c0da6f3733f4",
+    "config.json": "11e970eca4aa7ee711af9602f14eea5a5c4ea28efe1e67c74f712843b9cbad45"
+  },
+  "prior_ledger_sha256": "0bd04be15c1c6e1eeb96f96cdadf994aa14b5a0f2d894e38c3426193896b40f8",
+  "request_count": 67,
+  "quality_evaluation": false,
+  "requests": [
+    {
+      "original_position": 6,
+      "query_id": "weaving-paraphrase-3"
+    },
+    {
+      "original_position": 7,
+      "query_id": "weaving-direct-4"
+    },
+    {
+      "original_position": 8,
+      "query_id": "weaving-paraphrase-4"
+    },
+    {
+      "original_position": 9,
+      "query_id": "weaving-direct-5"
+    },
+    {
+      "original_position": 10,
+      "query_id": "weaving-paraphrase-5"
+    },
+    {
+      "original_position": 11,
+      "query_id": "weaving-direct-6"
+    },
+    {
+      "original_position": 12,
+      "query_id": "weaving-paraphrase-6"
+    },
+    {
+      "original_position": 13,
+      "query_id": "weaving-negative-1"
+    },
+    {
+      "original_position": 14,
+      "query_id": "weaving-negative-2"
+    },
+    {
+      "original_position": 15,
+      "query_id": "weaving-negative-3"
+    },
+    {
+      "original_position": 16,
+      "query_id": "weaving-negative-4"
+    },
+    {
+      "original_position": 17,
+      "query_id": "weaving-negative-5"
+    },
+    {
+      "original_position": 18,
+      "query_id": "weaving-negative-6"
+    },
+    {
+      "original_position": 19,
+      "query_id": "weaving-negative-7"
+    },
+    {
+      "original_position": 20,
+      "query_id": "weaving-negative-8"
+    },
+    {
+      "original_position": 21,
+      "query_id": "weaving-negative-9"
+    },
+    {
+      "original_position": 22,
+      "query_id": "weaving-negative-10"
+    },
+    {
+      "original_position": 23,
+      "query_id": "weaving-negative-11"
+    },
+    {
+      "original_position": 24,
+      "query_id": "weaving-negative-12"
+    },
+    {
+      "original_position": 25,
+      "query_id": "leather-direct-1"
+    },
+    {
+      "original_position": 26,
+      "query_id": "leather-paraphrase-1"
+    },
+    {
+      "original_position": 27,
+      "query_id": "leather-direct-2"
+    },
+    {
+      "original_position": 28,
+      "query_id": "leather-paraphrase-2"
+    },
+    {
+      "original_position": 29,
+      "query_id": "leather-direct-3"
+    },
+    {
+      "original_position": 30,
+      "query_id": "leather-paraphrase-3"
+    },
+    {
+      "original_position": 31,
+      "query_id": "leather-direct-4"
+    },
+    {
+      "original_position": 32,
+      "query_id": "leather-paraphrase-4"
+    },
+    {
+      "original_position": 33,
+      "query_id": "leather-direct-5"
+    },
+    {
+      "original_position": 34,
+      "query_id": "leather-paraphrase-5"
+    },
+    {
+      "original_position": 35,
+      "query_id": "leather-direct-6"
+    },
+    {
+      "original_position": 36,
+      "query_id": "leather-paraphrase-6"
+    },
+    {
+      "original_position": 37,
+      "query_id": "leather-negative-1"
+    },
+    {
+      "original_position": 38,
+      "query_id": "leather-negative-2"
+    },
+    {
+      "original_position": 39,
+      "query_id": "leather-negative-3"
+    },
+    {
+      "original_position": 40,
+      "query_id": "leather-negative-4"
+    },
+    {
+      "original_position": 41,
+      "query_id": "leather-negative-5"
+    },
+    {
+      "original_position": 42,
+      "query_id": "leather-negative-6"
+    },
+    {
+      "original_position": 43,
+      "query_id": "leather-negative-7"
+    },
+    {
+      "original_position": 44,
+      "query_id": "leather-negative-8"
+    },
+    {
+      "original_position": 45,
+      "query_id": "leather-negative-9"
+    },
+    {
+      "original_position": 46,
+      "query_id": "leather-negative-10"
+    },
+    {
+      "original_position": 47,
+      "query_id": "leather-negative-11"
+    },
+    {
+      "original_position": 48,
+      "query_id": "leather-negative-12"
+    },
+    {
+      "original_position": 49,
+      "query_id": "rainfall-direct-1"
+    },
+    {
+      "original_position": 50,
+      "query_id": "rainfall-paraphrase-1"
+    },
+    {
+      "original_position": 51,
+      "query_id": "rainfall-direct-2"
+    },
+    {
+      "original_position": 52,
+      "query_id": "rainfall-paraphrase-2"
+    },
+    {
+      "original_position": 53,
+      "query_id": "rainfall-direct-3"
+    },
+    {
+      "original_position": 54,
+      "query_id": "rainfall-paraphrase-3"
+    },
+    {
+      "original_position": 55,
+      "query_id": "rainfall-direct-4"
+    },
+    {
+      "original_position": 56,
+      "query_id": "rainfall-paraphrase-4"
+    },
+    {
+      "original_position": 57,
+      "query_id": "rainfall-direct-5"
+    },
+    {
+      "original_position": 58,
+      "query_id": "rainfall-paraphrase-5"
+    },
+    {
+      "original_position": 59,
+      "query_id": "rainfall-direct-6"
+    },
+    {
+      "original_position": 60,
+      "query_id": "rainfall-paraphrase-6"
+    },
+    {
+      "original_position": 61,
+      "query_id": "rainfall-negative-1"
+    },
+    {
+      "original_position": 62,
+      "query_id": "rainfall-negative-2"
+    },
+    {
+      "original_position": 63,
+      "query_id": "rainfall-negative-3"
+    },
+    {
+      "original_position": 64,
+      "query_id": "rainfall-negative-4"
+    },
+    {
+      "original_position": 65,
+      "query_id": "rainfall-negative-5"
+    },
+    {
+      "original_position": 66,
+      "query_id": "rainfall-negative-6"
+    },
+    {
+      "original_position": 67,
+      "query_id": "rainfall-negative-7"
+    },
+    {
+      "original_position": 68,
+      "query_id": "rainfall-negative-8"
+    },
+    {
+      "original_position": 69,
+      "query_id": "rainfall-negative-9"
+    },
+    {
+      "original_position": 70,
+      "query_id": "rainfall-negative-10"
+    },
+    {
+      "original_position": 71,
+      "query_id": "rainfall-negative-11"
+    },
+    {
+      "original_position": 72,
+      "query_id": "rainfall-negative-12"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "properties": {
+    "sufficient": {"type": "boolean"},
+    "evidence": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "properties": {
+          "chunk": {"type": "integer", "minimum": 1, "maximum": 5},
+          "quote": {"type": "string", "minLength": 1, "maxLength": 24}
+        },
+        "required": ["chunk", "quote"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["sufficient", "evidence"],
+  "additionalProperties": false
+}

@@ -10,9 +10,10 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
 COPY langgraph.json ./
 COPY src ./src
-COPY tests ./tests
 
 FROM base AS test
+COPY tests ./tests
+COPY tests/fixtures/knowledge-history /docs/implementation/evidence
 COPY smoke.py ./
 COPY approval_queue_time_smoke.py ./
 COPY auto_resolution_smoke.py ./

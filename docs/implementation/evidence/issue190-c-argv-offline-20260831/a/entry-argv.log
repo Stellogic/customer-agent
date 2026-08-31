@@ -1,0 +1,7 @@
+PASS: development 实际入口参数解析通过，MISSING_API_KEY前置停止；API=0。
+Exception: <WORKTREE>\scripts\test-knowledge-sufficiency-entry.ps1:36
+Line |
+  36 |          throw "实际入口argv回归失败：$mode；见$log"
+     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     |
+     | 实际入口argv回归失败：diagnostic；见<WORKTREE>\.local\gate-evidence\issue190-c-argv-offline-20260831a\argv\diagnostic.log

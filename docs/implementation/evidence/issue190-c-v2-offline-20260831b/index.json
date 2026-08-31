@@ -1,0 +1,64 @@
+{
+  "run_id": "issue190-c-v2-offline-20260831b",
+  "kind": "OFFLINE_ENGINEERING_NOT_MODEL_QUALITY",
+  "paid_api_calls": 0,
+  "shared_ledger_sha256": "c11630710263c473fbf938b60e789b33ef93b776021e258976825fdf47206a50",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da"
+    },
+    {
+      "path": "entry-argv.log",
+      "sha256": "19f72d999cfcdc4255566678908e2731b331f27bcc0f02c4ffd612a5aaf7344f"
+    },
+    {
+      "path": "focused.log",
+      "sha256": "443e32967013eacdd318308e9392f293f40cc9a2c0171d2318a52e9a47be055c"
+    },
+    {
+      "path": "focused.xml",
+      "sha256": "05bab7ee242a2950a7c369ca1e494dc925b2199c21332759ad02814332e96ec6"
+    },
+    {
+      "path": "format-check.log",
+      "sha256": "870d56ea1dd9e0c036cfe62581f12c237a5daf761f1bd1bd846e4b922d8777c0"
+    },
+    {
+      "path": "lint.log",
+      "sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0"
+    },
+    {
+      "path": "offline-component.log",
+      "sha256": "7fb75264a195949f5245bffe6e3b7880e83c1a2bf6c52cf41a5e9cbdfeffa342"
+    },
+    {
+      "path": "offline-component.xml",
+      "sha256": "9416293e7982439abb4b1c669f4a8cdff20158a7ad3b0d51ce15a5aaa9828516"
+    },
+    {
+      "path": "phase.json",
+      "sha256": "59487d097a9dc0e182fce4ac0ec49a585d2e1430809d87edd147b09c96830d1e"
+    },
+    {
+      "path": "types.log",
+      "sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14"
+    },
+    {
+      "path": "argv/c-v2.log",
+      "sha256": "46349923695bd5df574c582bd750f90a243b7006eac1d63a129babb0ddb4b6f6"
+    },
+    {
+      "path": "argv/development.log",
+      "sha256": "41f1e22f8c30e13335693b0aedac22f725f366406c47ea08641014ebc00394b0"
+    },
+    {
+      "path": "argv/diagnostic.log",
+      "sha256": "4927263343509eda03f22ec0ee50da54ad07a5fa5b6ae094ed7008d1ed7bcc09"
+    },
+    {
+      "path": "argv/remaining.log",
+      "sha256": "d3d11d05c6f2758f75b25df43ee03750ad34c8be9257799991ac44860c74a395"
+    }
+  ]
+}

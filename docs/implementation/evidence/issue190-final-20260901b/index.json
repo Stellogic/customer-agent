@@ -1,0 +1,32 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-final-20260901b",
+  "head_sha": "94765cefab95da09d4db826c10ecae902cd76551",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Text workspace/user-home/machine prefixes only; original files retained locally. Browser synthetic screenshots are unchanged.",
+  "lock_release_observation": "Own lock released, one FREE read; coordinator notified. See phase cleanup_error separately.",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "console.log",
+      "source_sha256": "0ffb3bddd356a340c7dcb67bf2d22af80d9634f9cb0756195d4ccb3680e99238",
+      "archived_sha256": "daa2e0772a18946e65205a736b11ef8010e488c34eb891af12076d1c423c7878"
+    },
+    {
+      "file": "exit-code.txt",
+      "source_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "archived_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "file": "phase.json",
+      "source_sha256": "4fe8035a372c68b14bd39dc185ebe7be2126601fa0724865d2e9fe54b31267d4",
+      "archived_sha256": "4fe8035a372c68b14bd39dc185ebe7be2126601fa0724865d2e9fe54b31267d4"
+    },
+    {
+      "file": "rag-layered-v2-retrieval-result.json",
+      "source_sha256": "5a79f94dab1975f8b0473a45c434f82135d7c00a1f541eed6eeff07f82686313",
+      "archived_sha256": "5a79f94dab1975f8b0473a45c434f82135d7c00a1f541eed6eeff07f82686313"
+    }
+  ]
+}

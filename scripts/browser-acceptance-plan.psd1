@@ -27,6 +27,7 @@
         'e2e/issue163.persistent-support-replies.spec.ts'
         'e2e/issue164.standard-compensation.spec.ts'
         'e2e/issue166.knowledge-catalog.spec.ts'
+        'e2e/issue190.hybrid-retrieval.spec.ts'
         'e2e/issue192.customer-help-docs.spec.ts'
     )
     Excluded = @{

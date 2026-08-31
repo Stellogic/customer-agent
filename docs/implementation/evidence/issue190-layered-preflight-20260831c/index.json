@@ -1,0 +1,67 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-layered-preflight-20260831c",
+  "head_sha": "495d3d1f91d170c618364c8105e966a3dacff820",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Text workspace/user-home/machine prefixes only; original files retained locally. Browser synthetic screenshots are unchanged.",
+  "lock_release_observation": "Own lock released, one FREE read; coordinator notified. See phase cleanup_error separately.",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "focused.log",
+      "source_sha256": "5c5f8b546d65350fcdadb761ad3dd7dbc1b954cce0890fec4dd6f0f07e563264",
+      "archived_sha256": "72e51ef2bc0035758899d632a8446890d517bbb696e095a51ab2269382f0a01f"
+    },
+    {
+      "file": "focused.xml",
+      "source_sha256": "fddbfd1739c7c280d66d2f4ffe4e322400cd0f17f0433247185016851ecfded1",
+      "archived_sha256": "9aeb77a8ca581617ee0bb9266ff08693acb57e24748719cf55099e5cf84d7cd0"
+    },
+    {
+      "file": "java-format.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "offline-regression.log",
+      "source_sha256": "a4e90e19a9f0cba5beb9406649447593d5ef1686e48d72bc4d7f832ef27371a7",
+      "archived_sha256": "1419114138c908c6ccf066a5a0e3fb92519519ff5534255bb0237bbc6c128bb4"
+    },
+    {
+      "file": "offline-regression.xml",
+      "source_sha256": "f1d087cf28b242f21608d47f3a551c6d91584eb30ae311067164a682132c4c82",
+      "archived_sha256": "47d6496f8dac6bc876895fdadf30d05a5cd59b107c597033a38204c0d19fa13d"
+    },
+    {
+      "file": "phase.json",
+      "source_sha256": "4fcdc3a5d5d6f6bdd2b298d889c7dcd5ed0a4fa8ed03e588e1c1e9213c8df3ec",
+      "archived_sha256": "4fcdc3a5d5d6f6bdd2b298d889c7dcd5ed0a4fa8ed03e588e1c1e9213c8df3ec"
+    },
+    {
+      "file": "prettier.log",
+      "source_sha256": "031cc2db3feb3011f06a7432724cfc881c243c09622767cc5d55fc7809bb8a32",
+      "archived_sha256": "031cc2db3feb3011f06a7432724cfc881c243c09622767cc5d55fc7809bb8a32"
+    },
+    {
+      "file": "pyright.log",
+      "source_sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14",
+      "archived_sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14"
+    },
+    {
+      "file": "ruff-format-check.log",
+      "source_sha256": "1a18e5807195ef8a8b3ebe647a5b4ce7e0f259ce7ad15cc506814b7ab469c27c",
+      "archived_sha256": "1a18e5807195ef8a8b3ebe647a5b4ce7e0f259ce7ad15cc506814b7ab469c27c"
+    },
+    {
+      "file": "ruff-format.log",
+      "source_sha256": "a0e6ed11583aba5e917f0499fa71d3b1803b2cb9523eb8651ba93914b5422296",
+      "archived_sha256": "a0e6ed11583aba5e917f0499fa71d3b1803b2cb9523eb8651ba93914b5422296"
+    },
+    {
+      "file": "ruff.log",
+      "source_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0",
+      "archived_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0"
+    }
+  ]
+}

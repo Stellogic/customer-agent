@@ -1,0 +1,37 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-startup-20260901a",
+  "head_sha": "94765cefab95da09d4db826c10ecae902cd76551",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Text workspace/user-home/machine prefixes only; original files retained locally. Browser synthetic screenshots are unchanged.",
+  "lock_release_observation": "Own lock released, one FREE read; coordinator notified. See phase cleanup_error separately.",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "console.log",
+      "source_sha256": "b51d264382c846864a6b20d911d45eb0c1958ef47625624643ad837becef3d7e",
+      "archived_sha256": "2a053b5bbbf1d7fb21f8f4cfc39dc6d0d9a61a041290befc0dbaad6856c17346"
+    },
+    {
+      "file": "old-volume.yaml",
+      "source_sha256": "e0928c8cd50837153f2cc34d89c1781fe38da804d0f79103c5c8a2822fd9c750",
+      "archived_sha256": "259c9f7fd2ef192df3704d366ab4697a9b24a959831e3b8804348f412adf9c26"
+    },
+    {
+      "file": "phase.json",
+      "source_sha256": "e8a978e2a46f3eb464be8a64702a068a0c00ebc0ca62ec02c1811e32d9c7cc1b",
+      "archived_sha256": "e8a978e2a46f3eb464be8a64702a068a0c00ebc0ca62ec02c1811e32d9c7cc1b"
+    },
+    {
+      "file": "runtime.log",
+      "source_sha256": "cb138cb2f0125438b0a8fd6ae450095a5e3b80da5bd97afd997dcf66cdf19126",
+      "archived_sha256": "12761ab98a5d385fb684ba1912f1977bfb9b34eab9b679f8d1d4802e8648e4de"
+    },
+    {
+      "file": "verification-script.ps1",
+      "source_sha256": "37d6f05410ea9137e059bde9aad580bf7917d67dd38aeefd91d2f60af724ee02",
+      "archived_sha256": "37d6f05410ea9137e059bde9aad580bf7917d67dd38aeefd91d2f60af724ee02"
+    }
+  ]
+}

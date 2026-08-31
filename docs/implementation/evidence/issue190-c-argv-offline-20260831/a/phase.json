@@ -1,0 +1,25 @@
+{
+  "run_id": "issue190-c-argv-offline-20260831a",
+  "head_sha": "e86ca3e7feb31a55f7cd6471c098785e1fc915cd",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "ERROR",
+  "phases": [
+    {
+      "name": "entry-syntax",
+      "exit_code": 0,
+      "elapsed_seconds": 0.7390038
+    },
+    {
+      "name": "entry-argv",
+      "exit_code": 1,
+      "elapsed_seconds": 7.3284693
+    }
+  ],
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "development_replay_run": false,
+  "holdout_or_frozen_evaluation_run": false,
+  "failure": "entry-argv failed: 1",
+  "elapsed_seconds": 8.120993,
+  "working_tree_changed": false
+}

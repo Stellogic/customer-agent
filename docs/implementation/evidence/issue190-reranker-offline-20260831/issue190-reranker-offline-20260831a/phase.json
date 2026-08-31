@@ -1,0 +1,27 @@
+{
+  "run_id": "issue190-reranker-offline-20260831a",
+  "head_sha": "5582f83bbde4142edc8bc0ccfc456c364f533730",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "ERROR",
+  "phases": [
+    {
+      "name": "focused",
+      "exit_code": 0,
+      "elapsed_seconds": 3.1871187
+    },
+    {
+      "name": "lint",
+      "exit_code": 1,
+      "elapsed_seconds": 0.152865
+    }
+  ],
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "model_downloaded": false,
+  "model_loaded": false,
+  "development_scoring_run": false,
+  "holdout_or_frozen_evaluation_run": false,
+  "failure": "lint failed: 1",
+  "elapsed_seconds": 3.4176249,
+  "working_tree_changed": false
+}

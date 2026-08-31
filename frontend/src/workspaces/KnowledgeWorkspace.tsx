@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Spin } from "antd";
 import { StatusNotice } from "../components/SystemState";
 import { humanSessionFetch } from "../humanSessionLifecycle";
+import KnowledgeHybridSearch from "./KnowledgeHybridSearch";
 
 const SCHEMA = "knowledge-catalog-v1" as const;
 const CATALOG_URL = "/api/internal/knowledge";
@@ -183,6 +184,8 @@ export default function KnowledgeWorkspace() {
         </div>
         <IndexBadge index={index} />
       </header>
+
+      <KnowledgeHybridSearch />
 
       <section className="knowledge-search-panel" aria-label="知识检索">
         <form onSubmit={submitSearch} role="search">

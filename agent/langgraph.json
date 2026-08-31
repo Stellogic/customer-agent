@@ -3,7 +3,8 @@
   "dependencies": ["."],
   "graphs": {
     "baseline_agent": "./src/baseline_agent/graph.py:graph",
-    "intake_agent": "./src/baseline_agent/intake_graph.py:graph"
+    "intake_agent": "./src/baseline_agent/intake_graph.py:graph",
+    "knowledge_embedding": "./src/baseline_agent/knowledge_embedding_graph.py:graph"
   },
   "auth": {
     "path": "./src/baseline_agent/auth.py:auth"

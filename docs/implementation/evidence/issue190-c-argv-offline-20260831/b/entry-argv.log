@@ -1,0 +1,2 @@
+PASS: development 实际入口参数解析通过，MISSING_API_KEY前置停止；API=0。
+PASS: diagnostic 实际入口参数解析通过，MISSING_API_KEY前置停止；API=0。

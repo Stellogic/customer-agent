@@ -1,0 +1,47 @@
+# [RAG] 交付离线 BGE 与 pgvector/RRF 混合检索
+
+> 父规格：[#149](../../specs/issue-149.md)
+> 来源：[https://github.com/Stellogic/customer-agent/issues/190](https://github.com/Stellogic/customer-agent/issues/190)
+> Issue 状态：OPEN
+> 最后更新时间：08/31/2026 15:20:59
+> 同步日期：2026-08-31
+> 说明：GitHub Issue 是事实源；本文件为回读正文镜像。
+
+## Parent
+
+Part of #149
+
+Child of #167
+
+## What to build
+
+使用 #189 已冻结的质量基线，在本地 CPU 上交付可工作的中文混合检索纵切片：固定 revision 的 BGE Embedding、PostgreSQL 全文候选、pgvector 精确向量候选、权限与版本硬过滤、RRF 融合，以及连接真实结果的内部检索页面。任何客户或客服 Agent 集成消费前必须通过 #149 的 rag-layered-v2 检索层质量门；不等待下游回答拒答门。
+
+## Non-goals
+
+- 不实现客户 Agent 知识引用或客服 Agent 辅助，它们分别由 #169 和 #170 承接。
+- 不要求 ONNX 才能完成本票，也不提前选择 HNSW 或 IVFFlat。
+- 不修改 #189 的查询、期望结果或阈值来取得通过结果。
+
+## Acceptance criteria
+
+- [ ] BAAI/bge-small-zh-v1.5 使用 #189 固定的完整 revision 与文件清单准备，模型权重不进入 Git；运行阶段只从校验通过的本地路径离线加载，缺失或校验失败时 fail closed。
+- [ ] 以 CPU PyTorch/Safetensors 实现 #189 固定的查询指令、pooling、L2 normalization、最大长度、截断策略和 512 维 Embedding，并提供确定性契约测试。
+- [ ] PostgreSQL 全文候选与 pgvector 精确向量候选分别可观测；权限、发布状态、版本和适用范围在排名前硬过滤，RRF 只融合过滤后的合法候选。
+- [ ] 真实内部检索页面展示条目标识、版本、适用范围和片段位置，并覆盖桌面、窄屏、loading、empty、error 与索引过期状态。
+- [ ] 保留 #189 冻结资产和旧评测协议，新增 rag-layered-v2 检索报告：同一完整冻结样本集上有答案 Recall@5 >= 0.90、MRR@5 >= 0.75，错误版本/范围/越权 Top-5 命中率均为 0%。无答案题仍执行并记录合法候选，不以结果为空判断语义拒答。保存环境、revision、数据哈希、源码、完整计数和结论；不修改题目、数值门槛，不把旧 FAIL 改为 PASS。未达到本层门槛仍保持下游阻塞。
+- [ ] 模型、索引、数据库扩展或融合阶段不可用时停止知识结果，不以无来源内容填补；完整规范化门禁和对应真实 PostgreSQL/浏览器验收通过后才能交付。
+
+## Blocked by
+
+- #189
+
+## Boundary
+
+本票交付从本地模型到内部用户可见检索结果的完整纵向切片。中文消融与可选 ONNX 仍属于 #168，客户和客服 Agent 的知识消费仍属于 #169、#170。
+
+## 分层实施边界（2026-08-31 用户批准）
+
+检索仅提供授权 Top-5 片段及可追溯元数据；分数用于排序，不使用 logistic、reranker 或额外云调用判断能否回答。当前产品路径解除实验评分/校准状态依赖，保留实验代码、原始失败、STOPPED 与预算记录作为非默认历史。BGE、中文全文、pgvector、RRF、权限/发布/版本/范围过滤、真实内部 UI 与故障快速失败保持。
+
+#190 负责新版检索评测适配、聚焦/组件验证和最终完整门禁，达标并合入关票后可独立交付。#169/#170 负责同一次 DeepSeek 生成回答时判断充分性，承担拒答 precision >= 0.90、recall >= 0.85 与引用/结构/语义验证；不是本票新增云调用，也不反向阻塞本票。#168 保持独立消融与可选 ONNX 归属。规格修订本身不是质量 PASS 或自动解阻。

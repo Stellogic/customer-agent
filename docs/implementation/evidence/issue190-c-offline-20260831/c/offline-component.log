@@ -1,0 +1,30 @@
+........................F....                                            [100%]
+================================== FAILURES ===================================
+___ test_offline_supplier_read_timeout_is_bounded_and_recorded_per_attempt ____
+
+    @pytest.mark.asyncio
+    async def test_offline_supplier_read_timeout_is_bounded_and_recorded_per_attempt() -> None:
+        slow = _SupplierAction(payload=_completed_response(), delay_seconds=0.08)
+        with _supplier_stub(slow, slow) as (endpoint, requests):
+            audit = InMemoryModelCallAuditSink()
+            model = _offline_model(
+                endpoint,
+                audit=audit,
+                read_timeout_seconds=0.01,
+                deadline_seconds=1,
+                max_attempts=2,
+            )
+    
+            with pytest.raises(InvestigationJudgmentFailure) as captured:
+                await model.judge(MODEL_INPUT)
+    
+        assert captured.value.code is InvestigationJudgmentFailureCode.MODEL_CALL_FAILED
+>       assert len(requests) == 2
+E       assert 0 == 2
+E        +  where 0 = len([])
+
+tests\test_deepseek_offline_contract.py:363: AssertionError
+- generated xml file: <WORKTREE>\.local\gate-evidence\issue190-c-offline-20260831c\offline-component.xml -
+=========================== short test summary info ===========================
+FAILED tests/test_deepseek_offline_contract.py::test_offline_supplier_read_timeout_is_bounded_and_recorded_per_attempt
+1 failed, 28 passed in 29.01s

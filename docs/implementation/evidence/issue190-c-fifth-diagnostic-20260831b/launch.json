@@ -1,0 +1,21 @@
+{
+  "run_id": "issue190-c-fifth-diagnostic-20260831b",
+  "head_sha": "f77e8a50612bedb08f34111fe136a14d42d6e1f3",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "started_at": "2026-08-31T05:06:29.8956663+08:00",
+  "pricing_and_context_verified_utc_date": "2026-08-30",
+  "pricing_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "endpoint": "https://api.deepseek.com/responses",
+  "requested_model": "deepseek-v4-flash",
+  "budget_micro_cny": 6000000,
+  "maximum_attempts_per_query": 1,
+  "maximum_api_requests": 1,
+  "diagnostic_not_replay": true,
+  "input_cny_per_million_upper": 3,
+  "output_cny_per_million_upper": 9,
+  "fixed_context_upper": 1048576,
+  "max_output_tokens": 256,
+  "exit_code": 0,
+  "elapsed_seconds": 6.3101213,
+  "finished_at": "2026-08-31T05:06:36.2098038+08:00"
+}

@@ -1,0 +1,38 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-reranker-prepare-20260831a",
+  "head_sha": "cf87a6b6d25a65974c9ea1986214d1bd8ec50298",
+  "code_sha": "04d7ee9c7129e00741db22f04ccc72492253738e",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "PREPARATION_ERROR_NOT_QUALITY_FAIL",
+  "error_type": "RemoteProtocolError",
+  "partial_weight_bytes": 204766396,
+  "expected_weight_bytes": 1112206140,
+  "partial_weight_sha256": "NOT_COLLECTED",
+  "partial_files_preserved": true,
+  "model_loaded": false,
+  "development_started": false,
+  "metrics": null,
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "lock_release_observation": "FREE after own release, one read",
+  "redaction": "Only worktree and user-home absolute paths replaced; original files retained locally",
+  "artifacts": [
+    {
+      "file": "launch.json",
+      "source_sha256": "ebffed02716caaa9c759dc903d4a6b2abd83c1c4e5ed770a370746c1d2575bea",
+      "archived_sha256": "ebffed02716caaa9c759dc903d4a6b2abd83c1c4e5ed770a370746c1d2575bea"
+    },
+    {
+      "file": "launch.log",
+      "source_sha256": "57031f1094d6121a8e103f81dc62eafeb0b5b1eed054ebee7d76c5d8fcd6f057",
+      "archived_sha256": "3b5b7b22c75f8b1cf15021d21dc263d86ecd3fc4338b3055624e74d4dd0b3c6e"
+    },
+    {
+      "file": "reranker-prepare.json",
+      "source_sha256": "8b7c578f5be49a1a23d91ae398a0efe56e6e39b8689a9e2b4f02514774726b23",
+      "archived_sha256": "8b7c578f5be49a1a23d91ae398a0efe56e6e39b8689a9e2b4f02514774726b23"
+    }
+  ]
+}

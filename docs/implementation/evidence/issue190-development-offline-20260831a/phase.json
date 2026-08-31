@@ -1,0 +1,51 @@
+{
+  "run_id": "issue190-development-offline-20260831a",
+  "head_sha": "ff4958165453c230e8a3c1aaad3c4081d0b4d305",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "PASS",
+  "phases": [
+    {
+      "name": "entry-argv",
+      "exit_code": 0,
+      "elapsed_seconds": 19.6007421
+    },
+    {
+      "name": "format-development",
+      "exit_code": 0,
+      "elapsed_seconds": 0.650504
+    },
+    {
+      "name": "focused",
+      "exit_code": 0,
+      "elapsed_seconds": 7.0685204
+    },
+    {
+      "name": "lint",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0834461
+    },
+    {
+      "name": "format-check",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0815198
+    },
+    {
+      "name": "types",
+      "exit_code": 0,
+      "elapsed_seconds": 17.5825858
+    },
+    {
+      "name": "offline-component",
+      "exit_code": 0,
+      "elapsed_seconds": 24.1413957
+    }
+  ],
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "development_replay_run": false,
+  "holdout_or_frozen_evaluation_run": false,
+  "ledger_sha_before": "0800A19D7111B2838D7131734A62CDF6A64BE48DCAC1FC8C9B44D3435B9646F0",
+  "ledger_sha_after": "0800A19D7111B2838D7131734A62CDF6A64BE48DCAC1FC8C9B44D3435B9646F0",
+  "elapsed_seconds": 69.3156588,
+  "working_tree_changed": true
+}

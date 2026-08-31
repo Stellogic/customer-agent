@@ -1,0 +1,52 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-layered-preflight-20260831a",
+  "head_sha": "802a34310d4c01991ea480082a6025372da016a8",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Text workspace/user-home/machine prefixes only; original files retained locally. Browser synthetic screenshots are unchanged.",
+  "lock_release_observation": "Own lock released, one FREE read; coordinator notified. See phase cleanup_error separately.",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "focused.log",
+      "source_sha256": "7412f9d9c309fbc87018470664b4787d8d9ca121f1241c1aa75fa14aef724076",
+      "archived_sha256": "eaa520778fd601bb1bc2fa776e66f83b2f4f6bb3c9ce418382d08bd36d7cc30f"
+    },
+    {
+      "file": "focused.xml",
+      "source_sha256": "9ead8ad447284eb491e50ca79f5071131a05f76d659786fe22d4194dfbafa951",
+      "archived_sha256": "bc38dc5b8b37341b3e0cf28ba376e69a71c0ab7f1f00dc77577c60745d23b63f"
+    },
+    {
+      "file": "java-format.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "phase.json",
+      "source_sha256": "a396feb1e45216f596d531f46e329dcab07aebf015f161f436bbff906033d2ae",
+      "archived_sha256": "a396feb1e45216f596d531f46e329dcab07aebf015f161f436bbff906033d2ae"
+    },
+    {
+      "file": "prettier.log",
+      "source_sha256": "893fbe090bd40df63e1aef42b7dabc2271735742b3377d014d6847a5f8cbe0f3",
+      "archived_sha256": "893fbe090bd40df63e1aef42b7dabc2271735742b3377d014d6847a5f8cbe0f3"
+    },
+    {
+      "file": "pyright.log",
+      "source_sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14",
+      "archived_sha256": "c584b21ee012de391dc2799d5455db619d3fefbb192ab07ea4ba83fb0d704c14"
+    },
+    {
+      "file": "ruff-format.log",
+      "source_sha256": "6d203e0ccd3937f8faab76ea8be422f8dd0cae98330d2e9412d3a5e9ff76363b",
+      "archived_sha256": "6d203e0ccd3937f8faab76ea8be422f8dd0cae98330d2e9412d3a5e9ff76363b"
+    },
+    {
+      "file": "ruff.log",
+      "source_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0",
+      "archived_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "file": ".gitattributes",
+    "bytes": 9,
+    "sha256": "8b9c3028d6467ff3be7c793141927841d70f47f52d0590677438f488ca154992"
+  },
+  {
+    "file": "cost-ledger.json",
+    "bytes": 300255,
+    "sha256": "045bd38d6bc2ed7daa113dd95b09cffbe8f5528e15c0fbb80665e6712b48157a"
+  },
+  {
+    "file": "launch.json",
+    "bytes": 886,
+    "sha256": "e3dc44d26b606159025884343ec872e81f94d40b4d28a4c563dc72d9fa53e198"
+  },
+  {
+    "file": "launch.log",
+    "bytes": 223,
+    "sha256": "cdf285880b86bd6dd566b52e1aee25d80bbdb3b04a4cbeab0e0eea96f059414b"
+  },
+  {
+    "file": "real-launch.ps1",
+    "bytes": 2750,
+    "sha256": "a00a0beb97f887c1558ac1b14923322253db99590b174d9cbff1884455162524"
+  },
+  {
+    "file": "requests.json",
+    "bytes": 10118,
+    "sha256": "703585ab58de3c1daa02096373275b4920c8698090a9f2b043ceb0ddcd048d45"
+  },
+  {
+    "file": "sufficiency-development.json",
+    "bytes": 446359,
+    "sha256": "4d43e6a39f874a72ff24af5f0f67085c6466472830386d1b63dadc36b0bf34c5"
+  },
+  {
+    "file": "summary.json",
+    "bytes": 2056,
+    "sha256": "63e1d4ba44ebd5ffffa78b566610422405143e2fa8f9e7fcedb226fceabb777e"
+  }
+]
