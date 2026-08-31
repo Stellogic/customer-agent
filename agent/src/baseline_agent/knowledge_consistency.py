@@ -98,7 +98,7 @@ def compare_consistency(
                 "query_id": pair.query_id,
                 "pytorch": left,
                 "onnx": right,
-                # 双方都拒答视为一致;一方拒答另一方命中则为零。
+                # 双方排序均为空视为一致;单侧为空则为零,不判断回答是否拒答。
                 "overlap": len(set(left) & set(right)) / denominator if denominator else 1.0,
                 "exact_order": left == right,
             }

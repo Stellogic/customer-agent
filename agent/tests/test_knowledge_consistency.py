@@ -25,7 +25,7 @@ def test_vector_similarity_does_not_hide_ranking_reversal():
     assert report["status"] == "FAIL"
 
 
-def test_wrong_version_and_one_sided_abstention_are_disagreement():
+def test_wrong_version_and_one_sided_empty_ranking_are_disagreement():
     report = compare_consistency(
         [VectorPair("document:a", [1.0, 0.0], [1.0, 0.0])],
         [RankingPair("version", ["a/v1/c1"], ["a/v2/c1"]), RankingPair("missing", ["a/v1/c1"], [])],
@@ -36,7 +36,7 @@ def test_wrong_version_and_one_sided_abstention_are_disagreement():
     assert report["status"] == "FAIL"
 
 
-def test_identical_short_lists_and_shared_abstention_pass_supplied_scope_only():
+def test_identical_short_lists_and_empty_rankings_pass_supplied_scope_only():
     report = compare_consistency(
         [VectorPair("query:q1", [1.0, 0.0], [1.0, 0.0])],
         [RankingPair("q1", ["a/v1/c1"], ["a/v1/c1"]), RankingPair("q2", [], [])],

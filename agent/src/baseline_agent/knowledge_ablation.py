@@ -10,22 +10,31 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Literal
 
-from baseline_agent.rag_eval_v1 import EvalQuery, compute_content_sha256, load_rag_eval_v1
+from baseline_agent.rag_eval_v1 import AllowedHit, EvalQuery, compute_content_sha256, load_rag_eval_v1
 
 RetrievalMode = Literal["lexical", "dense", "rrf"]
+EvaluationProtocol = Literal["rag-eval-v1", "rag-layered-v2"]
 MODES: tuple[RetrievalMode, ...] = ("lexical", "dense", "rrf")
-# 回调必须返回该模式独立完成硬过滤、拒答判定及 #190 评分后的行。
+# v2 回调返回该模式硬过滤后的排序及 #190 检索评分,无答案题也保留候选。
+# v1 仅用于重现旧口径,包含旧拒答评分;两版回调不可混用。
 # 不能把混合结果的 recall/MRR 复制给两路候选,也不能在此重新实现检索。
 QueryRunner = Callable[[RetrievalMode, EvalQuery], dict[str, Any]]
 Metrics = Callable[[list[dict[str, Any]]], dict[str, float]]
 
 
-def report_template(environment: dict[str, Any], parameters: dict[str, Any]) -> dict[str, Any]:
+def report_template(
+    environment: dict[str, Any],
+    parameters: dict[str, Any],
+    *,
+    protocol: EvaluationProtocol = "rag-layered-v2",
+) -> dict[str, Any]:
+    if protocol not in ("rag-eval-v1", "rag-layered-v2"):
+        raise ValueError("未知消融协议")
     dataset = load_rag_eval_v1()
     digest = compute_content_sha256()
     if digest != dataset.manifest.content_sha256:
         raise ValueError("冻结评测资产哈希不符")
-    return {
+    report: dict[str, Any] = {
         "schema": "knowledge-ablation-v1",
         "status": "NOT_RUN",
         "dataset": dataset.dataset_id,
@@ -39,6 +48,26 @@ def report_template(environment: dict[str, Any], parameters: dict[str, Any]) -> 
         "parameter_freeze": "PENDING_REPRODUCIBLE_BENEFIT",
         "default_change": "NOT_AUTHORIZED",
     }
+    if protocol == "rag-layered-v2":
+        thresholds = report["thresholds"]
+        report.update(
+            {
+                "schema": "knowledge-ablation-v2",
+                "protocol": protocol,
+                "evaluation_protocol": "rag-layered-v2-retrieval",
+                "pass_scope": "RETRIEVAL_ONLY",
+                "answer_evaluation": {
+                    "owners": [169, 170],
+                    "status": "NOT_EVALUATED",
+                    "thresholds": {
+                        "unanswered_precision": thresholds.pop("unanswered_precision"),
+                        "unanswered_recall": thresholds.pop("unanswered_recall"),
+                    },
+                    "metrics": None,
+                },
+            }
+        )
+    return report
 
 
 def run_ablation(
@@ -49,13 +78,14 @@ def run_ablation(
     parameters: dict[str, Any],
     output: Path,
     modes: tuple[RetrievalMode, ...] = MODES,
+    protocol: EvaluationProtocol = "rag-layered-v2",
 ) -> dict[str, Any]:
     """显式执行入口;失败保存已有逐题证据,绝不把异常当作正确拒答。"""
     if not modes or len(set(modes)) != len(modes) or any(mode not in MODES for mode in modes):
         raise ValueError("必须显式选择非空、不重复的已知检索模式")
-    report = report_template(environment, parameters)
+    report = report_template(environment, parameters, protocol=protocol)
     dataset = load_rag_eval_v1()
-    thresholds = asdict(dataset.thresholds)
+    thresholds = dict(report["thresholds"])
     thresholds.pop("k")
     active: dict[str, Any] | None = None
     try:
@@ -109,7 +139,7 @@ def run_reference_rrf(
     parameters: dict[str, Any],
     output: Path,
 ) -> dict[str, Any]:
-    """适配 PR203 的公开融合评分接口;两条单路保持 NOT_RUN,不冒充完整消融。"""
+    """仅重现 PR203@5402bd4 的 v1 评分;不得用作新版检索层适配器。"""
     evaluation = import_module("baseline_agent.knowledge_evaluation")
     return run_ablation(
         lambda _mode, query: evaluation.run_query(base_url, query),
@@ -118,4 +148,76 @@ def run_reference_rrf(
         parameters=parameters,
         output=output,
         modes=("rrf",),
+        protocol="rag-eval-v1",
+    )
+
+
+def score_candidates(
+    query: EvalQuery,
+    hits: list[dict[str, Any]],
+    matches: Callable[[dict[str, Any], AllowedHit], bool],
+) -> dict[str, Any]:
+    """按公共 matches 规则独立计数该路 Top-K;不继承融合评分或判断充分性。"""
+    matched = [any(matches(hit, allowed) for hit in hits) for allowed in query.allowed_hits]
+    ranks = [
+        rank
+        for rank, hit in enumerate(hits, start=1)
+        if any(matches(hit, allowed) for allowed in query.allowed_hits)
+    ]
+    violations = {
+        forbidden.reason
+        for forbidden in query.forbidden_hits
+        if any(
+            hit["articleId"] == forbidden.article_id and hit["version"] == forbidden.version
+            for hit in hits
+        )
+    }
+    denied = (
+        query.principal.subject_type != "INTERNAL"
+        or "KNOWLEDGE_READ_ACCESS" not in query.principal.capabilities
+    )
+    if denied and hits:
+        violations.add("unauthorized")
+    if query.kind == "out_of_scope" and hits:
+        violations.add("out_of_scope")
+    return {
+        "results": hits,
+        "recall": sum(matched) / len(matched) if matched else 0.0,
+        "reciprocal_rank": 1 / min(ranks) if ranks else 0.0,
+        "checked_prohibitions": sorted({item.reason for item in query.forbidden_hits}),
+        "violations": sorted(violations),
+    }
+
+
+def run_layered_ablation(
+    base_url: str,
+    *,
+    environment: dict[str, Any],
+    parameters: dict[str, Any],
+    output: Path,
+) -> dict[str, Any]:
+    """静态适配 PR203@802a343;实际执行仍须前置交付与协调运行窗口。"""
+    evaluation = import_module("baseline_agent.knowledge_evaluation")
+    responses: dict[str, dict[str, Any]] = {}
+    k = load_rag_eval_v1().thresholds.k
+
+    def run_route(mode: RetrievalMode, query: EvalQuery) -> dict[str, Any]:
+        # 每题仅请求一次,三路比较使用同一实际响应;不跨运行缓存。
+        if query.id not in responses:
+            responses[query.id] = evaluation.run_query(
+                base_url, query, expected_schema="knowledge-hybrid-v2"
+            )
+        row = responses[query.id]
+        if mode == "rrf":
+            return row
+        field = "lexicalCandidates" if mode == "lexical" else "vectorCandidates"
+        return {**row, **score_candidates(query, row[field][:k], evaluation.matches)}
+
+    return run_ablation(
+        run_route,
+        evaluation.retrieval_metrics,
+        environment=environment,
+        parameters=parameters,
+        output=output,
+        protocol="rag-layered-v2",
     )

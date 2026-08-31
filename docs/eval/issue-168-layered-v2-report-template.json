@@ -1,0 +1,64 @@
+{
+  "schema": "issue-168-evidence-v2",
+  "protocol": "rag-layered-v2",
+  "evaluation_protocol": "rag-layered-v2-retrieval",
+  "status": "NOT_RUN",
+  "note": "新版空模板，不是实测报告；旧协议及失败结果保留，不回算。",
+  "source": {
+    "head_sha": null,
+    "main_sha": null,
+    "integrated_issue190_sha": null,
+    "static_reference_sha": "802a34310d4c01991ea480082a6025372da016a8",
+    "legacy_reference_sha": "5402bd4c438ff68fc9bbc4a01e55080b12499ce9"
+  },
+  "baseline": {
+    "issue190_layered_retrieval_quality": "NOT_ESTABLISHED",
+    "issue190_gate": "NOT_ESTABLISHED",
+    "issue190_merged_and_closed": null
+  },
+  "dataset": {
+    "id": "rag-eval-v1",
+    "sha256": "d2d5efdae565395c1dc722e14f66077558575152e23c5c8fbea58b7ebcfd2fe5",
+    "model_revision": "7999e1d3359715c523056ef9478215996d62a620"
+  },
+  "retrieval": {
+    "status": "NOT_RUN",
+    "pass_scope": "RETRIEVAL_ONLY",
+    "thresholds": {
+      "k": 5,
+      "answered_recall_at_5": 0.90,
+      "answered_mrr_at_5": 0.75,
+      "wrong_version_top5_hit_rate": 0.0,
+      "out_of_scope_top5_hit_rate": 0.0,
+      "unauthorized_top5_hit_rate": 0.0
+    },
+    "full_sample_counts_by_mode_and_kind": null,
+    "unanswered_candidate_observations": null,
+    "ablation_runs": null
+  },
+  "answer_evaluation": {
+    "owners": [169, 170],
+    "status": "NOT_EVALUATED",
+    "thresholds": {"unanswered_precision": 0.90, "unanswered_recall": 0.85},
+    "metrics": null,
+    "evidence": null
+  },
+  "environment": null,
+  "parameters": null,
+  "reproducible_hybrid_benefit": null,
+  "lexical_alternatives_if_needed": null,
+  "onnx_export_manifest": null,
+  "approved_consistency_tolerance": null,
+  "consistency": null,
+  "paired_resource_runs": null,
+  "same_hardware_and_workload_verified": null,
+  "resource_benefit": null,
+  "decision": {
+    "parameter_freeze": "PENDING_EVIDENCE",
+    "default_change": "NOT_AUTHORIZED",
+    "retain_pytorch": true,
+    "reason": "未运行；不声称 PyTorch 基线已合格，不切换默认。"
+  },
+  "final_gate": "NOT_RUN",
+  "formal_delivery": false
+}
