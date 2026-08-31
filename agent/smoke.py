@@ -1974,37 +1974,23 @@ def main() -> None:
             ("APPROVAL_LEASE_REVOKED", "2026-08-09T14:00:00+00:00"),
         ]
 
-    duplicate_ticket = uuid.uuid4()
-    duplicate_generation = uuid.uuid4()
     try:
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
             connection.execute(
-                "insert into support_ticket (id, customer_id, order_reference, description, lifecycle_state, handling_mode, created_at, first_responded_at) "
-                "values (%s, 'customer-demo', %s, 'constraint proof', 'INVESTIGATING', 'AGENT', now(), now())",
-                (duplicate_ticket, proposal_order_reference),
-            )
-            connection.execute(
-                "insert into agent_processing_generation (id, ticket_id, generation_number, thread_id, status, created_at) "
-                "values (%s, %s, 1, %s, 'ACTIVE', now())",
-                (duplicate_generation, duplicate_ticket, uuid.uuid4()),
-            )
-            connection.execute(
                 "insert into compensation_proposal_revision "
                 "(id, proposal_id, revision_number, ticket_id, order_reference, generation_id, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, content_digest, status, created_at, expires_at) "
-                "select %s, %s, 1, %s, order_reference, %s, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, %s, 'PENDING_APPROVAL', now(), now() + interval '24 hours' "
+                "select %s, %s, 1, ticket_id, order_reference, null, delay_hours, delay_seconds, compensation_method, amount, reason_code, evidence_references, policy_version, %s, 'PENDING_APPROVAL', now(), now() + interval '24 hours' "
                 "from compensation_proposal_revision where id = %s",
                 (
                     uuid.uuid4(),
                     uuid.uuid4(),
-                    duplicate_ticket,
-                    duplicate_generation,
                     "f" * 64,
                     first_revision_id,
                 ),
             )
-        raise AssertionError("active intent unique constraint unexpectedly accepted a duplicate")
+        raise AssertionError("active ticket intent constraint unexpectedly accepted a duplicate")
     except psycopg.errors.UniqueViolation as error:
-        assert error.diag.constraint_name == "one_active_logistics_compensation_intent"
+        assert error.diag.constraint_name == "one_active_ticket_compensation_intent"
 
     second_generation = uuid.uuid4()
 
@@ -3641,7 +3627,7 @@ def main() -> None:
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         proposal_race_results = list(executor.map(create_competing_proposal, proposal_race_scopes))
-    assert sorted(proposal_race_results) == ["accepted", "one_active_logistics_compensation_intent"]
+    assert sorted(proposal_race_results) == ["accepted", "accepted"]
 
     race_digest = "7" * 64
     _, _, race_revision_id = seed_pending_decision_fixture(

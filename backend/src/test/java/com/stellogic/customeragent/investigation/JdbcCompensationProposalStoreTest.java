@@ -38,19 +38,20 @@ class JdbcCompensationProposalStoreTest {
         CompensationProposalExpiry expiry =
                 org.mockito.Mockito.mock(CompensationProposalExpiry.class);
         Instant lockProtectedNow = Instant.parse("2026-08-09T14:00:00Z");
+        UUID ticketId = UUID.randomUUID();
         UUID existingProposalId = UUID.randomUUID();
         when(jdbc.query(
                         org.mockito.ArgumentMatchers.contains("select distinct proposal_id"),
                         org.mockito.ArgumentMatchers
                                 .<org.springframework.jdbc.core.RowMapper<UUID>>any(),
-                        org.mockito.ArgumentMatchers.eq("ORDER-DELAY-001")))
+                        org.mockito.ArgumentMatchers.eq(ticketId)))
                 .thenReturn(List.of(existingProposalId));
-        when(expiry.expireDueForOrder("ORDER-DELAY-001")).thenReturn(lockProtectedNow);
+        when(expiry.expireDueForTicket(ticketId)).thenReturn(lockProtectedNow);
         var store = new JdbcCompensationProposalStore(jdbc, expiry);
 
         store.save(
                 new JdbcCompensationProposalStore.ProposalContent(
-                        UUID.randomUUID(),
+                        ticketId,
                         UUID.randomUUID(),
                         "ORDER-DELAY-001",
                         80,
@@ -68,7 +69,7 @@ class JdbcCompensationProposalStoreTest {
                         false,
                         false));
 
-        verify(expiry).expireDueForOrder("ORDER-DELAY-001");
+        verify(expiry).expireDueForTicket(ticketId);
         InOrder lockOrder = inOrder(jdbc, expiry);
         lockOrder
                 .verify(jdbc)
@@ -76,7 +77,7 @@ class JdbcCompensationProposalStoreTest {
                         org.mockito.ArgumentMatchers.contains("select distinct proposal_id"),
                         org.mockito.ArgumentMatchers
                                 .<org.springframework.jdbc.core.RowMapper<UUID>>any(),
-                        org.mockito.ArgumentMatchers.eq("ORDER-DELAY-001"));
+                        org.mockito.ArgumentMatchers.eq(ticketId));
         lockOrder
                 .verify(jdbc)
                 .query(
@@ -86,7 +87,7 @@ class JdbcCompensationProposalStoreTest {
                                 .<org.springframework.jdbc.core.ResultSetExtractor<Void>>any(),
                         org.mockito.ArgumentMatchers.eq(
                                 existingProposalId + "\nPROPOSAL_SUPPORT_PARTICIPANT_LINEAGE"));
-        lockOrder.verify(expiry).expireDueForOrder("ORDER-DELAY-001");
+        lockOrder.verify(expiry).expireDueForTicket(ticketId);
         ArgumentCaptor<Object[]> arguments = ArgumentCaptor.forClass(Object[].class);
         verify(jdbc, atLeastOnce())
                 .update(
