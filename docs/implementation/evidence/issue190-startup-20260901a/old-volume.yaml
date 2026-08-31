@@ -1,0 +1,8 @@
+services:
+  postgres:
+    volumes: !override
+      - postgres-data:/var/lib/postgresql
+      - <WORKTREE>/.local/gate-evidence/issue190-startup-20260901a/init:/docker-entrypoint-initdb.d:ro
+  spring-migrate:
+    environment:
+      SPRING_FLYWAY_TARGET: '41'
