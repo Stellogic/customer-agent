@@ -1,4 +1,6 @@
-from baseline_agent.knowledge_evaluation import metrics, retrieval_metrics
+import httpx
+
+from baseline_agent.knowledge_evaluation import failure_observation, metrics, retrieval_metrics
 
 
 def test_quality_metrics_penalize_answered_abstention_and_forbidden_results():
@@ -56,3 +58,17 @@ def test_layered_retrieval_does_not_treat_legal_candidates_as_an_answer():
         [row("answered", ["supported"]), row("unanswered", ["retired"], ["wrong_version"])]
     )
     assert forbidden["wrong_version_top5_hit_rate"] == 0.5
+
+
+def test_failed_query_evidence_keeps_location_without_response_or_credentials():
+    request = httpx.Request("GET", "https://user:secret@example.test/search?q=private")
+    response = httpx.Response(
+        503, request=request, json={"code": "INDEX_STALE", "message": "private payload"}
+    )
+    error = httpx.HTTPStatusError("private payload", request=request, response=response)
+    assert failure_observation(error, "synthetic-query") == {
+        "query_id": "synthetic-query",
+        "error_type": "HTTPStatusError",
+        "http_status": 503,
+        "code": "INDEX_STALE",
+    }

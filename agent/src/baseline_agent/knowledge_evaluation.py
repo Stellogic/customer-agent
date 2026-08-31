@@ -98,6 +98,33 @@ def login(client: httpx.Client, query: EvalQuery) -> None:
         raise ValueError("真实会话与冻结身份不符")
 
 
+def failure_observation(error: Exception, query_id: str | None) -> dict[str, Any]:
+    """记录失败位置和协议错误码,不保存请求、响应正文或带凭据地址。"""
+    result: dict[str, Any] = {
+        "query_id": query_id,
+        "error_type": type(error).__name__,
+        "http_status": None,
+        "code": None,
+    }
+    if isinstance(error, httpx.HTTPStatusError):
+        result["http_status"] = error.response.status_code
+        try:
+            body = error.response.json()
+        except ValueError:
+            body = None
+        code = body.get("code") if isinstance(body, dict) else None
+        if code in (
+            "KNOWLEDGE_ACCESS_DENIED",
+            "INVALID_KNOWLEDGE_QUERY",
+            "INDEX_STALE",
+            "MODEL_UNAVAILABLE",
+            "RETRIEVAL_UNAVAILABLE",
+            "FUSION_UNAVAILABLE",
+        ):
+            result["code"] = code
+    return result
+
+
 def run_query(
     base_url: str, query: EvalQuery, expected_schema: str = "knowledge-hybrid-v1"
 ) -> dict[str, Any]:
@@ -178,6 +205,7 @@ def main() -> None:
     args = parser.parse_args()
     started = time.perf_counter()
     dataset = load_rag_eval_v1()
+    active_query_id: str | None = None
     layered = args.protocol == "rag-layered-v2-retrieval"
     thresholds = {
         name: value
@@ -200,6 +228,7 @@ def main() -> None:
         "environment": {"python": platform.python_version(), "platform": platform.platform()},
         "thresholds": thresholds,
         "rows": [],
+        "query_count": len(dataset.queries),
         "metrics": None,
     }
     try:
@@ -257,6 +286,7 @@ def main() -> None:
             raise ValueError("512 token 右截断契约失败")
         report["embedding_contract"] = "PASS"
         for query in dataset.queries:
+            active_query_id = query.id
             report["rows"].append(
                 run_query(
                     os.environ["SPRING_INTERNAL_URL"],
@@ -264,6 +294,7 @@ def main() -> None:
                     "knowledge-hybrid-v2" if layered else "knowledge-hybrid-v1",
                 )
             )
+            active_query_id = None
         measured = retrieval_metrics(report["rows"]) if layered else metrics(report["rows"])
         report["metrics"] = measured
         report["passed"] = all(
@@ -274,7 +305,13 @@ def main() -> None:
     except Exception as error:
         # 不保存带凭据的连接串或供应商异常正文。
         report["error_type"] = type(error).__name__
+        report["failure"] = failure_observation(error, active_query_id)
     finally:
+        report["completed_queries"] = len(report["rows"])
+        report["failed_queries"] = int(active_query_id is not None)
+        report["not_run_queries"] = (
+            len(dataset.queries) - report["completed_queries"] - report["failed_queries"]
+        )
         report["elapsed_seconds"] = time.perf_counter() - started
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

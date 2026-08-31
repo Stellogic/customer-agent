@@ -1,4 +1,4 @@
-"""Beta strict输出通道的离线契约；Mock不代表供应商支持或质量通过。"""
+"""Beta strict输出通道的离线契约;Mock不代表供应商支持或质量通过。"""
 
 from __future__ import annotations
 
@@ -33,20 +33,29 @@ def chat_payload(arguments: str = '{"sufficient":false,"evidence":[]}') -> dict[
         "object": "chat.completion",
         "model": "deepseek-v4-flash",
         "system_fingerprint": None,
-        "choices": [{
-            "index": 0,
-            "finish_reason": "tool_calls",
-            "message": {
-                "role": "assistant", "content": None,
-                "tool_calls": [{
-                    "id": "synthetic-call", "type": "function",
-                    "function": {"name": SUFFICIENCY_FUNCTION, "arguments": arguments},
-                }],
-            },
-        }],
+        "choices": [
+            {
+                "index": 0,
+                "finish_reason": "tool_calls",
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "synthetic-call",
+                            "type": "function",
+                            "function": {"name": SUFFICIENCY_FUNCTION, "arguments": arguments},
+                        }
+                    ],
+                },
+            }
+        ],
         "usage": {
-            "prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120,
-            "prompt_cache_hit_tokens": 10, "prompt_cache_miss_tokens": 90,
+            "prompt_tokens": 100,
+            "completion_tokens": 20,
+            "total_tokens": 120,
+            "prompt_cache_hit_tokens": 10,
+            "prompt_cache_miss_tokens": 90,
             "completion_tokens_details": {"reasoning_tokens": 0},
         },
     }
@@ -63,9 +72,7 @@ def test_beta_request_keeps_context_and_uses_supported_schema() -> None:
     assert frozen["config"]["endpoint"] == "https://api.deepseek.com/beta/chat/completions"
     assert body["thinking"] == {"type": "disabled"}
     assert body["max_tokens"] == 256 and body["stream"] is False
-    assert body["tool_choice"] == {
-        "type": "function", "function": {"name": SUFFICIENCY_FUNCTION}
-    }
+    assert body["tool_choice"] == {"type": "function", "function": {"name": SUFFICIENCY_FUNCTION}}
     assert len(body["tools"]) == 1 and body["tools"][0]["function"]["strict"] is True
     schema = body["tools"][0]["function"]["parameters"]
     assert schema["properties"]["evidence"]["items"]["properties"]["quote"]["pattern"] == (
@@ -81,9 +88,11 @@ def test_old_c5_request_bytes_are_unchanged() -> None:
     actual = [
         {
             "query_id": source["id"],
-            "request_sha256": sha256(json.dumps(
-                request_body(source, frozen), ensure_ascii=False, separators=(",", ":")
-            ).encode("utf-8")),
+            "request_sha256": sha256(
+                json.dumps(
+                    request_body(source, frozen), ensure_ascii=False, separators=(",", ":")
+                ).encode("utf-8")
+            ),
         }
         for source in development_rows()
     ]
@@ -100,8 +109,12 @@ def test_chat_usage_and_decision_preserve_raw_quotes(details_present: bool) -> N
     if not details_present:
         del response["usage"]["completion_tokens_details"]
     parsed = parse_response(
-        response, row(), expected_identity=("deepseek-v4-flash", None),
-        duration_ms=1, c_v2=True, chat=True,
+        response,
+        row(),
+        expected_identity=("deepseek-v4-flash", None),
+        duration_ms=1,
+        c_v2=True,
+        chat=True,
     )
     assert parsed["decision"] == decision
     observation = parsed["observation"]
@@ -159,7 +172,7 @@ async def test_chat_failure_stops_once_and_preserves_budget_history(
     path.write_bytes((C5_ARCHIVE / "cost-ledger.json").read_bytes())
     frozen = contract(development_version="c6")
     ledger = ExperimentLedger(path, frozen)
-    # 模拟其他已完成阶段；不读取独立留出的账本或结果。
+    # 模拟其他已完成阶段;不读取独立留出的账本或结果。
     ledger.state["phases"]["synthetic_previous_phase"] = {"status": "STOPPED"}
     original = copy.deepcopy(ledger.state)
     calls = 0
@@ -189,7 +202,11 @@ async def test_chat_failure_stops_once_and_preserves_budget_history(
     report: dict[str, Any] = {"run_id": "c6-offline-failure", "metrics": None}
     with pytest.raises(SufficiencyBlocked):
         await run_development(
-            report, ledger, frozen, api_key="test-key", development_version="c6",
+            report,
+            ledger,
+            frozen,
+            api_key="test-key",
+            development_version="c6",
             transport=httpx.MockTransport(handle),
         )
     ledger.finish("STOPPED")
@@ -225,12 +242,17 @@ async def test_chat_whole_development_keeps_one_request_per_query(tmp_path: Path
 
     report: dict[str, Any] = {"run_id": "c6-offline-whole", "metrics": None}
     await run_development(
-        report, ledger, frozen, api_key="offline-only", development_version="c6",
+        report,
+        ledger,
+        frozen,
+        api_key="offline-only",
+        development_version="c6",
         transport=httpx.MockTransport(handle),
     )
     assert calls == len(report["rows"]) == len(report["request_manifest"]) == 72
     assert report["contract_validation"] == "PASS_72_OF_72"
     assert report["semantic_validation"] == "FAIL"  # 全拒答的Mock不能冒充模型质量。
     assert ledger.totals() == {
-        "settled_upper_micro_cny": 507630, "unsettled_reserved_micro_cny": 0,
+        "settled_upper_micro_cny": 507630,
+        "unsettled_reserved_micro_cny": 0,
     }

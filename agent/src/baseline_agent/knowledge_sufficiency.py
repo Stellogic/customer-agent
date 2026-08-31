@@ -102,7 +102,7 @@ def request_body(row: dict[str, Any], frozen: dict[str, Any]) -> dict[str, Any]:
     if any(hit["applicability"] != ["INTERNAL"] for hit in hits):
         raise SufficiencyBlocked("ARCHIVE_SCOPE_MISMATCH")
     config = frozen["config"]
-    # Chat与Responses使用同一问题/完整Top5，不加入标签、答案或特征。
+    # Chat与Responses使用同一问题/完整Top5,不加入标签、答案或特征。
     input_text = json.dumps(
         {
             "question": row["text"],
@@ -218,8 +218,11 @@ def response_observation(
             wire_usage={
                 key: usage[key]
                 for key in (
-                    "prompt_tokens", "completion_tokens", "total_tokens",
-                    "prompt_cache_hit_tokens", "prompt_cache_miss_tokens",
+                    "prompt_tokens",
+                    "completion_tokens",
+                    "total_tokens",
+                    "prompt_cache_hit_tokens",
+                    "prompt_cache_miss_tokens",
                 )
                 if type(usage.get(key)) is int
             },
@@ -254,12 +257,9 @@ def response_observation(
     cached = cache.get("cached_tokens") if isinstance(cache, dict) else None
     observation.update(reasoning_tokens=reasoning, cached_tokens=cached)
     if (
-        (
-            not (chat and reasoning is None)
-            and (type(reasoning) is not int or not 0 <= reasoning <= outputs)
-        )
-        or (cached is not None and (type(cached) is not int or not 0 <= cached <= inputs))
-    ):
+        not (chat and reasoning is None)
+        and (type(reasoning) is not int or not 0 <= reasoning <= outputs)
+    ) or (cached is not None and (type(cached) is not int or not 0 <= cached <= inputs)):
         return observation
     # 峰值无缓存价格作支出上界;不是账单实付金额。与语义判定是否成功分开。
     observation.update(usage_trusted=True, usage_upper_micro_cny=inputs * 3 + outputs * 9)
@@ -269,7 +269,7 @@ def response_observation(
 def decision_text(
     payload: dict[str, Any], observation: dict[str, Any], *, chat: bool = False
 ) -> str:
-    """只提取一个完整响应中的原始判定文本，不执行函数或修复内容。"""
+    """只提取一个完整响应中的原始判定文本,不执行函数或修复内容。"""
     if chat:
         choices = payload.get("choices")
         if (
@@ -377,8 +377,8 @@ def parse_response(
         raise SufficiencyBlocked("PROVIDER_IDENTITY_DRIFT", observation)
     if not observation["usage_trusted"]:
         raise SufficiencyBlocked("USAGE_UNTRUSTED", observation)
-    # Chat文档将reasoning明细列为可选；缺失记None，不伪报0。
-    # 非思考请求还须没有reasoning_content；总completion费用仍全部计入。
+    # Chat文档将reasoning明细列为可选;缺失记None,不伪报0。
+    # 非思考请求还须没有reasoning_content;总completion费用仍全部计入。
     if observation["reasoning_tokens"] not in ((None, 0) if chat else (0,)):
         raise SufficiencyBlocked("TOKEN_CONTRACT_INVALID", observation)
     text = decision_text(payload, observation, chat=chat)
