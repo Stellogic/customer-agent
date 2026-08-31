@@ -24,26 +24,25 @@ public class JdbcCompensationProposalStore {
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
-                content.orderReference() + "\nLOGISTICS_DELAY");
+                content.orderReference() + "\nCOMPENSATION_ALLOWANCE");
         List<UUID> existingProposalIds =
                 jdbc.query(
                         "select distinct proposal_id from compensation_proposal_revision "
-                                + "where order_reference = ? and reason_code = 'LOGISTICS_DELAY' "
+                                + "where ticket_id = ? "
                                 + "and status in ('PENDING_APPROVAL', 'APPROVED')",
                         (rs, row) -> rs.getObject(1, UUID.class),
-                        content.orderReference());
+                        content.ticketId());
         if (!existingProposalIds.isEmpty()) {
             jdbc.query(
                     "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                     rs -> null,
                     existingProposalIds.getFirst() + "\nPROPOSAL_SUPPORT_PARTICIPANT_LINEAGE");
         }
-        Instant now = expiry.expireDueForOrder(content.orderReference());
+        Instant now = expiry.expireDueForTicket(content.ticketId());
         List<ActiveProposal> active =
                 jdbc.query(
                         "select id, proposal_id, revision_number, ticket_id, content_digest, status "
-                                + "from compensation_proposal_revision where order_reference = ? "
-                                + "and reason_code = 'LOGISTICS_DELAY' "
+                                + "from compensation_proposal_revision where ticket_id = ? "
                                 + "and status in ('PENDING_APPROVAL', 'APPROVED') for update",
                         (rs, row) ->
                                 new ActiveProposal(
@@ -53,11 +52,8 @@ public class JdbcCompensationProposalStore {
                                         rs.getObject(4, UUID.class),
                                         rs.getString(5),
                                         rs.getString(6)),
-                        content.orderReference());
+                        content.ticketId());
         String contentDigest = content.digest();
-        if (!active.isEmpty() && !active.getFirst().ticketId().equals(content.ticketId())) {
-            throw new ActiveIntentException("ACTIVE_COMPENSATION_INTENT_CONFLICT");
-        }
         if (!active.isEmpty() && "APPROVED".equals(active.getFirst().status())) {
             throw new ActiveIntentException("ACTIVE_APPROVED_COMPENSATION_INTENT_CONFLICT");
         }
