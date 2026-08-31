@@ -1,0 +1,22 @@
+{
+  "run_id": "issue190-development-c5-20260831a",
+  "head_sha": "5402bd4c438ff68fc9bbc4a01e55080b12499ce9",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "started_at": "2026-08-31T09:37:53.7360437+08:00",
+  "pricing_and_context_verified_utc_date": "2026-08-31",
+  "pricing_source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+  "endpoint": "https://api.deepseek.com/responses",
+  "requested_model": "deepseek-v4-flash",
+  "budget_micro_cny": 6000000,
+  "maximum_attempts_per_query": 1,
+  "maximum_api_requests": 72,
+  "seen_development_only": true,
+  "prior_settled_upper_micro_cny": 287133,
+  "input_cny_per_million_upper": 3,
+  "output_cny_per_million_upper": 9,
+  "fixed_context_upper": 1048576,
+  "max_output_tokens": 256,
+  "exit_code": 0,
+  "elapsed_seconds": 83.9525823,
+  "finished_at": "2026-08-31T09:39:17.6925515+08:00"
+}
