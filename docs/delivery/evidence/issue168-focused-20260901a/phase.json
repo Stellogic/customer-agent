@@ -1,0 +1,32 @@
+{
+  "run_id": "issue168-focused-20260901a",
+  "head_sha": "737382c42b99c36349937f567d8d43c98efc8855",
+  "base_sha": "8bd86e618e1a282d647cc234dcb445035f8cb23a",
+  "scope": "integrated-ablation-onnx-focused",
+  "phases": [
+    {
+      "name": "environment",
+      "exit_code": 0
+    },
+    {
+      "name": "format-check",
+      "exit_code": 0
+    },
+    {
+      "name": "lint",
+      "exit_code": 1
+    },
+    {
+      "name": "types",
+      "exit_code": 0
+    },
+    {
+      "name": "focused",
+      "exit_code": 0
+    }
+  ],
+  "status": "FAIL",
+  "model_calls": 0,
+  "lock_released": true,
+  "elapsed_seconds": 31.1181762
+}

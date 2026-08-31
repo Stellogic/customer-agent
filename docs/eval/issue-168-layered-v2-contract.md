@@ -1,5 +1,7 @@
 # #168 分层消融协议与交接（rag-layered-v2）
 
+> 以下保留 2026-08-31 静态阶段记录。2026-09-01 #190 已正式交付、本票已同步 main，当前接线及运行协议见 [主线集成记录](../delivery/issue-168-integration.md)。旧参考关于 scope 无交集返回 200 的描述已被主线 403 修复取代；本文不作为当前运行授权状态。
+
 状态：**CODE_READY_NO_TESTS，仅本轮静态增量。** 2026-08-31 读取正式 [#149](https://github.com/Stellogic/customer-agent/issues/149)、[#168](https://github.com/Stellogic/customer-agent/issues/168)、[#190](https://github.com/Stellogic/customer-agent/issues/190) 后承接。规范来源是三张票据的正式分层修订；这不是重新设计检索或回答模型。
 
 独立 Standards / Spec 静态审查均 PASS，0 项发现，详见 [双轴记录](../delivery/issue-168-layered-v2-review.md)。

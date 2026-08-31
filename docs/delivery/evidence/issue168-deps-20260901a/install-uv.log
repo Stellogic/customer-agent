@@ -1,0 +1,6 @@
+Collecting uv==0.8.22
+  Downloading uv-0.8.22-py3-none-win_amd64.whl.metadata (12 kB)
+Downloading uv-0.8.22-py3-none-win_amd64.whl (21.4 MB)
+   ---------------------------------------- 21.4/21.4 MB 1.1 MB/s  0:00:20
+Installing collected packages: uv
+Successfully installed uv-0.8.22
