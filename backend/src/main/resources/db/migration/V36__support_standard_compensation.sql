@@ -1,0 +1,189 @@
+ALTER TABLE compensation_proposal_revision
+    ALTER COLUMN generation_id DROP NOT NULL;
+
+CREATE TABLE support_compensation_proposal_request (
+    support_id text NOT NULL,
+    request_id text NOT NULL CHECK (char_length(btrim(request_id)) BETWEEN 1 AND 200),
+    ticket_id uuid NOT NULL REFERENCES support_ticket(id),
+    parameter_digest char(64) NOT NULL,
+    proposal_revision_id uuid NOT NULL REFERENCES compensation_proposal_revision(id),
+    proposal_revision integer NOT NULL CHECK (proposal_revision > 0),
+    outcome text NOT NULL CHECK (outcome = 'ACCEPTED'),
+    received_at timestamptz NOT NULL,
+    PRIMARY KEY (support_id, request_id),
+    UNIQUE (proposal_revision_id, request_id)
+);
+
+CREATE TABLE exceptional_compensation_request (
+    id uuid PRIMARY KEY,
+    ticket_id uuid NOT NULL REFERENCES support_ticket(id),
+    order_reference text NOT NULL REFERENCES synthetic_order(order_reference),
+    support_id text NOT NULL CHECK (btrim(support_id) <> ''),
+    reason_code text NOT NULL CHECK (reason_code = 'STANDARD_PLAN_INSUFFICIENT'),
+    justification text NOT NULL CHECK (char_length(btrim(justification)) BETWEEN 1 AND 2000),
+    status text NOT NULL CHECK (status = 'SUBMITTED'),
+    created_at timestamptz NOT NULL
+);
+
+CREATE TABLE exceptional_compensation_request_receipt (
+    support_id text NOT NULL,
+    request_id text NOT NULL CHECK (char_length(btrim(request_id)) BETWEEN 1 AND 200),
+    ticket_id uuid NOT NULL REFERENCES support_ticket(id),
+    parameter_digest char(64) NOT NULL,
+    exceptional_request_id uuid NOT NULL REFERENCES exceptional_compensation_request(id),
+    outcome text NOT NULL CHECK (outcome = 'ACCEPTED'),
+    received_at timestamptz NOT NULL,
+    PRIMARY KEY (support_id, request_id),
+    UNIQUE (exceptional_request_id)
+);
+
+ALTER TABLE customer_public_event DROP CONSTRAINT customer_public_event_event_type_check;
+ALTER TABLE customer_public_event ADD CONSTRAINT customer_public_event_event_type_check
+    CHECK (event_type IN (
+        'TICKET_ACCEPTED', 'PUBLIC_MESSAGE_APPENDED', 'TICKET_RESOLVED',
+        'CUSTOMER_CLARIFICATION_REQUESTED', 'TICKET_INVESTIGATION_RESUMED',
+        'TICKET_HANDED_OFF', 'TICKET_REOPENED', 'TICKET_CLOSED',
+        'CUSTOMER_MESSAGE_ACCEPTED', 'AGENT_PROCESSING_TERMINATED',
+        'AGENT_PROCESSING_STARTED', 'AGENT_REPLY_LOADING',
+        'PUBLIC_PROGRESS_UPDATED', 'AGENT_REPLY_STREAM_STARTED',
+        'AGENT_REPLY_CONTENT_DELTA', 'AGENT_REPLY_COMPLETED',
+        'AGENT_REPLY_ABORTED', 'AGENT_REPLY_FAILED',
+        'COMPENSATION_REVIEW_PENDING'
+    ));
+
+CREATE OR REPLACE FUNCTION validate_customer_public_event_payload() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+    allowed_keys text[];
+BEGIN
+    IF NEW.agent_generation = 0 THEN
+        SELECT coalesce(max(generation_number), 0)
+        INTO NEW.agent_generation
+        FROM agent_processing_generation
+        WHERE ticket_id = NEW.ticket_id;
+    ELSIF NOT EXISTS (
+        SELECT 1 FROM agent_processing_generation
+        WHERE ticket_id = NEW.ticket_id AND generation_number = NEW.agent_generation
+    ) THEN
+        RAISE EXCEPTION 'customer public event generation is not scoped to the ticket';
+    END IF;
+    IF jsonb_typeof(NEW.payload) <> 'object' THEN
+        RAISE EXCEPTION 'customer public payload must be an object';
+    END IF;
+
+    allowed_keys := CASE NEW.event_type
+        WHEN 'TICKET_ACCEPTED' THEN ARRAY['ticketId', 'lifecycleState', 'handlingMode']
+        WHEN 'PUBLIC_MESSAGE_APPENDED' THEN ARRAY['author', 'body', 'sentAt']
+        WHEN 'CUSTOMER_MESSAGE_ACCEPTED' THEN ARRAY['author', 'body', 'sentAt']
+        WHEN 'AGENT_PROCESSING_TERMINATED' THEN ARRAY['reason']
+        WHEN 'AGENT_PROCESSING_STARTED' THEN ARRAY['state']
+        WHEN 'AGENT_REPLY_LOADING' THEN ARRAY['status']
+        WHEN 'PUBLIC_PROGRESS_UPDATED' THEN ARRAY['stage']
+        WHEN 'AGENT_REPLY_STREAM_STARTED' THEN ARRAY['status']
+        WHEN 'AGENT_REPLY_CONTENT_DELTA' THEN ARRAY['chunkIndex', 'delta']
+        WHEN 'AGENT_REPLY_COMPLETED' THEN ARRAY['status']
+        WHEN 'AGENT_REPLY_ABORTED' THEN ARRAY['status']
+        WHEN 'AGENT_REPLY_FAILED' THEN ARRAY['status']
+        WHEN 'TICKET_RESOLVED' THEN ARRAY['lifecycleState']
+        WHEN 'CUSTOMER_CLARIFICATION_REQUESTED' THEN ARRAY['lifecycleState', 'clarification']
+        WHEN 'TICKET_INVESTIGATION_RESUMED' THEN ARRAY['lifecycleState', 'clarification']
+        WHEN 'TICKET_HANDED_OFF' THEN ARRAY['handlingMode', 'clarification']
+        WHEN 'TICKET_REOPENED' THEN ARRAY['lifecycleState']
+        WHEN 'TICKET_CLOSED' THEN ARRAY['lifecycleState']
+        WHEN 'COMPENSATION_REVIEW_PENDING' THEN ARRAY['compensationMethod', 'amount', 'status']
+        ELSE NULL
+    END;
+    IF allowed_keys IS NULL OR EXISTS (
+        SELECT 1 FROM jsonb_object_keys(NEW.payload) AS payload_key
+        WHERE payload_key <> ALL (allowed_keys)
+    ) THEN
+        RAISE EXCEPTION 'customer public payload contains an unknown or internal field';
+    END IF;
+    IF NEW.payload::text ~* '"(reasoning|checkpoint|token|thread|run|trace|approval|rawModel|rawTool|provider)"[[:space:]]*:' THEN
+        RAISE EXCEPTION 'customer public payload contains a sensitive field';
+    END IF;
+    IF NEW.event_type IN ('PUBLIC_MESSAGE_APPENDED', 'CUSTOMER_MESSAGE_ACCEPTED') AND NOT (
+        NEW.payload ?& ARRAY['author', 'body', 'sentAt']
+        AND NEW.payload->>'author' IN ('CUSTOMER', 'SUPPORT', 'AGENT')
+        AND jsonb_typeof(NEW.payload->'body') = 'string'
+        AND jsonb_typeof(NEW.payload->'sentAt') = 'string'
+    ) THEN
+        RAISE EXCEPTION 'invalid public message payload';
+    END IF;
+    IF NEW.event_type = 'COMPENSATION_REVIEW_PENDING' AND NOT (
+        NEW.payload ?& ARRAY['compensationMethod', 'amount', 'status']
+        AND NEW.payload->>'compensationMethod' IN ('COUPON', 'SIMULATED_PARTIAL_REFUND')
+        AND jsonb_typeof(NEW.payload->'amount') = 'string'
+        AND NEW.payload->>'amount' ~ '^[0-9]+\.[0-9]{2}$'
+        AND NEW.payload->>'status' = 'PENDING_REVIEW'
+    ) THEN
+        RAISE EXCEPTION 'invalid compensation review payload';
+    END IF;
+    IF NEW.event_type = 'AGENT_REPLY_CONTENT_DELTA' AND NOT (
+        NEW.payload ?& ARRAY['chunkIndex', 'delta']
+        AND jsonb_typeof(NEW.payload->'chunkIndex') = 'number'
+        AND (NEW.payload->>'chunkIndex')::integer >= 0
+        AND jsonb_typeof(NEW.payload->'delta') = 'string'
+        AND char_length(NEW.payload->>'delta') BETWEEN 1 AND 512
+    ) THEN
+        RAISE EXCEPTION 'invalid public reply delta';
+    END IF;
+    IF NEW.event_type = 'PUBLIC_PROGRESS_UPDATED' AND NOT (
+        NEW.payload->>'stage' IN ('UNDERSTANDING', 'VERIFYING_FACTS', 'QUERYING_RULES', 'COMPOSING_REPLY')
+    ) THEN
+        RAISE EXCEPTION 'invalid public progress stage';
+    END IF;
+    IF NEW.event_type LIKE 'AGENT_REPLY_%' AND NEW.event_type <> 'AGENT_REPLY_CONTENT_DELTA'
+       AND NEW.event_type <> 'AGENT_REPLY_STREAM_STARTED' AND NEW.event_type <> 'AGENT_REPLY_LOADING'
+       AND NEW.payload->>'status' NOT IN ('COMPLETED', 'ABORTED', 'FAILED') THEN
+        RAISE EXCEPTION 'invalid public reply terminal state';
+    END IF;
+    IF NEW.event_type = 'AGENT_REPLY_LOADING' AND NEW.payload->>'status' <> 'LOADING' THEN
+        RAISE EXCEPTION 'invalid public reply loading state';
+    END IF;
+    IF NEW.event_type = 'AGENT_REPLY_STREAM_STARTED' AND NEW.payload->>'status' <> 'STREAMING' THEN
+        RAISE EXCEPTION 'invalid public reply streaming state';
+    END IF;
+    IF NEW.event_type IN (
+        'PUBLIC_MESSAGE_APPENDED', 'AGENT_REPLY_LOADING', 'PUBLIC_PROGRESS_UPDATED',
+        'AGENT_REPLY_STREAM_STARTED', 'AGENT_REPLY_CONTENT_DELTA', 'AGENT_REPLY_COMPLETED',
+        'AGENT_REPLY_ABORTED', 'AGENT_REPLY_FAILED'
+    ) AND (NEW.event_type <> 'PUBLIC_MESSAGE_APPENDED' OR NEW.payload->>'author' = 'AGENT')
+       AND NOT EXISTS (
+        SELECT 1
+        FROM agent_processing_generation g
+        JOIN support_ticket t ON t.id = g.ticket_id
+        WHERE g.ticket_id = NEW.ticket_id
+          AND g.generation_number = NEW.agent_generation
+          AND g.status IN ('ACTIVE', 'COMPLETED')
+          AND g.generation_number = (
+              SELECT max(current_generation.generation_number)
+              FROM agent_processing_generation current_generation
+              WHERE current_generation.ticket_id = NEW.ticket_id
+          )
+          AND t.handling_mode = 'AGENT'
+          AND NOT t.customer_human_preference
+    ) THEN
+        RAISE EXCEPTION 'stale agent generation cannot enter the customer public projection';
+    END IF;
+    IF NEW.event_type IN ('CUSTOMER_CLARIFICATION_REQUESTED', 'TICKET_INVESTIGATION_RESUMED')
+       AND NEW.payload->'clarification' IS DISTINCT FROM 'null'::jsonb AND NOT (
+        jsonb_typeof(NEW.payload->'clarification') = 'object'
+        AND NEW.payload->'clarification' ?& ARRAY['id', 'promptCode', 'question']
+        AND NOT EXISTS (
+            SELECT 1 FROM jsonb_object_keys(NEW.payload->'clarification') AS clarification_key
+            WHERE clarification_key <> ALL (ARRAY['id', 'promptCode', 'question'])
+        )
+    ) THEN
+        RAISE EXCEPTION 'invalid public clarification payload';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+GRANT SELECT, INSERT ON support_compensation_proposal_request TO spring_app;
+GRANT SELECT ON support_compensation_proposal_request TO spring_fixture;
+GRANT SELECT, INSERT ON exceptional_compensation_request TO spring_app;
+GRANT SELECT ON exceptional_compensation_request TO spring_fixture;
+GRANT SELECT, INSERT ON exceptional_compensation_request_receipt TO spring_app;
+GRANT SELECT ON exceptional_compensation_request_receipt TO spring_fixture;

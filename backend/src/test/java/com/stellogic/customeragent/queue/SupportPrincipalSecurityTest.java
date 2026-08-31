@@ -14,6 +14,7 @@ import com.stellogic.customeragent.identity.AuthSessionController;
 import com.stellogic.customeragent.identity.DemoAccountController;
 import com.stellogic.customeragent.identity.HumanSecurityConfiguration;
 import com.stellogic.customeragent.identity.LocalDemoHumanAccountsConfiguration;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ import tools.jackson.databind.ObjectMapper;
 @WebMvcTest(
         controllers = {
             SupportWorkbenchController.class,
+            SupportCompensationController.class,
             SharedSupportQueueController.class,
             AuthSessionController.class,
             DemoAccountController.class
@@ -48,6 +50,7 @@ class SupportPrincipalSecurityTest {
     @Autowired private ObjectMapper json;
     @Autowired private SupportWorkbenchProjectionService service;
     @Autowired private SharedSupportQueueProjectionService sharedQueue;
+    @Autowired private SupportCompensationService compensation;
 
     @Test
     void forgedSupportHeaderCannotReplaceTheAuthenticatedSupportPrincipal() throws Exception {
@@ -256,6 +259,81 @@ class SupportPrincipalSecurityTest {
     }
 
     @Test
+    void compensationSubmitRequiresCurrentCsrfAndAlwaysUsesThePrincipal() throws Exception {
+        when(compensation.submitProposal(
+                        "support-demo", TICKET_ID, "COUPON", "LOGISTICS_DELAY", "issue-164-1"))
+                .thenReturn(
+                        new SupportCompensationProposalResult(
+                                "support-workbench-v2",
+                                TICKET_ID,
+                                "issue-164-1",
+                                UUID.fromString("75000000-0000-0000-0000-000000000201"),
+                                1,
+                                "COUPON",
+                                new BigDecimal("10.00"),
+                                "CNY",
+                                "PENDING_APPROVAL",
+                                "ACCEPTED",
+                                false));
+        MockHttpSession support = login(mvc, json, "support-demo");
+
+        mvc.perform(
+                        post(
+                                        "/api/support/workbench/tickets/{ticketId}/compensation-proposals",
+                                        TICKET_ID)
+                                .session(support)
+                                .header("Idempotency-Key", "issue-164-1")
+                                .contentType("application/json")
+                                .content(
+                                        """
+                                        {
+                                          "schema":"support-workbench-v2",
+                                          "planCode":"COUPON",
+                                          "reasonCode":"LOGISTICS_DELAY"
+                                        }
+                                        """))
+                .andExpect(status().isForbidden());
+
+        MvcResult csrf =
+                mvc.perform(get("/api/auth/csrf").session(support))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        mvc.perform(
+                        post(
+                                        "/api/support/workbench/tickets/{ticketId}/compensation-proposals",
+                                        TICKET_ID)
+                                .session(support)
+                                .header("X-CSRF-TOKEN", token(json, csrf))
+                                .header("X-Synthetic-Support-Id", "internal-demo")
+                                .header("Idempotency-Key", "issue-164-1")
+                                .contentType("application/json")
+                                .content(
+                                        """
+                                        {
+                                          "schema":"support-workbench-v2",
+                                          "planCode":"COUPON",
+                                          "reasonCode":"LOGISTICS_DELAY"
+                                        }
+                                        """))
+                .andExpect(status().isCreated());
+
+        verify(compensation)
+                .submitProposal(
+                        "support-demo", TICKET_ID, "COUPON", "LOGISTICS_DELAY", "issue-164-1");
+    }
+
+    @Test
+    void customerCannotReadSupportCompensationOptions() throws Exception {
+        mvc.perform(
+                        get(
+                                        "/api/support/workbench/tickets/{ticketId}/compensation-options",
+                                        TICKET_ID)
+                                .session(login(mvc, json, "customer-demo"))
+                                .header("X-Synthetic-Support-Id", "support-demo"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void customerCannotSendASupportPublicReply() throws Exception {
         MockHttpSession customer = login(mvc, json, "customer-demo");
         MvcResult csrf =
@@ -338,6 +416,11 @@ class SupportPrincipalSecurityTest {
         @Bean
         SupportWorkbenchProjectionService supportWorkbenchProjectionService() {
             return mock(SupportWorkbenchProjectionService.class);
+        }
+
+        @Bean
+        SupportCompensationService supportCompensationService() {
+            return mock(SupportCompensationService.class);
         }
 
         @Bean

@@ -278,7 +278,7 @@ async def test_confirmed_package_issue_investigates_instead_of_immediate_unsuppo
                 "schemaVersion": "customer-reply-v1",
                 "body": (
                     "根据调查，订单 ORDER-SIGNED-161 的物流状态为已签收但您反馈未收到。"
-                    "当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。"
+                    "当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。"
                 ),
                 "intent": "NO_COMPENSATION_RESOLUTION",
                 "evidenceRefs": [
@@ -1122,7 +1122,7 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
                 return Response({"accepted": True})
             assert headers["X-Agent-Operation"] == "SUBMIT_INVESTIGATION_CONCLUSION"
             assert headers["Idempotency-Key"] == "generation-14:submit-conclusion"
-            return Response({"accepted": True, "lifecycleState": "RESOLVED"})
+            return Response({"accepted": True, "lifecycleState": "INVESTIGATING"})
 
     class ProviderStub:
         async def generate(self, request: dict[str, object]) -> dict[str, object]:
@@ -1131,7 +1131,7 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
                 "schemaVersion": "customer-reply-v1",
                 "body": (
                     "经核验，订单 ORDER-DELAY-UNDER-24 的本次物流延迟不足 24 小时，"
-                    "当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。"
+                    "当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。"
                 ),
                 "intent": "NO_COMPENSATION_RESOLUTION",
                 "evidenceRefs": [
@@ -1203,7 +1203,7 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
         "schemaVersion": "customer-reply-v1",
         "body": (
             "经核验，订单 ORDER-DELAY-UNDER-24 的本次物流延迟不足 24 小时，"
-            "当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。"
+            "当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。"
         ),
         "intent": "NO_COMPENSATION_RESOLUTION",
         "evidenceRefs": [

@@ -235,6 +235,11 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                         (rs, row) ->
                                 new GenerationRecord(rs.getObject(1, UUID.class), rs.getLong(2)),
                         command.ticketId());
+        jdbc.update(
+                "update ticket_auto_resolution set status = 'CANCELLED', updated_at = ? "
+                        + "where ticket_id = ? and status = 'PENDING'",
+                at,
+                command.ticketId());
         Long nextGeneration =
                 jdbc.queryForObject(
                         "select coalesce(max(generation_number), 0) + 1 "
@@ -401,10 +406,13 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
     public CustomerPublicSnapshot snapshot(String customerId, UUID ticketId) {
         List<CustomerPublicSnapshot> snapshots =
                 jdbc.query(
-                        "select id, lifecycle_state, handling_mode, created_at, first_responded_at, "
+                        "select t.id, t.lifecycle_state, t.handling_mode, t.created_at, t.first_responded_at, "
                                 + "coalesce((select max(sequence) from customer_public_event e where e.ticket_id = t.id and e.epoch = ?), 0), "
-                                + "coalesce((select max(generation_number) from agent_processing_generation g where g.ticket_id = t.id), 0) "
-                                + "from support_ticket t where id = ? and customer_id = ?",
+                                + "coalesce((select max(generation_number) from agent_processing_generation g where g.ticket_id = t.id), 0), "
+                                + "a.status, case when a.status = 'PENDING' then a.due_at else null end "
+                                + "from support_ticket t left join ticket_auto_resolution a on a.ticket_id = t.id "
+                                + "and (a.status <> 'RESOLVED' or t.lifecycle_state in ('RESOLVED', 'CLOSED')) "
+                                + "where t.id = ? and t.customer_id = ?",
                         (rs, row) ->
                                 new CustomerPublicSnapshot(
                                         rs.getObject(1, UUID.class),
@@ -417,7 +425,14 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                                         rs.getLong(7),
                                         List.of(),
                                         null,
-                                        null),
+                                        null,
+                                        rs.getString(8) == null
+                                                ? null
+                                                : new CurrentAutoResolution(
+                                                        rs.getString(8),
+                                                        rs.getTimestamp(9) == null
+                                                                ? null
+                                                                : rs.getTimestamp(9).toInstant())),
                         EPOCH,
                         ticketId,
                         customerId);
@@ -463,7 +478,25 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 ticket.agentGeneration(),
                 messages,
                 clarifications.isEmpty() ? null : clarifications.getFirst(),
-                currentReplyStream);
+                currentReplyStream,
+                ticket.autoResolution(),
+                pendingCompensation(ticketId));
+    }
+
+    private PendingCompensationProjection pendingCompensation(UUID ticketId) {
+        Instant now = clock.instant();
+        List<PendingCompensationProjection> pending =
+                jdbc.query(
+                        "select compensation_method, to_char(amount, 'FM999999990.00') "
+                                + "from compensation_proposal_revision "
+                                + "where ticket_id = ? and status = 'PENDING_APPROVAL' and expires_at > ? "
+                                + "order by revision_number desc, created_at desc limit 1",
+                        (rs, row) ->
+                                new PendingCompensationProjection(
+                                        rs.getString(1), rs.getString(2), "CNY", "PENDING_REVIEW"),
+                        ticketId,
+                        Timestamp.from(now));
+        return pending.isEmpty() ? null : pending.getFirst();
     }
 
     @Override

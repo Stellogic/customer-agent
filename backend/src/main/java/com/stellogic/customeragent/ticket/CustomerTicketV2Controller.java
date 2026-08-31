@@ -46,7 +46,10 @@ public final class CustomerTicketV2Controller {
                     "AGENT_REPLY_CONTENT_DELTA",
                     "AGENT_REPLY_COMPLETED",
                     "AGENT_REPLY_ABORTED",
-                    "AGENT_REPLY_FAILED");
+                    "AGENT_REPLY_FAILED",
+                    "AUTO_RESOLUTION_CHANGED",
+                    "COMPENSATION_REVIEW_PENDING",
+                    "COMPENSATION_REVIEW_CLEARED");
 
     private final CustomerTicketService service;
 
@@ -204,7 +207,9 @@ public final class CustomerTicketV2Controller {
             Ticket ticket,
             List<PublicMessage> messages,
             CurrentClarification clarification,
-            CurrentReplyStream replyStream) {
+            CurrentReplyStream replyStream,
+            CurrentAutoResolution autoResolution,
+            PendingCompensationProjection pendingCompensation) {
         static SnapshotResponse from(CustomerPublicSnapshot snapshot) {
             return new SnapshotResponse(
                     "PUBLIC_CONVERSATION",
@@ -217,7 +222,9 @@ public final class CustomerTicketV2Controller {
                             snapshot.agentGeneration()),
                     snapshot.messages(),
                     snapshot.clarification(),
-                    snapshot.replyStream());
+                    snapshot.replyStream(),
+                    snapshot.autoResolution(),
+                    snapshot.pendingCompensation());
         }
     }
 

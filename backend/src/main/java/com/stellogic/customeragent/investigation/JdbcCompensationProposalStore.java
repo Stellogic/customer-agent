@@ -11,39 +11,38 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-class JdbcCompensationProposalStore {
+public class JdbcCompensationProposalStore {
     private final JdbcTemplate jdbc;
     private final CompensationProposalExpiry expiry;
 
-    JdbcCompensationProposalStore(JdbcTemplate jdbc, CompensationProposalExpiry expiry) {
+    public JdbcCompensationProposalStore(JdbcTemplate jdbc, CompensationProposalExpiry expiry) {
         this.jdbc = jdbc;
         this.expiry = expiry;
     }
 
-    StoredProposal save(ProposalContent content) {
+    public StoredProposal save(ProposalContent content) {
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> null,
-                content.orderReference() + "\nLOGISTICS_DELAY");
+                content.orderReference() + "\nCOMPENSATION_ALLOWANCE");
         List<UUID> existingProposalIds =
                 jdbc.query(
                         "select distinct proposal_id from compensation_proposal_revision "
-                                + "where order_reference = ? and reason_code = 'LOGISTICS_DELAY' "
+                                + "where ticket_id = ? "
                                 + "and status in ('PENDING_APPROVAL', 'APPROVED')",
                         (rs, row) -> rs.getObject(1, UUID.class),
-                        content.orderReference());
+                        content.ticketId());
         if (!existingProposalIds.isEmpty()) {
             jdbc.query(
                     "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                     rs -> null,
                     existingProposalIds.getFirst() + "\nPROPOSAL_SUPPORT_PARTICIPANT_LINEAGE");
         }
-        Instant now = expiry.expireDueForOrder(content.orderReference());
+        Instant now = expiry.expireDueForTicket(content.ticketId());
         List<ActiveProposal> active =
                 jdbc.query(
                         "select id, proposal_id, revision_number, ticket_id, content_digest, status "
-                                + "from compensation_proposal_revision where order_reference = ? "
-                                + "and reason_code = 'LOGISTICS_DELAY' "
+                                + "from compensation_proposal_revision where ticket_id = ? "
                                 + "and status in ('PENDING_APPROVAL', 'APPROVED') for update",
                         (rs, row) ->
                                 new ActiveProposal(
@@ -53,11 +52,8 @@ class JdbcCompensationProposalStore {
                                         rs.getObject(4, UUID.class),
                                         rs.getString(5),
                                         rs.getString(6)),
-                        content.orderReference());
+                        content.ticketId());
         String contentDigest = content.digest();
-        if (!active.isEmpty() && !active.getFirst().ticketId().equals(content.ticketId())) {
-            throw new ActiveIntentException("ACTIVE_COMPENSATION_INTENT_CONFLICT");
-        }
         if (!active.isEmpty() && "APPROVED".equals(active.getFirst().status())) {
             throw new ActiveIntentException("ACTIVE_APPROVED_COMPENSATION_INTENT_CONFLICT");
         }
@@ -146,7 +142,7 @@ class JdbcCompensationProposalStore {
         return new StoredProposal(revisionId, revisionNumber, true);
     }
 
-    record ProposalContent(
+    public record ProposalContent(
             UUID ticketId,
             UUID generationId,
             String orderReference,
@@ -164,7 +160,7 @@ class JdbcCompensationProposalStore {
             boolean cancelled,
             boolean fullyRefunded,
             boolean existingCompensation) {
-        String digest() {
+        public String digest() {
             return StableParameterDigest.sha256(
                     ticketId.toString(),
                     orderReference,
@@ -186,16 +182,16 @@ class JdbcCompensationProposalStore {
         }
     }
 
-    record StoredProposal(UUID revisionId, int revisionNumber, boolean created) {}
+    public record StoredProposal(UUID revisionId, int revisionNumber, boolean created) {}
 
-    static final class ActiveIntentException extends RuntimeException {
+    public static final class ActiveIntentException extends RuntimeException {
         private final String reason;
 
-        ActiveIntentException(String reason) {
+        public ActiveIntentException(String reason) {
             this.reason = reason;
         }
 
-        String reason() {
+        public String reason() {
             return reason;
         }
     }

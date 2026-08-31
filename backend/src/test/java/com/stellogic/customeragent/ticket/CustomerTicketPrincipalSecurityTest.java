@@ -13,6 +13,7 @@ import com.stellogic.customeragent.identity.AuthSessionController;
 import com.stellogic.customeragent.identity.DemoAccountController;
 import com.stellogic.customeragent.identity.HumanSecurityConfiguration;
 import com.stellogic.customeragent.identity.LocalDemoHumanAccountsConfiguration;
+import com.stellogic.customeragent.investigation.AutoResolutionService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +34,7 @@ import tools.jackson.databind.ObjectMapper;
         controllers = {
             CustomerTicketController.class,
             CustomerTicketV2Controller.class,
+            CustomerAutoResolutionController.class,
             CustomerIntakeV2Controller.class,
             AuthSessionController.class,
             DemoAccountController.class
@@ -50,6 +52,50 @@ class CustomerTicketPrincipalSecurityTest {
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper json;
     @Autowired private CustomerTicketService service;
+    @Autowired private AutoResolutionService autoResolutionService;
+
+    @Test
+    void autoResolutionCancellationRequiresCustomerSessionAndCurrentCsrfToken() throws Exception {
+        String endpoint = "/api/customer/tickets/{ticketId}/auto-resolution/cancel";
+        String body = "{\"candidateDueAt\":\"2026-08-30T04:00:00Z\",\"candidateGeneration\":1}";
+        MockHttpSession customer = login("customer-demo");
+
+        mvc.perform(
+                        post(endpoint, TICKET_ID)
+                                .session(customer)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isForbidden());
+
+        MvcResult csrf =
+                mvc.perform(get("/api/auth/csrf").session(customer))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        mvc.perform(
+                        post(endpoint, TICKET_ID)
+                                .session(customer)
+                                .header("X-CSRF-TOKEN", token(csrf))
+                                .header("X-Synthetic-Customer-Id", "customer-other-demo")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isNoContent());
+
+        verify(autoResolutionService)
+                .cancel("customer-demo", TICKET_ID, Instant.parse("2026-08-30T04:00:00Z"), 1);
+
+        MockHttpSession support = login("support-demo");
+        MvcResult supportCsrf =
+                mvc.perform(get("/api/auth/csrf").session(support))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        mvc.perform(
+                        post(endpoint, TICKET_ID)
+                                .session(support)
+                                .header("X-CSRF-TOKEN", token(supportCsrf))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     void forgedCustomerHeaderCannotReplaceTheAuthenticatedCustomerPrincipal() throws Exception {
@@ -181,11 +227,17 @@ class CustomerTicketPrincipalSecurityTest {
                 1,
                 List.of(),
                 null,
+                null,
                 null);
     }
 
     @TestConfiguration(proxyBeanMethods = false)
     static class TestServices {
+        @Bean
+        AutoResolutionService autoResolutionService() {
+            return mock(AutoResolutionService.class);
+        }
+
         @Bean
         CustomerTicketService customerTicketService() {
             return mock(CustomerTicketService.class);

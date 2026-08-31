@@ -551,6 +551,12 @@ class JdbcCompensationExecutionService implements CompensationExecutionService {
     }
 
     private ExecutionRow lockExecution(UUID executionId, String executorId) {
+        jdbc.query(
+                "select pg_advisory_xact_lock(hashtextextended(order_reference || E'\\nCOMPENSATION_ALLOWANCE', 0)) "
+                        + "from compensation_execution where id = ? and assigned_executor_id = ?",
+                rs -> null,
+                executionId,
+                executorId);
         List<ExecutionRow> executions =
                 jdbc.query(
                         "select id, reservation_id, order_reference, compensation_method, amount, status, "

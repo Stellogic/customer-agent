@@ -79,7 +79,7 @@ test("Issue #159 真实 Chromium 恢复慢首字节、断线续流、失败与�
     type: "CONTENT_DELTA",
     chunkIndex: 1,
     delta:
-      "的本次物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+      "的本次物流延迟不足 24 小时，当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。",
   });
   executeFixtureSql(
     `UPDATE agent_processing_generation SET status = 'COMPLETED', completed_at = now() WHERE id = '${streamingGeneration}';`,
@@ -89,7 +89,7 @@ test("Issue #159 真实 Chromium 恢复慢首字节、断线续流、失败与�
   });
   await expect(
     page.getByText(
-      "经核验，订单 ORDER-DELAY-001 的本次物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。如有异议，您可在关闭等待期内回复。",
+      "经核验，订单 ORDER-DELAY-001 的本次物流延迟不足 24 小时，当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。",
       { exact: true },
     ),
   ).toBeVisible();

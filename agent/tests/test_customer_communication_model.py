@@ -13,6 +13,7 @@ from baseline_agent.customer_communication_model import (
     FixedFakeCustomerCommunicationModel,
     StructuredCustomerCommunicationModel,
     default_customer_reply_body,
+    is_authorized_body_prefix,
 )
 
 
@@ -47,6 +48,36 @@ async def test_fixed_fake_returns_a_structured_customer_reply_envelope() -> None
     assert result.escalation_required is False
     assert "等待人工审批" in result.body
     assert "审批完成前不会执行补偿或退款" in result.body
+
+
+@pytest.mark.asyncio
+async def test_no_compensation_conclusion_does_not_claim_ticket_resolution() -> None:
+    result = await FixedFakeCustomerCommunicationModel().compose(
+        CustomerCommunicationInput(
+            order_reference="ORDER-162",
+            delay_seconds=23 * 60 * 60,
+            compensation_review_required=False,
+            evidence_refs=("order:ORDER-162", "logistics:ORDER-162"),
+        )
+    )
+
+    assert result.intent is CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
+    assert "结论已给出" in result.body
+    assert "后续处理以页面状态为准" in result.body
+    assert "已解决" not in result.body
+    assert "关闭等待期" not in result.body
+    assert "五分钟" not in result.body
+
+
+@pytest.mark.parametrize(
+    "promise",
+    ["工单已解决", "工单已经关闭", "已自动解决", "关闭等待期", "五分钟后自动解决"],
+)
+def test_public_reply_rejects_premature_ticket_state_even_during_streaming(promise: str) -> None:
+    body = f"订单 ORDER-162 当前不符合补偿条件，{promise}。"
+
+    assert not is_authorized_body_prefix(body, "ORDER-162", complete=False)
+    assert not is_authorized_body_prefix(body, "ORDER-162", complete=True)
 
 
 @pytest.mark.asyncio
