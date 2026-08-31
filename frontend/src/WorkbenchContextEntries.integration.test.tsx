@@ -30,20 +30,34 @@ function openStream() {
 
 function supportSnapshot() {
   return Response.json({
-    view: "SUPPORT_WORKBENCH", schema: "support-workbench-v2", cursor: "support-workbench-v2:1",
-    sharedQueue: [], escalationQueue: [], assignedTicketIds: [ticketId],
+    view: "SUPPORT_WORKBENCH",
+    schema: "support-workbench-v2",
+    cursor: "support-workbench-v2:1",
+    sharedQueue: [],
+    escalationQueue: [],
+    assignedTicketIds: [ticketId],
   });
 }
 
 function supportDetail(handlingMode = "HUMAN") {
   return Response.json({
-    ticketId, customerId: "customer-fixture", orderReference: "ORDER-193",
-    description: "物流延迟", lifecycleState: "WAITING_FOR_CUSTOMER", handlingMode,
-    assignedSupportId: "support-fixture", publicConversation: [], businessTimeline: [],
-    investigationFacts: [{
-      factType: "DELIVERY_DELAY", factValue: "26 hours",
-      evidenceReference: "shipment:ORDER-193", recordedAt: "2026-08-31T01:00:00Z",
-    }],
+    ticketId,
+    customerId: "customer-fixture",
+    orderReference: "ORDER-193",
+    description: "物流延迟",
+    lifecycleState: "WAITING_FOR_CUSTOMER",
+    handlingMode,
+    assignedSupportId: "support-fixture",
+    publicConversation: [],
+    businessTimeline: [],
+    investigationFacts: [
+      {
+        factType: "DELIVERY_DELAY",
+        factValue: "26 hours",
+        evidenceReference: "shipment:ORDER-193",
+        recordedAt: "2026-08-31T01:00:00Z",
+      },
+    ],
   });
 }
 
@@ -57,21 +71,32 @@ describe("#193 现有授权工作台入口接线", () => {
       const path = String(input);
       if (path === supportSnapshotUrl) {
         snapshotReads += 1;
-        if (snapshotReads === 2) return new Promise<Response>((resolve) => { resolveSnapshot = resolve; });
+        if (snapshotReads === 2)
+          return new Promise<Response>((resolve) => {
+            resolveSnapshot = resolve;
+          });
         return supportSnapshot();
       }
       if (path === "/api/support/workbench/events") return openStream();
-      if (path === supportDetailUrl) return authorized ? supportDetail() : new Response(null, { status: 403 });
+      if (path === supportDetailUrl)
+        return authorized ? supportDetail() : new Response(null, { status: 403 });
       if (path === `${supportDetailUrl}/events`) {
-        return new Response(new ReadableStream<Uint8Array>({
-          start(controller) { closeAuthority = () => controller.close(); },
-        }), { headers: { "Content-Type": "text/event-stream" } });
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              closeAuthority = () => controller.close();
+            },
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        );
       }
       throw new Error(`unexpected request: ${path}`);
     });
     render(<SupportWorkbench />);
     const entries = await screen.findByRole("region", { name: "客服详情入口" });
-    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => url === `${supportDetailUrl}/events`)).toBe(true));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url]) => url === `${supportDetailUrl}/events`)).toBe(true),
+    );
     const before = fetchMock.mock.calls.length;
     fireEvent.click(within(entries).getByRole("button", { name: "查看订单" }));
     expect(document.activeElement).toHaveTextContent("ORDER-193");
@@ -97,7 +122,9 @@ describe("#193 现有授权工作台入口接线", () => {
     await screen.findByRole("dialog", { name: "更多操作 · 开发中" });
     authorized = false;
     closeAuthority();
-    await waitFor(() => expect(screen.queryByRole("region", { name: "客服详情入口" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "客服详情入口" })).not.toBeInTheDocument(),
+    );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.queryByText("ORDER-193")).not.toBeInTheDocument();
   });
@@ -121,18 +148,36 @@ describe("#193 现有授权工作台入口接线", () => {
     let authorized = true;
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
-      if (path === "/api/auth/csrf") return Response.json({ token: "fixture", headerName: "X-CSRF-TOKEN" });
-      if (path === approvalQueueUrl) return Response.json([{
-        proposalRevisionId: revisionId, compensationMethod: "COUPON", amount: 20,
-        submittedAt: "2026-08-31T01:00:00Z", expiresAt: "2099-01-01T00:00:00Z",
-      }]);
-      if (path.endsWith("/claims")) return Response.json({
-        proposalRevisionId: revisionId, leaseToken, leaseVersion: 1, expiresAt: "2099-01-01T00:00:00Z",
-      });
-      if (path.endsWith("/approval-view")) return authorized ? Response.json(approvalSnapshot()) : new Response(null, { status: 403 });
-      if (path.endsWith("/events")) return new Response(new ReadableStream<Uint8Array>({
-        start(controller) { closeAuthority = () => controller.close(); },
-      }), { headers: { "Content-Type": "text/event-stream" } });
+      if (path === "/api/auth/csrf")
+        return Response.json({ token: "fixture", headerName: "X-CSRF-TOKEN" });
+      if (path === approvalQueueUrl)
+        return Response.json([
+          {
+            proposalRevisionId: revisionId,
+            compensationMethod: "COUPON",
+            amount: 20,
+            submittedAt: "2026-08-31T01:00:00Z",
+            expiresAt: "2099-01-01T00:00:00Z",
+          },
+        ]);
+      if (path.endsWith("/claims"))
+        return Response.json({
+          proposalRevisionId: revisionId,
+          leaseToken,
+          leaseVersion: 1,
+          expiresAt: "2099-01-01T00:00:00Z",
+        });
+      if (path.endsWith("/approval-view"))
+        return authorized ? Response.json(approvalSnapshot()) : new Response(null, { status: 403 });
+      if (path.endsWith("/events"))
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              closeAuthority = () => controller.close();
+            },
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        );
       throw new Error(`unexpected request: ${path}`);
     });
     render(<ApprovalWorkbench />);
@@ -148,10 +193,13 @@ describe("#193 现有授权工作台入口接线", () => {
     expect(fetchMock).toHaveBeenCalledTimes(queueReads);
     fireEvent.click(screen.getByRole("button", { name: "领取审批" }));
     const entries = await screen.findByRole("region", { name: "审批详情入口" });
-    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/events"))).toBe(true));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/events"))).toBe(true),
+    );
     const before = fetchMock.mock.calls.length;
     for (const [label, target] of [
-      ["政策详情", "政策信息"], ["提案日志", "责任链"],
+      ["政策详情", "政策信息"],
+      ["提案日志", "责任链"],
       ["资格检查明细", "资格与金额"],
     ]) {
       fireEvent.click(within(entries).getByRole("button", { name: label }));
@@ -163,7 +211,9 @@ describe("#193 现有授权工作台入口接线", () => {
     expect(fetchMock).toHaveBeenCalledTimes(before);
     authorized = false;
     closeAuthority();
-    await waitFor(() => expect(screen.queryByRole("region", { name: "审批详情入口" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "审批详情入口" })).not.toBeInTheDocument(),
+    );
     expect(screen.queryByText("delay-policy-v1")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "批准补偿" })).not.toBeInTheDocument();
   });
@@ -171,13 +221,29 @@ describe("#193 现有授权工作台入口接线", () => {
 
 function approvalSnapshot() {
   return {
-    view: "APPROVAL_VIEW", schema: "approval-view-v1", cursor: "approval-view-v1:1",
-    proposalRevisionId: revisionId, proposalRevision: 1, contentDigest: "0".repeat(64),
-    orderReference: "ORDER-193", reasonCode: "LOGISTICS_DELAY", delayHours: 80, delaySeconds: 288000,
-    compensationMethod: "COUPON", proposedAmount: 20, authoritativeAmount: 20,
-    policyVersion: "delay-policy-v1", policyTier: "OVER_72_HOURS", eligibilityChecks: ["ORDER_PAID"],
-    evidenceReferences: ["shipment:ORDER-193"], evidenceSnapshot: { delayHours: 80 },
-    responsibilityChain: [], leaseToken, leaseVersion: 1, leaseExpiresAt: "2099-01-01T00:00:00Z",
-    submittedAt: "2026-08-31T01:00:00Z", proposalExpiresAt: "2099-01-01T00:00:00Z",
+    view: "APPROVAL_VIEW",
+    schema: "approval-view-v1",
+    cursor: "approval-view-v1:1",
+    proposalRevisionId: revisionId,
+    proposalRevision: 1,
+    contentDigest: "0".repeat(64),
+    orderReference: "ORDER-193",
+    reasonCode: "LOGISTICS_DELAY",
+    delayHours: 80,
+    delaySeconds: 288000,
+    compensationMethod: "COUPON",
+    proposedAmount: 20,
+    authoritativeAmount: 20,
+    policyVersion: "delay-policy-v1",
+    policyTier: "OVER_72_HOURS",
+    eligibilityChecks: ["ORDER_PAID"],
+    evidenceReferences: ["shipment:ORDER-193"],
+    evidenceSnapshot: { delayHours: 80 },
+    responsibilityChain: [],
+    leaseToken,
+    leaseVersion: 1,
+    leaseExpiresAt: "2099-01-01T00:00:00Z",
+    submittedAt: "2026-08-31T01:00:00Z",
+    proposalExpiresAt: "2099-01-01T00:00:00Z",
   };
 }

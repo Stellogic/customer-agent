@@ -861,9 +861,10 @@ function TicketDetail({
             onOpen: () => focusContextTarget(factsRef.current),
             description: "查看现有调查事实，是否含物流信息以当前投影为准。",
           },
-          contact: details.handlingMode === "HUMAN"
-            ? { kind: "available", onOpen: () => focusContextTarget(replyRef.current) }
-            : { kind: "unavailable", reason: "当前非人工处理模式，不能发送公开回复。" },
+          contact:
+            details.handlingMode === "HUMAN"
+              ? { kind: "available", onOpen: () => focusContextTarget(replyRef.current) }
+              : { kind: "unavailable", reason: "当前非人工处理模式，不能发送公开回复。" },
           similarCases: { kind: "unavailable", reason: "相似案例检索尚未接入。" },
           suggestedActions: { kind: "unavailable", reason: "客服辅助建议动作尚未接入。" },
         }}

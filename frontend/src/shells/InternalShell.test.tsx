@@ -50,7 +50,7 @@ describe("Issue #193 内部壳独立入口", () => {
     const shortcuts = within(screen.getByRole("navigation", { name: "快捷入口" }));
     fireEvent.click(shortcuts.getByRole("link", { name: /我的工单/ }));
     expect(screen.getByRole("heading", { name: "授权客服页面示例" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "客服工作区", exact: true })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "客服工作区" })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -64,15 +64,16 @@ describe("Issue #193 内部壳独立入口", () => {
   it("审批身份不出现客服或无权知识入口，能力移除后入口随投影消失", () => {
     const view = render(shell(support));
     view.rerender(shell(approver));
-    expect(screen.getByRole("link", { name: "审批工作区", exact: true })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /客服工作区|我的工单|SLA 监控|知识库|知识目录/ }))
-      .not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "审批工作区" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /客服工作区|我的工单|SLA 监控|知识库|知识目录/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("收起侧栏移除隐藏链接的焦点入口，并把焦点交还展开按钮", () => {
     render(shell(support));
-    fireEvent.click(screen.getByRole("button", { name: "收起侧栏", exact: true }));
-    const toggle = screen.getByRole("button", { name: "展开侧栏", exact: true });
+    fireEvent.click(screen.getByRole("button", { name: "收起侧栏" }));
+    const toggle = screen.getByRole("button", { name: "展开侧栏" });
     expect(toggle).toHaveFocus();
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("navigation", { name: "内部工作区" })).not.toBeInTheDocument();
@@ -97,7 +98,7 @@ describe("Issue #193 内部壳独立入口", () => {
 
   it("重新同步保留当前受保护地址，用整页导航恢复身份且不声明成功", () => {
     render(shell(support, "/internal/support?view=current"));
-    expect(screen.getByRole("link", { name: "重新同步", exact: true })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "重新同步" })).toHaveAttribute(
       "href",
       "/internal/support?view=current",
     );

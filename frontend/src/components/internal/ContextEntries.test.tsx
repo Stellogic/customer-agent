@@ -56,7 +56,9 @@ describe("Issue #193 独立详情入口的 props 边界", () => {
       fireEvent.click(within(dialog).getByRole("button", { name: "知道了" }));
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     }
-    expect(screen.queryByRole("button", { name: /补偿|发送公开回复|批准/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /补偿|发送公开回复|批准/ }),
+    ).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

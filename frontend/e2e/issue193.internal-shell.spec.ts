@@ -61,13 +61,16 @@ for (const identity of identities) {
         await expect(shortcuts).toBeVisible();
         if (identity.roles[0] === "SUPPORT") {
           await expect(shortcuts.getByRole("link", { name: /我的工单/ })).toHaveAttribute(
-            "href", "/internal/support",
+            "href",
+            "/internal/support",
           );
           await expect(shortcuts.getByRole("link", { name: /SLA 监控/ })).toHaveAttribute(
-            "href", "/internal/support",
+            "href",
+            "/internal/support",
           );
           await expect(shortcuts.getByRole("link", { name: "知识库" })).toHaveAttribute(
-            "href", "/internal/knowledge",
+            "href",
+            "/internal/knowledge",
           );
         } else {
           await expect(shortcuts.getByRole("link")).toHaveCount(0);
@@ -81,7 +84,10 @@ for (const identity of identities) {
         await expect(templateDialog).toBeHidden();
         await expect(template).toBeFocused();
         await expect(template).toHaveCSS("outline-style", "solid");
-        await page.screenshot({ path: testInfo.outputPath(`shell-${width}-focus.png`), fullPage: true });
+        await page.screenshot({
+          path: testInfo.outputPath(`shell-${width}-focus.png`),
+          fullPage: true,
+        });
 
         await page.getByRole("button", { name: "收起侧栏", exact: true }).click();
         await expect(header.getByRole("button", { name: "展开侧栏", exact: true })).toBeFocused();
@@ -92,7 +98,9 @@ for (const identity of identities) {
         await page.screenshot({ path: testInfo.outputPath(`shell-${width}-notification.png`) });
         await notifications.getByRole("button", { name: "知道了" }).click();
         expect(businessRequests).toEqual([]);
-        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true,
+        );
 
         // 模拟重新同步时 Session 失效，旧壳由既有 SessionGate 卸载。
         authorized = false;
@@ -114,7 +122,9 @@ for (const identity of identities) {
 test("独立壳 loading/error：身份未确认时不暴露内部入口", async ({ browser }, testInfo) => {
   const context = await newAcceptanceContext(browser, { viewport: { width: 360, height: 800 } });
   let releaseSession: () => void = () => undefined;
-  const pending = new Promise<void>((resolve) => { releaseSession = resolve; });
+  const pending = new Promise<void>((resolve) => {
+    releaseSession = resolve;
+  });
   await context.route("**/api/auth/session", async (route) => {
     await pending;
     await route.fulfill({ status: 503 });
