@@ -37,7 +37,8 @@ type StoredTicket = {
 };
 
 function storedTicket(ticketId: string): StoredTicket {
-  return JSON.parse(queryFixtureSql(`
+  return JSON.parse(
+    queryFixtureSql(`
     SELECT json_build_object(
       'lifecycle', t.lifecycle_state, 'candidate', a.status,
       'createdAt', a.created_at, 'dueAt', a.due_at,
@@ -50,12 +51,14 @@ function storedTicket(ticketId: string): StoredTicket {
         AND event_type = 'AUTO_RESOLUTION_CHANGED' AND payload->'autoResolution'->>'status' = 'CANCELLED')
     ) FROM support_ticket t JOIN ticket_auto_resolution a ON a.ticket_id = t.id
     WHERE t.id = '${ticketId}';
-  `)) as StoredTicket;
+  `),
+  ) as StoredTicket;
 }
 
 async function openTicket(page: Page, ticketId: string): Promise<Snapshot> {
   const loaded = page.waitForResponse(
-    (response) => response.request().method() === "GET" &&
+    (response) =>
+      response.request().method() === "GET" &&
       new URL(response.url()).pathname === `/api/customer/v2/tickets/${ticketId}`,
   );
   await page.goto(`/help?ticket=${ticketId}`);
@@ -63,33 +66,51 @@ async function openTicket(page: Page, ticketId: string): Promise<Snapshot> {
   expect(response.status()).toBe(200);
   const snapshot = (await response.json()) as Snapshot;
   expect(snapshot.ticket.id).toBe(ticketId);
-  await expect(page.getByRole("heading", {
-    name: `${ticketId.slice(0, 8)}…${ticketId.slice(-4)}`, exact: true,
-  })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: `${ticketId.slice(0, 8)}…${ticketId.slice(-4)}`,
+      exact: true,
+    }),
+  ).toBeVisible();
   return snapshot;
 }
 
 async function expectResolved(page: Page, ticket: ClockTicket) {
-  await expect.poll(() => storedTicket(ticket.ticketId).lifecycle, { timeout: 30_000 }).toBe("RESOLVED");
+  await expect
+    .poll(() => storedTicket(ticket.ticketId).lifecycle, { timeout: 30_000 })
+    .toBe("RESOLVED");
   const snapshot = await openTicket(page, ticket.ticketId);
   expect(snapshot.ticket.lifecycleState).toBe("RESOLVED");
   expect(snapshot.autoResolution).toEqual({ status: "RESOLVED", dueAt: null });
-  await expect(page.getByRole("region", { name: "自动解决状态" })
-    .getByText("工单已自动解决", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "自动解决状态" }).getByText("工单已自动解决", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "发送回复", exact: true })).toBeVisible();
   const stored = storedTicket(ticket.ticketId);
-  expect(stored).toMatchObject({ candidate: "RESOLVED", resolutions: 1, autoResolutions: 1, reopens: 0, closures: 0 });
+  expect(stored).toMatchObject({
+    candidate: "RESOLVED",
+    resolutions: 1,
+    autoResolutions: 1,
+    reopens: 0,
+    closures: 0,
+  });
   expect(Date.parse(stored.dueAt)).toBe(Date.parse(ticket.dueAt));
   expect(Date.parse(stored.resolvedAt!)).toBe(Date.parse(due));
   expect(Date.parse(stored.closeDueAt!)).toBe(Date.parse(closeDue));
 }
 
-async function replyThroughUi(page: Page, ticket: ClockTicket, message: string, expectedStatus: number) {
+async function replyThroughUi(
+  page: Page,
+  ticket: ClockTicket,
+  message: string,
+  expectedStatus: number,
+) {
   await page.getByLabel("回复订单编号").fill(ticket.reference);
   await page.getByLabel("回复问题类型").selectOption("LOGISTICS_DELAY");
   await page.getByLabel("工单回复", { exact: true }).fill(message);
   const replied = page.waitForResponse(
-    (response) => response.request().method() === "POST" &&
+    (response) =>
+      response.request().method() === "POST" &&
       new URL(response.url()).pathname === `/api/customer/tickets/${ticket.ticketId}/replies`,
   );
   await page.getByRole("button", { name: "发送回复", exact: true }).click();
@@ -114,8 +135,9 @@ test(`Issue #173 F：真实自动解决与72小时回复边界 / ${phase}`, asyn
         const reference = prepareOrder({ delayHours: 23 });
         await page.goto("/help");
         const ticketId = await createSingleTicket(page, reference, "请解释物流状态");
-        await expect(page.getByRole("button", { name: "仍需帮助，取消自动解决" }))
-          .toBeVisible({ timeout: 60_000 });
+        await expect(page.getByRole("button", { name: "仍需帮助，取消自动解决" })).toBeVisible({
+          timeout: 60_000,
+        });
         const snapshot = await openTicket(page, ticketId);
         expect(snapshot.ticket.lifecycleState).toBe("INVESTIGATING");
         expect(snapshot.autoResolution?.status).toBe("PENDING");
@@ -140,7 +162,10 @@ test(`Issue #173 F：真实自动解决与72小时回复边界 / ${phase}`, asyn
           expect(Date.parse(snapshot.autoResolution!.dueAt!)).toBe(Date.parse(ticket.dueAt));
           await expect(page.getByRole("button", { name: "仍需帮助，取消自动解决" })).toBeVisible();
           expect(storedTicket(ticket.ticketId)).toMatchObject({
-            lifecycle: "INVESTIGATING", candidate: "PENDING", resolutions: 0, autoResolutions: 0,
+            lifecycle: "INVESTIGATING",
+            candidate: "PENDING",
+            resolutions: 0,
+            autoResolutions: 0,
           });
         }
       } else if (["resolved", "resolved-restart", "before-close"].includes(phase)) {
@@ -150,7 +175,11 @@ test(`Issue #173 F：真实自动解决与72小时回复边界 / ${phase}`, asyn
           await openTicket(page, ticket.ticketId);
           const message = `仍需帮助，请人工继续核实本物流问题。${ticket.reference}`;
           const result = await replyThroughUi(page, ticket, message, 200);
-          expect(result).toMatchObject({ ticketId: ticket.ticketId, outcome: "REOPENED", replayed: false });
+          expect(result).toMatchObject({
+            ticketId: ticket.ticketId,
+            outcome: "REOPENED",
+            replayed: false,
+          });
           await expect(page.getByText(message, { exact: true })).toBeVisible();
           await expect(page.getByRole("region", { name: "自动解决状态" })).toHaveCount(0);
           const reopened = await openTicket(page, ticket.ticketId);
@@ -160,41 +189,81 @@ test(`Issue #173 F：真实自动解决与72小时回复边界 / ${phase}`, asyn
           await expect(page.getByText(message, { exact: true })).toBeVisible();
           await expect(page.getByRole("region", { name: "自动解决状态" })).toHaveCount(0);
           expect(storedTicket(ticket.ticketId)).toMatchObject({
-            lifecycle: "INVESTIGATING", candidate: "RESOLVED", resolvedAt: null, closeDueAt: null,
-            resolutions: 1, autoResolutions: 1, reopens: 1, closures: 0, cancellations: 0,
+            lifecycle: "INVESTIGATING",
+            candidate: "RESOLVED",
+            resolvedAt: null,
+            closeDueAt: null,
+            resolutions: 1,
+            autoResolutions: 1,
+            reopens: 1,
+            closures: 0,
+            cancellations: 0,
           });
         }
       } else if (phase === "closed") {
         const [reopened, closing] = state.tickets;
-        await expect.poll(() => storedTicket(closing.ticketId).lifecycle, { timeout: 30_000 }).toBe("CLOSED");
+        await expect
+          .poll(() => storedTicket(closing.ticketId).lifecycle, { timeout: 30_000 })
+          .toBe("CLOSED");
         const snapshot = await openTicket(page, closing.ticketId);
         expect(snapshot.ticket.lifecycleState).toBe("CLOSED");
         const stored = storedTicket(closing.ticketId);
-        expect(stored).toMatchObject({ candidate: "RESOLVED", resolutions: 1, autoResolutions: 1, reopens: 0, closures: 1 });
+        expect(stored).toMatchObject({
+          candidate: "RESOLVED",
+          resolutions: 1,
+          autoResolutions: 1,
+          reopens: 0,
+          closures: 1,
+        });
         expect(Date.parse(stored.closedAt!)).toBe(Date.parse(closeDue));
-        const result = await replyThroughUi(page, closing, "仍需帮助，请人工继续处理原物流问题。", 201);
+        const result = await replyThroughUi(
+          page,
+          closing,
+          "仍需帮助，请人工继续处理原物流问题。",
+          201,
+        );
         expect(result).toMatchObject({ outcome: "LINKED_TICKET_CREATED", replayed: false });
         expect(result.ticketId).toMatch(/^[0-9a-f-]{36}$/i);
         expect(result.ticketId).not.toBe(closing.ticketId);
-        await expect(page.getByRole("heading", {
-          name: `${result.ticketId.slice(0, 8)}…${result.ticketId.slice(-4)}`, exact: true,
-        })).toBeVisible();
-        expect(queryFixtureSql(`
+        await expect(
+          page.getByRole("heading", {
+            name: `${result.ticketId.slice(0, 8)}…${result.ticketId.slice(-4)}`,
+            exact: true,
+          }),
+        ).toBeVisible();
+        expect(
+          queryFixtureSql(`
           SELECT follow_up_of::text FROM support_ticket WHERE id = '${result.ticketId}';
-        `)).toBe(closing.ticketId);
+        `),
+        ).toBe(closing.ticketId);
         const original = await openTicket(page, reopened.ticketId);
         expect(original.ticket.lifecycleState).toBe("INVESTIGATING");
         expect(original.autoResolution).toBeNull();
         expect(storedTicket(reopened.ticketId)).toMatchObject({ reopens: 1, closures: 0 });
-        expect(storedTicket(closing.ticketId)).toMatchObject({ lifecycle: "CLOSED", closures: 1, reopens: 0 });
+        expect(storedTicket(closing.ticketId)).toMatchObject({
+          lifecycle: "CLOSED",
+          closures: 1,
+          reopens: 0,
+        });
       }
       state.completedPhase = phase;
     }
     // 同一隔离 project 的现有 artifacts 卷交接；前一阶段断言全部成功后才推进标记。
     writeFileSync(statePath, JSON.stringify(state, null, 2));
-    writeFileSync(`/artifacts/issue173-clock-${phase}.json`, JSON.stringify({
-      phase, tickets: state.tickets.map((ticket) => ({ ...ticket, stored: storedTicket(ticket.ticketId) })),
-    }, null, 2));
+    writeFileSync(
+      `/artifacts/issue173-clock-${phase}.json`,
+      JSON.stringify(
+        {
+          phase,
+          tickets: state.tickets.map((ticket) => ({
+            ...ticket,
+            stored: storedTicket(ticket.ticketId),
+          })),
+        },
+        null,
+        2,
+      ),
+    );
     await page.screenshot({ path: `/artifacts/issue173-clock-${phase}.png`, fullPage: true });
   } finally {
     await context.close();

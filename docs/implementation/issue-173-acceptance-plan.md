@@ -2,12 +2,12 @@
 
 ## 状态与范围
 
-**CODE_READY_NO_TESTS 仅用于本轮已写源码，不表示 #173 完成或任何 AC 验收通过。**
+**当前状态：离线聚焦验证通过，真实 A–F 浏览器验收及完整门禁仍 NOT_RUN。** 原静态提交 `9f2f441` 的状态为 CODE_READY_NO_TESTS；本次离线窗口结果见末节，不表示 #173 完成或所有 AC 验收通过。
 
 - 日期：2026-08-31。起点为已 fetch 的 `origin/main@c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`，初始工作树干净。
 - 分支：`codex/issue-173-static-acceptance`。开始前读取协调任务、任务列表、worktree 列表、GitHub #173 与开放 PR，未发现重复实现领取；#173 当时无 assignee、无评论、无开放 PR。
 - 原两文件阶段仅拥有 `frontend/e2e/issue173.full-stack.spec.ts` 与本文件。协调随后明确授权最小公共接线：`scripts/issue80-acceptance.ps1` 的本票阶段调度、`scripts/browser-acceptance-plan.psd1` 的本票串行登记、`compose.yaml` 仅 `browser-acceptance` 服务的本票 phase 环境传递，以及本票专属 helper/e2e。当前新增 `scripts/issue173-clock-acceptance.ps1`、`frontend/e2e/issue173.auto-resolution-clock.spec.ts`、`frontend/e2e/support/issue173-intake.ts`；仍不改产品或 #190 模型、Agent、后端服务定义。
-- 已完整读取本 worktree 的 `.agents/skills/implement/SKILL.md`。用户本轮限制优先：只静态实现与 Standards / Spec 双轴审查；不执行测试、格式化/格式检查、lint、类型检查、构建、Docker/Compose、浏览器、产品 API、模型或门禁，不查询/申请测试锁。
+- 已完整读取本 worktree 的 `.agents/skills/implement/SKILL.md`。原静态阶段只允许实现与 Standards / Spec 双轴审查，所有运行和锁查询均未执行。协调随后授予离线聚焦窗口，允许按锁验证脚本/编排契约、前端格式类型及相关组件；真实 API、模型、RAG、浏览器时钟阶段和完整门禁仍未授权运行。
 - GitHub 元数据只读查询和 Git fetch 不属于产品 API 验收。沙箱 gh 401 后，宿主上下文读取成功，未据此判断用户令牌失效。
 - 不合入、不关票，不触发或等待 CI。外部审查不作为本轮阻塞；本地双轴静态审查不能代替最终完整门禁。
 
@@ -133,7 +133,7 @@ D 仅检验候选/取消；原两文件阶段自动到期与重开为 **NOT_IMPL
 
 `compose.yaml` 只给 `browser-acceptance` 增加 `ISSUE173_CLOCK_PHASE` 传递，不改变 #190/Agent/backend 定义。新的 intake helper 仅原样搬出 A–E 已有订单准备/确认函数供 F 复用，A–E 业务步骤不重写。每阶段重新通过登录 UI 建立 Session；在现有 artifacts 卷内新建 `/artifacts/issue173-clock.json` 用于本次交接，要求前阶段完成标记匹配，不保存凭证。阶段缺失或未知直接失败，无 `skip`。
 
-将来运行成功时每阶段输出 `issue173-clock-<phase>.json` 和对应 PNG 到现有 artifacts 卷；JSON 包含真实工单 ID、截止和只读数据库事件计数。当前没有生成这些运行产物，不得把计划路径当作现存证据。全部运行、格式、类型、构建和锁查询仍 **NOT_RUN**，未占用 #190 的离线窗口。本增量做一次必要 Standards / Spec 双轴静态审查，结果与提交回报协调；不因此触发完整门禁、合并或关票。
+将来运行成功时每阶段输出 `issue173-clock-<phase>.json` 和对应 PNG 到现有 artifacts 卷；JSON 包含真实工单 ID、截止和只读数据库事件计数。当前没有生成这些真实浏览器运行产物，不得把计划路径当作现存证据。截至静态提交 `9f2f441`，全部运行、格式、类型、构建和锁查询均 **NOT_RUN**；后续独立授予的离线窗口结果见末节，不沿用 #190 的窗口或运行证据。
 
 首轮静态审查 Standards 为 PASS/0，Spec 发现1项代理地址未刷新的接线问题；已集中修正专属 helper 的阶段及恢复路径，两轴仅复核此修复与文档增量，不重跑全量风险审查。最终结论随提交回报。现有外层清理会删除 artifacts 卷，正式证据归档仍需在清理前由获准的运行流程导出；本阶段不把卷内临时文件宣称为永久归档。
 
@@ -145,8 +145,39 @@ D 仅检验候选/取消；原两文件阶段自动到期与重开为 **NOT_IMPL
 - **Spec：PASS，发现 0。** 确认三条源码场景及完整 AC 索引符合本轮隔离静态范围，未编造接口、假成功或跳过覆盖；RAG、v2-only 和公共登记保持待接线。
 - 主代理随后按执行服务源码发现正常执行可能解决工单，将 C 的“释放本票领取”移到批准前，以免批准后控件正常消失导致测试自身竞态；不更改产品。最终暂存增量（这一顺序调整及审查记录）再次交由两轴静态复核，最终结论随提交回报协调。
 
-运行清单均为 **NOT_RUN**：测试、格式化与格式检查、lint、类型检查、构建、浏览器、Docker/Compose、产品 API、模型调用、质量/性能评测、完整门禁。没有截图、运行日志或分数；付费模型调用为 0 次。
+截至静态提交 `9f2f441` 的运行清单均为 **NOT_RUN**：测试、格式化与格式检查、lint、类型检查、构建、浏览器、Docker/Compose、产品 API、模型调用、质量/性能评测、完整门禁。当时没有截图、运行日志或分数；付费模型调用为 0 次。以下离线验证不追认先前未运行的结果。
 
 本阶段只对 `00d2a6a` 之后的 D/E、必要 helper 改动与本计划增量进行一次必要的 Standards / Spec 双轴静态审查；结果随最终提交回报协调，不因额度或时间目标重复全量 CR。D/E 的测试源码不继承原 #162/#165 或上一阶段的运行结论。
 
 可用于后续简历/面试的贡献描述：基于现有真实产品接缝准备 A–F 跨层验收源码及六阶段固定时钟编排，梳理 #173 全 AC 和父规格 40 条测试决策，区分实现、静态审查与运行证据。不能表述为全栈验收已通过、RAG 已达标、生产可靠性提升或已交付 #173。
+
+## 2026-08-31 离线聚焦窗口：结果与交接
+
+协调明确确认 #190 归还未使用窗口后，将下一离线聚焦窗口交给 #173。开始前宿主真实锁查询为 FREE；每个运行均使用仓库 `Enter-TestGateLock -Issue 173 -CommandType offline-focused`，以 `finally` 调用 `Exit-TestGateLock`，没有替换正式锁身份或绕过锁。运行前 HEAD 为 `9f2f44183f928ff5630fd4996bbf03397e8875c5`，验证包含以下未提交修正，不能将结果归到旧 HEAD 的原始内容上。
+
+新增 `scripts/test-issue173-clock-acceptance.ps1`：先解析本票 helper 与 #80 入口的 PowerShell 语法，再用进程内 `docker` 参数记录器执行真实编排脚本，检查六阶段顺序/业务时钟/串行 spec、重建后的代理刷新、失败停止后续阶段，以及成功/浏览器失败/后端重建失败下的环境恢复。它不调用 Docker，也不制造工单、Agent 或浏览器成功；被测 helper 的输出明确标注 `MOCK_DOCKER_HELPER`。该离线测试尚未加入公共 `check.ps1`，本窗口显式调用，不改未授权公共区域。
+
+| 运行 ID | 结果 | 证据与处理 |
+| --- | --- | --- |
+| `issue173-offline-prepare-431bce6f` | 脚本语法、三种编排契约、既有分类/失败传播契约通过；离线依赖准备完成 | 本机缓存安装506个前端包，`npm ci --offline --ignore-scripts` 无网络下载；系统 Node22.15.0 产生版本警告，后续前端验证切换到已有 bundled Node24.19.0，不将警告归因产品 |
+| `issue173-offline-scripts-317f5802` | PASS | 三种编排契约与 `scripts/test-browser-acceptance-plan.ps1` 均通过，真实 Docker 调用0；子进程输出另存 commands.log |
+| `issue173-offline-frontend-7cd1bf57` | FAIL，已修复 | Prettier 检出两个本票 spec 格式问题；停止后续步骤、释放锁，仅格式化本票文件 |
+| `issue173-offline-format-0845f0a9` | 格式 PASS；lint FAIL，已修复 | 11条 lint 错误归于两处根因：原候选快照 JSON 缺声明，以及 F 使用的 node:fs 缺类型；新增本票 `issue173-node-fs.d.ts`，沿用仓库局部 Node API 声明惯例，不新增依赖、不修改公共 node.d.ts |
+| `issue173-offline-frontend-9392fd61` | PASS | Node24.19.0；本票4个 TS/d.ts 文件格式与 lint 通过；前端 `tsc --noEmit` 通过；已有 `src/AutoResolution.test.tsx` 5/5通过。组件阶段139.22秒，其中模块导入112.68秒，测试本身1.30秒，不把导入耗时当产品性能 |
+
+本地原始日志保存在 `.local/issue173-offline/<运行ID>.log`，可复核子进程输出位于相应 `.commands.log`。最终输入摘要为 `.local/issue173-offline/validation-evidence.json`；初次 prepare 的 transcript 未收全子进程文本，因此另行复验脚本契约并用 Tee 保存输出，不伪称首个 transcript 完整。临时持锁 runner 也保留在该目录，仅作本窗口复现入口，不替代规范化完整门禁。
+
+通过验证的关键源码 blob：
+
+| 文件 | Git blob |
+| --- | --- |
+| `scripts/test-issue173-clock-acceptance.ps1` | `5fb9d17e0e2e28d233e092ad239785257f500ed1` |
+| `frontend/e2e/issue173.full-stack.spec.ts` | `ec631cefda4cf78cc40c236464cfe9e443c85151` |
+| `frontend/e2e/issue173.auto-resolution-clock.spec.ts` | `faeac87bcaf00d87d2a2242a53001d16571ae6dc` |
+| `frontend/e2e/support/issue173-node-fs.d.ts` | `b8d9367c41ceec967496a8ef360eaa0a30938c97` |
+
+本轮各次运行结束均记录 **LOCK_RELEASED**，最后宿主回读为 **TEST_GATE_FREE**（21:49，北京时间），离线窗口已归还，后续文档/双轴复核不持锁。未创建 Docker 容器、镜像、网络或卷；前端 node_modules 和 `.local` 仅为本 worktree 的忽略目录，不清理其他任务资源。
+
+**下一次真实固定时钟浏览器入口**：`scripts/issue173-clock-acceptance.ps1 -ProjectName <已准备的唯一隔离project>`，必须由外层已持锁进程调用并继承令牌；直接无令牌调用会拒绝执行。前置为已有规范镜像/隔离栈、真实 PostgreSQL、确定性 Agent、生产构建 React 与 browser-frontend 已就绪，沿用 #80 环境/fixture 准备及 artifacts 卷。范围仅 F 的六阶段、两张真实 UI 工单及回复边界；不包含 RAG、真实模型、全部 A–E 或整票 AC。现有 `scripts/issue80-acceptance.ps1` 会准备完整浏览器隔离环境并调度 F，但它还运行其他浏览器组及 #80 Session 阶段，不能冒称只跑 F；是否使用完整浏览器入口由协调另行调度。本轮没有启动任一真实浏览器入口。
+
+当前剩余：A–F 真实浏览器、后端/Agent 集成、模型/RAG、构建与完整 `check.ps1 -Issue 173` 仍 NOT_RUN，整票不能合入或关闭。静态提交和本次离线结果的协调消息此前被自动风险审查拦截，未送达；本地交接已保存，自动披露仍待用户明确授权目标任务。此通信阻塞不改变实际锁已释放的事实。

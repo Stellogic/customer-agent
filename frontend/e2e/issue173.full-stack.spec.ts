@@ -37,7 +37,9 @@ test("Issue #173 A：自然语言多问题澄清、一次建单与订单分组�
     const overview = page.getByRole("region", { name: "订单工单总览" });
     await expect(overview.getByRole("heading", { name: `订单 ${reference}` })).toBeVisible();
     for (const ticketId of result.ticketIds) {
-      await expect(overview.getByRole("button", { name: `打开工单 ${ticketId}`, exact: true })).toBeVisible();
+      await expect(
+        overview.getByRole("button", { name: `打开工单 ${ticketId}`, exact: true }),
+      ).toBeVisible();
     }
     expect(
       await page.evaluate(
@@ -61,20 +63,26 @@ test("Issue #173 D：真实低风险回复产生五分钟候选，刷新后仍�
     const notice = page.getByRole("region", { name: "自动解决状态" });
     const cancel = notice.getByRole("button", { name: "仍需帮助，取消自动解决" });
     await expect(cancel).toBeVisible({ timeout: 60_000 });
-    const candidate = JSON.parse(queryFixtureSql(`
+    const candidate = JSON.parse(
+      queryFixtureSql(`
       SELECT json_build_object('waitSeconds', extract(epoch FROM due_at - created_at)::integer, 'dueAt', due_at)
       FROM ticket_auto_resolution WHERE ticket_id = '${ticketId}' AND status = 'PENDING';
-    `)) as { waitSeconds: number; dueAt: string };
+    `),
+    ) as { waitSeconds: number; dueAt: string };
     expect(candidate.waitSeconds).toBe(300);
 
     const reloaded = page.waitForResponse(
-      (response) => response.request().method() === "GET" &&
+      (response) =>
+        response.request().method() === "GET" &&
         new URL(response.url()).pathname === `/api/customer/v2/tickets/${ticketId}`,
     );
     await page.reload();
     const response = await reloaded;
     expect(response.ok()).toBe(true);
-    const snapshot = await response.json();
+    const snapshot = (await response.json()) as {
+      ticket: { agentGeneration: number };
+      autoResolution: { dueAt: string };
+    };
     expect(snapshot).toMatchObject({
       ticket: { id: ticketId, lifecycleState: "INVESTIGATING", handlingMode: "AGENT" },
       autoResolution: { status: "PENDING" },
@@ -83,8 +91,10 @@ test("Issue #173 D：真实低风险回复产生五分钟候选，刷新后仍�
     // 默认 Compose 固定 Spring 时钟，浏览器可能已显示“正在重新核验”；不由浏览器归零断言解决。
     await expect(cancel).toBeVisible();
     const cancelled = page.waitForResponse(
-      (result) => result.request().method() === "POST" &&
-        new URL(result.url()).pathname === `/api/customer/tickets/${ticketId}/auto-resolution/cancel`,
+      (result) =>
+        result.request().method() === "POST" &&
+        new URL(result.url()).pathname ===
+          `/api/customer/tickets/${ticketId}/auto-resolution/cancel`,
     );
     await cancel.click();
     const cancelResponse = await cancelled;
@@ -96,11 +106,13 @@ test("Issue #173 D：真实低风险回复产生五分钟候选，刷新后仍�
     await expect(notice.getByText("已取消自动解决", { exact: true })).toBeVisible();
     await page.reload();
     await expect(notice.getByText("已取消自动解决", { exact: true })).toBeVisible();
-    expect(queryFixtureSql(`
+    expect(
+      queryFixtureSql(`
       SELECT t.lifecycle_state || ':' || a.status
       FROM support_ticket t JOIN ticket_auto_resolution a ON a.ticket_id = t.id
       WHERE t.id = '${ticketId}';
-    `)).toBe("INVESTIGATING:CANCELLED");
+    `),
+    ).toBe("INVESTIGATING:CANCELLED");
   } finally {
     await context.close();
   }
@@ -116,10 +128,15 @@ test("Issue #173 E：同订单两提案竞争30元额度，只允许一笔26.80�
     const customer = await customerContext.newPage();
     await login(customer, "customer", "customer-demo");
     const ticketIds: string[] = [];
-    for (const description of ["物流延迟，请人工客服核实。", "物流延迟，请人工客服继续处理新问题。"]) {
+    for (const description of [
+      "物流延迟，请人工客服核实。",
+      "物流延迟，请人工客服继续处理新问题。",
+    ]) {
       await customer.goto("/help");
       ticketIds.push(await createSingleTicket(customer, reference, description));
-      await expect(customer.getByText("人工客服处理中", { exact: true })).toBeVisible({ timeout: 60_000 });
+      await expect(customer.getByText("人工客服处理中", { exact: true })).toBeVisible({
+        timeout: 60_000,
+      });
     }
     expect(new Set(ticketIds).size).toBe(2);
 
@@ -127,32 +144,47 @@ test("Issue #173 E：同订单两提案竞争30元额度，只允许一笔26.80�
     await login(supportPages[0], "internal", "support-demo");
     await supportPages[1].goto("/internal/support");
     for (const [index, page] of supportPages.entries()) {
-      await page.getByRole("table", { name: "待接手工单", exact: true })
-        .getByRole("button", { name: `领取工单 ${ticketIds[index]}`, exact: true }).click();
+      await page
+        .getByRole("table", { name: "待接手工单", exact: true })
+        .getByRole("button", { name: `领取工单 ${ticketIds[index]}`, exact: true })
+        .click();
       await page.getByRole("button", { name: "确认领取", exact: true }).click();
-      await expect(page.locator(".support-ticket-detail").getByText(
-        `${ticketIds[index].slice(0, 8)}…${ticketIds[index].slice(-4)}`, { exact: true },
-      )).toBeVisible();
-      await expect(page.getByRole("region", { name: "标准补偿", exact: true })
-        .getByRole("combobox", { name: "补偿方案" })).toContainText("26.80 CNY");
+      await expect(
+        page
+          .locator(".support-ticket-detail")
+          .getByText(`${ticketIds[index].slice(0, 8)}…${ticketIds[index].slice(-4)}`, {
+            exact: true,
+          }),
+      ).toBeVisible();
+      await expect(
+        page
+          .getByRole("region", { name: "标准补偿", exact: true })
+          .getByRole("combobox", { name: "补偿方案" }),
+      ).toContainText("26.80 CNY");
     }
-    const proposals = await Promise.all(supportPages.map(async (page, index) => {
-      const proposed = page.waitForResponse(
-        (response) => response.request().method() === "POST" &&
-          new URL(response.url()).pathname === `/api/support/workbench/tickets/${ticketIds[index]}/compensation-proposals`,
-      );
-      await page.getByRole("button", { name: "提交审批", exact: true }).click();
-      const response = await proposed;
-      expect(response.status()).toBe(201);
-      const proposal = (await response.json()) as { proposalRevisionId: string };
-      expect(proposal.proposalRevisionId).toMatch(/^[0-9a-f-]{36}$/i);
-      return proposal;
-    }));
+    const proposals = await Promise.all(
+      supportPages.map(async (page, index) => {
+        const proposed = page.waitForResponse(
+          (response) =>
+            response.request().method() === "POST" &&
+            new URL(response.url()).pathname ===
+              `/api/support/workbench/tickets/${ticketIds[index]}/compensation-proposals`,
+        );
+        await page.getByRole("button", { name: "提交审批", exact: true }).click();
+        const response = await proposed;
+        expect(response.status()).toBe(201);
+        const proposal = (await response.json()) as { proposalRevisionId: string };
+        expect(proposal.proposalRevisionId).toMatch(/^[0-9a-f-]{36}$/i);
+        return proposal;
+      }),
+    );
     expect(new Set(proposals.map((proposal) => proposal.proposalRevisionId)).size).toBe(2);
-    expect(queryFixtureSql(`
+    expect(
+      queryFixtureSql(`
       SELECT pending_proposal_amount = 53.60 AND active_reservation_amount = 0 AND consumed_amount = 0
       FROM order_compensation_allowance WHERE order_reference = '${reference}';
-    `)).toBe("t");
+    `),
+    ).toBe("t");
     // 与 C 相同，在批准可能触发自动执行前释放本场景领取；不撤销其他场景的客服责任。
     for (const page of supportPages) {
       await page.getByRole("button", { name: "释放领取", exact: true }).click();
@@ -162,9 +194,13 @@ test("Issue #173 E：同订单两提案竞争30元额度，只允许一笔26.80�
     await login(approverPages[0], "internal", "approver-demo");
     await approverPages[1].goto("/internal/approvals");
     for (const [index, page] of approverPages.entries()) {
-      await page.getByRole("row").filter({
-        has: page.locator(`code[title="${proposals[index].proposalRevisionId}"]`),
-      }).getByRole("button", { name: "领取审批", exact: true }).click();
+      await page
+        .getByRole("row")
+        .filter({
+          has: page.locator(`code[title="${proposals[index].proposalRevisionId}"]`),
+        })
+        .getByRole("button", { name: "领取审批", exact: true })
+        .click();
       await expect(page.getByRole("heading", { name: reference, exact: true })).toBeVisible();
       await page.getByRole("button", { name: "批准补偿", exact: true }).click();
       await expect(page.getByRole("dialog", { name: "确认批准补偿" })).toBeVisible();
@@ -173,36 +209,49 @@ test("Issue #173 E：同订单两提案竞争30元额度，只允许一笔26.80�
     // 两个真实 UI 请求都到达后再同时放行；只延迟传输，不替换请求、响应或服务端锁。
     let readyCount = 0;
     let releaseRequests: () => void = () => {};
-    const bothReady = new Promise<void>((resolve) => { releaseRequests = resolve; });
+    const bothReady = new Promise<void>((resolve) => {
+      releaseRequests = resolve;
+    });
     for (const [index, page] of approverPages.entries()) {
-      await page.route(`**/api/approver/compensation-proposals/${proposals[index].proposalRevisionId}/approve`, async (route) => {
-        readyCount += 1;
-        if (readyCount === 2) releaseRequests();
-        await bothReady;
-        await route.continue();
-      });
-    }
-    const approvals = await Promise.all(approverPages.map(async (page, index) => {
-      const approved = page.waitForResponse(
-        (response) => response.request().method() === "POST" &&
-          new URL(response.url()).pathname === `/api/approver/compensation-proposals/${proposals[index].proposalRevisionId}/approve`,
+      await page.route(
+        `**/api/approver/compensation-proposals/${proposals[index].proposalRevisionId}/approve`,
+        async (route) => {
+          readyCount += 1;
+          if (readyCount === 2) releaseRequests();
+          await bothReady;
+          await route.continue();
+        },
       );
-      await page.getByRole("dialog", { name: "确认批准补偿" })
-        .getByRole("button", { name: "确认批准", exact: true }).click();
-      return approved;
-    }));
+    }
+    const approvals = await Promise.all(
+      approverPages.map(async (page, index) => {
+        const approved = page.waitForResponse(
+          (response) =>
+            response.request().method() === "POST" &&
+            new URL(response.url()).pathname ===
+              `/api/approver/compensation-proposals/${proposals[index].proposalRevisionId}/approve`,
+        );
+        await page
+          .getByRole("dialog", { name: "确认批准补偿" })
+          .getByRole("button", { name: "确认批准", exact: true })
+          .click();
+        return approved;
+      }),
+    );
     expect(approvals.map((response) => response.status()).sort()).toEqual([200, 409]);
     for (const page of approverPages) {
       await expect(page.getByRole("heading", { name: reference, exact: true })).toHaveCount(0);
       await expect(page.getByRole("button", { name: "批准补偿", exact: true })).toHaveCount(0);
     }
     // 执行可能仍在预占，也可能已经消费；互斥汇总应始终只占26.80，剩余3.20，执行记录只有一笔。
-    expect(queryFixtureSql(`
+    expect(
+      queryFixtureSql(`
       SELECT active_reservation_amount + consumed_amount = 26.80
         AND total_available_compensation_amount - active_reservation_amount = 3.20
         AND (SELECT count(*) FROM compensation_execution WHERE order_reference = '${reference}') = 1
       FROM order_compensation_allowance WHERE order_reference = '${reference}';
-    `)).toBe("t");
+    `),
+    ).toBe("t");
   } finally {
     await approverContext.close();
     await supportContext.close();
@@ -217,7 +266,11 @@ test("Issue #173 B：真实调查后连续追加消息并从断线恢复同一�
   try {
     const page = await context.newPage();
     await login(page, "customer", "customer-demo");
-    const ticketId = await createSingleTicket(page, reference, "物流延迟，请核实订单后说明处理方案。");
+    const ticketId = await createSingleTicket(
+      page,
+      reference,
+      "物流延迟，请核实订单后说明处理方案。",
+    );
     // 等真实 Agent 经 Spring 形成待审批结果；不注入完成事件或补偿提案。
     await expect(page.getByRole("heading", { name: "待审批", exact: true })).toBeVisible({
       timeout: 60_000,
@@ -261,7 +314,10 @@ test("Issue #173 B：真实调查后连续追加消息并从断线恢复同一�
     }
     await expect(page.getByRole("heading", { name: "正在重新同步工单" })).toHaveCount(0);
     await expect(
-      page.getByRole("heading", { name: `${ticketId.slice(0, 8)}…${ticketId.slice(-4)}`, exact: true }),
+      page.getByRole("heading", {
+        name: `${ticketId.slice(0, 8)}…${ticketId.slice(-4)}`,
+        exact: true,
+      }),
     ).toBeVisible();
   } finally {
     await context.close();
@@ -271,9 +327,15 @@ test("Issue #173 B：真实调查后连续追加消息并从断线恢复同一�
 test("Issue #173 C：人工领取与公开回复、标准补偿提交和独立审批", async ({ browser }) => {
   test.setTimeout(120_000);
   const reference = prepareOrder();
-  const customerContext = await newAcceptanceContext(browser, { viewport: { width: 1440, height: 960 } });
-  const supportContext = await newAcceptanceContext(browser, { viewport: { width: 1440, height: 960 } });
-  const approverContext = await newAcceptanceContext(browser, { viewport: { width: 1440, height: 960 } });
+  const customerContext = await newAcceptanceContext(browser, {
+    viewport: { width: 1440, height: 960 },
+  });
+  const supportContext = await newAcceptanceContext(browser, {
+    viewport: { width: 1440, height: 960 },
+  });
+  const approverContext = await newAcceptanceContext(browser, {
+    viewport: { width: 1440, height: 960 },
+  });
   try {
     const customer = await customerContext.newPage();
     await login(customer, "customer", "customer-demo");
@@ -287,8 +349,10 @@ test("Issue #173 C：人工领取与公开回复、标准补偿提交和独立�
     await login(support, "internal", "support-demo");
     await expect(support.getByRole("heading", { name: "客服共享队列" })).toBeVisible();
     await expect(support.getByText(description, { exact: true })).toHaveCount(0);
-    await support.getByRole("table", { name: "待接手工单", exact: true })
-      .getByRole("button", { name: `领取工单 ${ticketId}`, exact: true }).click();
+    await support
+      .getByRole("table", { name: "待接手工单", exact: true })
+      .getByRole("button", { name: `领取工单 ${ticketId}`, exact: true })
+      .click();
     await support.getByRole("button", { name: "确认领取", exact: true }).click();
     await expect(support.getByRole("heading", { name: "人工公开回复" })).toBeVisible();
     const reply = `已收到您的补充，正在核实物流。${crypto.randomUUID()}`;
@@ -301,7 +365,10 @@ test("Issue #173 C：人工领取与公开回复、标准补偿提交和独立�
     await support.reload();
     await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
     // 同一演示客服可能保留其他场景的领取；从真实已领取列表选回本票，不撤销他票责任。
-    const assignedTicket = support.getByRole("button", { name: `打开已领取工单 ${ticketId}`, exact: true });
+    const assignedTicket = support.getByRole("button", {
+      name: `打开已领取工单 ${ticketId}`,
+      exact: true,
+    });
     if (await assignedTicket.isVisible()) await assignedTicket.click();
     await expect(
       support.getByRole("region", { name: "问题描述" }).getByText(description, { exact: true }),
@@ -315,7 +382,8 @@ test("Issue #173 C：人工领取与公开回复、标准补偿提交和独立�
     const proposed = support.waitForResponse(
       (response) =>
         response.request().method() === "POST" &&
-        new URL(response.url()).pathname === `/api/support/workbench/tickets/${ticketId}/compensation-proposals`,
+        new URL(response.url()).pathname ===
+          `/api/support/workbench/tickets/${ticketId}/compensation-proposals`,
     );
     await compensation.getByRole("button", { name: "提交审批", exact: true }).click();
     const response = await proposed;
@@ -346,10 +414,13 @@ test("Issue #173 C：人工领取与公开回复、标准补偿提交和独立�
     const approved = approver.waitForResponse(
       (result) =>
         result.request().method() === "POST" &&
-        new URL(result.url()).pathname === `/api/approver/compensation-proposals/${proposal.proposalRevisionId}/approve`,
+        new URL(result.url()).pathname ===
+          `/api/approver/compensation-proposals/${proposal.proposalRevisionId}/approve`,
     );
-    await approver.getByRole("dialog", { name: "确认批准补偿" })
-      .getByRole("button", { name: "确认批准", exact: true }).click();
+    await approver
+      .getByRole("dialog", { name: "确认批准补偿" })
+      .getByRole("button", { name: "确认批准", exact: true })
+      .click();
     expect((await approved).ok()).toBe(true);
     await expect(approver.getByText("审批责任已结束，已返回队列。", { exact: true })).toBeVisible();
     await expect(approver.getByRole("heading", { name: reference, exact: true })).toHaveCount(0);
