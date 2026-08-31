@@ -121,6 +121,30 @@ test("Issue #190 无答案问题仍可返回授权候选而不冒充充分性判
   }
 });
 
+test("Issue #190 显式未授权范围返回权限错误而非空结果", async ({ browser }) => {
+  const context = await newAcceptanceContext(browser);
+  try {
+    const page = await context.newPage();
+    await login(page, "internal", "support-demo");
+    await page.goto("/internal/knowledge");
+    const panel = page.getByRole("region", { name: "中文混合检索" });
+    await panel.getByLabel("检索问题", { exact: true }).fill("物流延迟");
+    await panel.getByLabel("检索适用范围").selectOption("APPROVER");
+    const fetched = page.waitForResponse((response) =>
+      response.url().includes("/api/internal/knowledge/search?"),
+    );
+    await panel.getByRole("button", { name: "混合检索", exact: true }).click();
+    const response = await fetched;
+    expect(response.status()).toBe(403);
+    expect((await response.json()).code).toBe("KNOWLEDGE_ACCESS_DENIED");
+    await expect(panel.getByRole("alert")).toContainText("无权检索所选适用范围");
+    await expect(panel.getByText("当前授权范围内没有匹配的知识片段。")).toHaveCount(0);
+    await expect(panel.getByRole("list", { name: "RRF 检索片段" })).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+});
+
 test("Issue #190 两路排名前排除高分草稿和退役版本", async ({ browser }) => {
   const context = await newAcceptanceContext(browser);
   try {

@@ -138,6 +138,12 @@ def run_query(
             query.principal.subject_type != "INTERNAL"
             or "KNOWLEDGE_READ_ACCESS" not in query.principal.capabilities
         )
+        # 本入口只请求 INTERNAL 或 CUSTOMER_PUBLIC; 内部检索 API 不授予后者。
+        if expected_schema == "knowledge-hybrid-v2":
+            denied = denied or scope == "CUSTOMER_PUBLIC"
+            if denied and response.status_code != 403:
+                response.raise_for_status()
+                raise ValueError("预期权限拒绝必须返回 HTTP 403")
         if response.status_code == 403 and denied:
             result: dict[str, Any] = {
                 "results": [],

@@ -64,12 +64,14 @@ class KnowledgeRetrievalService {
         if (query == null || query.isBlank() || query.length() > 200) {
             throw new KnowledgeInvalidQueryException("检索问题长度必须在 1 到 200 之间");
         }
-        List<String> scopes =
-                scope == null ? allowed : allowed.stream().filter(scope::equals).toList();
         if (scope != null
                 && !List.of("INTERNAL", "SUPPORT", "APPROVER", "CUSTOMER_PUBLIC").contains(scope)) {
             throw new KnowledgeInvalidQueryException("检索适用范围无效");
         }
+        if (scope != null && !allowed.contains(scope)) {
+            throw new KnowledgeAccessDeniedException();
+        }
+        List<String> scopes = scope == null ? allowed : List.of(scope);
         try {
             Long generation =
                     jdbc.queryForObject(

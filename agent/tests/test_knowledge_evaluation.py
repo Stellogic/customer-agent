@@ -1,6 +1,9 @@
 import httpx
+import pytest
 
+from baseline_agent import knowledge_evaluation
 from baseline_agent.knowledge_evaluation import failure_observation, metrics, retrieval_metrics
+from baseline_agent.rag_eval_v1 import EvalPrincipal, EvalQuery
 
 
 def test_quality_metrics_penalize_answered_abstention_and_forbidden_results():
@@ -72,3 +75,45 @@ def test_failed_query_evidence_keeps_location_without_response_or_credentials():
         "http_status": 503,
         "code": "INDEX_STALE",
     }
+
+
+@pytest.mark.parametrize(
+    ("schema", "context", "status", "error"),
+    [
+        ("knowledge-hybrid-v2", "CUSTOMER_PUBLIC", 403, None),
+        ("knowledge-hybrid-v2", "INTERNAL", 403, httpx.HTTPStatusError),
+        ("knowledge-hybrid-v1", "CUSTOMER_PUBLIC", 403, httpx.HTTPStatusError),
+        ("knowledge-hybrid-v2", "CUSTOMER_PUBLIC", 200, ValueError),
+    ],
+)
+def test_layered_scope_denial_is_explicit_without_swallowing_other_errors(
+    monkeypatch, schema, context, status, error
+):
+    query = EvalQuery(
+        "synthetic-scope",
+        "out_of_scope",
+        "温室浇水",
+        (),
+        EvalPrincipal("INTERNAL", ("SUPPORT",), ("KNOWLEDGE_READ_ACCESS",), ("INTERNAL",)),
+        context,
+        (),
+        (),
+    )
+    client_type = httpx.Client
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(status, json={"code": "KNOWLEDGE_ACCESS_DENIED"})
+    )
+    monkeypatch.setattr(
+        knowledge_evaluation.httpx,
+        "Client",
+        lambda **kwargs: client_type(**kwargs, transport=transport),
+    )
+    monkeypatch.setattr(knowledge_evaluation, "login", lambda client, query: None)
+    if error is not None:
+        with pytest.raises(error):
+            knowledge_evaluation.run_query("https://example.test", query, schema)
+    else:
+        result = knowledge_evaluation.run_query("https://example.test", query, schema)
+        assert result["http_status"] == 403
+        assert result["results"] == []
+        assert result["lexicalCandidates"] == result["vectorCandidates"] == []

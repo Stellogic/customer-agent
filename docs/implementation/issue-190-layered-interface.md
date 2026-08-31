@@ -9,7 +9,7 @@
 - Java `KnowledgeRetrievalService.search(principal, query, scope)`；HTTP `GET /api/internal/knowledge/search?q=...&scope=...`，只支持真实内部会话。不存在 `searchAuthorizedScopes`；本票没有 Agent 或客户检索授权 API，不得伪装内部身份调用。
 - 响应 `schema=knowledge-hybrid-v2`，顶层 `query/generation/revision/lexicalCandidates/vectorCandidates/results`。不含 `policy`、校准哈希、阈值或 `answerable`；v1 的评分语义不能混用。
 - 各 hit 为 `chunkId/articleId/version/title/applicability/sourceFile/startLine/endLine/snippet/score/lexicalScore/vectorScore`，**无 updatedAt**。`results` 是 RRF 有序 Top-5，两个候选数组分别是排名前硬过滤后的最多 20 条词法/稠密候选，不是两个独立已验收的分路输出。
-- HTTP 200 的空 `results` 仅表示当前授权范围无匹配，不代表资料不足的语义判断。有效 scope 与当前身份允许范围无交集时，当前行为也是 200 空候选。无权限/客户调用内部接口是 403；400 为无效 query/scope；503 为模型、索引、检索或融合不可用。不能把非 200 当 NO_MATCH。
+- HTTP 200 的空 `results` 仅表示当前授权范围无匹配，不代表资料不足的语义判断。显式有效 scope 不在当前身份允许范围时返回 403，不调用编码器或检索。此前 200 空交集行为属于已确认的权限错误，不能继续作为接口契约。无权限/客户调用内部接口是 403；400 为无效 query/scope；503 为模型、索引、检索或融合不可用。不能把非 200 当 NO_MATCH。
 - 业务错误码来自 `KnowledgeCatalogExceptionHandler`：`KNOWLEDGE_ACCESS_DENIED`、`INVALID_KNOWLEDGE_QUERY`、`INDEX_STALE`、`MODEL_UNAVAILABLE`、`RETRIEVAL_UNAVAILABLE`、`FUSION_UNAVAILABLE`。旧 `CALIBRATION_REQUIRED` 不再是默认路径故障。路由级授权拒绝可能先于该处理器发生，应以 HTTP 403 处理。
 - 目录/条目详情 API 有 `updatedAt`，仍要求内部授权，且允许查旧版本；不能以该接口为客户补读或绕过当前发布过滤。#169/#170 共享 Agent 适配、授权范围与来源投影由协调指定的唯一 owner 承接，不在 #190 另建 HTTP 接口或复制其实现。
 

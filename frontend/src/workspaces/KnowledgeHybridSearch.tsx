@@ -51,6 +51,7 @@ export default function KnowledgeHybridSearch() {
         cache: "no-store",
         signal: controller.signal,
       });
+      if (response.status === 403) throw new Error("当前身份无权检索所选适用范围。");
       const value: unknown = await response.json();
       if (!response.ok) {
         const stale = record(value) && value.code === "INDEX_STALE";
