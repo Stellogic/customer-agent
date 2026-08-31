@@ -1,0 +1,27 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-layered-runtime-20260831b",
+  "head_sha": "34392b7ce8bc6a9274c7b3da2c849aecdec924ff",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Text workspace/user-home/machine prefixes only; original files retained locally. Browser synthetic screenshots are unchanged.",
+  "lock_release_observation": "Own lock released, one FREE read; coordinator notified. See phase cleanup_error separately.",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "compose.log",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "phase.json",
+      "source_sha256": "d0e4e2b3a0f40877ec252f9004fbcbe490e83f9973d457bdf25eac4f1258b3b8",
+      "archived_sha256": "d0e4e2b3a0f40877ec252f9004fbcbe490e83f9973d457bdf25eac4f1258b3b8"
+    },
+    {
+      "file": "runtime.log",
+      "source_sha256": "d5bd36b69ce21b4773b11dbe69a472096f90900dea122f518adea40b6523933d",
+      "archived_sha256": "c8bd7480a5a6cda25e68a865510758536708a9fa69616316220d0b7de685cbca"
+    }
+  ]
+}

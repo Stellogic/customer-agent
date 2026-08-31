@@ -1,0 +1,37 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-layered-preflight-20260831b",
+  "head_sha": "495d3d1f91d170c618364c8105e966a3dacff820",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Text workspace/user-home/machine prefixes only; original files retained locally. Browser synthetic screenshots are unchanged.",
+  "lock_release_observation": "Own lock released, one FREE read; coordinator notified. See phase cleanup_error separately.",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "focused.log",
+      "source_sha256": "2ab4d5483ea1eca92d55a5e2027f90e47de18340e64e841b3ed144b2112b839e",
+      "archived_sha256": "8fa612b09866183c7275a160bb160dcc3ded3f6d8995ee1606ca2751d528fc71"
+    },
+    {
+      "file": "focused.xml",
+      "source_sha256": "d6bd2b567f714b29de359ab267c1fa6664f8b1ef7b48cfe0f48eb1ab3f98c4fd",
+      "archived_sha256": "e5fa7f093b119861a7097a1bf76a92bae3acdf6586f75eefa943a0e9f38ece94"
+    },
+    {
+      "file": "phase.json",
+      "source_sha256": "c5ea42586965ff7d867398b6e725dbe0c84fc53e922f2b8f96822507e905caa5",
+      "archived_sha256": "c5ea42586965ff7d867398b6e725dbe0c84fc53e922f2b8f96822507e905caa5"
+    },
+    {
+      "file": "ruff-format.log",
+      "source_sha256": "6dd4929dd40ed1f25239565edabec7f1159826d90ed90c1c4330acf2b00db00d",
+      "archived_sha256": "6dd4929dd40ed1f25239565edabec7f1159826d90ed90c1c4330acf2b00db00d"
+    },
+    {
+      "file": "ruff.log",
+      "source_sha256": "bcff73dd8bd32aec47ebd724ded91d644de2bbd3c07c63b1f0da063fee7ef8a2",
+      "archived_sha256": "bcff73dd8bd32aec47ebd724ded91d644de2bbd3c07c63b1f0da063fee7ef8a2"
+    }
+  ]
+}

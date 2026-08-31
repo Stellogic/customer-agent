@@ -1,0 +1,13 @@
+{
+  "run_id": "issue190-layered-runtime-20260831a",
+  "head_sha": "495d3d1f91d170c618364c8105e966a3dacff820",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "ERROR",
+  "paid_model_calls": 0,
+  "answer_quality": "NOT_EVALUATED",
+  "phases": [],
+  "fingerprint": "6f1799638332c1985f1b607aa8991c32dc4f96755cd9c5fc570eba610921855e",
+  "failure": "Program \"docker.exe\" ended with non-zero exit code: 1 (0x00000001).",
+  "cleanup_error": "Program \"docker.exe\" ended with non-zero exit code: 1 (0x00000001).",
+  "elapsed_seconds": 146.3299583
+}
