@@ -1,5 +1,7 @@
 # #169 客户知识来源：隔离静态预开发
 
+> 本文记录首轮 UI 阶段。后续在 main `c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472` 上追加了纯引用结构校验/投影和[最小接入方案](issue-169-agent-retrieval-contract-proposal.md)；后文“没有服务端安全投影”描述首轮状态。新增纯模块仍不等于已完成授权、内容安全或真实检索接线。
+
 ## 范围与状态
 
 本轮基线：`origin/main` = `efbdb8348dc9c12f259c69d9e8c16de5e4d3994c`（2026-08-31 获取）。
