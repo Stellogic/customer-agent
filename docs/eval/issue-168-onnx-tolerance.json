@@ -1,0 +1,9 @@
+{
+  "protocol_id": "issue168-fp32-onnx-v1",
+  "max_absolute_error": 0.0001,
+  "max_cosine_distance": 0.00001,
+  "max_norm_error": 0.00001,
+  "min_top_k_overlap": 1.0,
+  "min_exact_order_rate": 1.0,
+  "k": 5
+}

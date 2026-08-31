@@ -1,0 +1,212 @@
+RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+ --> src\baseline_agent\knowledge_onnx.py:1:42
+  |
+1 | """#168 可选 feature-extraction 图导出与 CPU 执行，不加载/复制 #190 编码器。"""
+  |                                                  ^^
+2 |
+3 | from __future__ import annotations
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\baseline_agent\knowledge_onnx.py:3:1
+   |
+ 1 |   """#168 可选 feature-extraction 图导出与 CPU 执行，不加载/复制 #190 编码器。"""
+ 2 |
+ 3 | / from __future__ import annotations
+ 4 | |
+ 5 | | import hashlib
+ 6 | | import json
+ 7 | | import shutil
+ 8 | | from collections.abc import Callable
+ 9 | | from dataclasses import asdict
+10 | | from importlib import import_module
+11 | | from importlib.metadata import version
+12 | | from pathlib import Path
+13 | | from typing import Any
+14 | |
+15 | | from baseline_agent.rag_eval_v1 import load_rag_eval_v1
+16 | | from baseline_agent.knowledge_embedding import (
+17 | |     TOKENIZER_FILES,
+18 | |     load_feature_model,
+19 | |     load_tokenizer,
+20 | |     tokenize_texts,
+21 | |     verify_model_directory as verify_bge_directory,
+22 | | )
+   | |_^
+23 |
+24 |   TOKEN_INPUTS = ("input_ids", "attention_mask", "token_type_ids")
+   |
+help: Organize imports
+   |
+14 |
+   - from baseline_agent.rag_eval_v1 import load_rag_eval_v1
+15 | from baseline_agent.knowledge_embedding import (
+--------------------------------------------------------------------------------
+19 |     tokenize_texts,
+20 + )
+21 + from baseline_agent.knowledge_embedding import (
+22 |     verify_model_directory as verify_bge_directory,
+23 | )
+24 + from baseline_agent.rag_eval_v1 import load_rag_eval_v1
+25 |
+   |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_onnx.py:26:45
+   |
+24 | TOKEN_INPUTS = ("input_ids", "attention_mask", "token_type_ids")
+25 | # 集成方从已校验路径离线构造 CPU/eager feature model 和一批正确分词的示例。
+26 | # 本模块不访问 OfflineBgeEncoder._model/_tokenizer，也不复制其加载代码。
+   |                                                   ^^
+27 | FeatureSource = Callable[[Path], tuple[Any, dict[str, Any]]]
+   |
+
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+  --> src\baseline_agent\knowledge_onnx.py:42:18
+   |
+40 |     feature_source: FeatureSource,
+41 | ) -> dict[str, Any]:
+42 |     """只在获批持锁窗口调用；调用者提供 #190 校验器及尚待集成的加载接缝。"""
+   |                            ^^
+43 |     verified_path = verify_model_directory(model_directory)
+44 |     protocol = load_rag_eval_v1().protocol.model
+   |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_onnx.py:72:37
+   |
+70 |             return torch.nn.functional.normalize(hidden[:, 0], p=2, dim=1)
+71 |
+72 |     # 不覆盖既有模型/证据。失败可留下无 manifest 的目录，不能被运行器加载。
+   |                                                        ^^
+73 |     destination.mkdir(parents=True, exist_ok=False)
+74 |     artifact = destination / "model.onnx"
+   |
+
+RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+   --> src\baseline_agent\knowledge_onnx.py:113:15
+    |
+112 | class OnnxFeatureExtractor:
+113 |     """只接收分词张量，不是文本 Encoder；query 指令/截断适配留给集成方。"""
+    |                      ^^
+114 |
+115 |     def __init__(self, directory: Path) -> None:
+    |
+
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+   --> src\baseline_agent\knowledge_onnx.py:113:28
+    |
+112 | class OnnxFeatureExtractor:
+113 |     """只接收分词张量，不是文本 Encoder；query 指令/截断适配留给集成方。"""
+    |                                        ^^
+114 |
+115 |     def __init__(self, directory: Path) -> None:
+    |
+
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+ --> src\baseline_agent\knowledge_resources.py:1:18
+  |
+1 | """显式单进程 CPU 编码基准；每次 spawn 隔离模型加载与操作系统峰值 RSS。"""
+  |                           ^^
+2 |
+3 | from __future__ import annotations
+  |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_resources.py:50:19
+   |
+48 |         raise ValueError("延迟必须为有限正数")
+49 |     ordered = sorted(latencies_ms)
+50 |     # nearest-rank，无插值；延迟单位是一次 batch encode，吞吐单位是文本/秒。
+   |                   ^^
+51 |     return {
+52 |         "p50_batch_ms": ordered[math.ceil(len(ordered) * 0.50) - 1],
+   |
+
+RUF003 Comment contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+  --> src\baseline_agent\knowledge_resources.py:50:23
+   |
+48 |         raise ValueError("延迟必须为有限正数")
+49 |     ordered = sorted(latencies_ms)
+50 |     # nearest-rank，无插值；延迟单位是一次 batch encode，吞吐单位是文本/秒。
+   |                           ^^
+51 |     return {
+52 |         "p50_batch_ms": ordered[math.ceil(len(ordered) * 0.50) - 1],
+   |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_resources.py:50:44
+   |
+48 |         raise ValueError("延迟必须为有限正数")
+49 |     ordered = sorted(latencies_ms)
+50 |     # nearest-rank，无插值；延迟单位是一次 batch encode，吞吐单位是文本/秒。
+   |                                                        ^^
+51 |     return {
+52 |         "p50_batch_ms": ordered[math.ceil(len(ordered) * 0.50) - 1],
+   |
+
+RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_resources.py:59:14
+   |
+58 | def peak_rss_bytes() -> int:
+59 |     """OS 高水位，不是权重体积或定时采样的最大值。"""
+   |                 ^^
+60 |     if os.name == "nt":
+61 |         from ctypes import wintypes
+   |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+   --> src\baseline_agent\knowledge_resources.py:102:47
+    |
+100 | ) -> None:
+101 |     try:
+102 |         # factory 必须是显式选择的可信本地 module:callable，在新进程内加载。
+    |                                                           ^^
+103 |         os.environ["OMP_NUM_THREADS"] = "1"
+104 |         os.environ["MKL_NUM_THREADS"] = "1"
+    |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+   --> src\baseline_agent\knowledge_resources.py:124:29
+    |
+122 |                 latencies.append((time.perf_counter() - batch_started) * 1000)
+123 |         elapsed_ms = (time.perf_counter() - measured_started) * 1000
+124 |         # 在包元数据读取和结果序列化前取高水位，包含加载、首推理和所有测量。
+    |                                               ^^
+125 |         peak = peak_rss_bytes()
+126 |         versions = {}
+    |
+
+RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+   --> src\baseline_agent\knowledge_resources.py:170:20
+    |
+168 |     hardware_id: str,
+169 | ) -> dict[str, Any]:
+170 |     """调用即启动真实进程/推理，必须由获批的外层持锁入口调用。"""
+    |                               ^^
+171 |     if not hardware_id.strip() or not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+172 |         raise ValueError("必须记录硬件标识和有限正超时")
+    |
+
+RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+  --> tests\test_knowledge_embedding.py:67:42
+   |
+66 | def test_tokenizer_missing_files_fails_without_requiring_model_weights(tmp_path):
+67 |     with pytest.raises(ValueError, match="config.json"):
+   |                                          ^^^^^^^^^^^^^
+68 |         load_tokenizer(tmp_path)
+   |
+help: Use a raw string or `re.escape()` to make the intention explicit
+
+RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> tests\test_knowledge_resources.py:11:18
+   |
+10 | class SmallEncoder:
+11 |     """仅验证进程/计数边界，不提供 BGE 性能或质量证据。"""
+   |                           ^^
+12 |
+13 |     def __init__(self, directory):
+   |
+
+Found 17 errors.
+[*] 1 fixable with the `--fix` option.
