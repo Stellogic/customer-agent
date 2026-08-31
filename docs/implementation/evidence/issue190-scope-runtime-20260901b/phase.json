@@ -1,0 +1,66 @@
+{
+  "run_id": "issue190-scope-runtime-20260901b",
+  "head_sha": "eae2cc9772c1581b7f730c157343ef8b7828f905",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "PASS",
+  "paid_model_calls": 0,
+  "answer_quality": "NOT_EVALUATED",
+  "phases": [
+    "COMPONENTS_PASS",
+    "BROWSER_PASS"
+  ],
+  "fingerprint": "e0d4568bd09e7ce808712f1a9a9518de59d73f442827f0282524a5aa7a763ad9",
+  "builds": [
+    {
+      "Image": "customer-agent/backend-test:gate-issue190-scope-runtime-20260901b",
+      "Target": "test",
+      "Seconds": 1.124,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/agent-test:gate-issue190-scope-runtime-20260901b",
+      "Target": "test",
+      "Seconds": 1.206,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/frontend-test:gate-issue190-scope-runtime-20260901b",
+      "Target": "test",
+      "Seconds": 89.66,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/backend:gate-issue190-scope-runtime-20260901b",
+      "Target": "runtime",
+      "Seconds": 1.103,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/agent:gate-issue190-scope-runtime-20260901b",
+      "Target": "runtime",
+      "Seconds": 1.078,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/frontend:gate-issue190-scope-runtime-20260901b",
+      "Target": "runtime",
+      "Seconds": 2.64,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/frontend-browser-test:gate-issue190-scope-runtime-20260901b",
+      "Target": "browser-test",
+      "Seconds": 1.053,
+      "Reused": false
+    },
+    {
+      "Image": "customer-agent/frontend-browser-server:gate-issue190-scope-runtime-20260901b",
+      "Target": "browser-server",
+      "Seconds": 1.207,
+      "Reused": false
+    }
+  ],
+  "quality": "NOT_RUN",
+  "resources": "CLEANED",
+  "elapsed_seconds": 191.7405697
+}

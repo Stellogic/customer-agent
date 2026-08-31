@@ -11,3 +11,25 @@
 新增独立 HTTP 解析回归 4 项，以及真实客服页面选择审批范围的浏览器用例。`issue190-scope-preflight-20260901a` 在提交前脏树完成聚焦 7 项、相关离线 50 项、Ruff/类型/Java/前端格式 PASS，63.6995 秒；不是干净最终 SHA 或真实浏览器证据。[原始预检与哈希](evidence/issue190-scope-preflight-20260901a/index.json)。此轮还回读此前 runtime-a/b 自有镜像标签均为空，不清理其他任务资源。结束释放自身锁，只读一次 FREE 并通知协调。
 
 修复后增量 Standards PASS / Spec PASS（各 0 阻塞），未读冻结逐题结果或独立留出；真实组件/浏览器及新的最终门禁待运行。没有付费调用、费用 0，旧账本未重置。此记录是一次自动化门禁未覆盖、随后审查发现的工程缺陷，可作为学习项目的试错证据；不宣称生产事故或用户独立手写贡献。
+
+## 后续真实复验与响应正文问题
+
+上述“待运行”为提交时状态，后续三次真实运行均保留，未覆盖旧结果：
+
+| RunId | HEAD | 结果 | 阶段秒 |
+| --- | --- | --- | ---: |
+| issue190-scope-runtime-20260901a | 0527552d250f6c2a819cff6365ad8870268f7761 | 三端组件 PASS；浏览器 5 通过、新增权限用例 30 秒超时 | 504.9397 |
+| issue190-scope-trace-20260901a | 同上 | 不改源码/断言/超时，只跑该用例，重复超时；成功保存 trace | 116.7566 |
+| issue190-scope-runtime-20260901b | eae2cc9772c1581b7f730c157343ef8b7828f905 | 组件 PASS；原 6 项浏览器全部 PASS（10.7 秒） | 191.7406 |
+
+trace 中 HTTP 403 断言已完成，页面快照已经显示正确的权限 alert；卡住的是随后 Playwright `Response.body`，只有 before、没有 after。前端新增的 403 分支在读取错误正文之前抛出异常。`eae2cc9` 仅将它移到 `await response.json()` 之后：读取正常的 JSON 权限响应，再显示同一错误。全部原断言（403、错误码、权限提示及不能显示空结果）和 30 秒超时保持不变，原六例恢复通过。该修复增量 Standards / Spec 各 PASS；这是响应消费接缝问题，不是检索质量失败，没有据此改题、改权限或调参。
+
+组件细节：runtime-a 后端 Gradle check 实际执行通过，Agent 312 项通过、前端 164 通过/3 个既有跳过；trace-a 使用相同源码构建缓存。runtime-b 后端/Agent 使用同源缓存，前端变更后重新运行规范检查。三轮均未执行冻结质量评测、没有付费调用，清理自有资源/镜像完成；各次释放后只读一次宿主 FREE 并通知协调，窗口保留用于后续完整门禁。
+
+- [runtime-a 失败与组件输出](evidence/issue190-scope-runtime-20260901a/index.json)
+- [trace-a 失败、页面快照与脱敏诊断](evidence/issue190-scope-trace-20260901a/index.json)
+- [runtime-b 通过、桌面/窄屏截图与原始日志](evidence/issue190-scope-runtime-20260901b/index.json)
+
+runtime-a 因旧临时脚本复制了空 `/artifacts`，未保存失败 trace；trace-a 改为复制真实 `/app/test-results`，不修改产品。原 zip 可能含临时会话头，仅留在本地 `.local/gate-evidence/issue190-scope-trace-20260901a/browser`，其 SHA256 与不含头/凭据的诊断摘要归档；不把敏感 raw zip 提交 Git。runtime-b 成功保存两张真实截图。后续仅文档归档不改变已复验源码；仍须新的最终完整门禁后合入关票，不复用旧 final-a 的交付证据。
+
+本次三轮归档再次经 Standards PASS / Spec PASS（各 0 阻塞）；Standards 核对 18 个归档文件哈希及未提交 raw trace，Spec 核对失败/成功和质量未运行的边界。没有新增运行或变更源码。

@@ -1,0 +1,11 @@
+{
+  "source_trace_sha256": "1cbd040a5759bd86e6afdf1c238c988bc33002ff76d0fecf14a778509dd7d5dd",
+  "redaction": "Only operation names/times and observed UI/status; no cookies, request headers or login payload. Raw trace retained locally only.",
+  "observations": [
+    "HTTP 403 assertion completed in test.trace expect@45",
+    "0-trace.trace call@32 Response.body has before but no after",
+    "error-context.md shows current scope APPROVER and the expected permission alert"
+  ],
+  "verdict": "UNREAD_RESPONSE_BODY_WAIT",
+  "method_unchanged": true
+}
