@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import {
   assignmentKey,
+  type AssistanceKind,
   type AssistanceView,
   type SupportAssistanceState,
 } from "./supportAssistanceState";
@@ -19,6 +20,7 @@ export type SupportAssistancePanelProps = {
   // 只将已审阅的文本填入现有人工 composer；不得在此回调直接发送。
   // null 表示尚未接线或既有人工发送正在处理中/结果未确认。
   onReviewDraft: ((text: string) => void) | null;
+  onRequest?: ((kind: AssistanceKind) => void) | null;
 };
 
 export function SupportAssistancePanel(props: SupportAssistancePanelProps) {
@@ -30,6 +32,7 @@ export function SupportAssistancePanel(props: SupportAssistancePanelProps) {
       key={assignmentKey(props.state.assignment)}
       view={props.state.view}
       onReviewDraft={props.onReviewDraft}
+      onRequest={props.onRequest ?? null}
     />
   );
 }
@@ -37,9 +40,11 @@ export function SupportAssistancePanel(props: SupportAssistancePanelProps) {
 function AuthorizedAssistance({
   view,
   onReviewDraft,
+  onRequest,
 }: {
   view: AssistanceView;
   onReviewDraft: SupportAssistancePanelProps["onReviewDraft"];
+  onRequest: ((kind: AssistanceKind) => void) | null;
 }) {
   const titleId = useId();
   const [draft, setDraft] = useState("");
@@ -77,13 +82,14 @@ function AuthorizedAssistance({
           <button
             key={kind}
             type="button"
-            onClick={() => setNotice(`${label}接入开发中，未发起 Agent 请求。`)}
+            disabled={onRequest !== null && (view.status === "loading" || view.status === "empty")}
+            onClick={() => onRequest ? onRequest(kind as AssistanceKind) : setNotice(`${label}接入开发中，未发起 Agent 请求。`)}
           >
             {label}
           </button>
         ))}
       </nav>
-      <p className="support-assistance__hint">辅助接入开发中；不会执行建议、修改工单或提交补偿。</p>
+      <p className="support-assistance__hint">{onRequest ? "辅助仅供人工审阅；不会执行建议、修改工单或提交补偿。" : "辅助接入开发中；不会执行建议、修改工单或提交补偿。"}</p>
 
       <div className="support-assistance__result" aria-busy={view.status === "loading"}>
         {view.status === "idle" && <p>暂无辅助结果，可继续人工编辑回复。</p>}

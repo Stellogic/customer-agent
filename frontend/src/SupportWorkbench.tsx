@@ -12,6 +12,7 @@ import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import { IntakeAssistancePanel } from "./IntakeAssistancePanel";
 import { SupportCompensationPanel } from "./SupportCompensationPanel";
+import { SupportAssistance } from "./components/support-assistance/SupportAssistance";
 import { clearPendingReply, readPendingReply, storePendingReply } from "./supportReplyStorage";
 
 const SUPPORT_SCHEMA = "support-workbench-v2" as const;
@@ -96,6 +97,7 @@ export function SupportWorkbench() {
     "loading" | "syncing" | "resetting" | "live" | "stale"
   >("loading");
   const [details, setDetails] = useState<TicketDetails | null>(null);
+  const [suspendedAssistanceTicket, setSuspendedAssistanceTicket] = useState<string | null>(null);
   const [pendingClaimTicketId, setPendingClaimTicketId] = useState<string | null>(null);
   const [claimingTicketId, setClaimingTicketId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
@@ -116,6 +118,7 @@ export function SupportWorkbench() {
   }, []);
 
   function invalidateDetailAuthority() {
+    setSuspendedAssistanceTicket(null);
     detailAuthorityGeneration.current += 1;
     detailStreamController.current?.abort();
     detailStreamController.current = null;
@@ -468,10 +471,12 @@ export function SupportWorkbench() {
       generation !== detailAuthorityGeneration.current
     )
       return;
+    setSuspendedAssistanceTicket(ticketId);
     try {
       const value = await readTicketDetails(ticketId);
       if (generation !== detailAuthorityGeneration.current) return;
       setDetails((current) => (current?.ticketId === ticketId ? value : current));
+      setSuspendedAssistanceTicket(null);
       void monitorTicketAuthority(ticketId, generation);
     } catch {
       if (generation !== detailAuthorityGeneration.current) return;
@@ -574,6 +579,7 @@ export function SupportWorkbench() {
                 <TicketDetail
                   key={details.ticketId}
                   details={details}
+                  assistanceAvailable={suspendedAssistanceTicket !== details.ticketId}
                   onCopyError={setActionError}
                   onSendReply={sendPublicReply}
                   onQueryReply={queryPublicReply}
@@ -742,6 +748,7 @@ function QueueSection({
 
 function TicketDetail({
   details,
+  assistanceAvailable,
   onCopyError,
   onSendReply,
   onQueryReply,
@@ -749,6 +756,7 @@ function TicketDetail({
   onRelease,
 }: {
   details: TicketDetails;
+  assistanceAvailable: boolean;
   onCopyError: (message: string) => void;
   onSendReply: (
     ticketId: string,
@@ -771,11 +779,23 @@ function TicketDetail({
     storedPendingReply ? "上次公开回复的发送结果尚未确认，请查询 Spring 权威结果。" : "",
   );
   const replyBusy = replyState === "sending" || replyState === "querying";
+  const [reviewedAssistance, setReviewedAssistance] = useState<string | null>(null);
+  useEffect(() => {
+    if (!assistanceAvailable) setReviewedAssistance(null);
+  }, [assistanceAvailable]);
+
+  function reviewAssistance(text: string) {
+    if (!assistanceAvailable || replyBusy || replyState === "unknown") return;
+    if (draft.trim() && draft !== text) {
+      setReviewedAssistance(text);
+    } else setDraft(text);
+  }
 
   async function submitReply() {
     const body = draft.trim();
     if (!body || replyState === "sending" || replyState === "querying") return;
     const idempotencyKey = createIdempotencyKey();
+    setReviewedAssistance(null);
     storePendingReply(details.ticketId, { idempotencyKey, body });
     setPendingIdempotencyKey(idempotencyKey);
     setReplyState("sending");
@@ -883,11 +903,18 @@ function TicketDetail({
             aria-label="公开回复"
             value={draft}
             maxLength={2000}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => { setDraft(event.target.value); setReviewedAssistance(null); }}
             placeholder="写下客户可以看到的回复…"
             disabled={replyBusy || replyState === "unknown"}
             rows={4}
           />
+          {reviewedAssistance !== null && !replyBusy && replyState !== "unknown" && (
+            <div role="group" aria-label="确认替换人工发送区草稿">
+              <p>发送区已有编辑内容，是否替换为已审阅辅助草稿？不会自动发送。</p>
+              <button type="button" onClick={() => { setDraft(reviewedAssistance); setReviewedAssistance(null); }}>替换发送区草稿</button>
+              <button type="button" onClick={() => setReviewedAssistance(null)}>保留发送区编辑</button>
+            </div>
+          )}
           <div className="support-reply-actions">
             <small>{draft.trim().length}/2000</small>
             <button
@@ -917,6 +944,11 @@ function TicketDetail({
             </p>
           )}
         </section>
+      )}
+
+      {details.handlingMode === "HUMAN" && assistanceAvailable && (
+        <SupportAssistance ticketId={details.ticketId} defaultQuery={details.description}
+          onReviewDraft={replyBusy || replyState === "unknown" ? null : reviewAssistance} />
       )}
 
       {details.handlingMode === "HUMAN" && (

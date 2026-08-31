@@ -168,3 +168,14 @@
     width: 100%;
   }
 }
+.support-assistance-host > label {
+  display: grid;
+  gap: 0.5rem;
+  margin-block: 1rem;
+}
+
+.support-assistance-host > label > textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+}
