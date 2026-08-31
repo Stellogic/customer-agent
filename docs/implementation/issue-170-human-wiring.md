@@ -10,7 +10,7 @@
 
 本分支只引用这些公开类/纯解析，未复制未合入实现。它们目前不在 main 中，**运行前须同步 #169 已交付源码并核对契约**；当前静态审查不能证明本分支已可编译。旧 #190 scope 交集200语义不使用，显式越权由403处理。
 
-双方确认：#170 拥有 queue 下自有文件、SupportWorkbench 中辅助挂载/草稿衔接、`langgraph.json` 的 support_assistance 注册；请求表暂用 V43，#169暂用 V44。编号不是预留，交付前按最新 main 核对并重排未发布迁移。#169拥有知识适配及客户路径。本票未改 App、InternalShell、共享回复/补偿存储、编码器或 #189 资产。
+协调统一交付顺序：#169 共享实现先交付并使用 V43，#170 后交付，请求表使用 `V44__support_assistance_request.sql`；本票已将未发布的 V43 仅改名为 V44，SQL内容不变。#170仍拥有 queue 下自有文件、SupportWorkbench 中辅助挂载/草稿衔接和 `langgraph.json` 的 support_assistance 注册。运行前须同步 #169 正式 main 并再次核对序号，不修改已发布迁移、不用 outOfOrder 绕过。#169拥有知识适配及客户路径，本票未修改其文件，也未改 App、InternalShell、共享回复/补偿存储、编码器或 #189 资产。
 
 ## 最小运行链路
 
@@ -18,7 +18,7 @@
 
 1. 已授权客服详情挂载独立 SupportAssistance。GET `/api/support/workbench/tickets/{ticketId}/assistance/context` 只返回当前 assignmentId；必须 SUPPORT/HUMAN/ACTIVE 且工单非终态。主体取 Authentication，不接受 supportId、scope 或 generation。
 2. POST `/assistance/requests` 使用 `support-assistance-v1`、assignmentId、UUID requestId、四种 kind 和最多200字符查询（与共享检索上限一致）。CSRF/会话复用既有链路。输入只由 Spring 加载当前描述、最近20条公开消息和授权调查事实，不采用浏览器提供的事实/知识。
-3. V43 持久化请求参数和输入投影。按客服/requestId唯一，同 ID 异工单/assignment/type/query 拒绝；参数直接比较，不新增哈希。工单行锁只覆盖申请执行权及保存回执的短事务；重复请求读取原回执，不再次执行。
+3. V44 持久化请求参数和输入投影。按客服/requestId唯一，同 ID 异工单/assignment/type/query 拒绝；参数直接比较，不新增哈希。工单行锁只覆盖申请执行权及保存回执的短事务；重复请求读取原回执，不再次执行。
 4. 外层无事务地检索，之后再次验证 assignment；独立 support_assistance 图在同次 DeepSeek 输出充分性决定和总结/知识说明/政策解释/草稿，不单独调用充分性模型，无业务工具、自动发送或自动重试。
 5. Spring 检查输出结构、长度、引用必须来自本次 Top5及逐字原文，以 canonical metadata 构造浏览器白名单投影；调用 #169 复核选中完整 Source，再验证当前 assignment 才存/返回。每次 GET `/assistance/requests/{requestId}` 也重新验证授权及知识引用，不缓存授权结论。模型 audit/知识原始回执不发送浏览器。
 6. 客服手动插入、编辑并勾选审阅后，只把文字移交既有人工发送区。发送区已有编辑时再次确认替换；发送中/结果未知时禁止移交。最终公开发送仍由原按钮、CSRF、权限与幂等路径执行。详情撤权/断线重同步卸载辅助组件并中止客户端接收。
@@ -50,3 +50,5 @@
 ## 静态双 CR 记录
 
 固定比较 `git diff --cached 6bc2eff270349f985494dd30f4e1f91fe034930f`，最终23个自有文件。Standards首轮PASS；Spec首轮发现P1原HTTP会话未在慢调用返回前复核、P2详情权限流断开后等待重读期间辅助未卸载。两项均已修复并添加测试源码：会话注销/主体切换拒绝内容返回，慢详情重读尚未完成时辅助编辑区已卸载。复核后 **Standards PASS / Spec PASS，剩余各0项有效发现**。最终文档只补记审查过程，无被测或实测证据；所有运行仍NOT_RUN。
+
+迁移顺序增量：基线 `debe02094eca3f3ad4af8c03a84a7b73fc1ffa84`，仅自有迁移 V43→V44 的100%同内容重命名和本文引用更新；Standards / Spec 各 PASS、0项发现。未运行验证、未查询锁、未修改已发布迁移或他票文件。
