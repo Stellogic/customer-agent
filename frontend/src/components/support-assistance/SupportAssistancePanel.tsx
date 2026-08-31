@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { assignmentKey, type AssistanceView, type SupportAssistanceState } from "./supportAssistanceState";
 import "./support-assistance.css";
 
 const assistanceLabels = {
@@ -8,47 +9,22 @@ const assistanceLabels = {
   draft: "回复草稿",
 } as const;
 
-// 仅为本组件的展示模型，不是 #169 的共享 Agent 或 HTTP 契约。
-export type AssistanceKind = keyof typeof assistanceLabels;
-export type AssistanceView =
-  | { status: "idle" }
-  | { status: "loading"; kind: AssistanceKind }
-  | { status: "empty"; kind: AssistanceKind }
-  | { status: "error"; reason: "conflict" | "index" | "model" }
-  | {
-      status: "ready";
-      kind: AssistanceKind;
-      requestId: string;
-      text: string;
-      suggestions: string[];
-      citations: Array<{
-        title: string;
-        version: string;
-        articleId: string;
-        chunkId: string;
-        snippet: string;
-        applicability: string[];
-      }>;
-    };
-
 export type SupportAssistancePanelProps = {
-  // 宿主只在当前负责客服 + HUMAN + 权威投影有效时提供非空键。
-  // 键必须区分会话身份、工单和责任代次；撤权/断线重同步时立即传 null。
-  projectionKey: string | null;
-  view: { projectionKey: string; content: AssistanceView } | null;
+  // 宿主使用 #170 纯状态函数，撤权/断线重同步时撤销 assignment。
+  state: SupportAssistanceState;
   // 只将已审阅的文本填入现有人工 composer；不得在此回调直接发送。
   // null 表示尚未接线或既有人工发送正在处理中/结果未确认。
   onReviewDraft: ((text: string) => void) | null;
 };
 
 export function SupportAssistancePanel(props: SupportAssistancePanelProps) {
-  if (props.projectionKey === null) {
+  if (props.state.assignment === null) {
     return <p role="status">当前无有效人工处理权限，辅助内容与草稿已清除。</p>;
   }
   return (
     <AuthorizedAssistance
-      key={props.projectionKey}
-      view={props.view?.projectionKey === props.projectionKey ? props.view.content : { status: "idle" }}
+      key={assignmentKey(props.state.assignment)}
+      view={props.state.view}
       onReviewDraft={props.onReviewDraft}
     />
   );
@@ -109,7 +85,7 @@ function AuthorizedAssistance({
         {view.status === "empty" && <p role="status">{assistanceLabels[view.kind]}暂无可用答案，请人工核实。</p>}
         {view.status === "error" && (
           <p role="alert">
-            {{ conflict: "知识存在冲突，请人工核实适用政策。", index: "知识索引暂不可用。", model: "模型辅助暂不可用。" }[view.reason]}
+            {{ conflict: "知识依据不可用，请人工核实适用政策。", index: "知识索引暂不可用。", embedding: "知识向量模型暂不可用。", model: "回复生成模型暂不可用。", retrieval: "知识检索暂不可用。", request: "辅助请求未被接受，请核实输入和请求身份。" }[view.reason]}
             人工处理不受影响。
           </p>
         )}
@@ -133,8 +109,10 @@ function AuthorizedAssistance({
                     <strong>{citation.title}</strong>
                     <dl>
                       <div><dt>版本</dt><dd>{citation.version}</dd></div>
+                      <div><dt>更新时间</dt><dd><time dateTime={citation.updatedAt}>{citation.updatedAt}</time></dd></div>
                       <div><dt>内部标识</dt><dd>{citation.articleId} / {citation.chunkId}</dd></div>
                       <div><dt>适用范围</dt><dd>{citation.applicability.join("、")}</dd></div>
+                      <div><dt>引用行号</dt><dd>{citation.startLine}–{citation.endLine}</dd></div>
                     </dl>
                     <blockquote>{citation.snippet}</blockquote>
                   </li>

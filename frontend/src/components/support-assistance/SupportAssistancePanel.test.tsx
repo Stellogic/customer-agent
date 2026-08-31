@@ -2,12 +2,17 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   SupportAssistancePanel,
-  type AssistanceView,
   type SupportAssistancePanelProps,
 } from "./SupportAssistancePanel";
+import {
+  createSupportAssistanceState,
+  reduceSupportAssistance,
+  type AssistanceView,
+  type SupportAssignment,
+} from "./supportAssistanceState";
 
 // 仅测试展示交互的合成 fixture；不代表真实 Agent 或检索契约、质量证据。
-const projectionKey = "session-a/ticket-a/claim-1";
+const assignment: SupportAssignment = { sessionKey: "session-a", ticketId: "ticket-a", assignmentId: "claim-1" };
 const fixture: AssistanceView = {
   status: "ready",
   kind: "draft",
@@ -19,13 +24,26 @@ const fixture: AssistanceView = {
     version: "fixture-v1",
     articleId: "fixture-article",
     chunkId: "fixture-chunk",
+    updatedAt: "2026-08-31T01:00:00Z",
+    startLine: 3,
+    endLine: 5,
     snippet: "合成引用：先核实签收情况。",
     applicability: ["合成测试范围"],
   }],
 };
 
 function props(content: AssistanceView = fixture): SupportAssistancePanelProps {
-  return { projectionKey, view: { projectionKey, content }, onReviewDraft: null };
+  let state = createSupportAssistanceState(assignment);
+  if (content.status !== "idle") {
+    const request = {
+      assignment,
+      requestId: content.status === "ready" ? content.requestId : "fixture-request-1",
+      kind: "kind" in content ? content.kind : "draft" as const,
+    };
+    state = reduceSupportAssistance(state, { type: "start", request });
+    if (content.status !== "loading") state = reduceSupportAssistance(state, { type: "complete", request, view: content });
+  }
+  return { state, onReviewDraft: null };
 }
 
 function editor() {
@@ -63,6 +81,8 @@ describe("独立客服辅助展示与草稿", () => {
       expect(screen.getByText(text)).toBeInTheDocument();
     }
     expect(screen.getByText("fixture-article / fixture-chunk")).toBeInTheDocument();
+    expect(screen.getByText("2026-08-31T01:00:00Z")).toBeInTheDocument();
+    expect(screen.getByText("3–5")).toBeInTheDocument();
     expect(screen.queryByText("不应呈现的 prompt")).not.toBeInTheDocument();
     expect(screen.queryByText("不应呈现的原始载荷")).not.toBeInTheDocument();
     expect(container.querySelector("script")).toBeNull();
@@ -114,23 +134,31 @@ describe("独立客服辅助展示与草稿", () => {
     const { rerender } = render(<SupportAssistancePanel {...props()} />);
     fireEvent.click(screen.getByRole("button", { name: "插入回复草稿" }));
     review();
-    rerender(<SupportAssistancePanel {...props()} projectionKey={null} />);
+    const denied = reduceSupportAssistance(props().state, { type: "accessDenied", assignment });
+    rerender(<SupportAssistancePanel {...props()} state={denied} />);
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByText("合成物流政策")).not.toBeInTheDocument();
-    rerender(<SupportAssistancePanel {...props()} projectionKey={null} />);
+    const late = reduceSupportAssistance(denied, { type: "complete", request: props().state.request!, view: fixture });
+    rerender(<SupportAssistancePanel {...props()} state={late} />);
     expect(screen.queryByText(fixture.text)).not.toBeInTheDocument();
-    rerender(<SupportAssistancePanel {...props()} projectionKey="session-a/ticket-a/claim-2" />);
+    const reclaimed = reduceSupportAssistance(late, { type: "authorize", assignment: { ...assignment, assignmentId: "claim-2" } });
+    rerender(<SupportAssistancePanel {...props()} state={reclaimed} />);
     expect(editor()).toHaveValue("");
     expect(screen.queryByText("合成物流政策")).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox")).not.toBeChecked();
   });
 
-  it.each(["session-b/ticket-a/claim-1", "session-a/ticket-b/claim-1", "session-a/ticket-a/claim-2"])(
-    "身份/工单/责任切换清除内容与审阅状态：%s", (nextKey) => {
+  it.each([
+    { ...assignment, sessionKey: "session-b" },
+    { ...assignment, ticketId: "ticket-b" },
+    { ...assignment, assignmentId: "claim-2" },
+  ])(
+    "身份/工单/责任切换清除内容与审阅状态：%j", (nextAssignment) => {
       const { rerender } = render(<SupportAssistancePanel {...props()} />);
       fireEvent.click(screen.getByRole("button", { name: "插入回复草稿" }));
       review();
-      rerender(<SupportAssistancePanel {...props()} projectionKey={nextKey} />);
+      const state = reduceSupportAssistance(props().state, { type: "authorize", assignment: nextAssignment });
+      rerender(<SupportAssistancePanel {...props()} state={state} />);
       expect(editor()).toHaveValue("");
       expect(screen.getByRole("checkbox")).not.toBeChecked();
       expect(screen.queryByText("合成物流政策")).not.toBeInTheDocument();
@@ -143,6 +171,9 @@ describe("独立客服辅助展示与草稿", () => {
     { status: "error", reason: "conflict" },
     { status: "error", reason: "index" },
     { status: "error", reason: "model" },
+    { status: "error", reason: "embedding" },
+    { status: "error", reason: "retrieval" },
+    { status: "error", reason: "request" },
   ])("辅助状态 $status 不阻止人工继续编辑", (content) => {
     const { rerender } = render(<SupportAssistancePanel {...props()} />);
     fireEvent.change(editor(), { target: { value: "保留人工回复" } });
@@ -151,6 +182,13 @@ describe("独立客服辅助展示与草稿", () => {
     expect(editor()).toBeEnabled();
     expect(screen.queryByText("合成物流政策")).not.toBeInTheDocument();
     expect(screen.getByRole(content.status === "error" ? "alert" : "status")).toBeInTheDocument();
+  });
+
+  it("向量检索模型与回复生成模型失败展示不同原因", () => {
+    const { rerender } = render(<SupportAssistancePanel {...props({ status: "error", reason: "embedding" })} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("知识向量模型暂不可用");
+    rerender(<SupportAssistancePanel {...props({ status: "error", reason: "model" })} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("回复生成模型暂不可用");
   });
 
   it("未接线/人工发送未确认时不能移交；空白与超长草稿不能插入", () => {
