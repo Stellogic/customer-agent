@@ -4,7 +4,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from baseline_agent.knowledge_ablation import MODES, report_template, run_ablation, run_reference_rrf
+from baseline_agent.knowledge_ablation import (
+    MODES,
+    report_template,
+    run_ablation,
+    run_reference_rrf,
+)
 from baseline_agent.rag_eval_v1 import load_rag_eval_v1
 
 
@@ -36,7 +41,13 @@ def test_all_modes_receive_every_frozen_query_and_independent_metrics(tmp_path):
         return values
 
     output = tmp_path / "ablation.json"
-    report = run_ablation(query_runner, metrics, environment={"evidence": "synthetic-test"}, parameters={}, output=output)
+    report = run_ablation(
+        query_runner,
+        metrics,
+        environment={"evidence": "synthetic-test"},
+        parameters={},
+        output=output,
+    )
     assert calls == [(mode, query.id) for mode in MODES for query in dataset.queries]
     assert report["modes"]["lexical"]["status"] == "FAIL"
     assert report["modes"]["rrf"]["status"] == "PASS"
@@ -70,7 +81,10 @@ def test_mismatched_query_is_not_accepted_as_frozen_evidence(tmp_path):
     with pytest.raises(ValueError, match="冻结查询"):
         run_ablation(
             lambda mode, query: {"id": "wrong", "kind": query.kind, "results": []},
-            lambda rows: {}, environment={}, parameters={}, output=tmp_path / "report.json",
+            lambda rows: {},
+            environment={},
+            parameters={},
+            output=tmp_path / "report.json",
         )
 
 
@@ -83,10 +97,13 @@ def test_reference_rrf_delegates_scoring_without_relabeling_candidates(monkeypat
     def upstream_query(base_url, query):
         assert base_url == "http://reference.invalid"
         row = {
-            "id": query.id, "kind": query.kind, "results": [],
+            "id": query.id,
+            "kind": query.kind,
+            "results": [],
             "lexicalCandidates": [{"chunkId": "lexical-only"}],
             "vectorCandidates": [{"chunkId": "dense-only"}],
-            "recall": 0.0, "reciprocal_rank": 0.0,
+            "recall": 0.0,
+            "reciprocal_rank": 0.0,
         }
         rows.append(row)
         return row
@@ -102,8 +119,10 @@ def test_reference_rrf_delegates_scoring_without_relabeling_candidates(monkeypat
 
     monkeypatch.setattr("baseline_agent.knowledge_ablation.import_module", import_evaluation)
     report = run_reference_rrf(
-        "http://reference.invalid", environment={"evidence": "synthetic-test"},
-        parameters={}, output=tmp_path / "rrf.json",
+        "http://reference.invalid",
+        environment={"evidence": "synthetic-test"},
+        parameters={},
+        output=tmp_path / "rrf.json",
     )
     assert [row["id"] for row in rows] == [query.id for query in dataset.queries]
     assert report["status"] == "PARTIAL"

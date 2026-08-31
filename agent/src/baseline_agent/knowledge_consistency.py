@@ -1,4 +1,4 @@
-"""比较同一文本/查询的向量与外部检索排序；不实现新的检索器或默认切换。"""
+"""比较同一文本/查询的向量与外部检索排序;不实现新的检索器或默认切换。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class ConsistencyTolerance:
-    # #189 没有冻结 ONNX 容差；调用者必须提供经审查的独立协议标识，无内置宽松默认。
+    # #189 没有冻结 ONNX 容差;调用者必须提供经审查的独立协议标识,无内置宽松默认。
     protocol_id: str
     max_absolute_error: float
     max_cosine_distance: float
@@ -45,7 +45,7 @@ class VectorPair:
 @dataclass(frozen=True)
 class RankingPair:
     query_id: str
-    # 唯一标识须包含 article/version/chunk，不能只用 articleId。
+    # 唯一标识须包含 article/version/chunk,不能只用 articleId。
     pytorch: list[str]
     onnx: list[str]
 
@@ -69,31 +69,40 @@ def compare_consistency(
             not math.isfinite(value) for value in pair.pytorch + pair.onnx
         ):
             raise ValueError("向量维度不符或包含非有限值")
-        norms = [math.sqrt(sum(value * value for value in vector)) for vector in (pair.pytorch, pair.onnx)]
+        norms = [
+            math.sqrt(sum(value * value for value in vector))
+            for vector in (pair.pytorch, pair.onnx)
+        ]
         if min(norms) == 0:
             raise ValueError("零向量不能计算余弦距离")
         cosine = sum(a * b for a, b in zip(pair.pytorch, pair.onnx, strict=True)) / math.prod(norms)
-        vector_rows.append({
-            "sample_id": pair.sample_id,
-            "max_absolute_error": max(abs(a - b) for a, b in zip(pair.pytorch, pair.onnx, strict=True)),
-            "cosine_distance": 1 - max(-1.0, min(1.0, cosine)),
-            "pytorch_norm": norms[0],
-            "onnx_norm": norms[1],
-        })
+        vector_rows.append(
+            {
+                "sample_id": pair.sample_id,
+                "max_absolute_error": max(
+                    abs(a - b) for a, b in zip(pair.pytorch, pair.onnx, strict=True)
+                ),
+                "cosine_distance": 1 - max(-1.0, min(1.0, cosine)),
+                "pytorch_norm": norms[0],
+                "onnx_norm": norms[1],
+            }
+        )
     ranking_rows: list[dict[str, Any]] = []
     for pair in rankings:
-        left, right = pair.pytorch[:tolerance.k], pair.onnx[:tolerance.k]
+        left, right = pair.pytorch[: tolerance.k], pair.onnx[: tolerance.k]
         if len(set(left)) != len(left) or len(set(right)) != len(right):
             raise ValueError("Top-K 包含重复片段")
         denominator = max(len(left), len(right))
-        ranking_rows.append({
-            "query_id": pair.query_id,
-            "pytorch": left,
-            "onnx": right,
-            # 双方都拒答视为一致；一方拒答另一方命中则为零。
-            "overlap": len(set(left) & set(right)) / denominator if denominator else 1.0,
-            "exact_order": left == right,
-        })
+        ranking_rows.append(
+            {
+                "query_id": pair.query_id,
+                "pytorch": left,
+                "onnx": right,
+                # 双方都拒答视为一致;一方拒答另一方命中则为零。
+                "overlap": len(set(left) & set(right)) / denominator if denominator else 1.0,
+                "exact_order": left == right,
+            }
+        )
     measured = {
         "max_absolute_error": max(row["max_absolute_error"] for row in vector_rows),
         "max_cosine_distance": max(row["cosine_distance"] for row in vector_rows),
