@@ -72,6 +72,15 @@ class KnowledgeRetrievalService {
             throw new KnowledgeAccessDeniedException();
         }
         List<String> scopes = scope == null ? allowed : List.of(scope);
+        return searchAuthorizedScopes(query, scopes);
+    }
+
+    // 仅供同包可信适配使用。调用方的代理事务覆盖检索和元数据补读。
+    KnowledgeRetrievalResponse searchAuthorizedScopes(String query, List<String> scopes) {
+        if (scopes.isEmpty()) throw new KnowledgeAccessDeniedException();
+        if (query == null || query.isBlank() || query.length() > 200) {
+            throw new KnowledgeInvalidQueryException("检索问题长度必须在 1 到 200 之间");
+        }
         try {
             Long generation =
                     jdbc.queryForObject(
