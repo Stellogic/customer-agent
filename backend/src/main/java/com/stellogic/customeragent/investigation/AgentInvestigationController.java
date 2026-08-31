@@ -22,6 +22,13 @@ import tools.jackson.databind.JsonNode;
 @RestController
 @RequestMapping("/internal/agent/tickets/{ticketId}/generations/{generationId}")
 public final class AgentInvestigationController {
+    @org.springframework.web.bind.annotation.ExceptionHandler(CustomerKnowledgeReplyPolicy.Rejected.class)
+    org.springframework.http.ResponseEntity<java.util.Map<String, String>> rejectedKnowledgeReply(
+            CustomerKnowledgeReplyPolicy.Rejected error) {
+        return org.springframework.http.ResponseEntity.unprocessableEntity()
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(java.util.Map.of("code", error.getReason(), "message", "知识回复未通过公开校验"));
+    }
     private final AgentInvestigationService service;
     private final byte[] agentToken;
     private final AgentKnowledgeRetrievalAdapter knowledge;
@@ -229,6 +236,10 @@ public final class AgentInvestigationController {
                         "evidenceRefs",
                         "escalationRequired",
                         "referencedOrder");
+        if (reply != null && "customer-reply-v2".equals(reply.path("schemaVersion").asText())) {
+            expectedReply = Set.of("schemaVersion", "body", "intent", "evidenceRefs",
+                    "escalationRequired", "referencedOrder", "knowledgeRequestId", "knowledge");
+        }
         if (reply == null || !reply.isObject() || !expectedReply.equals(properties(reply))) {
             return malformedConclusion(ticketId);
         }
@@ -251,10 +262,30 @@ public final class AgentInvestigationController {
                             CustomerReplyIntent.valueOf(requiredText(reply, "intent")),
                             requiredTextList(reply, "evidenceRefs"),
                             requiredBoolean(reply, "escalationRequired"),
-                            requiredText(reply, "referencedOrder")));
+                            requiredText(reply, "referencedOrder"),
+                            reply.has("knowledge") ? requiredText(reply, "knowledgeRequestId") : null,
+                            reply.has("knowledge") ? parseKnowledge(reply.get("knowledge")) : null));
         } catch (IllegalArgumentException exception) {
             return malformedConclusion(ticketId);
         }
+    }
+
+    private static CustomerKnowledgeReply parseKnowledge(JsonNode value) {
+        if (!value.isObject() || !properties(value).equals(Set.of("status", "answer", "citations"))
+                || !value.path("citations").isArray() || value.path("citations").size() > 5) {
+            throw new IllegalArgumentException("invalid knowledge reply");
+        }
+        var citations = new java.util.ArrayList<CustomerKnowledgeCitation>();
+        for (JsonNode citation : value.get("citations")) {
+            if (!citation.isObject()
+                    || !properties(citation).equals(Set.of("articleId", "version", "chunkId", "quote"))) {
+                throw new IllegalArgumentException("invalid knowledge citation");
+            }
+            citations.add(new CustomerKnowledgeCitation(requiredText(citation, "articleId"),
+                    requiredText(citation, "version"), requiredText(citation, "chunkId"), requiredText(citation, "quote")));
+        }
+        return new CustomerKnowledgeReply(CustomerKnowledgeStatus.valueOf(requiredText(value, "status")),
+                requiredText(value, "answer"), java.util.List.copyOf(citations));
     }
 
     private InvestigationConclusion malformedConclusion(UUID ticketId) {

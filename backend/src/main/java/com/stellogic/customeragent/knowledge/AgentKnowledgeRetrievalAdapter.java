@@ -4,11 +4,13 @@ import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 共用检索投影。外层须在调用前后各自校验当前工单 generation 或 HUMAN assignment。
- * 外层不持事务；通过 Spring 代理调用本类，保证检索与 canonical 补读使用同一快照。
+ * 搜索与普通复核的外层不持事务；通过 Spring 代理使用同一快照。
+ * 最终发布专用方法则要求参与调用方已有短事务，详见方法契约。
  */
 @Service
 public class AgentKnowledgeRetrievalAdapter {
@@ -35,6 +37,14 @@ public class AgentKnowledgeRetrievalAdapter {
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public AgentKnowledgeResult revalidateCustomer(AgentKnowledgeResult receipt) {
+        return revalidate(receipt, List.of("CUSTOMER_PUBLIC"));
+    }
+
+    /** 最终发布专用：外层已持工单授权锁；与目录/向量更新互斥直到公开消息事务结束。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public AgentKnowledgeResult revalidateCustomerForPublication(AgentKnowledgeResult receipt) {
+        // 与 KnowledgeCatalogIndexer / KnowledgeVectorIndexer 复用同一现有锁，不运行编码。
+        jdbc.query("select pg_advisory_xact_lock_shared(16620260829)", rs -> null);
         return revalidate(receipt, List.of("CUSTOMER_PUBLIC"));
     }
 

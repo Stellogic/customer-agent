@@ -15,6 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class JdbcCustomerTicketService implements CustomerTicketService {
@@ -26,13 +27,15 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final TicketAuthorityLock authorityLock;
+    private final ObjectMapper json;
 
     @Autowired
     public JdbcCustomerTicketService(
-            JdbcTemplate jdbc, Clock clock, TicketAuthorityLock authorityLock) {
+            JdbcTemplate jdbc, Clock clock, TicketAuthorityLock authorityLock, ObjectMapper json) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.authorityLock = authorityLock;
+        this.json = json;
     }
 
     @Override
@@ -439,8 +442,8 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         if (snapshots.isEmpty()) throw new TicketNotFoundException();
         List<PublicMessage> messages =
                 jdbc.query(
-                        "select author, body, sent_at from public_message where ticket_id = ? order by message_sequence",
-                        JdbcCustomerTicketService::mapMessage,
+                        "select author, body, sent_at, knowledge::text from public_message where ticket_id = ? order by message_sequence",
+                        this::mapMessage,
                         ticketId);
         CustomerPublicSnapshot ticket = snapshots.getFirst();
         List<CurrentClarification> clarifications =
@@ -539,8 +542,9 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 after);
     }
 
-    private static PublicMessage mapMessage(ResultSet rs, int row) throws SQLException {
-        return new PublicMessage(rs.getString(1), rs.getString(2), rs.getTimestamp(3).toInstant());
+    private PublicMessage mapMessage(ResultSet rs, int row) throws SQLException {
+        return new PublicMessage(rs.getString(1), rs.getString(2), rs.getTimestamp(3).toInstant(),
+                rs.getString(4) == null ? null : json.readValue(rs.getString(4), CustomerKnowledgeProjection.class));
     }
 
     private record RequestRecord(String digest, UUID ticketId) {}

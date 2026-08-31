@@ -1,5 +1,6 @@
 import asyncio
 import json
+from dataclasses import replace
 
 import httpx
 import pytest
@@ -26,6 +27,8 @@ from baseline_agent.investigation_action_loop import (
     DeterministicActionModel,
     TerminalAction,
 )
+
+
 from baseline_agent.investigation_model import (
     InvestigationJudgment,
     InvestigationJudgmentFailure,
@@ -1251,6 +1254,7 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
         "POST",
         "POST",
         "GET",
+        "GET",
         "POST",
     ]
 
@@ -1518,3 +1522,83 @@ def test_clarification_interrupt_and_checkpoint_contain_only_recovery_fields(
     ]
     assert result == {"clarification_answer": {"clarificationRequestId": "clarification-16"}}
     assert "digest" not in repr(result)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("retrieval_status", "invalid_first", "spring_rejects"), [
+    (200, False, False), (200, True, False), (200, False, True), (200, True, True),
+    (503, False, False), (403, False, False),
+])
+async def test_customer_knowledge_graph_binds_receipt_and_keeps_failure_separate(monkeypatch, retrieval_status, invalid_first, spring_rejects):
+    facts = {
+        "matchStatus": "UNIQUE", "orderReference": "ORDER-DELAY-UNDER-24", "delayHours": 23,
+        "delaySeconds": 23 * 3600, "logisticsStatus": "IN_TRANSIT", "paid": True,
+        "cancelled": False, "fullyRefunded": False, "duplicateChargeSuspected": False,
+        "existingCompensation": False, "pendingActionCount": 0, "policyVersion": "delay-policy-v1",
+        "orderRuleSummary": "ADDRESS_CHANGE_AND_CANCEL_RULES_V1",
+    }
+    calls = []
+    generation_requests = []
+
+    class ChoosingKnowledge(DeterministicActionModel):
+        async def choose(self, context):
+            decision = await super().choose(context)
+            if decision.action.kind is TerminalAction.SUBMIT_CONCLUSION:
+                assert context["customerQuestion"]
+                return replace(decision, knowledge_query="包裹未到如何补充情况")
+            return decision
+
+    class AnsweringProvider:
+        async def generate(self, request):
+            generation_requests.append(request)
+            assert request["untrustedKnowledge"] == []
+            if invalid_first and len(generation_requests) == 1:
+                return {"schemaVersion": "invalid-first-answer"}
+            return {
+                "schemaVersion": "customer-reply-v2",
+                "body": "经核验，订单 ORDER-DELAY-UNDER-24 的本次物流延迟不足 24 小时，当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。",
+                "intent": "NO_COMPENSATION_RESOLUTION", "evidenceRefs": ["order:ORDER-DELAY-UNDER-24", "logistics:ORDER-DELAY-UNDER-24"],
+                "escalationRequired": False, "referencedOrder": "ORDER-DELAY-UNDER-24",
+                "knowledge": {"status": "INSUFFICIENT_INFORMATION", "answer": "现有资料不足以回答，请补充包裹情况。", "citations": []},
+            }
+
+    def spring(request):
+        path = request.url.path
+        body = json.loads(request.content) if request.content else None
+        calls.append((path, body, request.headers))
+        if request.method == "GET":
+            return httpx.Response(200, json=_catalog_or_customer_context(path))
+        if "/capabilities/" in path:
+            return httpx.Response(200, json=_capability_result(path, facts))
+        if path.endswith("/knowledge/search"):
+            assert body == {"query": "包裹未到如何补充情况"}
+            assert request.headers["X-Agent-Operation"] == "SEARCH_KNOWLEDGE"
+            if retrieval_status == 403:
+                return httpx.Response(403, text="forbidden")
+            return httpx.Response(retrieval_status, json={"schema": "agent-knowledge-v1", "indexGeneration": 7, "results": []}
+                                  if retrieval_status == 200 else {"code": "INDEX_STALE"})
+        if path.endswith("/conclusions") and spring_rejects and sum(p.endswith("/conclusions") for p, _, _ in calls) == 1:
+            return httpx.Response(422, json={"code": "UNSAFE_KNOWLEDGE"})
+        return httpx.Response(200, json={"accepted": True, "lifecycleState": "INVESTIGATING"})
+
+    native_client = httpx.AsyncClient
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **kwargs: native_client(**kwargs, transport=httpx.MockTransport(spring)))
+    monkeypatch.setattr("baseline_agent.graph.investigation_action_model", ChoosingKnowledge())
+    monkeypatch.setattr("baseline_agent.graph.customer_communication_model", StructuredCustomerCommunicationModel(AnsweringProvider()))
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    monkeypatch.setenv("AGENT_TOOL_MAX_ATTEMPTS", "3")
+    result = await investigate_ticket({"requested_by": "spring", "ticket_id": "ticket-169", "generation_id": "generation-169"})
+    submitted = [body for path, body, _ in calls if path.endswith("/conclusions")]
+    if retrieval_status != 200:
+        assert result["knowledge_failure"] == ("ACCESS_DENIED" if retrieval_status == 403 else "INDEX_STALE")
+        assert submitted == generation_requests == []
+        assert sum(path.endswith("/knowledge/search") for path, _, _ in calls) == (1 if retrieval_status == 403 else 3)
+    else:
+        assert len(generation_requests) == (2 if invalid_first or spring_rejects else 1)
+        assert len(submitted) == (2 if spring_rejects and not invalid_first else 1)
+        receipt_request = next(headers["Idempotency-Key"] for path, _, headers in calls if path.endswith("/knowledge/search"))
+        assert submitted[0]["customerReply"]["knowledgeRequestId"] == receipt_request
+        assert submitted[0]["customerReply"]["knowledge"]["status"] == "INSUFFICIENT_INFORMATION"
+        assert any(path.endswith("/human-handoff") for path, _, _ in calls) == (invalid_first and spring_rejects)
+    assert not any(body and body.get("type") in {"CONTENT_DELTA", "STREAM_STARTED"} for _, body, _ in calls)

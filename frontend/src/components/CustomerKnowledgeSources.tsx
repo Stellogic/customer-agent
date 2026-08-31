@@ -8,7 +8,7 @@ export type CustomerKnowledgeSource = Readonly<{
   updatedAt: string;
 }>;
 
-/** 本地展示状态，不是尚未确定的 Spring API 或 SSE 协议。 */
+/** 本地展示状态；由调用方从受控公开消息及连接状态映射。 */
 export type CustomerKnowledgeSourcesState =
   | { status: "ready"; sources: readonly CustomerKnowledgeSource[] }
   | { status: "loading" | "empty" | "conflict" | "error" | "recovering" };
@@ -21,7 +21,7 @@ const STATUS_TEXT = {
   recovering: "连接恢复中，正在重新确认本次回复的知识来源。",
 } as const;
 
-/** 独立组件，尚未接入客户对话。不会检索、生成答复、缓存或恢复旧来源。 */
+/** 不会检索、生成答复、缓存或恢复旧来源。 */
 export function CustomerKnowledgeSources({ state }: { state: CustomerKnowledgeSourcesState }) {
   const [expanded, setExpanded] = useState(true);
   const status = state.status === "ready" && state.sources.length === 0 ? "empty" : state.status;

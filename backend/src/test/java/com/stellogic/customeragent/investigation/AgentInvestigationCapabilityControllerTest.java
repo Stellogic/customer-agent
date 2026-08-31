@@ -351,6 +351,19 @@ class AgentInvestigationCapabilityControllerTest {
                 .formatted(additionalReplyField);
     }
 
+    @Test
+    void v2UnsafeKnowledgeRejectionHasAStableCorrectionCode() throws Exception {
+        when(service.submit(eq(TICKET_ID), eq(GENERATION_ID), eq("reply-request"), any()))
+                .thenThrow(new CustomerKnowledgeReplyPolicy.Rejected("UNSAFE_KNOWLEDGE"));
+        String body = validConclusion(
+                ",\"knowledgeRequestId\":\"knowledge-request\",\"knowledge\":{\"status\":\"INSUFFICIENT_INFORMATION\",\"answer\":\"资料不足，请补充情况。\",\"citations\":[]}")
+                .replace("customer-reply-v1", "customer-reply-v2");
+        mvc.perform(post("/internal/agent/tickets/{ticketId}/generations/{generationId}/conclusions", TICKET_ID, GENERATION_ID)
+                        .headers(conclusionHeaders()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("UNSAFE_KNOWLEDGE"));
+    }
+
     private static org.springframework.http.HttpHeaders conclusionHeaders() {
         org.springframework.http.HttpHeaders headers = scopedHeaders();
         headers.set("X-Agent-Operation", "SUBMIT_INVESTIGATION_CONCLUSION");

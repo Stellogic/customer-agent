@@ -85,7 +85,7 @@ public class AutoResolutionService {
                                 + "and not exists(select 1 from agent_public_reply_stream where generation_id = g.id and status <> 'COMPLETED'))",
                         Boolean.class,
                         candidate.replyId(),
-                        candidate.conclusion().customerReply().body(),
+                        candidate.conclusion().customerReply().publicBody(),
                         ticketId,
                         candidate.generationId(),
                         candidate.customerSequence());

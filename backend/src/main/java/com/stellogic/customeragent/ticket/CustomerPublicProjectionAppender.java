@@ -7,14 +7,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public final class CustomerPublicProjectionAppender {
     private static final String EPOCH = "customer-public-v1";
     private final JdbcTemplate jdbc;
+    private final ObjectMapper json;
 
-    public CustomerPublicProjectionAppender(JdbcTemplate jdbc) {
+    public CustomerPublicProjectionAppender(JdbcTemplate jdbc, ObjectMapper json) {
         this.jdbc = jdbc;
+        this.json = json;
     }
 
     public void appendSupportMessage(UUID ticketId, String body, Instant now) {
@@ -86,6 +89,21 @@ public final class CustomerPublicProjectionAppender {
                     "jsonb_build_object('lifecycleState', 'RESOLVED')",
                     now);
         }
+    }
+
+    public void appendAgentKnowledgeMessage(UUID ticketId, UUID generationId, String body,
+            CustomerKnowledgeProjection knowledge, Instant now) {
+        appendMessage(ticketId, UUID.randomUUID(), generationId, "AGENT", body, now, knowledge);
+    }
+
+    public void completeBufferedAgentReplyStream(UUID ticketId, UUID generationId, String body, Instant now) {
+        int updated = jdbc.update("update agent_public_reply_stream set status='STREAMING', body=?, updated_at=? "
+                        + "where generation_id=? and ticket_id=? and status='LOADING' and body=''",
+                body, Timestamp.from(now), generationId, ticketId);
+        if (updated != 1) {
+            throw new IllegalStateException("knowledge reply must remain buffered until acceptance");
+        }
+        completeAgentReplyStream(ticketId, generationId, body, now);
     }
 
     public void completeAgentReplyStream(
@@ -259,6 +277,11 @@ public final class CustomerPublicProjectionAppender {
             String author,
             String body,
             Instant now) {
+        return appendMessage(ticketId, publicMessageId, generationId, author, body, now, null);
+    }
+
+    private long appendMessage(UUID ticketId, UUID publicMessageId, UUID generationId, String author,
+            String body, Instant now, CustomerKnowledgeProjection knowledge) {
         Timestamp at = Timestamp.from(now);
         if ("CUSTOMER".equals(author)) {
             jdbc.update(
@@ -279,32 +302,34 @@ public final class CustomerPublicProjectionAppender {
                         ticketId,
                         EPOCH);
         jdbc.update(
-                "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) "
-                        + "values (?, ?, ?, ?, ?, ?)",
+                "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at, knowledge) "
+                        + "values (?, ?, ?, ?, ?, ?, ?::jsonb)",
                 publicMessageId,
                 ticketId,
                 messageSequence,
                 author,
                 body,
-                at);
+                at,
+                knowledge == null ? null : json.writeValueAsString(knowledge));
         if (generationId == null) {
             jdbc.update(
                     "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
                             + "values (?, ?, ?, 'PUBLIC_MESSAGE_APPENDED', "
-                            + "jsonb_build_object('author', ?, 'body', ?, 'sentAt', ?::text), ?)",
+                            + "jsonb_build_object('author', ?, 'body', ?, 'sentAt', ?::text, 'knowledge', ?::jsonb), ?)",
                     ticketId,
                     EPOCH,
                     eventSequence,
                     author,
                     body,
                     now.toString(),
+                    knowledge == null ? null : json.writeValueAsString(knowledge),
                     at);
         } else {
             jdbc.update(
                     "insert into customer_public_event "
                             + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
                             + "values (?, ?, ?, ?, 'PUBLIC_MESSAGE_APPENDED', "
-                            + "jsonb_build_object('author', ?, 'body', ?, 'sentAt', ?::text), ?)",
+                            + "jsonb_build_object('author', ?, 'body', ?, 'sentAt', ?::text, 'knowledge', ?::jsonb), ?)",
                     ticketId,
                     EPOCH,
                     eventSequence,
@@ -312,6 +337,7 @@ public final class CustomerPublicProjectionAppender {
                     author,
                     body,
                     now.toString(),
+                    knowledge == null ? null : json.writeValueAsString(knowledge),
                     at);
         }
         return eventSequence + 1;

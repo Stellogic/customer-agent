@@ -55,6 +55,12 @@ from baseline_agent.investigation_model import (
     InvestigationReasonCode,
 )
 from baseline_agent.investigation_model_runtime import configured_investigation_model
+from baseline_agent.knowledge_retrieval import (
+    KnowledgeFailureCode,
+    KnowledgeRetrievalFailure,
+    KnowledgeRetrievalResult,
+    parse_knowledge_response,
+)
 from baseline_agent.shadow_investigation import (
     ShadowCandidate,
     compare_shadow_judgment,
@@ -84,6 +90,7 @@ class BaselineState(TypedDict, total=False):
     investigation_judgment_evidence: dict[str, object]
     customer_communication_evidence: dict[str, object]
     investigation_progress: dict[str, object] | None
+    knowledge_failure: str
 
 
 class CustomerCommunicationContextMessage(TypedDict):
@@ -508,6 +515,25 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 judgment_evidence,
             )
         conclusion = _build_conclusion(facts, judgment, loop_result.evidence_claims, issue_kind)
+        knowledge_result = None
+        knowledge_request_id = f"{generation_id}:knowledge:{capability_request_scope}"
+        if loop_result.knowledge_query is not None:
+            await _publish_reply_event(client, base_url, ticket_id, generation_id, scope_headers,
+                                       "progress-knowledge", {"type": "PROGRESS", "stage": "QUERYING_RULES"})
+            try:
+                knowledge_result = await _search_customer_knowledge(
+                    client, base_url, ticket_id, generation_id, scope_headers,
+                    knowledge_request_id, loop_result.knowledge_query,
+                )
+            except KnowledgeRetrievalFailure as failure:
+                failed = await _human_handoff(
+                    client, base_url, ticket_id, generation_id, scope_headers,
+                    "TOOL_RETRY_EXHAUSTED", _controlled_summary_facts(facts), action_records,
+                    _completed_run_evidence(loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")),
+                    judgment_evidence,
+                )
+                failed["knowledge_failure"] = failure.code.value
+                return failed
         communication_input = CustomerCommunicationInput(
             order_reference=facts["orderReference"],
             delay_seconds=facts["delaySeconds"],
@@ -524,6 +550,7 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
             logistics_status=facts.get("logisticsStatus")
             if isinstance(facts.get("logisticsStatus"), str)
             else None,
+            knowledge=knowledge_result,
         )
         communication_audit_offset = _communication_audit_offset()
         await _publish_reply_event(
@@ -535,105 +562,58 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
             "progress-composing",
             {"type": "PROGRESS", "stage": "COMPOSING_REPLY"},
         )
+        async def reply_handoff(reason: str) -> BaselineState:
+            return await _human_handoff(
+                client, base_url, ticket_id, generation_id, scope_headers, reason,
+                _controlled_summary_facts(facts), action_records,
+                _completed_run_evidence(loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")),
+                judgment_evidence, _communication_call_evidence(communication_audit_offset, reason),
+            )
+
         customer_reply = None
-        communication_evidence = None
         for correction_attempt in range(2):
             try:
                 publish_delta = _reply_delta_publisher(
                     client, base_url, ticket_id, generation_id, scope_headers
                 )
                 customer_reply = await customer_communication_model.compose(
-                    communication_input, on_body_delta=publish_delta
+                    communication_input, on_body_delta=None if knowledge_result is not None else publish_delta
                 )
                 validate_customer_reply_envelope(communication_input, customer_reply)
-                communication_evidence = _communication_call_evidence(
-                    communication_audit_offset, ""
-                )
-                break
             except Exception:
                 if correction_attempt == 0:
                     continue
-                communication_evidence = _communication_call_evidence(
-                    communication_audit_offset, "MODEL_CALL_FAILED"
+                return await reply_handoff("INVALID_MODEL_OUTPUT")
+            if customer_reply.intent is CustomerReplyIntent.HUMAN_HANDOFF:
+                return await reply_handoff("CUSTOMER_REQUESTED_HUMAN")
+            completion = {**conclusion, "customerReply": customer_reply.as_request_value()}
+            if knowledge_result is not None:
+                completion["customerReply"]["knowledgeRequestId"] = knowledge_request_id
+            try:
+                conclusion_response = await _request_with_retries(
+                    lambda: client.post(
+                        f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/conclusions",
+                        headers={**scope_headers, "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
+                                 "Idempotency-Key": f"{generation_id}:submit-conclusion"},
+                        json=completion,
+                    )
                 )
-                return await _human_handoff(
-                    client,
-                    base_url,
-                    ticket_id,
-                    generation_id,
-                    scope_headers,
-                    "INVALID_MODEL_OUTPUT",
-                    _controlled_summary_facts(facts),
-                    action_records,
-                    _completed_run_evidence(
-                        loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
-                    ),
-                    judgment_evidence,
-                    communication_evidence,
-                )
+            except httpx.HTTPStatusError as error:
+                if error.response.status_code != 422:
+                    raise
+                try:
+                    rejection = error.response.json()
+                except ValueError:
+                    rejection = {}
+                correctable = (knowledge_result is not None and isinstance(rejection, dict)
+                               and rejection.get("code") == "UNSAFE_KNOWLEDGE")
+                if correctable and correction_attempt == 0:
+                    continue
+                return await reply_handoff("INVALID_MODEL_OUTPUT" if correctable else "FACT_CONFLICT")
+            if conclusion_response is None:
+                return await reply_handoff("TOOL_RETRY_EXHAUSTED")
+            break
         assert customer_reply is not None
-        if customer_reply.intent is CustomerReplyIntent.HUMAN_HANDOFF:
-            communication_evidence = _communication_call_evidence(communication_audit_offset, "")
-            return await _human_handoff(
-                client,
-                base_url,
-                ticket_id,
-                generation_id,
-                scope_headers,
-                "CUSTOMER_REQUESTED_HUMAN",
-                _controlled_summary_facts(facts),
-                action_records,
-                _completed_run_evidence(
-                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
-                ),
-                judgment_evidence,
-                communication_evidence,
-            )
-        completion = {**conclusion, "customerReply": customer_reply.as_request_value()}
-        try:
-            conclusion_response = await _request_with_retries(
-                lambda: client.post(
-                    f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/conclusions",
-                    headers={
-                        **scope_headers,
-                        "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
-                        "Idempotency-Key": f"{generation_id}:submit-conclusion",
-                    },
-                    json=completion,
-                )
-            )
-        except httpx.HTTPStatusError as error:
-            if error.response.status_code == 422:
-                return await _human_handoff(
-                    client,
-                    base_url,
-                    ticket_id,
-                    generation_id,
-                    scope_headers,
-                    "FACT_CONFLICT",
-                    _controlled_summary_facts(facts),
-                    action_records,
-                    _completed_run_evidence(
-                        loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
-                    ),
-                    judgment_evidence,
-                )
-            raise
-        if conclusion_response is None:
-            return await _human_handoff(
-                client,
-                base_url,
-                ticket_id,
-                generation_id,
-                scope_headers,
-                "TOOL_RETRY_EXHAUSTED",
-                _controlled_summary_facts(facts),
-                action_records,
-                _completed_run_evidence(
-                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
-                ),
-                judgment_evidence,
-            )
         return {
             "facts": facts,
             "conclusion": conclusion,
@@ -704,7 +684,7 @@ async def _read_customer_communication_context(
             and message["author"] in {"CUSTOMER", "SUPPORT", "AGENT"}
             and isinstance(message["body"], str)
             and bool(message["body"].strip())
-            and len(message["body"]) <= 2_000
+            and len(message["body"]) <= (3_000 if message["author"] == "AGENT" else 2_000)
             for message in conversation
         )
     ):
@@ -773,9 +753,45 @@ async def _advance_investigation_action_loop(
     async def choose(facts: dict) -> ActionDecision:
         model_context = dict(facts)
         model_context["siblingTickets"] = sibling_tickets
+        if {"delaySeconds", "paid", "existingCompensation", "policyVersion", "orderRuleSummary"}.issubset(facts):
+            context = await _read_customer_communication_context(
+                client, base_url, ticket_id, generation_id, scope_headers,
+            )
+            if context is None:
+                raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
+            customer_messages = [message["body"] for message in context["publicConversation"]
+                                 if message["author"] == "CUSTOMER"]
+            model_context["customerQuestion"] = customer_messages[-1] if customer_messages else context["syntheticCustomerText"]
         return await investigation_action_model.choose(model_context)
 
     return await ActionLoop(choose, ActionBudget.configured()).advance(checkpoint, execute)
+
+
+async def _search_customer_knowledge(
+    client: httpx.AsyncClient, base_url: str, ticket_id: str, generation_id: str,
+    headers: dict[str, str], request_id: str, query: str,
+) -> KnowledgeRetrievalResult:
+    failure = KnowledgeRetrievalFailure(KnowledgeFailureCode.RETRIEVAL_UNAVAILABLE)
+    for attempt in range(_tool_attempt_budget()):
+        try:
+            response = await client.post(
+                f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/knowledge/search",
+                headers={**headers, "X-Agent-Operation": "SEARCH_KNOWLEDGE", "Idempotency-Key": request_id},
+                json={"query": query},
+            )
+        except httpx.TransportError:
+            continue
+        if response.status_code in {400, 401, 403, 404, 409}:
+            return parse_knowledge_response(response.status_code, None)
+        try:
+            return parse_knowledge_response(response.status_code, response.json())
+        except ValueError:
+            failure = KnowledgeRetrievalFailure(KnowledgeFailureCode.RETRIEVAL_UNAVAILABLE)
+        except KnowledgeRetrievalFailure as error:
+            failure = error
+        if response.status_code < 500 or attempt + 1 == _tool_attempt_budget():
+            raise failure
+    raise failure
 
 
 def _combined_model_mode() -> str:
@@ -950,7 +966,7 @@ def _communication_call_evidence(
         if record.failure_classification is not None
     }
     current = {
-        "logicalCalls": 1 if records else 0,
+        "logicalCalls": len({record.internal_call_id for record in records}),
         "providerAttempts": len(records),
         "tokens": sum(record.total_tokens or 0 for record in records),
         "costMicros": estimate_flash_cost_micros(input_tokens, output_tokens),

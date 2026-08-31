@@ -37,7 +37,7 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
         JdbcAgentInvestigationService service = new JdbcAgentInvestigationService(
                 jdbc, mock(AgentAccessAudit.class), Clock.systemUTC(),
                 mock(JdbcCompensationProposalStore.class), mock(TicketAuthorityLock.class),
-                mock(CustomerPublicProjectionAppender.class), mock(ObjectMapper.class));
+                mock(CustomerPublicProjectionAppender.class), mock(ObjectMapper.class), mock(com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter.class));
 
         assertThatThrownBy(() -> service.acceptKnowledgeSearch(
                 UUID.randomUUID(), UUID.randomUUID(), "same-request", "配送指引", validated))
@@ -66,7 +66,7 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                         mock(JdbcCompensationProposalStore.class),
                         mock(TicketAuthorityLock.class),
                         mock(CustomerPublicProjectionAppender.class),
-                        mock(ObjectMapper.class));
+                        mock(ObjectMapper.class), mock(com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter.class));
 
         service.customerCommunicationContext(UUID.randomUUID(), UUID.randomUUID());
 
@@ -99,7 +99,7 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                         mock(JdbcCompensationProposalStore.class),
                         mock(TicketAuthorityLock.class),
                         mock(CustomerPublicProjectionAppender.class),
-                        mock(ObjectMapper.class));
+                        mock(ObjectMapper.class), mock(com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter.class));
 
         assertThat(service.siblingTicketSummary(UUID.randomUUID(), UUID.randomUUID()).tickets())
                 .isEmpty();
@@ -134,7 +134,7 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                         mock(JdbcCompensationProposalStore.class),
                         mock(TicketAuthorityLock.class),
                         publicProjection,
-                        mock(ObjectMapper.class));
+                        mock(ObjectMapper.class), mock(com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter.class));
 
         assertThatThrownBy(
                         () ->

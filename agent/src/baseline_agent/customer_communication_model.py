@@ -201,7 +201,7 @@ def validate_customer_communication_input(model_input: CustomerCommunicationInpu
         isinstance(message, CustomerConversationMessage)
         and message.author in {"CUSTOMER", "SUPPORT", "AGENT"}
         and bool(message.body.strip())
-        and len(message.body) <= 2_000
+        and len(message.body) <= (3_000 if message.author == "AGENT" else 2_000)
         for message in model_input.public_conversation
     )
     if (

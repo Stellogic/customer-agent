@@ -28,6 +28,45 @@ vi.mock("./OrderTicketGroups", () => ({
 }));
 
 describe("客户帮助中心", () => {
+  it("客户恢复快照只展示已接受来源标题时间，完成流不重复正文", async () => {
+    const ticketId = "60000000-0000-0000-0000-000000000169";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    const body = "测".repeat(2502); // 已接受v2正文的存储/恢复上限，不是产品生成器。
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/events")) return openEventResponse();
+      return new Response(JSON.stringify({
+        view: "PUBLIC_CONVERSATION", schema: "public-conversation-v2", cursor: "public-conversation-v2:4",
+        ticket: { id: ticketId, lifecycleState: "INVESTIGATING", handlingMode: "AGENT", agentGeneration: 1 },
+        messages: [{ author: "AGENT", body, sentAt: "2026-09-01T00:00:00Z", knowledge: {
+          status: "SUPPORTED", sources: [{ title: "配送帮助", updatedAt: "2026-09-01T00:00:00Z" }],
+        } }], clarification: null,
+        replyStream: { status: "COMPLETED", body, progressStage: "COMPOSING_REPLY" },
+      }));
+    });
+    render(<App />);
+    expect(await screen.findByText("配送帮助")).toBeInTheDocument();
+    expect(screen.getByText("2026-09-01T00:00:00Z")).toBeInTheDocument();
+    expect(screen.getAllByText(body)).toHaveLength(1);
+    expect(screen.queryByText("适用的客服规则")).not.toBeInTheDocument();
+  });
+
+  it("来源快照含内部字段时拒绝整份投影而不展示旧来源", async () => {
+    const ticketId = "60000000-0000-0000-0000-000000000169";
+    globalThis.history.replaceState(null, "", `/?ticket=${ticketId}`);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      view: "PUBLIC_CONVERSATION", schema: "public-conversation-v2", cursor: "public-conversation-v2:4",
+      ticket: { id: ticketId, lifecycleState: "INVESTIGATING", handlingMode: "AGENT", agentGeneration: 1 },
+      messages: [{ author: "AGENT", body: "不应显示的正文", sentAt: "2026-09-01T00:00:00Z", knowledge: {
+        status: "SUPPORTED", sources: [{ title: "不应显示的来源", updatedAt: "2026-09-01T00:00:00Z", chunkId: "private:1" }],
+      } }], clarification: null,
+    })));
+    render(<App />);
+    expect(await screen.findByText("暂时无法读取最新工单状态，我们会继续尝试从权威记录恢复。")).toBeInTheDocument();
+    expect(screen.queryByText("不应显示的来源")).not.toBeInTheDocument();
+    expect(screen.queryByText("不应显示的正文")).not.toBeInTheDocument();
+  });
+
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();

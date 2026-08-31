@@ -2,9 +2,11 @@ package com.stellogic.customeragent.investigation;
 
 import com.stellogic.customeragent.compensation.DelayCompensationPolicy;
 import com.stellogic.customeragent.knowledge.AgentKnowledgeResult;
+import com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
+import com.stellogic.customeragent.ticket.CustomerKnowledgeProjection;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -31,6 +33,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private final TicketAuthorityLock authorityLock;
     private final CustomerPublicProjectionAppender publicProjection;
     private final ObjectMapper json;
+    private final AgentKnowledgeRetrievalAdapter knowledge;
     private final DelayCompensationPolicy policy = new DelayCompensationPolicy();
 
     @Autowired
@@ -41,7 +44,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             JdbcCompensationProposalStore proposalStore,
             TicketAuthorityLock authorityLock,
             CustomerPublicProjectionAppender publicProjection,
-            ObjectMapper json) {
+            ObjectMapper json,
+            AgentKnowledgeRetrievalAdapter knowledge) {
         this.jdbc = jdbc;
         this.accessAudit = accessAudit;
         this.clock = clock;
@@ -49,6 +53,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         this.authorityLock = authorityLock;
         this.publicProjection = publicProjection;
         this.json = json;
+        this.knowledge = knowledge;
     }
 
     @Override
@@ -461,17 +466,18 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         && conclusion.evidenceRefs().equals(expectedEvidence);
         if (!factsMatch) reject(ticketId, "DETERMINISTIC_REVIEW_FAILED");
         validateCustomerReply(ticketId, conclusion, order);
+        CustomerKnowledgeProjection knowledgeProjection = validateKnowledgeReply(generationId, conclusion.customerReply());
 
         if (!conclusion.compensationRequired()) {
             if (requiresHumanAfterGroundedReply(conclusion.reasonCode())) {
                 return acceptGroundedReplyThenHandoff(
-                        ticketId, generationId, requestId, parameterDigest, conclusion);
+                        ticketId, generationId, requestId, parameterDigest, conclusion, knowledgeProjection);
             }
             return acceptNoCompensation(
-                    ticketId, generationId, requestId, parameterDigest, conclusion, order);
+                    ticketId, generationId, requestId, parameterDigest, conclusion, order, knowledgeProjection);
         }
         return acceptCompensationProposal(
-                ticketId, generationId, requestId, parameterDigest, conclusion, order);
+                ticketId, generationId, requestId, parameterDigest, conclusion, order, knowledgeProjection);
     }
 
     private static boolean requiresHumanAfterGroundedReply(DecisionReasonCode reasonCode) {
@@ -488,14 +494,12 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             UUID generationId,
             String requestId,
             String parameterDigest,
-            InvestigationConclusion conclusion) {
+            InvestigationConclusion conclusion,
+            CustomerKnowledgeProjection knowledgeProjection) {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publicProjection.completeAgentReplyStream(
-                ticketId, generationId, conclusion.customerReply().body(), now);
-        publicProjection.appendAgentMessage(
-                ticketId, generationId, conclusion.customerReply().body(), now, false);
+        publishCustomerReply(ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
         int updated =
                 jdbc.update(
                         "update support_ticket set handling_mode = 'HUMAN', human_handoff_reason_code = ? "
@@ -530,19 +534,28 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             String requestId,
             String parameterDigest,
             InvestigationConclusion conclusion,
-            ScopedOrder order) {
+            ScopedOrder order,
+            CustomerKnowledgeProjection knowledgeProjection) {
         Instant now = clock.instant();
         String scenario = autoResolutionScenario(ticketId, conclusion, order);
         if (scenario == null) {
             return acceptGroundedReplyThenHandoff(
-                    ticketId, generationId, requestId, parameterDigest, conclusion);
+                    ticketId, generationId, requestId, parameterDigest, conclusion, knowledgeProjection);
         }
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publicProjection.completeAgentReplyStream(
-                ticketId, generationId, conclusion.customerReply().body(), now);
-        publicProjection.appendAgentMessage(
-                ticketId, generationId, conclusion.customerReply().body(), now, false);
+        publishCustomerReply(ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
+        if (conclusion.customerReply().knowledge() != null
+                && conclusion.customerReply().knowledge().status() != CustomerKnowledgeStatus.SUPPORTED) {
+            jdbc.update("insert into audit_event (ticket_id,event_type,actor_id,occurred_at) "
+                    + "values (?,'AGENT_CONCLUSION_ACCEPTED','agent-machine',?)", ticketId, databaseTime);
+            jdbc.update("insert into agent_command_request "
+                    + "(generation_id,request_id,operation,parameter_digest,response_payload,created_at) "
+                    + "values (?,?,'SUBMIT_INVESTIGATION_CONCLUSION',?, "
+                    + "jsonb_build_object('accepted',true,'lifecycleState','INVESTIGATING'),?)",
+                    generationId, requestId, parameterDigest, databaseTime);
+            return new ConclusionAcceptance(true, TicketLifecycleState.INVESTIGATING, null, null, null);
+        }
         Instant candidateCreatedAt = clock.instant();
         jdbc.update(
                 "insert into ticket_auto_resolution (ticket_id, generation_id, policy_version, scenario, conclusion, "
@@ -629,7 +642,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             String requestId,
             String parameterDigest,
             InvestigationConclusion conclusion,
-            ScopedOrder order) {
+            ScopedOrder order,
+            CustomerKnowledgeProjection knowledgeProjection) {
         if (conclusion.reasonCode() != DecisionReasonCode.LOGISTICS_DELAY
                 || !eligibleOrderState(order)
                 || order.existingCompensation()
@@ -676,10 +690,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publicProjection.completeAgentReplyStream(
-                ticketId, generationId, conclusion.customerReply().body(), now);
-        publicProjection.appendAgentMessage(
-                ticketId, generationId, conclusion.customerReply().body(), now, false);
+        publishCustomerReply(ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, subject_type, subject_id) values "
                         + "(?, ?, 'spring-system', ?, 'COMPENSATION_PROPOSAL_REVISION', ?), "
@@ -729,7 +740,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 || conclusion.customerReply().evidenceRefs() == null
                 || conclusion.customerReply().evidenceRefs().size() != 2
                 || conclusion.customerReply().evidenceRefs().stream().anyMatch(Objects::isNull)
-                || conclusion.customerReply().referencedOrder() == null) {
+                || conclusion.customerReply().referencedOrder() == null
+                || (conclusion.customerReply().knowledge() != null
+                    && (conclusion.customerReply().knowledgeRequestId() == null
+                        || conclusion.customerReply().knowledgeRequestId().isBlank()))) {
             accessAudit.rejected(ticketId, "MALFORMED_CONCLUSION");
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "malformed investigation conclusion");
@@ -744,15 +758,50 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         if (rejection != null) reject(ticketId, rejection);
     }
 
-    private static String replyDigest(CustomerReplyEnvelope reply) {
+    private String replyDigest(CustomerReplyEnvelope reply) {
         if (reply == null) return "missing-customer-reply";
-        return StableParameterDigest.sha256(
+        String digest = StableParameterDigest.sha256(
                 reply.schemaVersion(),
                 reply.body(),
                 reply.intent() == null ? "null" : reply.intent().name(),
                 reply.evidenceRefs() == null ? "null" : String.join("\n", reply.evidenceRefs()),
                 Boolean.toString(reply.escalationRequired()),
                 reply.referencedOrder());
+        return reply.knowledge() == null ? digest : StableParameterDigest.sha256(
+                digest, reply.knowledgeRequestId(), json.writeValueAsString(reply.knowledge()));
+    }
+
+    private CustomerKnowledgeProjection validateKnowledgeReply(UUID generationId, CustomerReplyEnvelope reply) {
+        if (reply.knowledge() == null) return null;
+        if (reply.knowledgeRequestId() == null || reply.knowledgeRequestId().isBlank()
+                || reply.knowledgeRequestId().length() > 200) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_KNOWLEDGE_CITATION");
+        }
+        List<AgentKnowledgeResult> receipts = jdbc.query(
+                "select response_payload::text from agent_command_request "
+                        + "where generation_id=? and request_id=? and operation='SEARCH_KNOWLEDGE'",
+                (rs, row) -> json.readValue(rs.getString(1), AgentKnowledgeResult.class),
+                generationId, reply.knowledgeRequestId());
+        if (receipts.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_KNOWLEDGE_CITATION");
+        }
+        AgentKnowledgeResult receipt = knowledge.revalidateCustomerForPublication(receipts.getFirst());
+        return CustomerKnowledgeReplyPolicy.validate(reply.knowledge(), receipt);
+    }
+
+    private void publishCustomerReply(UUID ticketId, UUID generationId, CustomerReplyEnvelope reply,
+            CustomerKnowledgeProjection projection, Instant now) {
+        if (projection == null) {
+            publicProjection.completeAgentReplyStream(ticketId, generationId, reply.body(), now);
+            publicProjection.appendAgentMessage(ticketId, generationId, reply.body(), now, false);
+            return;
+        }
+        publicProjection.completeBufferedAgentReplyStream(ticketId, generationId, reply.publicBody(), now);
+        publicProjection.appendAgentKnowledgeMessage(ticketId, generationId, reply.publicBody(), projection, now);
+        if (reply.knowledge().status() == CustomerKnowledgeStatus.CONFLICT) {
+            jdbc.update("insert into audit_event (ticket_id,event_type,actor_id,occurred_at) "
+                    + "values (?,'KNOWLEDGE_CONFLICT','spring-system',?)", ticketId, Timestamp.from(now));
+        }
     }
 
     private static String evidenceDigest(List<ConclusionEvidence> evidence) {
