@@ -1,11 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
-import { login } from "./support/auth";
+import { continueAsNewIfDuplicate, login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
-import { executeFixtureSql } from "./support/database";
+import { executeFixtureSql, queryFixtureSql } from "./support/database";
 
 // 隔离静态准备，尚未运行或登记公共门禁；完整 AC 与待接线项见 issue-173-acceptance-plan.md。
 // SQL 只准备独有订单，不预造工单、回复、代次、领取、提案或审批结果。
-function prepareOrder() {
+function prepareOrder({ delayHours = 80, allowance = 268 } = {}) {
   const reference = `ORDER-ISSUE-173-${crypto.randomUUID()}`;
   executeFixtureSql(`
     INSERT INTO synthetic_order (
@@ -13,8 +13,8 @@ function prepareOrder() {
       paid, cancelled, fully_refunded, existing_compensation, policy_version,
       available_compensation_amount
     ) VALUES (
-      '${reference}', 'customer-demo', 268.00, 'CNY', 80, 288000,
-      true, false, false, false, 'delay-policy-v1', 268.00
+      '${reference}', 'customer-demo', 268.00, 'CNY', ${delayHours}, ${delayHours * 3600},
+      true, false, false, false, 'delay-policy-v1', ${allowance}
     );
   `);
   return reference;
@@ -32,7 +32,7 @@ async function createSingleTicket(page: Page, reference: string, description: st
   await page.getByLabel("订单编号").fill(reference);
   await page.getByLabel("问题描述").fill(description);
   await page.getByRole("button", { name: "提交物流延迟问题" }).click();
-  await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
+  await continueAsNewIfDuplicate(page);
   const confirmed = intakeReply(page);
   await page.getByRole("button", { name: "确认，就是这个问题" }).click();
   const response = await confirmed;
@@ -83,6 +83,167 @@ test("Issue #173 A：自然语言多问题澄清、一次建单与订单分组�
     ).toBe(true);
   } finally {
     await context.close();
+  }
+});
+
+test("Issue #173 D：真实低风险回复产生五分钟候选，刷新后仍可取消", async ({ browser }) => {
+  test.setTimeout(90_000);
+  const reference = prepareOrder({ delayHours: 23 });
+  const context = await newAcceptanceContext(browser, { viewport: { width: 1440, height: 960 } });
+  try {
+    const page = await context.newPage();
+    await login(page, "customer", "customer-demo");
+    // 使用 #162 的真实白名单问句；不把任意物流诉求或模型置信度当作自动解决资格。
+    const ticketId = await createSingleTicket(page, reference, "请解释物流状态");
+    const notice = page.getByRole("region", { name: "自动解决状态" });
+    const cancel = notice.getByRole("button", { name: "仍需帮助，取消自动解决" });
+    await expect(cancel).toBeVisible({ timeout: 60_000 });
+    const candidate = JSON.parse(queryFixtureSql(`
+      SELECT json_build_object('waitSeconds', extract(epoch FROM due_at - created_at)::integer, 'dueAt', due_at)
+      FROM ticket_auto_resolution WHERE ticket_id = '${ticketId}' AND status = 'PENDING';
+    `)) as { waitSeconds: number; dueAt: string };
+    expect(candidate.waitSeconds).toBe(300);
+
+    const reloaded = page.waitForResponse(
+      (response) => response.request().method() === "GET" &&
+        new URL(response.url()).pathname === `/api/customer/v2/tickets/${ticketId}`,
+    );
+    await page.reload();
+    const response = await reloaded;
+    expect(response.ok()).toBe(true);
+    const snapshot = await response.json();
+    expect(snapshot).toMatchObject({
+      ticket: { id: ticketId, lifecycleState: "INVESTIGATING", handlingMode: "AGENT" },
+      autoResolution: { status: "PENDING" },
+    });
+    expect(Date.parse(snapshot.autoResolution.dueAt)).toBe(Date.parse(candidate.dueAt));
+    // 默认 Compose 固定 Spring 时钟，浏览器可能已显示“正在重新核验”；不由浏览器归零断言解决。
+    await expect(cancel).toBeVisible();
+    const cancelled = page.waitForResponse(
+      (result) => result.request().method() === "POST" &&
+        new URL(result.url()).pathname === `/api/customer/tickets/${ticketId}/auto-resolution/cancel`,
+    );
+    await cancel.click();
+    const cancelResponse = await cancelled;
+    expect(cancelResponse.ok()).toBe(true);
+    expect(cancelResponse.request().postDataJSON()).toEqual({
+      candidateDueAt: snapshot.autoResolution.dueAt,
+      candidateGeneration: snapshot.ticket.agentGeneration,
+    });
+    await expect(notice.getByText("已取消自动解决", { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(notice.getByText("已取消自动解决", { exact: true })).toBeVisible();
+    expect(queryFixtureSql(`
+      SELECT t.lifecycle_state || ':' || a.status
+      FROM support_ticket t JOIN ticket_auto_resolution a ON a.ticket_id = t.id
+      WHERE t.id = '${ticketId}';
+    `)).toBe("INVESTIGATING:CANCELLED");
+  } finally {
+    await context.close();
+  }
+});
+
+test("Issue #173 E：同订单两提案竞争30元额度，只允许一笔26.80元批准", async ({ browser }) => {
+  test.setTimeout(150_000);
+  const reference = prepareOrder({ allowance: 30 });
+  const customerContext = await newAcceptanceContext(browser);
+  const supportContext = await newAcceptanceContext(browser);
+  const approverContext = await newAcceptanceContext(browser);
+  try {
+    const customer = await customerContext.newPage();
+    await login(customer, "customer", "customer-demo");
+    const ticketIds: string[] = [];
+    for (const description of ["物流延迟，请人工客服核实。", "物流延迟，请人工客服继续处理新问题。"]) {
+      await customer.goto("/help");
+      ticketIds.push(await createSingleTicket(customer, reference, description));
+      await expect(customer.getByText("人工客服处理中", { exact: true })).toBeVisible({ timeout: 60_000 });
+    }
+    expect(new Set(ticketIds).size).toBe(2);
+
+    const supportPages = [await supportContext.newPage(), await supportContext.newPage()];
+    await login(supportPages[0], "internal", "support-demo");
+    await supportPages[1].goto("/internal/support");
+    for (const [index, page] of supportPages.entries()) {
+      await page.getByRole("table", { name: "待接手工单", exact: true })
+        .getByRole("button", { name: `领取工单 ${ticketIds[index]}`, exact: true }).click();
+      await page.getByRole("button", { name: "确认领取", exact: true }).click();
+      await expect(page.locator(".support-ticket-detail").getByText(
+        `${ticketIds[index].slice(0, 8)}…${ticketIds[index].slice(-4)}`, { exact: true },
+      )).toBeVisible();
+      await expect(page.getByRole("region", { name: "标准补偿", exact: true })
+        .getByRole("combobox", { name: "补偿方案" })).toContainText("26.80 CNY");
+    }
+    const proposals = await Promise.all(supportPages.map(async (page, index) => {
+      const proposed = page.waitForResponse(
+        (response) => response.request().method() === "POST" &&
+          new URL(response.url()).pathname === `/api/support/workbench/tickets/${ticketIds[index]}/compensation-proposals`,
+      );
+      await page.getByRole("button", { name: "提交审批", exact: true }).click();
+      const response = await proposed;
+      expect(response.status()).toBe(201);
+      const proposal = (await response.json()) as { proposalRevisionId: string };
+      expect(proposal.proposalRevisionId).toMatch(/^[0-9a-f-]{36}$/i);
+      return proposal;
+    }));
+    expect(new Set(proposals.map((proposal) => proposal.proposalRevisionId)).size).toBe(2);
+    expect(queryFixtureSql(`
+      SELECT pending_proposal_amount = 53.60 AND active_reservation_amount = 0 AND consumed_amount = 0
+      FROM order_compensation_allowance WHERE order_reference = '${reference}';
+    `)).toBe("t");
+    // 与 C 相同，在批准可能触发自动执行前释放本场景领取；不撤销其他场景的客服责任。
+    for (const page of supportPages) {
+      await page.getByRole("button", { name: "释放领取", exact: true }).click();
+    }
+
+    const approverPages = [await approverContext.newPage(), await approverContext.newPage()];
+    await login(approverPages[0], "internal", "approver-demo");
+    await approverPages[1].goto("/internal/approvals");
+    for (const [index, page] of approverPages.entries()) {
+      await page.getByRole("row").filter({
+        has: page.locator(`code[title="${proposals[index].proposalRevisionId}"]`),
+      }).getByRole("button", { name: "领取审批", exact: true }).click();
+      await expect(page.getByRole("heading", { name: reference, exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "批准补偿", exact: true }).click();
+      await expect(page.getByRole("dialog", { name: "确认批准补偿" })).toBeVisible();
+    }
+
+    // 两个真实 UI 请求都到达后再同时放行；只延迟传输，不替换请求、响应或服务端锁。
+    let readyCount = 0;
+    let releaseRequests: () => void = () => {};
+    const bothReady = new Promise<void>((resolve) => { releaseRequests = resolve; });
+    for (const [index, page] of approverPages.entries()) {
+      await page.route(`**/api/approver/compensation-proposals/${proposals[index].proposalRevisionId}/approve`, async (route) => {
+        readyCount += 1;
+        if (readyCount === 2) releaseRequests();
+        await bothReady;
+        await route.continue();
+      });
+    }
+    const approvals = await Promise.all(approverPages.map(async (page, index) => {
+      const approved = page.waitForResponse(
+        (response) => response.request().method() === "POST" &&
+          new URL(response.url()).pathname === `/api/approver/compensation-proposals/${proposals[index].proposalRevisionId}/approve`,
+      );
+      await page.getByRole("dialog", { name: "确认批准补偿" })
+        .getByRole("button", { name: "确认批准", exact: true }).click();
+      return approved;
+    }));
+    expect(approvals.map((response) => response.status()).sort()).toEqual([200, 409]);
+    for (const page of approverPages) {
+      await expect(page.getByRole("heading", { name: reference, exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "批准补偿", exact: true })).toHaveCount(0);
+    }
+    // 执行可能仍在预占，也可能已经消费；互斥汇总应始终只占26.80，剩余3.20，执行记录只有一笔。
+    expect(queryFixtureSql(`
+      SELECT active_reservation_amount + consumed_amount = 26.80
+        AND total_available_compensation_amount - active_reservation_amount = 3.20
+        AND (SELECT count(*) FROM compensation_execution WHERE order_reference = '${reference}') = 1
+      FROM order_compensation_allowance WHERE order_reference = '${reference}';
+    `)).toBe("t");
+  } finally {
+    await approverContext.close();
+    await supportContext.close();
+    await customerContext.close();
   }
 });
 
