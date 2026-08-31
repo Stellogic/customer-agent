@@ -20,12 +20,13 @@ from baseline_agent.knowledge_sufficiency_run import (
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("version", ["c3", "c4"])
 async def test_development_version_preserves_history_and_counts_one_whole_run(
-    tmp_path: Path,
+    tmp_path: Path, version: str
 ) -> None:
     path = tmp_path / "cost.json"
     path.write_bytes(DEVELOPMENT_ANCHOR.read_bytes())
-    frozen = contract(development_version="c3")
+    frozen = contract(development_version=version)
     ledger = ExperimentLedger(path, frozen)
     original = copy.deepcopy(ledger.state)
     calls = 0
@@ -48,7 +49,7 @@ async def test_development_version_preserves_history_and_counts_one_whole_run(
         ledger,
         frozen,
         api_key="offline-only",
-        development_version="c3",
+        development_version=version,
         transport=httpx.MockTransport(handle),
     )
     ledger.finish(report["status"])
@@ -59,7 +60,9 @@ async def test_development_version_preserves_history_and_counts_one_whole_run(
     assert ledger.state["attempts"][:122] == original["attempts"]
     assert all(ledger.state["phases"][key] == value for key, value in original["phases"].items())
     with pytest.raises(SufficiencyBlocked, match="VERSION_ALREADY_RUN"):
-        ledger.begin_version("c3", "new-run-id", frozen["asset_sha256"], report["request_manifest"])
+        ledger.begin_version(
+            version, "new-run-id", frozen["asset_sha256"], report["request_manifest"]
+        )
 
 
 def test_development_version_keeps_budget_and_old_history(tmp_path: Path) -> None:

@@ -19,3 +19,13 @@ RunId `issue190-development-offline-20260831a`：[原始证据](evidence/issue19
 API调用0，费用0；共享账本前后SHA256均为 `0800a19d7111b2838d7131734a62cdf6a64be48dcac1fc8c9b44d3435b9646f0`。进程释放后宿主单次回读FREE并已通知协调。随后协调再次明确恢复自主开发窗口；未重复执行已通过的离线项目。
 
 Standards PASS：独立静态审查 `ff49581`，0缺陷；原有runner/账本复用、历史不覆盖，无新增题目特例。Spec PASS：独立静态审查 `ff49581`及格式增量，0缺陷；72题整批、顺序hash、预算和旧阶段保留符合恢复授权。两项均不是质量通过。以上由Codex实现及Agent审查，不声称用户逐行手写、生产规模或线上收益。真实c3结果尚未运行。
+
+### c3 实际结果与 c4 最小改进
+
+c3 RunId `issue190-development-c3-20260831a`，受测提交 `ff29761d85ef524912447426ef635784a62f7257`，base仍c19a7ebe。3次请求、2/72完成后 `INVALID_DECISION_SCHEMA` 停止，metrics=null，语义质量未评估。[脱敏原始报告及共享账本](evidence/issue190-development-c3-20260831a/)保留第3次输出：模型返回整个JSON Schema定义，缺少sufficient/evidence实例字段；本地拒绝正确，不将其解释成检索或语义质量FAIL。
+
+输入1807、输出165 token，新增保守费用6906微元，累计0.202485元、未结算0；Python6.5674578秒、入口9.958633秒。实返deepseek-v4-flash、fingerprint=null。账本SHA256 `6aaf63e0b38110df34a98138c18ae2c86156a39f2d5310791fbe15a4a9a12693`；无重试，旧122次记录未改，c3独立STOPPED。单次宿主回读FREE并通知协调后继续当前开发窗口。
+
+c4仅在c3提示末尾补充正/负JSON实例形状，明确不输出Schema定义，格式占位必须替换成当前真实片段，绝不把占位当证据。依据[供应商JSON Output指引](https://api-docs.deepseek.com/zh-cn/guides/json_mode/)要求明确输出格式样例；[Responses兼容文档](https://api-docs.deepseek.com/zh-cn/guides/responses_api/)声明支持text.format，但本次实返仍不遵约，因此保留所有本地校验。模型、schema、数值边界、数据及门槛不变。新版完整72题单独验证，不续c3、不拼分。
+
+c4增量Standards/Spec均PASS，0缺陷。`issue190-development-c4-offline-20260831a`：3项版本化离线回归、Ruff/格式/Pyright PASS，23.7218885秒，API=0、账本hash前后相同；复用已通过的入口/旧组件，不无故重跑。运行起始ff29761加本次未提交c4资产/测试增量，随后提交的源码即本次受测内容，不能把起始HEAD当作纯净受测HEAD。原始日志见[evidence](evidence/issue190-development-c4-offline-20260831a/)。
