@@ -1,4 +1,4 @@
-"""一次开发可行性候选；不接入默认检索、不训练分类器、不调用云模型。"""
+"""一次开发可行性候选;不接入默认检索、不训练分类器、不调用云模型。"""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def verify_directory(directory: Path) -> Path:
 class OfflineReranker:
     def __init__(self, directory: Path):
         path = verify_directory(directory)
-        # 模型文件校验通过后才导入框架；运行阶段不能下载模型。
+        # 模型文件校验通过后才导入框架;运行阶段不能下载模型。
         import torch
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -97,7 +97,7 @@ def evaluate_development(
     score: Callable[[str, list[str]], list[float]],
     report: dict[str, Any],
 ) -> None:
-    """保留原候选顺序，只选择一次整体接受/拒答界限；不导出产品参数。"""
+    """保留原候选顺序,只选择一次整体接受/拒答界限;不导出产品参数。"""
     report["rows"] = []
     maximum_scores = []
     for row in rows:

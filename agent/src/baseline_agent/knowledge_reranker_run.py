@@ -1,4 +1,4 @@
-"""固定72题的单次本地可行性入口；不提供留出、冻结集或续跑模式。"""
+"""固定72题的单次本地可行性入口;不提供留出、冻结集或续跑模式。"""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from baseline_agent.knowledge_sufficiency_run import write_json
 
 
 def prepare(directory: Path) -> None:
-    # 仅显式 prepare 阶段下载，不由评分器触发，也不生成新依赖锁。
+    # 仅显式 prepare 阶段下载,不由评分器触发,也不生成新依赖锁。
     import httpx
 
     fixed = protocol()
@@ -60,8 +60,11 @@ def main() -> None:
     args = parser.parse_args()
     subprocess.run(
         [
-            "pwsh", "-NoProfile", "-File",
-            str(REPO / "scripts/test-gate-lock.ps1"), "-AssertInherited",
+            "pwsh",
+            "-NoProfile",
+            "-File",
+            str(REPO / "scripts/test-gate-lock.ps1"),
+            "-AssertInherited",
         ],
         check=True,
     )
@@ -90,7 +93,7 @@ def main() -> None:
         },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    # 正式入口给 development 固定的共享路径；换 RunId 不会重启终结阶段。
+    # 正式入口给 development 固定的共享路径;换 RunId 不会重启终结阶段。
     with args.output.open("x", encoding="utf-8") as output:
         json.dump(report, output, ensure_ascii=False, indent=2)
     started = time.perf_counter()
