@@ -1,4 +1,4 @@
-from baseline_agent.knowledge_evaluation import metrics
+from baseline_agent.knowledge_evaluation import metrics, retrieval_metrics
 
 
 def test_quality_metrics_penalize_answered_abstention_and_forbidden_results():
@@ -29,3 +29,30 @@ def test_quality_metrics_penalize_answered_abstention_and_forbidden_results():
     assert measured["wrong_version_top5_hit_rate"] == 1 / 6
     assert measured["out_of_scope_top5_hit_rate"] == 0
     assert measured["unauthorized_top5_hit_rate"] == 0
+
+
+def test_layered_retrieval_does_not_treat_legal_candidates_as_an_answer():
+    def row(kind, hits, violations=()):
+        return {
+            "kind": kind,
+            "recall": 1.0 if kind == "answered" else 0.0,
+            "reciprocal_rank": 0.5 if kind == "answered" else 0.0,
+            "results": hits,
+            "violations": violations,
+            "checked_prohibitions": ["wrong_version", "out_of_scope", "unauthorized"],
+        }
+
+    measured = retrieval_metrics(
+        [row("answered", ["supported"]), row("unanswered", ["legal_but_insufficient"])]
+    )
+    assert measured == {
+        "answered_recall_at_5": 1.0,
+        "answered_mrr_at_5": 0.5,
+        "wrong_version_top5_hit_rate": 0.0,
+        "out_of_scope_top5_hit_rate": 0.0,
+        "unauthorized_top5_hit_rate": 0.0,
+    }
+    forbidden = retrieval_metrics(
+        [row("answered", ["supported"]), row("unanswered", ["retired"], ["wrong_version"])]
+    )
+    assert forbidden["wrong_version_top5_hit_rate"] == 0.5

@@ -39,15 +39,24 @@ def matches(hit: dict[str, Any], allowed: AllowedHit) -> bool:
 
 
 def metrics(rows: list[dict[str, Any]]) -> dict[str, float]:
+    """保留旧检索空列表拒答口径,不得把新版结果标作旧门通过。"""
     answered = [row for row in rows if row["kind"] == "answered"]
     unanswered = [row for row in rows if row["kind"] == "unanswered"]
     abstentions = [row for row in answered + unanswered if not row["results"]]
     true_abstentions = sum(not row["results"] for row in unanswered)
+    return {
+        **retrieval_metrics(rows),
+        "unanswered_precision": true_abstentions / len(abstentions) if abstentions else 0.0,
+        "unanswered_recall": true_abstentions / len(unanswered),
+    }
+
+
+def retrieval_metrics(rows: list[dict[str, Any]]) -> dict[str, float]:
+    """新版只度量召回/排名/硬过滤,完整保留无答案样本但不猜测回答充分性。"""
+    answered = [row for row in rows if row["kind"] == "answered"]
     values = {
         "answered_recall_at_5": sum(row["recall"] for row in answered) / len(answered),
         "answered_mrr_at_5": sum(row["reciprocal_rank"] for row in answered) / len(answered),
-        "unanswered_precision": true_abstentions / len(abstentions) if abstentions else 0.0,
-        "unanswered_recall": true_abstentions / len(unanswered),
     }
     for reason in ("wrong_version", "out_of_scope", "unauthorized"):
         relevant = [row for row in rows if reason in row["checked_prohibitions"]]
@@ -89,7 +98,9 @@ def login(client: httpx.Client, query: EvalQuery) -> None:
         raise ValueError("真实会话与冻结身份不符")
 
 
-def run_query(base_url: str, query: EvalQuery) -> dict[str, Any]:
+def run_query(
+    base_url: str, query: EvalQuery, expected_schema: str = "knowledge-hybrid-v1"
+) -> dict[str, Any]:
     with httpx.Client(base_url=base_url, timeout=90) as client:
         login(client, query)
         scope = "CUSTOMER_PUBLIC" if query.search_context == "CUSTOMER_PUBLIC" else "INTERNAL"
@@ -110,7 +121,7 @@ def run_query(base_url: str, query: EvalQuery) -> dict[str, Any]:
             response.raise_for_status()
             result = response.json()
             if (
-                result["schema"] != "knowledge-hybrid-v1"
+                result["schema"] != expected_schema
                 or result["revision"] != load_rag_eval_v1().protocol.model.revision
             ):
                 raise ValueError("检索协议不符")
@@ -159,10 +170,23 @@ def main() -> None:
     parser.add_argument("--head-sha")
     parser.add_argument("--base-sha")
     parser.add_argument("--working-tree-dirty", action="store_true")
+    parser.add_argument(
+        "--protocol",
+        choices=("rag-eval-v1", "rag-layered-v2-retrieval"),
+        default="rag-eval-v1",
+    )
     args = parser.parse_args()
     started = time.perf_counter()
     dataset = load_rag_eval_v1()
+    layered = args.protocol == "rag-layered-v2-retrieval"
+    thresholds = {
+        name: value
+        for name, value in asdict(dataset.thresholds).items()
+        if not layered or not name.startswith("unanswered_")
+    }
     report: dict[str, Any] = {
+        "evaluation_protocol": args.protocol,
+        "answer_quality": "NOT_EVALUATED",
         "dataset": dataset.dataset_id,
         "dataset_sha256": compute_content_sha256(),
         "revision": dataset.protocol.model.revision,
@@ -174,7 +198,7 @@ def main() -> None:
         "working_tree_dirty": args.working_tree_dirty,
         "paid_model_cost_cny": 0,
         "environment": {"python": platform.python_version(), "platform": platform.platform()},
-        "thresholds": asdict(dataset.thresholds),
+        "thresholds": thresholds,
         "rows": [],
         "metrics": None,
     }
@@ -233,10 +257,15 @@ def main() -> None:
             raise ValueError("512 token 右截断契约失败")
         report["embedding_contract"] = "PASS"
         for query in dataset.queries:
-            report["rows"].append(run_query(os.environ["SPRING_INTERNAL_URL"], query))
-        measured = metrics(report["rows"])
+            report["rows"].append(
+                run_query(
+                    os.environ["SPRING_INTERNAL_URL"],
+                    query,
+                    "knowledge-hybrid-v2" if layered else "knowledge-hybrid-v1",
+                )
+            )
+        measured = retrieval_metrics(report["rows"]) if layered else metrics(report["rows"])
         report["metrics"] = measured
-        thresholds = asdict(dataset.thresholds)
         report["passed"] = all(
             value == 0 if name.endswith("hit_rate") else value >= thresholds[name]
             for name, value in measured.items()

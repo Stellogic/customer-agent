@@ -3,11 +3,10 @@ package com.stellogic.customeragent.knowledge;
 import java.io.IOException;
 import java.util.List;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@Component
+// 保留旧实验数值契约与测试；rag-layered-v2 不将其注册为产品依赖。
 final class KnowledgeAnswerabilityPolicy {
     private final JsonNode configuration;
 

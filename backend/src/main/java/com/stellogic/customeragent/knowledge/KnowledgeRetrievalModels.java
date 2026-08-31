@@ -23,7 +23,6 @@ record KnowledgeRetrievalResponse(
         String query,
         long generation,
         String revision,
-        KnowledgeRetrievalPolicy policy,
         List<KnowledgeRetrievalHit> lexicalCandidates,
         List<KnowledgeRetrievalHit> vectorCandidates,
         List<KnowledgeRetrievalHit> results) {}

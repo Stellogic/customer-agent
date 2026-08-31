@@ -27,47 +27,41 @@ class KnowledgeRetrievalService {
     private final JdbcTemplate jdbc;
     private final KnowledgeAccessPolicy access;
     private final KnowledgeEmbeddingGateway embedding;
-    private final KnowledgeAnswerabilityPolicy answerability;
 
     KnowledgeRetrievalService(
             JdbcTemplate jdbc,
             KnowledgeAccessPolicy access,
-            KnowledgeEmbeddingGateway embedding,
-            KnowledgeAnswerabilityPolicy answerability) {
+            KnowledgeEmbeddingGateway embedding) {
         this.jdbc = jdbc;
         this.access = access;
         this.embedding = embedding;
-        this.answerability = answerability;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public KnowledgeRetrievalResponse search(String principal, String query, String scope) {
-        access.requireScopes(principal);
-        KnowledgeRetrievalPolicy policy = answerability.requireCalibrated();
-        var candidates = retrieve(principal, query, scope);
-        List<KnowledgeRetrievalHit> results =
-                candidates.vectorCandidates().isEmpty()
-                                || !answerability.accepts(candidates.features())
-                        ? List.of()
-                        : candidates.fusedCandidates();
-        return new KnowledgeRetrievalResponse(
-                "knowledge-hybrid-v1",
-                query.trim(),
-                candidates.generation(),
-                candidates.revision(),
-                policy,
-                candidates.lexicalCandidates(),
-                candidates.vectorCandidates(),
-                results);
+        return retrieve(principal, query, scope);
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public KnowledgeDevelopmentResponse developmentCandidates(
             String principal, String query, String scope) {
-        return retrieve(principal, query, scope);
+        var candidates = retrieve(principal, query, scope);
+        return new KnowledgeDevelopmentResponse(
+                "knowledge-development-v1",
+                candidates.generation(),
+                candidates.revision(),
+                KnowledgeAnswerabilityFeatures.NAMES,
+                KnowledgeAnswerabilityFeatures.extract(
+                        query.trim(),
+                        candidates.lexicalCandidates(),
+                        candidates.vectorCandidates(),
+                        candidates.results()),
+                candidates.lexicalCandidates(),
+                candidates.vectorCandidates(),
+                candidates.results());
     }
 
-    private KnowledgeDevelopmentResponse retrieve(String principal, String query, String scope) {
+    private KnowledgeRetrievalResponse retrieve(String principal, String query, String scope) {
         List<String> allowed = access.requireScopes(principal);
         if (query == null || query.isBlank() || query.length() > 200) {
             throw new KnowledgeInvalidQueryException("检索问题长度必须在 1 到 200 之间");
@@ -128,12 +122,11 @@ class KnowledgeRetrievalService {
                             vector,
                             vector);
             List<KnowledgeRetrievalHit> fused = fuse(lexical, dense);
-            return new KnowledgeDevelopmentResponse(
-                    "knowledge-development-v1",
+            return new KnowledgeRetrievalResponse(
+                    "knowledge-hybrid-v2",
+                    query.trim(),
                     generation,
                     KnowledgeEmbeddingGateway.REVISION,
-                    KnowledgeAnswerabilityFeatures.NAMES,
-                    KnowledgeAnswerabilityFeatures.extract(query.trim(), lexical, dense, fused),
                     lexical,
                     dense,
                     fused);

@@ -18,7 +18,7 @@ type Hit = {
 };
 
 type Retrieval = {
-  schema: "knowledge-hybrid-v1";
+  schema: "knowledge-hybrid-v2";
   query: string;
   generation: number;
   revision: string;
@@ -54,13 +54,10 @@ export default function KnowledgeHybridSearch() {
       const value: unknown = await response.json();
       if (!response.ok) {
         const stale = record(value) && value.code === "INDEX_STALE";
-        const pending = record(value) && value.code === "CALIBRATION_REQUIRED";
         throw new Error(
           stale
             ? "混合检索索引过期，请联系维护者重新准备索引。"
-            : pending
-              ? "拒答策略尚未完成独立校准，没有返回知识结果。"
-              : "混合检索不可用；没有返回知识结果，请稍后重试。",
+            : "混合检索不可用；没有返回知识结果，请稍后重试。",
         );
       }
       if (!isRetrieval(value)) throw new Error("检索返回的数据不兼容，已停止显示结果。");
@@ -113,13 +110,13 @@ export default function KnowledgeHybridSearch() {
             索引代次 {result.generation}
           </p>
           {result.results.length === 0 ? (
-            <p>没有足够相关的可引用知识，不生成无来源答案。</p>
+            <p>当前授权范围内没有匹配的知识片段。</p>
           ) : (
-            <HitList hits={result.results} label="RRF 合格结果" />
+            <HitList hits={result.results} label="RRF 检索片段" />
           )}
           <details>
             <summary>查看两路合法候选与分值</summary>
-            <p>候选仅供检索诊断，不等同于达到相关性要求的答案。模型 revision：{result.revision}</p>
+            <p>检索片段不代表资料足以回答问题；分值只用于排序。模型 revision：{result.revision}</p>
             <HitList hits={result.lexicalCandidates} label="全文候选" />
             <HitList hits={result.vectorCandidates} label="向量候选" />
           </details>
@@ -181,7 +178,7 @@ function isHit(value: unknown): value is Hit {
 function isRetrieval(value: unknown): value is Retrieval {
   return (
     record(value) &&
-    value.schema === "knowledge-hybrid-v1" &&
+    value.schema === "knowledge-hybrid-v2" &&
     typeof value.query === "string" &&
     value.revision === "7999e1d3359715c523056ef9478215996d62a620" &&
     Number.isSafeInteger(value.generation) &&

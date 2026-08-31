@@ -23,16 +23,16 @@ for (const viewport of [
       const response = await fetched;
       expect(response.status()).toBe(200);
       const data = await response.json();
-      expect(data.schema).toBe("knowledge-hybrid-v1");
+      expect(data.schema).toBe("knowledge-hybrid-v2");
       expect(data.results.length).toBeGreaterThan(0);
       expect(data.lexicalCandidates.length).toBeGreaterThan(0);
-      expect(data.policy.id).toBe("retrieval-logistic-v1");
+      expect(data).not.toHaveProperty("policy");
       for (const hit of [...data.results, ...data.lexicalCandidates, ...data.vectorCandidates]) {
         expect(hit.version === "v1" && hit.articleId === "logistics-delay").toBe(false);
         expect(hit.sourceFile).toMatch(/^knowledge\//);
         expect(hit.startLine).toBeGreaterThan(0);
       }
-      await expect(panel.getByRole("list", { name: "RRF 合格结果" })).toContainText(
+      await expect(panel.getByRole("list", { name: "RRF 检索片段" })).toContainText(
         "logistics-delay",
       );
       expect(
@@ -47,7 +47,7 @@ for (const viewport of [
       try {
         await panel.getByRole("button", { name: "混合检索", exact: true }).click();
         await expect(panel.getByRole("alert")).toContainText("索引过期");
-        await expect(panel.getByRole("list", { name: "RRF 合格结果" })).toHaveCount(0);
+        await expect(panel.getByRole("list", { name: "RRF 检索片段" })).toHaveCount(0);
       } finally {
         executeFixtureSql(
           "UPDATE knowledge_vector_state SET generation=generation-1000000 WHERE id=1",
@@ -67,7 +67,7 @@ for (const viewport of [
       await panel.getByRole("button", { name: "混合检索", exact: true }).click();
       await expect(panel.getByRole("status")).toContainText("正在读取真实混合检索结果");
       release?.();
-      await expect(panel.getByText("没有足够相关的可引用知识，不生成无来源答案。")).toBeVisible();
+      await expect(panel.getByText("当前授权范围内没有匹配的知识片段。")).toBeVisible();
       await page.unroute("**/api/internal/knowledge/search?**");
       await page.route("**/api/internal/knowledge/search?**", (route) =>
         route.fulfill({ status: 503, json: { code: "MODEL_UNAVAILABLE" } }),
@@ -97,6 +97,27 @@ test("Issue #190 真实会话拒绝客户与无知识读权限人员", async ({ 
     } finally {
       await context.close();
     }
+  }
+});
+
+test("Issue #190 无答案问题仍可返回授权候选而不冒充充分性判断", async ({ browser }) => {
+  const context = await newAcceptanceContext(browser);
+  try {
+    await login(await context.newPage(), "internal", "support-demo");
+    // 独立工程样例，不取自冻结评测题；当前知识库没有园艺指导。
+    const response = await context.request.get("/api/internal/knowledge/search", {
+      params: { q: "温室里马铃薯每周应该浇几次水", scope: "INTERNAL" },
+    });
+    expect(response.status()).toBe(200);
+    const result = await response.json();
+    expect(result.schema).toBe("knowledge-hybrid-v2");
+    expect(result.results.length).toBeGreaterThan(0);
+    expect(result.results.length).toBeLessThanOrEqual(5);
+    expect(result).not.toHaveProperty("policy");
+    expect(result).not.toHaveProperty("answerable");
+    for (const hit of result.results) expect(hit.applicability).toContain("INTERNAL");
+  } finally {
+    await context.close();
   }
 });
 
