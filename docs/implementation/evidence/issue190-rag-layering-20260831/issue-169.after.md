@@ -1,12 +1,3 @@
-# [知识] 客户 Agent 回复使用知识引用
-
-> 父规格：[#149](../../specs/issue-149.md)
-> 来源：[https://github.com/Stellogic/customer-agent/issues/169](https://github.com/Stellogic/customer-agent/issues/169)
-> Issue 状态：OPEN
-> 最后更新时间：08/31/2026 15:20:36
-> 同步日期：2026-08-31
-> 说明：GitHub Issue 是事实源；本文件为回读正文镜像。
-
 ## Parent
 
 Part of #149

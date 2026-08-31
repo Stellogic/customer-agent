@@ -1,0 +1,97 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "date": "2026-08-31",
+  "authorization": "User approved layered acceptance, asked to amend all affected specs/tickets and retain trial history",
+  "standards_review": "PASS static",
+  "spec_review": "PASS static",
+  "tests": "NOT_RUN_DOCUMENTATION_ONLY",
+  "original_closed_tickets_preserved": [
+    166,
+    189
+  ],
+  "unchanged_ticket": 166,
+  "items": [
+    {
+      "issue": 149,
+      "state": "OPEN",
+      "updated_at": "2026-08-31T15:19:32Z",
+      "before_sha256": "d301a48ae1fb811251a6a2aa8b608db9faf98d2c76f89b42a45aa80db297c94e",
+      "after_sha256": "75af643f9ea2906465e3b1b1792937ef7584c5a551d1a5511d62c4d3f552bec4",
+      "readback": "MATCHED",
+      "reopened": false
+    },
+    {
+      "issue": 167,
+      "state": "OPEN",
+      "updated_at": "2026-08-31T15:19:37Z",
+      "before_sha256": "4a2695afeab98d191b3c10edb5bce17a25703e55838b6c9125a627dd2ecf5b93",
+      "after_sha256": "bc8a962b2c887cf73bf69d59a7d810c3cef58e86ed3cfcfd7e55cf762963e100",
+      "readback": "MATCHED",
+      "reopened": false
+    },
+    {
+      "issue": 168,
+      "state": "OPEN",
+      "updated_at": "2026-08-31T15:20:32Z",
+      "before_sha256": "4cdc9b9b825ec3d1c16fecc4267b0147b453ce6b8c8ae0e7155d9d827f8d873a",
+      "after_sha256": "086e11059de76368caf13b513d076671f07883833f9123e1d27907d03e05d94a",
+      "readback": "MATCHED",
+      "reopened": false
+    },
+    {
+      "issue": 169,
+      "state": "OPEN",
+      "updated_at": "2026-08-31T15:20:36Z",
+      "before_sha256": "e4f232102814da0b68cc440e13512b5b55557e783309cefef6a70ec638b532ea",
+      "after_sha256": "f30b3bf1d52d84caec925fd99bcd4fdd26524625e570bfd834b0046ef09570cb",
+      "readback": "MATCHED",
+      "reopened": false
+    },
+    {
+      "issue": 170,
+      "state": "OPEN",
+      "updated_at": "2026-08-31T15:20:41Z",
+      "before_sha256": "cd1ead938171a699712adf760af683a80da74825a8bf50ec7ee0c9743985b33b",
+      "after_sha256": "94565ef8040ccf40def8fe16ec7ee55722e0e1684ed5f628d0b20b6762a90489",
+      "readback": "MATCHED",
+      "reopened": false
+    },
+    {
+      "issue": 173,
+      "state": "OPEN",
+      "updated_at": "2026-08-31T15:20:45Z",
+      "before_sha256": "1b5d47003c0388e77622bf663317507ea106474b1e859cab09e2bb8f8b613770",
+      "after_sha256": "f0adaf2cc3281ae7fc4b1dfddfa91ecd1f1389cd0824f7796f3ea37667612174",
+      "readback": "MATCHED",
+      "reopened": false
+    },
+    {
+      "issue": 174,
+      "state": "OPEN",
+      "updated_at": "2026-08-31T15:20:51Z",
+      "before_sha256": "e65c2a9e5cd2c1804491afc9c6cda20152420393737c8503e4413393ceca8d85",
+      "after_sha256": "ac1ada3252a79ff895f9bf5324777841a9adf82a0bb250ca4d50d9c0fb015305",
+      "readback": "MATCHED",
+      "reopened": false
+    },
+    {
+      "issue": 189,
+      "state": "CLOSED",
+      "updated_at": "2026-08-31T15:20:55Z",
+      "before_sha256": "7f73e695dc639fa957f5c75a5994952f1b1e7aa3158cc2c435d7e09af9b1c06c",
+      "after_sha256": "a2c47ff28b5a848bca67bb721c435e12da336eabfa56ba99912ec3348590ee47",
+      "readback": "MATCHED",
+      "reopened": false
+    },
+    {
+      "issue": 190,
+      "state": "OPEN",
+      "updated_at": "2026-08-31T15:20:59Z",
+      "before_sha256": "2dab6ce36631cb09627a9757937fb29b8b752d24420b41ccbe7818023b44ca4e",
+      "after_sha256": "39b634c756578e22e7a612db1b8c00063452ac4ea0c9077e3bc24ddd151f735c",
+      "readback": "MATCHED",
+      "reopened": false
+    }
+  ]
+}

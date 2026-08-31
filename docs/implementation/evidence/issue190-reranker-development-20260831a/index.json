@@ -1,0 +1,38 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-reranker-development-20260831a",
+  "head_sha": "9bbeca00b202e077963c0e8832dd2b2b4dae8994",
+  "code_sha": "04d7ee9c7129e00741db22f04ccc72492253738e",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Only workspace/user-home path prefixes; original files retained locally. Archived launchers are evidence, not run-in-place entrypoints.",
+  "lock_release_observation": "FREE after own release, one read; coordinator notified",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "launch.json",
+      "source_sha256": "7113ad686f1507599add0bdc5abc82c54a30d828a464644a3339b4a0671c690c",
+      "archived_sha256": "7113ad686f1507599add0bdc5abc82c54a30d828a464644a3339b4a0671c690c"
+    },
+    {
+      "file": "model-verification.log",
+      "source_sha256": "e8a08c08256a79e07f2eab678d9b0e92153eb09e71af3c12b1f6c61b45bae9b5",
+      "archived_sha256": "e8a08c08256a79e07f2eab678d9b0e92153eb09e71af3c12b1f6c61b45bae9b5"
+    },
+    {
+      "file": "development.log",
+      "source_sha256": "623cf16c6922ea78ca148e299f5685d87ac2c5110fd6ab10eeb39c616b83076c",
+      "archived_sha256": "623cf16c6922ea78ca148e299f5685d87ac2c5110fd6ab10eeb39c616b83076c"
+    },
+    {
+      "file": "development.json",
+      "source_sha256": "d2df80213e12b2a0cbed93c43f0a305ca9402461f4518a7d84cb385fb409392b",
+      "archived_sha256": "d2df80213e12b2a0cbed93c43f0a305ca9402461f4518a7d84cb385fb409392b"
+    },
+    {
+      "file": "issue190-reranker-development-a.ps1",
+      "source_sha256": "96992daf179fec69b56376e13ec2d247b9fa737fa4c0f4badbba0e2760204b30",
+      "archived_sha256": "96992daf179fec69b56376e13ec2d247b9fa737fa4c0f4badbba0e2760204b30"
+    }
+  ]
+}

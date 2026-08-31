@@ -1,12 +1,3 @@
-# [RAG] 完成中文检索消融与可选 ONNX 验证
-
-> 父规格：[#149](../../specs/issue-149.md)
-> 来源：[https://github.com/Stellogic/customer-agent/issues/168](https://github.com/Stellogic/customer-agent/issues/168)
-> Issue 状态：OPEN
-> 最后更新时间：08/31/2026 15:20:32
-> 同步日期：2026-08-31
-> 说明：GitHub Issue 是事实源；本文件为回读正文镜像。
-
 ## Parent
 
 Part of #149
@@ -17,7 +8,7 @@ Part of #149
 
 ## Acceptance criteria
 
-- [ ] 在冻结评测集上分别报告词法、稠密向量和 RRF 的 Recall@K、MRR 或 nDCG、无答案题的候选观察及错误版本/范围/权限命中。按 #149 rag-layered-v2，纯检索不计算语义拒答 PASS；回答拒答质量由 #169/#170 承接，旧消融协议与结果保留。
+- [ ] 在冻结评测集上分别报告词法、稠密向量和 RRF 的 Recall@K、MRR 或 nDCG、无答案表现及错误版本命中。
 - [ ] 只有混合方案相对单路检索有可复现收益时才冻结候选数、RRF 常数和排序参数。
 - [ ] 若 PostgreSQL 内建词法召回不足，按证据比较 `pg_trgm`、写入前中文分词或 PGroonga，不直接引入未经评估扩展。
 - [ ] ONNX 导出固定 feature-extraction 模型、pooling 与 normalization，并与 PyTorch 比较向量差异和 Top-K 排序一致性。
@@ -38,9 +29,11 @@ Part of #149
 
 - 可提前：基于 #189 冻结协议及 #190 明确接口编写词法/稠密/RRF 消融、ONNX 导出、一致性与资源评测代码、报告结构及测试源码；不改冻结题、期望结果或阈值。
 - 归属：#190 拥有默认 PyTorch 混合检索实现，本票拥有后续消融与可选优化；不为提前开发复制或调整前置检索实现。
-- 必须等待：#190 rag-layered-v2 检索层质量实测 PASS、最终本地完整门禁通过、PR 合入 main 且 Issue 关闭后，才可将其视为合格基线并进行真实优化比较、参数冻结或默认切换及本票正式交付。模型准备、下载、导出、推理和 CPU 资源评测均需现有锁与协调窗口；不能凭静态 GATE_READY 声称质量合格。原 ONNX 验收范围不变。
+- 必须等待：#190 冻结质量实测 PASS、最终本地完整门禁通过、PR 合入 main 且 Issue 关闭后，才可将其视为合格基线并进行真实优化比较、参数冻结或默认切换及本票正式交付。模型准备、下载、导出、推理和 CPU 资源评测均需现有锁与协调窗口；不能凭静态 GATE_READY 声称质量合格。原 ONNX 验收范围不变。
 
 ## Blocked by
 
 - #150
 - #190
+
+

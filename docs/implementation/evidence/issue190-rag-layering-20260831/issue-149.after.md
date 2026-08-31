@@ -1,11 +1,3 @@
-# [规格] 重塑自然语言多工单客服 Agent 与知识工作台
-
-> 来源：[https://github.com/Stellogic/customer-agent/issues/149](https://github.com/Stellogic/customer-agent/issues/149)
-> Issue 状态：OPEN
-> 最后更新时间：08/31/2026 15:19:32
-> 同步日期：2026-08-31
-> 说明：GitHub Issue 是事实源；本文件为回读正文镜像。
-
 # 自然语言多工单客服 Agent 与知识工作台规格
 
 ## Problem Statement

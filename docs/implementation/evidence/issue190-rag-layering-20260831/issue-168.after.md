@@ -1,12 +1,3 @@
-# [RAG] 完成中文检索消融与可选 ONNX 验证
-
-> 父规格：[#149](../../specs/issue-149.md)
-> 来源：[https://github.com/Stellogic/customer-agent/issues/168](https://github.com/Stellogic/customer-agent/issues/168)
-> Issue 状态：OPEN
-> 最后更新时间：08/31/2026 15:20:32
-> 同步日期：2026-08-31
-> 说明：GitHub Issue 是事实源；本文件为回读正文镜像。
-
 ## Parent
 
 Part of #149

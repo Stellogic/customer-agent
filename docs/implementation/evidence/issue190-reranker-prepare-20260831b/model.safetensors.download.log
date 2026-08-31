@@ -1,0 +1,2 @@
+curl: (56) schannel: server closed abruptly (missing close_notify)
+http_code=206 downloaded_bytes=40761161 elapsed_seconds=65.105883

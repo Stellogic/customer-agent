@@ -1,5 +1,7 @@
 # Issue #190：规格澄清与暂停边界
 
+> 历史对齐记录：本文件当时保留检索层拒答门的决定，已被用户后续明确批准的 [rag-layered-v2 分层验收](../eval/rag-layered-v2.md) 替代。以下内容保留用于解释试错过程，不再作为恢复评分实验或阻塞新版检索交付的现行要求。原实验及失败不追改。
+
 2026-08-31，用户在本任务的 `grill-with-docs` 对齐中确认。关联 [Issue #190](https://github.com/Stellogic/customer-agent/issues/190) / [PR203](https://github.com/Stellogic/customer-agent/pull/203)。记录起点为 `60ead9ef852ced41639a375be17dc9d6b46eac81`；工作树已有 c6 静态修改保留，本次不将其当作已验证或已批准的产品方案。
 
 ## 约束来源与正式规格核对

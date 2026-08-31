@@ -1,12 +1,3 @@
-# [验收] 完成 #149 确定性真实全栈验收
-
-> 父规格：[#149](../../specs/issue-149.md)
-> 来源：[https://github.com/Stellogic/customer-agent/issues/173](https://github.com/Stellogic/customer-agent/issues/173)
-> Issue 状态：OPEN
-> 最后更新时间：08/31/2026 15:20:45
-> 同步日期：2026-08-31
-> 说明：GitHub Issue 是事实源；本文件为回读正文镜像。
-
 ## Parent
 
 Part of #149

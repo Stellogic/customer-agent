@@ -1,12 +1,3 @@
-# [RAG] 冻结 rag-eval-v1 中文检索质量基线
-
-> 父规格：[#149](../../specs/issue-149.md)
-> 来源：[https://github.com/Stellogic/customer-agent/issues/189](https://github.com/Stellogic/customer-agent/issues/189)
-> Issue 状态：CLOSED
-> 最后更新时间：08/31/2026 15:20:55
-> 同步日期：2026-08-31
-> 说明：GitHub Issue 是事实源；本文件为回读正文镜像。
-
 ## Parent
 
 Part of #149
