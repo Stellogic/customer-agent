@@ -1,6 +1,26 @@
 # #193 内部壳与非核心入口：隔离静态预开发
 
-## 第三阶段：前端聚焦验证与修复（2026-08-31，当前状态）
+## 第四阶段：定向复验通过（2026-08-31，当前状态）
+
+状态为 **FOCUSED_VALIDATED**，仅本阶段授权范围通过聚焦验证，不代表完整前端套件、浏览器或整票交付通过。第三阶段的待复验结论保留为历史记录。
+
+- 协调任务重新明确分配窗口后，使用默认权威锁运行 `issue193-20260831-focus4`。验证基线 `c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472`，验证 HEAD `280d3b1c7ec2d5efca327018640eff5c2232b7c8`；运行期间无源码修改，本次格式命令也未产生改动。
+- Node **24.19.0**；限定 12 个本票相关文件 Prettier 通过且全部 unchanged；全前端 `tsc --noEmit` 通过。
+- 本票三个文件 **20/20 PASS**：InternalShell 6 项、ContextEntries 10 项、WorkbenchContextEntries.integration 4 项。最新参数化修复已完成运行复验，未删减名称、关闭、无请求与撤权断言。
+- 此前失败的客户路由单项 **1/1 PASS**，同文件另外 32 项为未选中，不计作通过。没有改动路由/Session 源码或提高超时；首次加载超时原因仍未证实，本次只表明失败未在定向复验中重现。
+- 三文件运行耗时 42.83 秒；路由单项运行耗时 18.72 秒。原始日志在本 worktree 忽略目录 `.local/issue193-focus4.log`。执行入口 `.local/issue193-recheck.ps1` 在 finally 释放锁；日志末尾为 `LOCK_RELEASED ... result=PASS`、`TEST_GATE_FREE`，已成功通知协调任务并归还窗口，不等待静态收尾占锁。
+- 仅执行所授权的必要格式、类型和聚焦测试。没有运行 lint、构建、浏览器、Docker、模型/评测或完整门禁，也没有重跑 focus2 已通过的客服/审批套件。CI 保持关闭。
+
+三文件命令：`node node_modules/vitest/vitest.mjs run src/shells/InternalShell.test.tsx src/components/internal/ContextEntries.test.tsx src/WorkbenchContextEntries.integration.test.tsx --maxWorkers=1`。
+
+路由单项命令：`node node_modules/vitest/vitest.mjs run src/Routing.test.tsx -t '客户路由使用 CustomerShell，且不出现内部导航' --maxWorkers=1`。以上均从 frontend 目录执行，并在整个运行期间持有仓库锁。
+
+本次无源码增量，原实现/测试修复 `df2da9e` 的 Standards PASS / Spec PASS 仍对应相同源码。本次第四阶段证据文档另经独立 Standards PASS / Spec PASS，各 0 项有效问题，两轴均只读核对日志与执行脚本。此次只更新运行证据，不把聚焦结果当成最终完整门禁；后续文档提交不会冒称在新 HEAD 重新跑过门禁。
+
+剩余事项：#170 前置与真实辅助功能接线；真实浏览器下连续弹窗、宽窄屏、Session/SSE 撤权、键盘和视觉证据；最新 main 同步、迁移/共享文件核对、增量 CR；明确放行后运行完整本地门禁。PR 继续 Draft，Issue 继续 OPEN，不转 Ready、不合并、不关票。
+
+
+## 第三阶段：前端聚焦验证与修复（2026-08-31，历史记录）
 
 当前为 **FOCUSED_VALIDATION_PENDING**：已有运行证据，但聚焦验证尚未全部通过；不能继续笼统称为“从未测试”，也不能称整票完成。第二阶段的禁测和 CODE_READY_NO_TESTS 是历史窗口记录，已由本次明确授权取代。
 
