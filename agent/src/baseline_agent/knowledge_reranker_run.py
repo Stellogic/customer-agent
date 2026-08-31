@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import platform
+import subprocess
 import time
 from importlib.metadata import version
 from pathlib import Path
@@ -23,6 +23,7 @@ from baseline_agent.knowledge_sufficiency import (
     ARCHIVE,
     ARCHIVE_SHA256,
     DATA_SHA256,
+    REPO,
     SOURCE_SHA,
     development_rows,
 )
@@ -57,8 +58,13 @@ def main() -> None:
     parser.add_argument("--head-sha", required=True)
     parser.add_argument("--base-sha", required=True)
     args = parser.parse_args()
-    if not os.environ.get("CUSTOMER_AGENT_TEST_GATE_TOKEN"):
-        raise ValueError("须通过持有仓库锁的 PowerShell 入口运行")
+    subprocess.run(
+        [
+            "pwsh", "-NoProfile", "-File",
+            str(REPO / "scripts/test-gate-lock.ps1"), "-AssertInherited",
+        ],
+        check=True,
+    )
     report: dict[str, Any] = {
         "schema": "issue190-reranker-feasibility-v1",
         "phase": args.phase,
