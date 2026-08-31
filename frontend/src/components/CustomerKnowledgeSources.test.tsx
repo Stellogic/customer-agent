@@ -47,9 +47,7 @@ describe("Issue #169 独立客户知识来源展示（未接入检索）", () =>
     rerender(<CustomerKnowledgeSources state={{ status }} />);
 
     expect(screen.queryByText(source.title)).not.toBeInTheDocument();
-    expect(screen.getByRole(status === "error" ? "alert" : "status")).toHaveTextContent(
-      message,
-    );
+    expect(screen.getByRole(status === "error" ? "alert" : "status")).toHaveTextContent(message);
     expect(screen.getByRole("region", { name: "知识来源" })).toHaveAttribute(
       "aria-busy",
       String(status === "loading" || status === "recovering"),

@@ -4,8 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * 纯引用校验与字段投影，尚未接线。article 必须由 Spring 从当前权威知识元数据加载，
- * allowedScopes 必须由服务端授权得出，不能来自模型或 HTTP 请求体。
+ * 纯引用校验与字段投影，尚未接线。article 必须由 Spring 从当前权威知识元数据加载， allowedScopes 必须由服务端授权得出，不能来自模型或 HTTP 请求体。
  * 调用方仍负责工单授权、检索质量/代次、引用归属、内容安全和事实冲突校验。
  */
 final class KnowledgeCitationProjection {

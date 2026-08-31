@@ -1,7 +1,7 @@
-"""#169/#170 共用的受控响应 DTO 与纯解析；未接线，不发送 HTTP 请求。
+"""#169/#170 共用的受控响应 DTO 与纯解析。未接线且不发送 HTTP 请求。
 
-只接受 Spring 适配后的正式 results，不接受内部检索候选。结构正确不代表
-当前工单有权访问，也不证明知识内容安全；授权/回执/引用校验仍由 Spring 完成。
+只接受 Spring 适配后的正式 results 而不接受内部检索候选。结构正确不代表
+当前工单有权访问或知识内容安全。授权/回执/引用校验仍由 Spring 完成。
 """
 
 from collections.abc import Mapping
@@ -24,7 +24,7 @@ class KnowledgeFailureCode(StrEnum):
     REQUEST_CONFLICT = "REQUEST_CONFLICT"
     CALIBRATION_REQUIRED = "CALIBRATION_REQUIRED"
     INDEX_STALE = "INDEX_STALE"
-    MODEL_UNAVAILABLE = "MODEL_UNAVAILABLE"  # Embedding，不是辅助生成模型。
+    MODEL_UNAVAILABLE = "MODEL_UNAVAILABLE"  # 指 Embedding 而不是辅助生成模型。
     RETRIEVAL_UNAVAILABLE = "RETRIEVAL_UNAVAILABLE"
     INVALID_KNOWLEDGE_CITATION = "INVALID_KNOWLEDGE_CITATION"
     KNOWLEDGE_CONFLICT = "KNOWLEDGE_CONFLICT"
@@ -61,9 +61,9 @@ class KnowledgeRetrievalResult:
 
 
 def parse_knowledge_response(status_code: int, payload: object) -> KnowledgeRetrievalResult:
-    """解析已解码的 JSON 值；不重试、不缓存，不把错误正文放入异常。
+    """解析已解码的 JSON 值。不重试、不缓存且不把错误正文放入异常。
 
-    200 的空 results 是 NO_ANSWER；HTTP 错误或畸形成功载荷必须失败，不能降为无答案。
+    200 的空 results 是 NO_ANSWER。HTTP 错误或畸形成功载荷必须失败而不能降为无答案。
     调用方仍须把 JSON 解码失败/传输异常归为 RETRIEVAL_UNAVAILABLE。
     """
     if status_code != 200:
@@ -108,8 +108,15 @@ def _source(payload: object) -> KnowledgeSource:
     value = _record(
         payload,
         {
-            "articleId", "version", "chunkId", "title", "updatedAt",
-            "applicability", "startLine", "endLine", "snippet",
+            "articleId",
+            "version",
+            "chunkId",
+            "title",
+            "updatedAt",
+            "applicability",
+            "startLine",
+            "endLine",
+            "snippet",
         },
     )
     scopes = value["applicability"]

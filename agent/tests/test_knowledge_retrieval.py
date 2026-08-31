@@ -1,4 +1,4 @@
-"""#169/#170 消费者契约源码；合成 JSON fixture，不发请求，不证明真实检索质量。"""
+"""#169/#170 消费者契约源码。合成 JSON fixture 不发请求且不证明真实检索质量。"""
 
 from dataclasses import FrozenInstanceError
 
@@ -16,17 +16,19 @@ def response(scope: str = "CUSTOMER_PUBLIC") -> dict:
     return {
         "schema": "agent-knowledge-v1",
         "indexGeneration": 7,
-        "results": [{
-            "articleId": "delivery-rules",
-            "version": "v1",
-            "chunkId": "chunk-test",
-            "title": "配送规则（测试）",
-            "updatedAt": "2026-08-01T00:00:00Z",
-            "applicability": [scope],
-            "startLine": 12,
-            "endLine": 16,
-            "snippet": "一般规则（测试），不代表订单事实。",
-        }],
+        "results": [
+            {
+                "articleId": "delivery-rules",
+                "version": "v1",
+                "chunkId": "chunk-test",
+                "title": "配送规则（测试）",
+                "updatedAt": "2026-08-01T00:00:00Z",
+                "applicability": [scope],
+                "startLine": 12,
+                "endLine": 16,
+                "snippet": "一般规则（测试），不代表订单事实。",
+            }
+        ],
     }
 
 
@@ -38,18 +40,21 @@ def test_both_consumers_share_one_controlled_dto(scope: str) -> None:
     assert result.status is KnowledgeResultStatus.AVAILABLE
     assert result.index_generation == 7
     assert (source.article_id, source.version, source.chunk_id) == (
-        "delivery-rules", "v1", "chunk-test",
+        "delivery-rules",
+        "v1",
+        "chunk-test",
     )
     assert source.updated_at == "2026-08-01T00:00:00Z"
     assert source.applicability == (scope,)
     assert (source.start_line, source.end_line) == (12, 16)
-    # DTO 脱离原始可变 JSON；消费者不能把响应对象后续变更当新授权。
+    # DTO 脱离原始可变 JSON。消费者不能把响应对象后续变更当新授权。
     payload["results"][0]["applicability"].clear()
     payload["results"].clear()
     assert result.sources == (source,)
     assert source.applicability == (scope,)
     with pytest.raises(FrozenInstanceError):
-        setattr(source, "title", "被修改")
+        # 故意违反只读属性约束以验证运行时也拒绝变更。
+        source.title = "被修改"  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_empty_formal_results_are_no_answer_without_invented_source() -> None:
@@ -74,13 +79,16 @@ def test_source_payload_does_not_accept_private_fields(field: str) -> None:
     assert_unavailable(200, payload)
 
 
-@pytest.mark.parametrize("changes", [
-    {"version": ""},
-    {"updatedAt": "2026-08-01"},
-    {"applicability": []},
-    {"startLine": 0},
-    {"endLine": 11},
-])
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"version": ""},
+        {"updatedAt": "2026-08-01"},
+        {"applicability": []},
+        {"startLine": 0},
+        {"endLine": 11},
+    ],
+)
 def test_incomplete_citation_is_failure_not_partial_success(changes: dict) -> None:
     payload = response()
     payload["results"][0].update(changes)
@@ -94,23 +102,28 @@ def test_invalid_success_schema_generation_or_top_five_contract_fails() -> None:
     assert_unavailable(200, {**payload, "results": payload["results"] * 6})
 
 
-@pytest.mark.parametrize(("status", "code", "expected"), [
-    (401, "INDEX_STALE", KnowledgeFailureCode.ACCESS_DENIED),
-    (403, None, KnowledgeFailureCode.ACCESS_DENIED),
-    (404, None, KnowledgeFailureCode.ACCESS_DENIED),
-    (400, None, KnowledgeFailureCode.INVALID_QUERY),
-    (409, None, KnowledgeFailureCode.REQUEST_CONFLICT),
-    (503, "INDEX_STALE", KnowledgeFailureCode.INDEX_STALE),
-    (503, "CALIBRATION_REQUIRED", KnowledgeFailureCode.CALIBRATION_REQUIRED),
-    (503, "MODEL_UNAVAILABLE", KnowledgeFailureCode.MODEL_UNAVAILABLE),
-    (503, "FUSION_UNAVAILABLE", KnowledgeFailureCode.RETRIEVAL_UNAVAILABLE),
-    (500, "internal-trace", KnowledgeFailureCode.RETRIEVAL_UNAVAILABLE),
-    (422, "INVALID_KNOWLEDGE_CITATION", KnowledgeFailureCode.INVALID_KNOWLEDGE_CITATION),
-    (422, "KNOWLEDGE_CONFLICT", KnowledgeFailureCode.KNOWLEDGE_CONFLICT),
-    (422, "UNSAFE_KNOWLEDGE", KnowledgeFailureCode.UNSAFE_KNOWLEDGE),
-])
+@pytest.mark.parametrize(
+    ("status", "code", "expected"),
+    [
+        (401, "INDEX_STALE", KnowledgeFailureCode.ACCESS_DENIED),
+        (403, None, KnowledgeFailureCode.ACCESS_DENIED),
+        (404, None, KnowledgeFailureCode.ACCESS_DENIED),
+        (400, None, KnowledgeFailureCode.INVALID_QUERY),
+        (409, None, KnowledgeFailureCode.REQUEST_CONFLICT),
+        (503, "INDEX_STALE", KnowledgeFailureCode.INDEX_STALE),
+        (503, "CALIBRATION_REQUIRED", KnowledgeFailureCode.CALIBRATION_REQUIRED),
+        (503, "MODEL_UNAVAILABLE", KnowledgeFailureCode.MODEL_UNAVAILABLE),
+        (503, "FUSION_UNAVAILABLE", KnowledgeFailureCode.RETRIEVAL_UNAVAILABLE),
+        (500, "internal-trace", KnowledgeFailureCode.RETRIEVAL_UNAVAILABLE),
+        (422, "INVALID_KNOWLEDGE_CITATION", KnowledgeFailureCode.INVALID_KNOWLEDGE_CITATION),
+        (422, "KNOWLEDGE_CONFLICT", KnowledgeFailureCode.KNOWLEDGE_CONFLICT),
+        (422, "UNSAFE_KNOWLEDGE", KnowledgeFailureCode.UNSAFE_KNOWLEDGE),
+    ],
+)
 def test_controlled_errors_preserve_meaning_without_raw_payload(
-    status: int, code: str | None, expected: KnowledgeFailureCode,
+    status: int,
+    code: str | None,
+    expected: KnowledgeFailureCode,
 ) -> None:
     with pytest.raises(KnowledgeRetrievalFailure) as failure:
         parse_knowledge_response(status, {"code": code, "message": "private traceback"})

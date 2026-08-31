@@ -22,14 +22,9 @@ const STATUS_TEXT = {
 } as const;
 
 /** 独立组件，尚未接入客户对话。不会检索、生成答复、缓存或恢复旧来源。 */
-export function CustomerKnowledgeSources({
-  state,
-}: {
-  state: CustomerKnowledgeSourcesState;
-}) {
+export function CustomerKnowledgeSources({ state }: { state: CustomerKnowledgeSourcesState }) {
   const [expanded, setExpanded] = useState(true);
-  const status =
-    state.status === "ready" && state.sources.length === 0 ? "empty" : state.status;
+  const status = state.status === "ready" && state.sources.length === 0 ? "empty" : state.status;
 
   return (
     <section
