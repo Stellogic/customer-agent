@@ -1,4 +1,13 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { ConfigProvider } from "antd";
+import type { ReactElement } from "react";
+import {
+  cleanup,
+  fireEvent,
+  render as rtlRender,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApprovalContextEntries,
@@ -25,6 +34,14 @@ const approvalEntries: ApprovalContextEntriesProps["entries"] = {
   eligibility: { kind: "unavailable", reason: "当前没有资格检查投影。" },
 };
 
+// jsdom 不执行 CSS 动画；只在本票测试中关闭 motion，保留真实弹层和关闭断言。
+function render(ui: ReactElement) {
+  return rtlRender(ui, {
+    wrapper: ({ children }) => (
+      <ConfigProvider theme={{ token: { motion: false } }}>{children}</ConfigProvider>
+    ),
+  });
+}
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -46,16 +63,15 @@ describe("Issue #193 独立详情入口的 props 边界", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("客服转派和更多操作只提供无副作用反馈，不实现补偿或 Agent 核心动作", async () => {
+  // rc util 在测试模式固定生成 test-id；分别挂载，避免保留弹层的标题 ID 相互干扰。
+  it.each(["转派", "更多操作", "相似案例", "建议动作"])("%s 不提交业务请求", async (label) => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     render(<SupportContextEntries projectionKey="current" entries={supportEntries} />);
-    for (const label of ["转派", "更多操作", "相似案例", "建议动作"]) {
-      fireEvent.click(screen.getByRole("button", { name: label }));
-      const dialog = await screen.findByRole("dialog", { name: `${label} · 开发中` });
-      expect(within(dialog).getByRole("status")).toHaveTextContent("未更改任何业务状态");
-      fireEvent.click(within(dialog).getByRole("button", { name: "知道了" }));
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    }
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    const dialog = await screen.findByRole("dialog", { name: `${label} · 开发中` });
+    expect(within(dialog).getByRole("status")).toHaveTextContent("未更改任何业务状态");
+    fireEvent.click(within(dialog).getByRole("button", { name: "知道了" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(
       screen.queryByRole("button", { name: /补偿|发送公开回复|批准/ }),
     ).not.toBeInTheDocument();

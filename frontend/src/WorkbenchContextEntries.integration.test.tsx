@@ -1,4 +1,13 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { ConfigProvider } from "antd";
+import type { ReactElement } from "react";
+import {
+  cleanup,
+  fireEvent,
+  render as rtlRender,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SupportWorkbench } from "./SupportWorkbench";
 import { ApprovalWorkbench } from "./ApprovalWorkbench";
@@ -14,6 +23,14 @@ const supportSnapshotUrl = "/api/support/workbench/snapshot?schema=support-workb
 const supportDetailUrl = `/api/support/workbench/tickets/${ticketId}`;
 const approvalQueueUrl = "/api/approver/compensation-proposals";
 
+// jsdom 不执行 CSS 动画；只在本票测试中关闭 motion，保留真实弹层和关闭断言。
+function render(ui: ReactElement) {
+  return rtlRender(ui, {
+    wrapper: ({ children }) => (
+      <ConfigProvider theme={{ token: { motion: false } }}>{children}</ConfigProvider>
+    ),
+  });
+}
 afterEach(() => {
   cleanup();
   resetHumanSessionLifecycleForTests();
@@ -143,7 +160,8 @@ describe("#193 现有授权工作台入口接线", () => {
     expect(screen.queryByRole("textbox", { name: "公开回复" })).not.toBeInTheDocument();
   });
 
-  it("审批队列辅助操作无请求，领取后入口只定位当前证据并随撤权卸载", async () => {
+  // 每项独立挂载，避免 rc util 测试模式的固定标题 ID 在保留弹层间冲突。
+  it.each(["更多筛选", "导出"])("审批 %s 无请求，详情入口随撤权卸载", async (label) => {
     let closeAuthority: () => void = () => undefined;
     let authorized = true;
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
@@ -184,12 +202,10 @@ describe("#193 现有授权工作台入口接线", () => {
     await screen.findByRole("button", { name: "领取审批" });
     expect(screen.queryByRole("region", { name: "审批详情入口" })).not.toBeInTheDocument();
     const queueReads = fetchMock.mock.calls.length;
-    for (const label of ["更多筛选", "导出"]) {
-      fireEvent.click(screen.getByRole("button", { name: label }));
-      const dialog = await screen.findByRole("dialog", { name: `${label} · 开发中` });
-      fireEvent.click(within(dialog).getByRole("button", { name: "知道了" }));
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    }
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    const dialog = await screen.findByRole("dialog", { name: `${label} · 开发中` });
+    fireEvent.click(within(dialog).getByRole("button", { name: "知道了" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(fetchMock).toHaveBeenCalledTimes(queueReads);
     fireEvent.click(screen.getByRole("button", { name: "领取审批" }));
     const entries = await screen.findByRole("region", { name: "审批详情入口" });

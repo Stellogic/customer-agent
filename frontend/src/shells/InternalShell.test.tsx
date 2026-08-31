@@ -1,4 +1,13 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { ConfigProvider } from "antd";
+import type { ReactElement } from "react";
+import {
+  cleanup,
+  fireEvent,
+  render as rtlRender,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CurrentSession } from "../authContract";
@@ -21,6 +30,14 @@ const approver: CurrentSession = {
   capabilities: ["APPROVAL_WORKBENCH_ACCESS"],
 };
 
+// jsdom 不执行 CSS 动画；只在本票测试中关闭 motion，保留真实弹层和关闭断言。
+function render(ui: ReactElement) {
+  return rtlRender(ui, {
+    wrapper: ({ children }) => (
+      <ConfigProvider theme={{ token: { motion: false } }}>{children}</ConfigProvider>
+    ),
+  });
+}
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
