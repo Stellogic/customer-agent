@@ -1,0 +1,18 @@
+{
+  "schema": "issue169-answer-ledger-stop-v1",
+  "run": "issue169-answer-20260902b",
+  "before_sha256": "1346c248f6a8ed08638e3ebd5ac9c3dbcc4ad9f451851da2fe8601f14ccd8735",
+  "after_sha256": "b864ce95d2786e020d5eb2ff12150086bf2264f0af2fa5a6676c91d427f64058",
+  "settled_attempts": 289,
+  "settled_charged_micro_cny": 620805,
+  "pending_attempts": 1,
+  "pending_reserved_micro_cny": 3159552,
+  "cumulative_committed_micro_cny": 3780357,
+  "provider_attempt": {
+    "query_id": "delivery-01-a",
+    "model": "deepseek-v4-flash",
+    "failure_classification": "CONNECTION_TIMEOUT",
+    "usage_reported": false
+  },
+  "decision": "STOP_PENDING_USAGE_UNKNOWN"
+}

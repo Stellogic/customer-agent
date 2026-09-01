@@ -196,7 +196,7 @@ async def main() -> None:
                 evidence_refs=tuple(facts["evidenceRefs"]),
                 synthetic_customer_text=current_row["question"],
                 risk_scenario="LOGISTICS_DELAY",
-                logistics_status=facts["logisticsStatus"],
+                logistics_status=facts.get("logisticsStatus"),
                 knowledge=retrieval,
             )
             current_row["compositions"] = []
