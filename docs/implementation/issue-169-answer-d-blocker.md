@@ -22,6 +22,16 @@
 
 仓库已有 #190 调研记录同类限制：Responses 文档列出 `text.format=json_schema`，但供应商仍可能不遵约；历史开发曾以输出样例调整提示。#169 的冻结协议明确禁止读取本轮模型结果后修改 prompt 或选参，因此不能复用该做法继续付费重跑。
 
+## 接缝诊断
+
+实际 `_build_request` 把输出约束放在 `text.format`，其中 `type=json_schema`、`name=customer_agent_public_reply`、`schema=<customer-reply-v2 JSON Schema>`；answer-d 保存的 `response.created` 原样回显了该对象和 `strict=true`，因此没有请求层级错位或传输丢字段。
+
+DeepSeek 官方 [Create Response](https://api-docs.deepseek.com/api/create-response/) 文档列出 `text.format` 的 `text`、`json_object`、`json_schema` 三种类型，并说明 `name` 与 `schema` 是 `json_schema` 所需字段、输出必须符合给定 schema。官方 [Responses API 指南](https://api-docs.deepseek.com/zh-cn/guides/responses_api/) 将 `text.format` 标为“完整支持”，同时说明不支持的参数会被静默忽略。Create Response 参数表没有单独列出 `strict` 子字段；这只能说明没有专项承诺，不能证明删掉 `strict` 会修复本次输出。冻结协议又明确要求 strict JSON schema，因此不凭猜测改变该字段。
+
+产品流解析从 `response.completed.response.output[].content[].output_text` 读取最终文本，并验证它与全部 `response.output_text.delta` 拼接结果一致。该路径与官方 SSE 事件表一致，answer-d 中的失败文本在 delta、`output_text.done` 和 `response.completed` 三处一致。因此失败不是本地选错事件或截断，而是供应商完成响应本身不符合其回显的 schema。
+
+结论：当前没有证据支持修改请求构造、解析器或冻结配置。把 `properties` 内容静默解包、删 `strict`、增加样例提示或改走另一传输都会改变已冻结契约，其中前三者还会使用本轮结果调参。保持质量 FAIL 是当前唯一有证据的处理。
+
 ## 证据
 
 - `docs/implementation/evidence/issue169-answer-20260902d/answers.json`
@@ -37,4 +47,3 @@
 - 回答层质量门槛：`FAIL`（结构失败，整集未完成）。
 - 最终 `pwsh ./scripts/check.ps1 -Issue 169`：`NOT_RUN`。
 - 推送、PR Ready、合入、关票、`origin/main` 回读：`NOT_RUN`。
-
