@@ -31,6 +31,28 @@ def _input(*, review_required: bool | None = True) -> CustomerCommunicationInput
     )
 
 
+def _input_with_knowledge() -> CustomerCommunicationInput:
+    return replace(
+        _input(),
+        knowledge=KnowledgeRetrievalResult(
+            7,
+            (
+                KnowledgeSource(
+                    "delivery-help",
+                    "v1",
+                    "delivery-help:1",
+                    "配送帮助",
+                    "2026-09-01T00:00:00Z",
+                    ("CUSTOMER_PUBLIC",),
+                    1,
+                    2,
+                    "包裹未到时，可以在当前工单补充最新情况。",
+                ),
+            ),
+        ),
+    )
+
+
 def _completed(body: str, intent: str = "COMPENSATION_REVIEW_PENDING") -> dict[str, object]:
     evidence = (
         [] if intent == "CLARIFICATION_REQUIRED" else ["order:ORDER-C129", "logistics:ORDER-C129"]
@@ -331,6 +353,71 @@ async def test_schema_failure_diagnostic_is_bounded_and_field_specific(
     assert "sk-secret" not in repr(diagnostic)
     if fault == "sensitive-enum":
         assert "actual_value" not in diagnostic
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("fault", "expected_category", "expected_path"),
+    [
+        ("citations", "DOMAIN_KNOWLEDGE_CITATIONS", "$.knowledge.citations"),
+        ("evidence", "DOMAIN_EVIDENCE_REFS", "$.evidenceRefs"),
+        ("body", "DOMAIN_BODY_AUTHORIZATION", "$.body"),
+    ],
+)
+async def test_domain_failure_diagnostic_uses_fixed_code_without_reply_values(
+    fault: str, expected_category: str, expected_path: str
+) -> None:
+    payload = _completed(
+        "调查结果显示，订单 ORDER-C129 的物流出现延迟。"
+        "补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
+    )
+    part = payload["output"][0]["content"][0]  # type: ignore[index]
+    raw = json.loads(part["text"])
+    if fault == "citations":
+        raw["schemaVersion"] = "customer-reply-v2"
+        raw["knowledge"] = {
+            "status": "SUPPORTED",
+            "answer": "do-not-record-this-answer",
+            "citations": [
+                {
+                    "articleId": "unknown",
+                    "version": "v1",
+                    "chunkId": "missing",
+                    "quote": "do-not-record-this-quote",
+                }
+            ],
+        }
+        model_input = _input_with_knowledge()
+    elif fault == "evidence":
+        raw["evidenceRefs"] = []
+        model_input = _input()
+    else:
+        raw["body"] = "Bearer sk-secret Authorization: copied text"
+        raw["schemaVersion"] = "customer-reply-v2"
+        raw["knowledge"] = {
+            "status": "INSUFFICIENT_INFORMATION",
+            "answer": "请补充公开信息。",
+            "citations": [],
+        }
+        model_input = _input_with_knowledge()
+    part["text"] = json.dumps(raw, ensure_ascii=False)
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(payload)),
+    )
+
+    with pytest.raises(CustomerCommunicationFailure):
+        await model.compose(model_input)
+
+    diagnostic = model.audit_sink.records[0].validation_diagnostic
+    assert diagnostic == {
+        "category": expected_category,
+        "path": expected_path,
+        "expected": "customer_reply_policy",
+        "actual_type": "array" if fault in {"citations", "evidence"} else "string",
+    }
+    assert "do-not-record" not in repr(diagnostic)
+    assert "sk-secret" not in repr(diagnostic)
 
 
 @pytest.mark.asyncio

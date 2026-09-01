@@ -1,0 +1,10 @@
+{
+  "schema": "issue190-sufficiency-cost-v1",
+  "run": "issue169-canary-diagnostic-20260902b",
+  "attempts": 306,
+  "settled": 304,
+  "timeout_released": 2,
+  "pending": 0,
+  "total_charged_micro_cny": 759564.0,
+  "ledger_sha256": "07f00fa5078c93e513eb4b8e98d1ab480a90c8400d32d436c86e0cc72eb4d076"
+}

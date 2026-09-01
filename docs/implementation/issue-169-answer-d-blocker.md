@@ -36,6 +36,10 @@ DeepSeek 官方 [Create Response](https://api-docs.deepseek.com/api/create-respo
 
 Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具体回答字段值；在一次 canary 限额已用完后，无法不新增付费调用地进一步区分引用、正文授权、枚举或其他深层值错误。不能因顶层正确而降低完整 envelope、引用和 Spring 校验，也不能补跑第二次 canary。因此该路线仍保持质量 FAIL 并停止付费调用。
 
+协调随后授权在唯一 6 CNY 账本内继续做有界诊断。稳定 HEAD `9ff05aa70716fd64fb1cca11593a66b4ce597b11` 的 `issue169-canary-diagnostic-20260902b` 仍只执行 `delivery-01-a` 一次 compose：HTTP 200 completed、顶层七键与完整 JSON Schema 均通过，失败被收窄到根级 `DOMAIN_VALIDATION/customer_reply_policy`。该次 1261 input / 753 output / 2014 total tokens，保守结算 10560 micro-CNY；累计账本 304 `SETTLED`、2 `TIMEOUT_RELEASED`、0 `PENDING`、759564 micro-CNY，SHA-256 为 `07f00fa5078c93e513eb4b8e98d1ab480a90c8400d32d436c86e0cc72eb4d076`。
+
+根级代码仍不足以区分知识引用、证据引用、意图、正文授权与事实叙述规则。后续源码把原校验逐项映射为固定规则码与 JSON path，校验入口继续对任一违规抛出同一 `INVALID_OUTPUT`；诊断不保存正文、引文、标识符或密钥。`issue169-20260902-focus44` 的 Ruff format/lint、生产源码 Pyright 与 45 个 owned tests 均 PASS，`paid_model_calls=0`，Standards / Spec 双轴审查均 PASS。下一次付费 canary 必须绑定该诊断源码的稳定提交，仍固定一题和最多一次 compose。
+
 ## 证据
 
 - `docs/implementation/evidence/issue169-answer-20260902d/answers.json`
@@ -46,6 +50,10 @@ Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具�
 - `docs/implementation/evidence/issue169-httpx-transport-20260902a/container.json`
 - `docs/implementation/evidence/issue169-canary-20260902a/canary.json`
 - `docs/implementation/evidence/issue169-canary-20260902a/phase.json`
+- `docs/implementation/evidence/issue169-canary-diagnostic-20260902b/canary.json`
+- `docs/implementation/evidence/issue169-canary-diagnostic-20260902b/phase.json`
+- `docs/implementation/evidence/issue169-canary-diagnostic-20260902b/ledger-summary.json`
+- `docs/implementation/evidence/issue169-20260902-focus44/phase.json`
 
 ## 未完成项
 

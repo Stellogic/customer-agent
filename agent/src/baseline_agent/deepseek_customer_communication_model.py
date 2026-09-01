@@ -21,6 +21,7 @@ from baseline_agent.customer_communication_model import (
     CustomerReplyIntent,
     authorized_customer_reply_pattern,
     customer_communication_provider_request,
+    customer_reply_policy_violation,
     customer_requested_human,
     is_authorized_body_prefix,
     parse_customer_reply_envelope,
@@ -237,6 +238,7 @@ class DeepSeekResponsesCustomerCommunicationModel:
                     validation_diagnostic = _response_validation_diagnostic(
                         payload,
                         request_body["text"]["format"]["schema"],
+                        model_input,
                     )
                     await self._record(
                         internal_call_id,
@@ -635,7 +637,9 @@ def _official_json_schema_requested(request: dict[str, Any]) -> bool:
     )
 
 
-def _response_validation_diagnostic(payload: object, schema: object) -> dict[str, object]:
+def _response_validation_diagnostic(
+    payload: object, schema: object, model_input: CustomerCommunicationInput
+) -> dict[str, object]:
     if not isinstance(payload, dict):
         return _diagnostic("RESPONSE_SHAPE", "$", "completed_response", _json_type(payload))
     try:
@@ -648,9 +652,18 @@ def _response_validation_diagnostic(payload: object, schema: object) -> dict[str
         return _diagnostic("JSON_PARSE", "$", "json_object", "string")
     if not isinstance(schema, dict):
         return _diagnostic("LOCAL_SCHEMA", "$", "json_schema", _json_type(schema))
-    return _schema_diagnostic(raw, schema, "$") or _diagnostic(
-        "DOMAIN_VALIDATION", "$", "customer_reply_policy", _json_type(raw)
-    )
+    schema_failure = _schema_diagnostic(raw, schema, "$")
+    if schema_failure is not None:
+        return schema_failure
+    try:
+        envelope = parse_customer_reply_envelope(raw)
+    except CustomerCommunicationFailure:
+        return _diagnostic("DOMAIN_PARSE", "$", "customer_reply_envelope", _json_type(raw))
+    violation = customer_reply_policy_violation(model_input, envelope)
+    if violation is None:
+        return _diagnostic("DOMAIN_VALIDATION", "$", "customer_reply_policy", _json_type(raw))
+    code, path = violation
+    return _diagnostic(f"DOMAIN_{code}", path, "customer_reply_policy", _path_type(raw, path))
 
 
 def _schema_diagnostic(
@@ -727,6 +740,15 @@ def _json_type(value: object) -> str:
     if isinstance(value, float):
         return "number"
     return type(value).__name__
+
+
+def _path_type(raw: object, path: str) -> str:
+    value = raw
+    for name in path.removeprefix("$.").split("."):
+        if path == "$" or not isinstance(value, dict) or name not in value:
+            return "missing" if path != "$" else _json_type(raw)
+        value = value[name]
+    return _json_type(value)
 
 
 def _safe_value(path: str, value: object) -> object | None:

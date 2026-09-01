@@ -1,0 +1,71 @@
+{
+  "run": "issue169-canary-diagnostic-20260902b",
+  "working_tree_dirty": true,
+  "cleanup": "PASS",
+  "steps": [
+    {
+      "name": "python-static",
+      "exitCode": 0
+    },
+    {
+      "name": "build-backend",
+      "exitCode": 0
+    },
+    {
+      "name": "build-agent",
+      "exitCode": 0
+    },
+    {
+      "name": "build-frontend",
+      "exitCode": 0
+    },
+    {
+      "name": "startup",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-smoke",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-acceptance",
+      "exitCode": 0
+    },
+    {
+      "name": "http-pg",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-http-pg",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-sql",
+      "exitCode": 0
+    },
+    {
+      "name": "projection-sql",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-canary-runner",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-canary-answer",
+      "exitCode": 0
+    },
+    {
+      "name": "canary",
+      "exitCode": 2
+    }
+  ],
+  "error": "canary failed: 2",
+  "head": "9ff05aa70716fd64fb1cca11593a66b4ce597b11",
+  "frontend_port": "52923",
+  "status": "FAIL",
+  "answer_quality": "FAIL",
+  "paid_model_calls": 1,
+  "project": "customer-agent-gate-issue169-canary-diagnostic-20260902b",
+  "image_tag": "gate-issue169-canary-diagnostic-20260902b"
+}

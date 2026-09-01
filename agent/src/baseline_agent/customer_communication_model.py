@@ -272,20 +272,26 @@ def is_authorized_body_prefix(body: str, order_reference: str, *, complete: bool
 def validate_customer_reply_envelope(
     model_input: CustomerCommunicationInput, envelope: CustomerReplyEnvelope
 ) -> None:
+    if customer_reply_policy_violation(model_input, envelope) is not None:
+        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+
+
+def customer_reply_policy_violation(
+    model_input: CustomerCommunicationInput, envelope: CustomerReplyEnvelope
+) -> tuple[str, str] | None:
+    """Return a bounded policy code and JSON path without exposing reply values."""
     expected_schema = (
         CUSTOMER_KNOWLEDGE_REPLY_SCHEMA_VERSION
         if model_input.knowledge is not None
         else CUSTOMER_REPLY_SCHEMA_VERSION
     )
     if (model_input.knowledge is None) != (envelope.knowledge is None):
-        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+        return ("KNOWLEDGE_PRESENCE", "$.knowledge")
     if model_input.knowledge is not None and envelope.knowledge is not None:
         try:
             validate_customer_knowledge_citations(envelope.knowledge, model_input.knowledge)
         except ValueError:
-            raise CustomerCommunicationFailure(
-                CustomerCommunicationFailureCode.INVALID_OUTPUT
-            ) from None
+            return ("KNOWLEDGE_CITATIONS", "$.knowledge.citations")
     if envelope.intent is CustomerReplyIntent.HUMAN_HANDOFF:
         valid_intent = customer_requested_human(model_input)
         expected_evidence = model_input.evidence_refs
@@ -305,17 +311,22 @@ def validate_customer_reply_envelope(
         valid_intent = envelope.intent is expected_intent
         expected_evidence = model_input.evidence_refs
         expected_escalation = False
-    if (
-        not isinstance(envelope, CustomerReplyEnvelope)
-        or envelope.schema_version != expected_schema
-        or not envelope.body
-        or len(envelope.body) > 1_000
-        or not valid_intent
-        or envelope.evidence_refs != expected_evidence
-        or envelope.escalation_required is not expected_escalation
-        or envelope.referenced_order != model_input.order_reference
-    ):
-        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+    if not isinstance(envelope, CustomerReplyEnvelope):
+        return ("ENVELOPE_TYPE", "$")
+    if envelope.schema_version != expected_schema:
+        return ("SCHEMA_VERSION", "$.schemaVersion")
+    if not envelope.body:
+        return ("BODY_REQUIRED", "$.body")
+    if len(envelope.body) > 1_000:
+        return ("BODY_LENGTH", "$.body")
+    if not valid_intent:
+        return ("INTENT", "$.intent")
+    if envelope.evidence_refs != expected_evidence:
+        return ("EVIDENCE_REFS", "$.evidenceRefs")
+    if envelope.escalation_required is not expected_escalation:
+        return ("ESCALATION", "$.escalationRequired")
+    if envelope.referenced_order != model_input.order_reference:
+        return ("REFERENCED_ORDER", "$.referencedOrder")
     if envelope.intent in {
         CustomerReplyIntent.CLARIFICATION_REQUIRED,
         CustomerReplyIntent.HUMAN_HANDOFF,
@@ -328,12 +339,13 @@ def validate_customer_reply_envelope(
             )
             is None
         ):
-            raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
-        return
+            return ("BODY_TEMPLATE", "$.body")
+        return None
     if not is_authorized_body_prefix(envelope.body, model_input.order_reference, complete=True):
-        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+        return ("BODY_AUTHORIZATION", "$.body")
     if not _has_grounded_investigation_narrative(model_input, envelope.body):
-        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+        return ("GROUNDED_NARRATIVE", "$.body")
+    return None
 
 
 def _infer_intent_from_compensation_language(body: str) -> CustomerReplyIntent:
