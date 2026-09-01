@@ -43,6 +43,12 @@ _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 503})
 
 
 @dataclass(frozen=True)
+class _StreamedResponse:
+    payload: dict[str, Any]
+    output_text_matches: bool
+
+
+@dataclass(frozen=True)
 class DeepSeekCustomerCommunicationConfig:
     api_key: str = field(repr=False)
     model: str = DEEPSEEK_FLASH_MODEL
@@ -120,15 +126,17 @@ class DeepSeekResponsesCustomerCommunicationModel:
                 attempt_started = time.monotonic()
                 payload: object = None
                 published_length = 0
+                published_body = ""
 
                 async def publish(delta: str) -> None:
-                    nonlocal published_length
+                    nonlocal published_body, published_length
                     if on_body_delta is not None:
                         await on_body_delta(delta)
                     published_length += len(delta)
+                    published_body += delta
 
                 try:
-                    payload = await asyncio.wait_for(
+                    streamed = await asyncio.wait_for(
                         _read_streamed_response(
                             client,
                             self._endpoint,
@@ -138,6 +146,9 @@ class DeepSeekResponsesCustomerCommunicationModel:
                         ),
                         timeout=remaining,
                     )
+                    payload = streamed.payload
+                    if not streamed.output_text_matches:
+                        raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
                 except asyncio.CancelledError:
                     await self._record(
                         internal_call_id,
@@ -209,6 +220,7 @@ class DeepSeekResponsesCustomerCommunicationModel:
                         attempt_started,
                         request_body,
                         DeepSeekFailureClassification.SCHEMA_MISMATCH,
+                        payload if isinstance(payload, dict) else None,
                         provider_http_status=200,
                     )
                     raise
@@ -228,7 +240,7 @@ class DeepSeekResponsesCustomerCommunicationModel:
                         provider_http_status=200,
                     )
                     raise _failure() from None
-                if model_input.knowledge is None and published_length != len(envelope.body):
+                if model_input.knowledge is None and published_body != envelope.body:
                     await self._record(
                         internal_call_id,
                         attempt_id,
@@ -309,7 +321,8 @@ class DeepSeekResponsesCustomerCommunicationModel:
                 cache_hit=None,
                 failure_classification=failure,
                 provider_http_status=provider_http_status,
-                strict_schema_requested=_strict_schema_requested(request_body),
+                # 共享审计字段沿用旧名;这里验证的是DeepSeek官方json_schema三键契约。
+                strict_schema_requested=_official_json_schema_requested(request_body),
                 thinking_disabled=request_body.get("reasoning") == {"effort": "none"},
                 allowed_parameters_only=set(request_body)
                 == {
@@ -338,7 +351,7 @@ async def _read_streamed_response(
     request_body: dict[str, Any],
     model_input: CustomerCommunicationInput,
     publish: Callable[[str], Awaitable[None]],
-) -> dict[str, Any]:
+) -> _StreamedResponse:
     expected_intent = (
         CustomerReplyIntent.CLARIFICATION_REQUIRED
         if model_input.compensation_review_required is None
@@ -399,12 +412,11 @@ async def _read_streamed_response(
                 raise _failure()
     if final_response is None:
         raise _failure()
-    envelope = _parse_response(final_response)
-    if output_text != _response_output_text(final_response) or (
-        model_input.knowledge is None and published_body != envelope.body
-    ):
-        raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
-    return final_response
+    try:
+        output_text_matches = output_text == _response_output_text(final_response)
+    except CustomerCommunicationFailure:
+        output_text_matches = False
+    return _StreamedResponse(final_response, output_text_matches)
 
 
 def _partial_json_string_field(value: str, field: str) -> str | None:
@@ -552,7 +564,6 @@ def _build_request(
             "format": {
                 "type": "json_schema",
                 "name": "customer_agent_public_reply",
-                "strict": True,
                 "schema": schema,
             }
         },
@@ -596,13 +607,16 @@ def _validate_public_body(envelope: CustomerReplyEnvelope) -> None:
         raise _failure()
 
 
-def _strict_schema_requested(request: dict[str, Any]) -> bool:
+def _official_json_schema_requested(request: dict[str, Any]) -> bool:
     text = request.get("text")
     value = text.get("format") if isinstance(text, dict) else None
     return (
         isinstance(value, dict)
+        and set(value) == {"type", "name", "schema"}
         and value.get("type") == "json_schema"
-        and value.get("strict") is True
+        and isinstance(value.get("name"), str)
+        and bool(value["name"])
+        and isinstance(value.get("schema"), dict)
     )
 
 

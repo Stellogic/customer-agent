@@ -136,7 +136,8 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
     assert request["model"] == "deepseek-v4-flash"
     assert request["stream"] is True
     assert request["reasoning"] == {"effort": "none"}
-    assert request["text"]["format"]["strict"] is True
+    assert set(request["text"]["format"]) == {"type", "name", "schema"}
+    assert request["text"]["format"]["type"] == "json_schema"
     body_schema = request["text"]["format"]["schema"]["properties"]["body"]
     assert "pattern" not in body_schema
     assert "enum" not in body_schema
@@ -229,6 +230,59 @@ async def test_unsafe_or_invalid_output_fails_closed(payload: dict[str, object])
 
     with pytest.raises(CustomerCommunicationFailure):
         await model.compose(_input())
+
+
+@pytest.mark.asyncio
+async def test_schema_description_wrapper_fails_closed_but_records_completed_usage() -> None:
+    payload = _completed("等待审批。")
+    part = payload["output"][0]["content"][0]  # type: ignore[index]
+    instance = json.loads(part["text"])
+    part["text"] = json.dumps({"type": "object", "properties": instance})
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(payload)),
+    )
+
+    with pytest.raises(CustomerCommunicationFailure):
+        await model.compose(_input())
+
+    record = model.audit_sink.records[0]
+    assert record.failure_classification == "SCHEMA_MISMATCH"
+    assert record.provider_response_id == "response-c129"
+    assert record.response_status == "completed"
+    assert record.response_model == "deepseek-v4-flash-202608"
+    assert (record.input_tokens, record.output_tokens, record.total_tokens) == (80, 30, 110)
+    assert record.usage_reported is True
+    assert record.actual_response_shape_valid is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["multiple-output", "refusal", "delta-final-mismatch"])
+async def test_completed_stream_shape_failures_remain_closed_and_audited(failure: str) -> None:
+    payload = _completed(
+        "调查结果显示，订单 ORDER-C129 的物流出现延迟。"
+        "补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
+    )
+    if failure == "multiple-output":
+        payload["output"].append(payload["output"][0])  # type: ignore[union-attr]
+        response = _streamed(payload)
+    elif failure == "refusal":
+        payload["output"] = [{"type": "message", "content": [{"type": "refusal"}]}]
+        response = _streamed(payload)
+    else:
+        response = _streamed_with_delta(payload, "{}")
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: response),
+    )
+
+    with pytest.raises(CustomerCommunicationFailure):
+        await model.compose(_input())
+
+    record = model.audit_sink.records[0]
+    assert record.failure_classification == "SCHEMA_MISMATCH"
+    assert record.usage_reported is True
+    assert record.total_tokens == 110
 
 
 @pytest.mark.asyncio
@@ -357,3 +411,17 @@ async def test_knowledge_sufficiency_and_answer_share_one_call_and_never_stream_
 
 async def _capture(target: list[str], value: str) -> None:
     target.append(value)
+
+
+def _streamed_with_delta(payload: dict[str, object], delta: str) -> httpx.Response:
+    events = [
+        {"type": "response.output_text.delta", "sequence_number": 0, "delta": delta},
+        {"type": "response.completed", "sequence_number": 1, "response": payload},
+    ]
+    content = "".join(
+        f"event: {event['type']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+        for event in events
+    )
+    return httpx.Response(
+        200, headers={"Content-Type": "text/event-stream"}, content=content.encode()
+    )
