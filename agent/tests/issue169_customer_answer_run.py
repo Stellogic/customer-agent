@@ -27,6 +27,28 @@ class BudgetStop(Exception):
     pass
 
 
+def unresolved_attempt(item: dict, retry_run_id: str) -> bool:
+    if item["status"] == "SETTLED":
+        return False
+    if item["status"] != "TIMEOUT_RELEASED":
+        return True
+    release = item.get("release", {})
+    observation = item.get("observation", {})
+    return not (
+        release.get("authority") == "USER"
+        and release.get("reason") == "CONNECTION_TIMEOUT_NO_USAGE"
+        and release.get("supplier_nonbilling_confirmed") is False
+        and release.get("authorized_retry_run") == retry_run_id
+        and observation.get("failure_classification") == "CONNECTION_TIMEOUT"
+        and observation.get("usage_reported") is False
+        and all(
+            observation.get(name) is None
+            for name in ("input_tokens", "output_tokens", "total_tokens")
+        )
+        and "charged_upper_micro_cny" not in item
+    )
+
+
 class BudgetTransport(httpx.AsyncBaseTransport):
     """只为本次验收拦截实际provider请求记账,不改请求、回复或产品重试。"""
 
@@ -37,7 +59,7 @@ class BudgetTransport(httpx.AsyncBaseTransport):
             raise BudgetStop("账本schema不符")
         if run_id in self.state["phases"]:
             raise BudgetStop("同一冻结运行已启动,禁止覆盖结果")
-        if any(item["status"] != "SETTLED" for item in self.state["attempts"]):
+        if any(unresolved_attempt(item, run_id) for item in self.state["attempts"]):
             raise BudgetStop("存在未结算预留")
         self.phase = run_id
         self.state["phases"][run_id] = {
@@ -57,10 +79,10 @@ class BudgetTransport(httpx.AsyncBaseTransport):
         body = json.loads(request.content)
         if body["model"] != "deepseek-v4-flash" or not 1 <= body["max_output_tokens"] <= 1536:
             raise BudgetStop("请求超出冻结模型/输出上限")
-        if any(item["status"] != "SETTLED" for item in self.state["attempts"]):
+        if any(unresolved_attempt(item, self.phase) for item in self.state["attempts"]):
             raise BudgetStop("未知usage,停止后续调用")
         spent = self.state["prior_paid_micro_cny"] + sum(
-            item["charged_upper_micro_cny"] for item in self.state["attempts"]
+            item.get("charged_upper_micro_cny", 0) for item in self.state["attempts"]
         )
         reserve = 1048576 * 3 + body["max_output_tokens"] * 9
         if spent + reserve > 6000000:
@@ -266,7 +288,7 @@ async def main() -> None:
             report["ledger_pending_micro_cny"] = sum(
                 item["reserved_micro_cny"]
                 for item in budget.state["attempts"]
-                if item["status"] != "SETTLED"
+                if unresolved_attempt(item, budget.phase)
             )
             budget.state["phases"][run_id]["status"] = report["status"]
             write_json(budget.path, budget.state)
