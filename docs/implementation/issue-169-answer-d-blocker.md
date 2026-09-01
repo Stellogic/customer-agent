@@ -30,7 +30,11 @@ DeepSeek 官方 [Create Response](https://api-docs.deepseek.com/api/create-respo
 
 产品流解析从 `response.completed.response.output[].content[].output_text` 读取最终文本，并验证它与全部 `response.output_text.delta` 拼接结果一致。该路径与官方 SSE 事件表一致，answer-d 中的失败文本在 delta、`output_text.done` 和 `response.completed` 三处一致。因此失败不是本地选错事件或截断，而是供应商完成响应本身不符合其回显的 schema。
 
-结论：当前没有证据支持修改请求构造、解析器或冻结配置。把 `properties` 内容静默解包、删 `strict`、增加样例提示或改走另一传输都会改变已冻结契约，其中前三者还会使用本轮结果调参。保持质量 FAIL 是当前唯一有证据的处理。
+后续协调核查确认 `strict` 并非 DeepSeek 官方 `text.format` 三键之一。适配提交 `dccc92b` 因此只删除该未文档字段，不改 prompt、schema 或质量门槛，并先保留完整 `response.completed` 再做严格解析，使失败也能正常结算 usage。离线回归与双轴审查均 PASS。
+
+稳定 HEAD `c596400ae543270022979c96242daa32e31638f8` 随后只执行一次冻结 canary `issue169-canary-20260902a`，固定 `delivery-01-a` 且最多一次 compose。供应商返回 HTTP 200 completed，顶层已经是 `body/escalationRequired/evidenceRefs/intent/knowledge/referencedOrder/schemaVersion`，不再是 `{type,properties}` schema 描述包装；但完整产品解析/校验仍判定 `SCHEMA_MISMATCH`。该次 1261 input / 587 output / 1848 total tokens 已按 9066 micro-CNY 结算，账本 0 PENDING。
+
+Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具体回答字段值；在一次 canary 限额已用完后，无法不新增付费调用地进一步区分引用、正文授权、枚举或其他深层值错误。不能因顶层正确而降低完整 envelope、引用和 Spring 校验，也不能补跑第二次 canary。因此该路线仍保持质量 FAIL 并停止付费调用。
 
 ## 证据
 
@@ -40,6 +44,8 @@ DeepSeek 官方 [Create Response](https://api-docs.deepseek.com/api/create-respo
 - `docs/implementation/evidence/issue169-answer-20260902d/ledger-reconciliation.json`
 - `docs/implementation/evidence/issue169-answer-20260902c/timeout-release.json`
 - `docs/implementation/evidence/issue169-httpx-transport-20260902a/container.json`
+- `docs/implementation/evidence/issue169-canary-20260902a/canary.json`
+- `docs/implementation/evidence/issue169-canary-20260902a/phase.json`
 
 ## 未完成项
 
