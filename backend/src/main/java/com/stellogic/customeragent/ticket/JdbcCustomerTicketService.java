@@ -50,7 +50,8 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 command.customerId() + "\n" + command.requestId());
         List<RequestRecord> existing =
                 jdbc.query(
-                        "select parameter_digest, ticket_id from customer_ticket_request where customer_id = ? and request_id = ?",
+                        "select parameter_digest, ticket_id from customer_ticket_request where"
+                                + " customer_id = ? and request_id = ?",
                         (rs, row) ->
                                 new RequestRecord(rs.getString(1), rs.getObject(2, UUID.class)),
                         command.customerId(),
@@ -70,8 +71,10 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         boolean startsAgentInvestigation =
                 agentHandling
                         && !jdbc.query(
-                                        "select 1 from synthetic_order where order_reference = ? and customer_id = ? "
-                                                + "union all select 1 from synthetic_order_alias where alias = ? and customer_id = ? limit 1",
+                                        "select 1 from synthetic_order where order_reference = ?"
+                                                + " and customer_id = ? union all select 1 from"
+                                                + " synthetic_order_alias where alias = ? and"
+                                                + " customer_id = ? limit 1",
                                         (rs, row) -> rs.getInt(1),
                                         command.orderReference(),
                                         command.customerId(),
@@ -79,9 +82,10 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                                         command.customerId())
                                 .isEmpty();
         jdbc.update(
-                "insert into support_ticket (id, customer_id, order_reference, description, issue_kind, lifecycle_state, handling_mode, "
-                        + "created_at, first_responded_at, resolution_running_since) "
-                        + "values (?, ?, ?, ?, ?, 'INVESTIGATING', ?, ?, ?, ?)",
+                "insert into support_ticket (id, customer_id, order_reference, description,"
+                        + " issue_kind, lifecycle_state, handling_mode, created_at, first_responded_at,"
+                        + " resolution_running_since) values (?, ?, ?, ?, ?, 'INVESTIGATING', ?, ?, ?,"
+                        + " ?)",
                 ticketId,
                 command.customerId(),
                 command.orderReference(),
@@ -92,7 +96,8 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 databaseTime,
                 databaseTime);
         jdbc.update(
-                "insert into customer_ticket_request (customer_id, request_id, parameter_digest, ticket_id) values (?, ?, ?, ?)",
+                "insert into customer_ticket_request (customer_id, request_id, parameter_digest,"
+                        + " ticket_id) values (?, ?, ?, ?)",
                 command.customerId(),
                 command.requestId(),
                 digest,
@@ -111,9 +116,9 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
             if (startsAgentInvestigation) {
                 UUID submissionRequestId = UUID.randomUUID();
                 jdbc.update(
-                        "insert into agent_submission "
-                                + "(submission_request_id, generation_id, thread_id, parameter_digest, status, next_attempt_at, created_at) "
-                                + "values (?, ?, ?, ?, 'PENDING', current_timestamp, ?)",
+                        "insert into agent_submission (submission_request_id, generation_id,"
+                                + " thread_id, parameter_digest, status, next_attempt_at, created_at)"
+                                + " values (?, ?, ?, ?, 'PENDING', current_timestamp, ?)",
                         submissionRequestId,
                         generationId,
                         threadId,
@@ -126,7 +131,8 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
             }
         } else {
             jdbc.update(
-                    "update support_ticket set human_handoff_reason_code = 'UNSUPPORTED_SCENARIO' where id = ?",
+                    "update support_ticket set human_handoff_reason_code = 'UNSUPPORTED_SCENARIO'"
+                            + " where id = ?",
                     ticketId);
             jdbc.update(
                     "insert into shared_support_queue_entry (ticket_id, reason_code, entered_at) "
@@ -135,7 +141,8 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                     databaseTime);
         }
         jdbc.update(
-                "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) values (?, ?, 1, 'CUSTOMER', ?, ?), (?, ?, 2, 'SUPPORT', ?, ?)",
+                "insert into public_message (id, ticket_id, message_sequence, author, body,"
+                        + " sent_at) values (?, ?, 1, 'CUSTOMER', ?, ?), (?, ?, 2, 'SUPPORT', ?, ?)",
                 UUID.randomUUID(),
                 ticketId,
                 command.description(),
@@ -145,7 +152,9 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 acknowledgement,
                 databaseTime);
         jdbc.update(
-                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, 'TICKET_CREATED', ?, ?), (?, 'FIRST_RESPONSE_RECORDED', 'spring-system', ?)",
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?,"
+                        + " 'TICKET_CREATED', ?, ?), (?, 'FIRST_RESPONSE_RECORDED', 'spring-system',"
+                        + " ?)",
                 ticketId,
                 command.customerId(),
                 databaseTime,
@@ -165,12 +174,11 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                     databaseTime);
         }
         jdbc.update(
-                "insert into customer_public_event "
-                        + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
-                        + "values (?, ?, 1, ?, 'TICKET_ACCEPTED', "
-                        + "jsonb_build_object('ticketId', ?::text, 'lifecycleState', 'INVESTIGATING', 'handlingMode', ?), ?), "
-                        + "(?, ?, 2, ?, 'PUBLIC_MESSAGE_APPENDED', "
-                        + "jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?)",
+                "insert into customer_public_event (ticket_id, epoch, sequence, agent_generation,"
+                        + " event_type, payload, occurred_at) values (?, ?, 1, ?, 'TICKET_ACCEPTED',"
+                        + " jsonb_build_object('ticketId', ?::text, 'lifecycleState', 'INVESTIGATING',"
+                        + " 'handlingMode', ?), ?), (?, ?, 2, ?, 'PUBLIC_MESSAGE_APPENDED',"
+                        + " jsonb_build_object('author', 'SUPPORT', 'body', ?, 'sentAt', ?::text), ?)",
                 ticketId,
                 EPOCH,
                 agentHandling ? 1 : 0,
@@ -252,8 +260,8 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         long newGeneration = nextGeneration == null ? 1 : nextGeneration;
         for (GenerationRecord generation : active) {
             jdbc.update(
-                    "update agent_processing_generation set status = 'SUPERSEDED', completed_at = ? "
-                            + "where id = ? and status = 'ACTIVE'",
+                    "update agent_processing_generation set status = 'SUPERSEDED', completed_at = ?"
+                            + " where id = ? and status = 'ACTIVE'",
                     at,
                     generation.id());
             jdbc.update(
@@ -279,9 +287,9 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 threadId,
                 at);
         jdbc.update(
-                "insert into agent_submission "
-                        + "(submission_request_id, generation_id, thread_id, parameter_digest, status, next_attempt_at, created_at) "
-                        + "values (?, ?, ?, ?, 'PENDING', ?, ?)",
+                "insert into agent_submission (submission_request_id, generation_id, thread_id,"
+                        + " parameter_digest, status, next_attempt_at, created_at) values (?, ?, ?, ?,"
+                        + " 'PENDING', ?, ?)",
                 submissionRequestId,
                 generationId,
                 threadId,
@@ -294,25 +302,28 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 at);
         if ("WAITING_FOR_CUSTOMER".equals(ticket.lifecycleState())) {
             jdbc.update(
-                    "update support_ticket set lifecycle_state = 'INVESTIGATING', resolution_running_since = ? where id = ?",
+                    "update support_ticket set lifecycle_state = 'INVESTIGATING',"
+                            + " resolution_running_since = ? where id = ?",
                     at,
                     command.ticketId());
         }
 
         Long messageSequence =
                 jdbc.queryForObject(
-                        "select coalesce(max(message_sequence), 0) + 1 from public_message where ticket_id = ?",
+                        "select coalesce(max(message_sequence), 0) + 1 from public_message where"
+                                + " ticket_id = ?",
                         Long.class,
                         command.ticketId());
         Long eventSequence =
                 jdbc.queryForObject(
-                        "select coalesce(max(sequence), 0) + 1 from customer_public_event where ticket_id = ? and epoch = ?",
+                        "select coalesce(max(sequence), 0) + 1 from customer_public_event where"
+                                + " ticket_id = ? and epoch = ?",
                         Long.class,
                         command.ticketId(),
                         EPOCH);
         jdbc.update(
-                "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at) "
-                        + "values (?, ?, ?, 'CUSTOMER', ?, ?)",
+                "insert into public_message (id, ticket_id, message_sequence, author, body,"
+                        + " sent_at) values (?, ?, ?, 'CUSTOMER', ?, ?)",
                 UUID.randomUUID(),
                 command.ticketId(),
                 messageSequence,
@@ -320,10 +331,10 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                 at);
         long acceptedGeneration = active.isEmpty() ? newGeneration : active.getFirst().number();
         jdbc.update(
-                "insert into customer_public_event "
-                        + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) values "
-                        + "(?, ?, ?, ?, 'CUSTOMER_MESSAGE_ACCEPTED', "
-                        + "jsonb_build_object('author', 'CUSTOMER', 'body', ?, 'sentAt', ?::text), ?)",
+                "insert into customer_public_event (ticket_id, epoch, sequence, agent_generation,"
+                        + " event_type, payload, occurred_at) values (?, ?, ?, ?,"
+                        + " 'CUSTOMER_MESSAGE_ACCEPTED', jsonb_build_object('author', 'CUSTOMER',"
+                        + " 'body', ?, 'sentAt', ?::text), ?)",
                 command.ticketId(),
                 EPOCH,
                 eventSequence,
@@ -334,10 +345,10 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         long nextEvent = eventSequence + 1;
         if (!active.isEmpty()) {
             jdbc.update(
-                    "insert into customer_public_event "
-                            + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
-                            + "values (?, ?, ?, ?, 'AGENT_PROCESSING_TERMINATED', "
-                            + "jsonb_build_object('reason', 'NEW_CUSTOMER_MESSAGE'), ?)",
+                    "insert into customer_public_event (ticket_id, epoch, sequence,"
+                            + " agent_generation, event_type, payload, occurred_at) values (?, ?, ?, ?,"
+                            + " 'AGENT_PROCESSING_TERMINATED', jsonb_build_object('reason',"
+                            + " 'NEW_CUSTOMER_MESSAGE'), ?)",
                     command.ticketId(),
                     EPOCH,
                     nextEvent++,
@@ -345,19 +356,18 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                     at);
         }
         jdbc.update(
-                "insert into customer_public_event "
-                        + "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
-                        + "values (?, ?, ?, ?, 'AGENT_PROCESSING_STARTED', "
-                        + "jsonb_build_object('state', 'PROCESSING'), ?)",
+                "insert into customer_public_event (ticket_id, epoch, sequence, agent_generation,"
+                        + " event_type, payload, occurred_at) values (?, ?, ?, ?,"
+                        + " 'AGENT_PROCESSING_STARTED', jsonb_build_object('state', 'PROCESSING'), ?)",
                 command.ticketId(),
                 EPOCH,
                 nextEvent,
                 newGeneration,
                 at);
         jdbc.update(
-                "insert into customer_public_message_request "
-                        + "(customer_id, message_id, parameter_digest, ticket_id, outcome, received_at) "
-                        + "values (?, ?, ?, ?, 'ACCEPTED', ?)",
+                "insert into customer_public_message_request (customer_id, message_id,"
+                        + " parameter_digest, ticket_id, outcome, received_at) values (?, ?, ?, ?,"
+                        + " 'ACCEPTED', ?)",
                 command.customerId(),
                 command.messageId(),
                 digest,
@@ -409,13 +419,15 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
     public CustomerPublicSnapshot snapshot(String customerId, UUID ticketId) {
         List<CustomerPublicSnapshot> snapshots =
                 jdbc.query(
-                        "select t.id, t.lifecycle_state, t.handling_mode, t.created_at, t.first_responded_at, "
-                                + "coalesce((select max(sequence) from customer_public_event e where e.ticket_id = t.id and e.epoch = ?), 0), "
-                                + "coalesce((select max(generation_number) from agent_processing_generation g where g.ticket_id = t.id), 0), "
-                                + "a.status, case when a.status = 'PENDING' then a.due_at else null end "
-                                + "from support_ticket t left join ticket_auto_resolution a on a.ticket_id = t.id "
-                                + "and (a.status <> 'RESOLVED' or t.lifecycle_state in ('RESOLVED', 'CLOSED')) "
-                                + "where t.id = ? and t.customer_id = ?",
+                        "select t.id, t.lifecycle_state, t.handling_mode, t.created_at,"
+                                + " t.first_responded_at, coalesce((select max(sequence) from"
+                                + " customer_public_event e where e.ticket_id = t.id and e.epoch = ?),"
+                                + " 0), coalesce((select max(generation_number) from"
+                                + " agent_processing_generation g where g.ticket_id = t.id), 0),"
+                                + " a.status, case when a.status = 'PENDING' then a.due_at else null"
+                                + " end from support_ticket t left join ticket_auto_resolution a on"
+                                + " a.ticket_id = t.id and (a.status <> 'RESOLVED' or t.lifecycle_state"
+                                + " in ('RESOLVED', 'CLOSED')) where t.id = ? and t.customer_id = ?",
                         (rs, row) ->
                                 new CustomerPublicSnapshot(
                                         rs.getObject(1, UUID.class),
@@ -442,14 +454,16 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         if (snapshots.isEmpty()) throw new TicketNotFoundException();
         List<PublicMessage> messages =
                 jdbc.query(
-                        "select author, body, sent_at, knowledge::text from public_message where ticket_id = ? order by message_sequence",
+                        "select author, body, sent_at, knowledge::text from public_message where"
+                                + " ticket_id = ? order by message_sequence",
                         this::mapMessage,
                         ticketId);
         CustomerPublicSnapshot ticket = snapshots.getFirst();
         List<CurrentClarification> clarifications =
                 jdbc.query(
-                        "select id, prompt_code, public_question from customer_clarification_request "
-                                + "where ticket_id = ? and status = 'OPEN'",
+                        "select id, prompt_code, public_question from"
+                                + " customer_clarification_request where ticket_id = ? and status ="
+                                + " 'OPEN'",
                         (rs, row) ->
                                 new CurrentClarification(
                                         rs.getObject(1, UUID.class),
@@ -458,10 +472,11 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                         ticketId);
         List<CurrentReplyStream> replyStreams =
                 jdbc.query(
-                        "select coalesce(s.status, case when g.status = 'ACTIVE' then 'LOADING' else null end), "
-                                + "coalesce(s.body, ''), coalesce(s.progress_stage, 'UNDERSTANDING') "
-                                + "from agent_processing_generation g left join agent_public_reply_stream s on s.generation_id = g.id "
-                                + "where g.ticket_id = ? order by g.generation_number desc limit 1",
+                        "select coalesce(s.status, case when g.status = 'ACTIVE' then 'LOADING'"
+                                + " else null end), coalesce(s.body, ''), coalesce(s.progress_stage,"
+                                + " 'UNDERSTANDING') from agent_processing_generation g left join"
+                                + " agent_public_reply_stream s on s.generation_id = g.id where"
+                                + " g.ticket_id = ? order by g.generation_number desc limit 1",
                         (rs, row) ->
                                 rs.getString(1) == null
                                         ? null
@@ -490,10 +505,10 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         Instant now = clock.instant();
         List<PendingCompensationProjection> pending =
                 jdbc.query(
-                        "select compensation_method, to_char(amount, 'FM999999990.00') "
-                                + "from compensation_proposal_revision "
-                                + "where ticket_id = ? and status = 'PENDING_APPROVAL' and expires_at > ? "
-                                + "order by revision_number desc, created_at desc limit 1",
+                        "select compensation_method, to_char(amount, 'FM999999990.00') from"
+                                + " compensation_proposal_revision where ticket_id = ? and status ="
+                                + " 'PENDING_APPROVAL' and expires_at > ? order by revision_number"
+                                + " desc, created_at desc limit 1",
                         (rs, row) ->
                                 new PendingCompensationProjection(
                                         rs.getString(1), rs.getString(2), "CNY", "PENDING_REVIEW"),
@@ -521,7 +536,8 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         if (after < 0 || after > authority.sequence()) throw new ProjectionCursorException();
         Long firstRetained =
                 jdbc.queryForObject(
-                        "select min(sequence) from customer_public_event where ticket_id = ? and epoch = ?",
+                        "select min(sequence) from customer_public_event where ticket_id = ? and"
+                                + " epoch = ?",
                         Long.class,
                         ticketId,
                         EPOCH);
@@ -529,7 +545,9 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
             throw new ProjectionCursorException();
         }
         return jdbc.query(
-                "select epoch, sequence, agent_generation, event_type, payload::text from customer_public_event where ticket_id = ? and epoch = ? and sequence > ? order by sequence",
+                "select epoch, sequence, agent_generation, event_type, payload::text from"
+                        + " customer_public_event where ticket_id = ? and epoch = ? and sequence > ?"
+                        + " order by sequence",
                 (rs, row) ->
                         new CustomerPublicEvent(
                                 rs.getString(1),
@@ -543,8 +561,13 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
     }
 
     private PublicMessage mapMessage(ResultSet rs, int row) throws SQLException {
-        return new PublicMessage(rs.getString(1), rs.getString(2), rs.getTimestamp(3).toInstant(),
-                rs.getString(4) == null ? null : json.readValue(rs.getString(4), CustomerKnowledgeProjection.class));
+        return new PublicMessage(
+                rs.getString(1),
+                rs.getString(2),
+                rs.getTimestamp(3).toInstant(),
+                rs.getString(4) == null
+                        ? null
+                        : json.readValue(rs.getString(4), CustomerKnowledgeProjection.class));
     }
 
     private record RequestRecord(String digest, UUID ticketId) {}

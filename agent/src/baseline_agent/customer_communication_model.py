@@ -71,7 +71,11 @@ class CustomerReplyEnvelope:
             "evidenceRefs": list(self.evidence_refs),
             "escalationRequired": self.escalation_required,
             "referencedOrder": self.referenced_order,
-            **({"knowledge": self.knowledge.as_request_value()} if self.knowledge is not None else {}),
+            **(
+                {"knowledge": self.knowledge.as_request_value()}
+                if self.knowledge is not None
+                else {}
+            ),
         }
 
 
@@ -270,7 +274,8 @@ def validate_customer_reply_envelope(
 ) -> None:
     expected_schema = (
         CUSTOMER_KNOWLEDGE_REPLY_SCHEMA_VERSION
-        if model_input.knowledge is not None else CUSTOMER_REPLY_SCHEMA_VERSION
+        if model_input.knowledge is not None
+        else CUSTOMER_REPLY_SCHEMA_VERSION
     )
     if (model_input.knowledge is None) != (envelope.knowledge is None):
         raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
@@ -278,7 +283,9 @@ def validate_customer_reply_envelope(
         try:
             validate_customer_knowledge_citations(envelope.knowledge, model_input.knowledge)
         except ValueError:
-            raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT) from None
+            raise CustomerCommunicationFailure(
+                CustomerCommunicationFailureCode.INVALID_OUTPUT
+            ) from None
     if envelope.intent is CustomerReplyIntent.HUMAN_HANDOFF:
         valid_intent = customer_requested_human(model_input)
         expected_evidence = model_input.evidence_refs
@@ -415,13 +422,21 @@ def customer_communication_provider_request(
             "compensationReviewRequired": model_input.compensation_review_required,
             "evidenceRefs": list(model_input.evidence_refs),
         },
-        **({
-            "untrustedKnowledge": [
-                {"articleId": source.article_id, "version": source.version,
-                 "chunkId": source.chunk_id, "snippet": source.snippet}
-                for source in model_input.knowledge.sources
-            ],
-        } if model_input.knowledge is not None else {}),
+        **(
+            {
+                "untrustedKnowledge": [
+                    {
+                        "articleId": source.article_id,
+                        "version": source.version,
+                        "chunkId": source.chunk_id,
+                        "snippet": source.snippet,
+                    }
+                    for source in model_input.knowledge.sources
+                ],
+            }
+            if model_input.knowledge is not None
+            else {}
+        ),
     }
 
 
@@ -454,7 +469,9 @@ def parse_customer_reply_envelope(raw: Mapping[str, object]) -> CustomerReplyEnv
         try:
             knowledge = parse_customer_knowledge_answer(raw.get("knowledge"))
         except (ValueError, TypeError):
-            raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT) from None
+            raise CustomerCommunicationFailure(
+                CustomerCommunicationFailureCode.INVALID_OUTPUT
+            ) from None
     if set(raw) != expected:
         raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
     evidence = raw["evidenceRefs"]

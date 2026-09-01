@@ -14,7 +14,11 @@ import { humanSessionFetch } from "./humanSessionLifecycle";
 import { OrderTicketGroups } from "./OrderTicketGroups";
 import { AutoResolutionNotice, type AutoResolution } from "./AutoResolutionNotice";
 import { CustomerCapabilityGuide, CustomerTrustStrip } from "./components/CustomerHelpTrust";
-import { CustomerKnowledgeSources, type CustomerKnowledgeSource, type CustomerKnowledgeSourcesState } from "./components/CustomerKnowledgeSources";
+import {
+  CustomerKnowledgeSources,
+  type CustomerKnowledgeSource,
+  type CustomerKnowledgeSourcesState,
+} from "./components/CustomerKnowledgeSources";
 
 const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
 const PUBLIC_CONVERSATION_BASE = "/api/customer/v2/tickets";
@@ -32,10 +36,15 @@ type Snapshot = {
     handlingMode: string;
     agentGeneration: number;
   };
-  messages: Array<{ author: string; body: string; sentAt: string; knowledge?: {
-    status: "SUPPORTED" | "INSUFFICIENT_INFORMATION" | "CONFLICT";
-    sources: CustomerKnowledgeSource[];
-  } | null }>;
+  messages: Array<{
+    author: string;
+    body: string;
+    sentAt: string;
+    knowledge?: {
+      status: "SUPPORTED" | "INSUFFICIENT_INFORMATION" | "CONFLICT";
+      sources: CustomerKnowledgeSource[];
+    } | null;
+  }>;
   clarification: { id: string; promptCode: string; question: string } | null;
   autoResolution?: AutoResolution | null;
   replyStream?: {
@@ -1457,7 +1466,11 @@ export function App() {
                   placement={message.author === "CUSTOMER" ? "end" : "start"}
                   variant={message.author === "AGENT" ? "outlined" : "filled"}
                   content={message.body}
-                  footer={message.author === "AGENT" ? <CustomerKnowledgeSources state={knowledgeSourcesState(message.knowledge)} /> : undefined}
+                  footer={
+                    message.author === "AGENT" ? (
+                      <CustomerKnowledgeSources state={knowledgeSourcesState(message.knowledge)} />
+                    ) : undefined
+                  }
                   header={
                     message.author === "CUSTOMER"
                       ? "你"
@@ -1467,45 +1480,56 @@ export function App() {
                   }
                 />
               ))}
-            {snapshot.replyStream && !snapshot.messages.some(message => message.knowledge && message.body === snapshot.replyStream?.body) && (
-              <>
-                <Bubble
-                  key={`stream-${snapshot.ticket.agentGeneration}`}
-                  placement="start"
-                  variant="outlined"
-                  content={
-                    snapshot.replyStream.body || progressLabel(snapshot.replyStream.progressStage)
-                  }
-                  header="智能客服"
-                  loading={snapshot.replyStream.status === "LOADING"}
-                  streaming={snapshot.replyStream.status === "STREAMING"}
-                  footer={
-                    snapshot.replyStream.status === "LOADING"
-                      ? undefined
-                      : replyStreamFooter(snapshot.replyStream.status)
-                  }
-                />
-                {snapshot.replyStream.status === "LOADING" && (
-                  <p className="reply-stream-status" role="status">
-                    等待首个内容片段
-                  </p>
-                )}
-                {["STREAMING", "COMPLETED"].includes(snapshot.replyStream.status) && (
-                  <Sources
-                    rootClassName="reply-sources"
-                    title="本次回复依据"
-                    defaultExpanded
-                    items={[
-                      { key: "conversation", title: "当前工单公开对话" },
-                      { key: "business-facts", title: "已核对的订单与物流事实" },
-                    ]}
+            {snapshot.replyStream &&
+              !snapshot.messages.some(
+                (message) => message.knowledge && message.body === snapshot.replyStream?.body,
+              ) && (
+                <>
+                  <Bubble
+                    key={`stream-${snapshot.ticket.agentGeneration}`}
+                    placement="start"
+                    variant="outlined"
+                    content={
+                      snapshot.replyStream.body || progressLabel(snapshot.replyStream.progressStage)
+                    }
+                    header="智能客服"
+                    loading={snapshot.replyStream.status === "LOADING"}
+                    streaming={snapshot.replyStream.status === "STREAMING"}
+                    footer={
+                      snapshot.replyStream.status === "LOADING"
+                        ? undefined
+                        : replyStreamFooter(snapshot.replyStream.status)
+                    }
                   />
-                )}
-                {((snapshot.replyStream.status === "LOADING" && ["QUERYING_RULES", "COMPOSING_REPLY"].includes(snapshot.replyStream.progressStage)) || snapshot.replyStream.status === "FAILED") && (
-                  <CustomerKnowledgeSources state={{ status: snapshot.replyStream.status === "FAILED" ? "error" : "loading" }} />
-                )}
-              </>
-            )}
+                  {snapshot.replyStream.status === "LOADING" && (
+                    <p className="reply-stream-status" role="status">
+                      等待首个内容片段
+                    </p>
+                  )}
+                  {["STREAMING", "COMPLETED"].includes(snapshot.replyStream.status) && (
+                    <Sources
+                      rootClassName="reply-sources"
+                      title="本次回复依据"
+                      defaultExpanded
+                      items={[
+                        { key: "conversation", title: "当前工单公开对话" },
+                        { key: "business-facts", title: "已核对的订单与物流事实" },
+                      ]}
+                    />
+                  )}
+                  {((snapshot.replyStream.status === "LOADING" &&
+                    ["QUERYING_RULES", "COMPOSING_REPLY"].includes(
+                      snapshot.replyStream.progressStage,
+                    )) ||
+                    snapshot.replyStream.status === "FAILED") && (
+                    <CustomerKnowledgeSources
+                      state={{
+                        status: snapshot.replyStream.status === "FAILED" ? "error" : "loading",
+                      }}
+                    />
+                  )}
+                </>
+              )}
           </div>
           {snapshot.messages.length === 0 && !snapshot.replyStream && (
             <p className="empty-conversation">新消息会在这里出现。</p>
@@ -2120,17 +2144,34 @@ function isPublicMessage(value: unknown): value is Snapshot["messages"][number] 
   );
 }
 
-function isPublicKnowledge(value: unknown): value is NonNullable<Snapshot["messages"][number]["knowledge"]> {
-  if (!isRecord(value) || !hasOnlyKeys(value, ["status", "sources"]) ||
-      !["SUPPORTED", "INSUFFICIENT_INFORMATION", "CONFLICT"].includes(String(value.status)) ||
-      !Array.isArray(value.sources) || value.sources.length > 5) return false;
-  return ((value.status === "SUPPORTED") === (value.sources.length > 0)) && value.sources.every(source =>
-    isRecord(source) && hasOnlyKeys(source, ["title", "updatedAt"]) &&
-    typeof source.title === "string" && source.title.trim().length > 0 &&
-    typeof source.updatedAt === "string" && !Number.isNaN(Date.parse(source.updatedAt)));
+function isPublicKnowledge(
+  value: unknown,
+): value is NonNullable<Snapshot["messages"][number]["knowledge"]> {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["status", "sources"]) ||
+    !["SUPPORTED", "INSUFFICIENT_INFORMATION", "CONFLICT"].includes(String(value.status)) ||
+    !Array.isArray(value.sources) ||
+    value.sources.length > 5
+  )
+    return false;
+  return (
+    (value.status === "SUPPORTED") === value.sources.length > 0 &&
+    value.sources.every(
+      (source) =>
+        isRecord(source) &&
+        hasOnlyKeys(source, ["title", "updatedAt"]) &&
+        typeof source.title === "string" &&
+        source.title.trim().length > 0 &&
+        typeof source.updatedAt === "string" &&
+        !Number.isNaN(Date.parse(source.updatedAt)),
+    )
+  );
 }
 
-function knowledgeSourcesState(knowledge: Snapshot["messages"][number]["knowledge"]): CustomerKnowledgeSourcesState {
+function knowledgeSourcesState(
+  knowledge: Snapshot["messages"][number]["knowledge"],
+): CustomerKnowledgeSourcesState {
   if (!knowledge || knowledge.status === "INSUFFICIENT_INFORMATION") return { status: "empty" };
   if (knowledge.status === "CONFLICT") return { status: "conflict" };
   return { status: "ready", sources: knowledge.sources };

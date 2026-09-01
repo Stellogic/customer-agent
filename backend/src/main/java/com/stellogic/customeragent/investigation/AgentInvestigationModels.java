@@ -213,9 +213,22 @@ record CustomerReplyEnvelope(
         String referencedOrder,
         String knowledgeRequestId,
         CustomerKnowledgeReply knowledge) {
-    CustomerReplyEnvelope(String schemaVersion, String body, CustomerReplyIntent intent,
-            List<String> evidenceRefs, boolean escalationRequired, String referencedOrder) {
-        this(schemaVersion, body, intent, evidenceRefs, escalationRequired, referencedOrder, null, null);
+    CustomerReplyEnvelope(
+            String schemaVersion,
+            String body,
+            CustomerReplyIntent intent,
+            List<String> evidenceRefs,
+            boolean escalationRequired,
+            String referencedOrder) {
+        this(
+                schemaVersion,
+                body,
+                intent,
+                evidenceRefs,
+                escalationRequired,
+                referencedOrder,
+                null,
+                null);
     }
 
     String publicBody() {

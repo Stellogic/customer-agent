@@ -31,18 +31,26 @@ class AgentKnowledgeControllerTest {
     private static final String PATH =
             "/internal/agent/tickets/{ticketId}/generations/{generationId}/knowledge/search";
     private final AgentInvestigationService service = mock(AgentInvestigationService.class);
-    private final AgentKnowledgeRetrievalAdapter knowledge = mock(AgentKnowledgeRetrievalAdapter.class);
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-            new AgentInvestigationController(service, "agent-token", knowledge)).build();
-    private final AgentKnowledgeResult receipt = new AgentKnowledgeResult("agent-knowledge-v1", 7, List.of());
+    private final AgentKnowledgeRetrievalAdapter knowledge =
+            mock(AgentKnowledgeRetrievalAdapter.class);
+    private final MockMvc mvc =
+            MockMvcBuilders.standaloneSetup(
+                            new AgentInvestigationController(service, "agent-token", knowledge))
+                    .build();
+    private final AgentKnowledgeResult receipt =
+            new AgentKnowledgeResult("agent-knowledge-v1", 7, List.of());
 
     @Test
     void authorizesBeforeSearchAndRechecksBeforeAcceptingEvenAnEmptyReceipt() throws Exception {
         when(knowledge.searchCustomer(QUERY)).thenReturn(receipt);
-        when(service.acceptKnowledgeSearch(TICKET, GENERATION, REQUEST, QUERY, receipt)).thenReturn(receipt);
+        when(service.acceptKnowledgeSearch(TICKET, GENERATION, REQUEST, QUERY, receipt))
+                .thenReturn(receipt);
 
-        mvc.perform(post(PATH, TICKET, GENERATION).headers(headers())
-                        .contentType(MediaType.APPLICATION_JSON).content(body()))
+        mvc.perform(
+                        post(PATH, TICKET, GENERATION)
+                                .headers(headers())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.schema").value("agent-knowledge-v1"))
                 .andExpect(jsonPath("$.indexGeneration").value(7))
@@ -56,12 +64,17 @@ class AgentKnowledgeControllerTest {
 
     @Test
     void retryRevalidatesTheSavedReceiptWithoutAnotherRetrieval() throws Exception {
-        when(service.authorizeKnowledgeSearch(TICKET, GENERATION, REQUEST, QUERY)).thenReturn(receipt);
+        when(service.authorizeKnowledgeSearch(TICKET, GENERATION, REQUEST, QUERY))
+                .thenReturn(receipt);
         when(knowledge.revalidateCustomer(receipt)).thenReturn(receipt);
-        when(service.acceptKnowledgeSearch(TICKET, GENERATION, REQUEST, QUERY, receipt)).thenReturn(receipt);
+        when(service.acceptKnowledgeSearch(TICKET, GENERATION, REQUEST, QUERY, receipt))
+                .thenReturn(receipt);
 
-        mvc.perform(post(PATH, TICKET, GENERATION).headers(headers())
-                        .contentType(MediaType.APPLICATION_JSON).content(body()))
+        mvc.perform(
+                        post(PATH, TICKET, GENERATION)
+                                .headers(headers())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body()))
                 .andExpect(status().isOk());
 
         verify(knowledge).revalidateCustomer(receipt);
@@ -73,8 +86,11 @@ class AgentKnowledgeControllerTest {
         when(service.authorizeKnowledgeSearch(TICKET, GENERATION, REQUEST, QUERY))
                 .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN));
 
-        mvc.perform(post(PATH, TICKET, GENERATION).headers(headers())
-                        .contentType(MediaType.APPLICATION_JSON).content(body()))
+        mvc.perform(
+                        post(PATH, TICKET, GENERATION)
+                                .headers(headers())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body()))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(knowledge);
     }
@@ -82,19 +98,25 @@ class AgentKnowledgeControllerTest {
     @Test
     void generationRevokedDuringSearchCannotReturnTheReceipt() throws Exception {
         when(knowledge.searchCustomer(QUERY)).thenReturn(receipt);
-        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN)).when(service)
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN))
+                .when(service)
                 .acceptKnowledgeSearch(TICKET, GENERATION, REQUEST, QUERY, receipt);
 
-        mvc.perform(post(PATH, TICKET, GENERATION).headers(headers())
-                        .contentType(MediaType.APPLICATION_JSON).content(body()))
+        mvc.perform(
+                        post(PATH, TICKET, GENERATION)
+                                .headers(headers())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body()))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void requestCannotChooseItsOwnScope() throws Exception {
-        mvc.perform(post(PATH, TICKET, GENERATION).headers(headers())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"query\":\"签收问题\",\"scope\":\"INTERNAL\"}"))
+        mvc.perform(
+                        post(PATH, TICKET, GENERATION)
+                                .headers(headers())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"query\":\"签收问题\",\"scope\":\"INTERNAL\"}"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(service, knowledge);
     }
@@ -103,8 +125,11 @@ class AgentKnowledgeControllerTest {
     void machineOperationScopeIsRequired() throws Exception {
         HttpHeaders headers = headers();
         headers.set("X-Agent-Operation", "USE_INVESTIGATION_CAPABILITY");
-        mvc.perform(post(PATH, TICKET, GENERATION).headers(headers)
-                        .contentType(MediaType.APPLICATION_JSON).content(body()))
+        mvc.perform(
+                        post(PATH, TICKET, GENERATION)
+                                .headers(headers)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body()))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(knowledge);
     }

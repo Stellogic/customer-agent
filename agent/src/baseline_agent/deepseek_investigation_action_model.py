@@ -485,7 +485,11 @@ def _build_request(
                 "syntheticInvestigationFacts": {
                     key: value for key, value in facts.items() if key != "customerQuestion"
                 },
-                **({"customerQuestion": facts["customerQuestion"]} if "customerQuestion" in facts else {}),
+                **(
+                    {"customerQuestion": facts["customerQuestion"]}
+                    if "customerQuestion" in facts
+                    else {}
+                ),
             },
             separators=(",", ":"),
             sort_keys=True,

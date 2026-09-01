@@ -518,18 +518,38 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
         knowledge_result = None
         knowledge_request_id = f"{generation_id}:knowledge:{capability_request_scope}"
         if loop_result.knowledge_query is not None:
-            await _publish_reply_event(client, base_url, ticket_id, generation_id, scope_headers,
-                                       "progress-knowledge", {"type": "PROGRESS", "stage": "QUERYING_RULES"})
+            await _publish_reply_event(
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                "progress-knowledge",
+                {"type": "PROGRESS", "stage": "QUERYING_RULES"},
+            )
             try:
                 knowledge_result = await _search_customer_knowledge(
-                    client, base_url, ticket_id, generation_id, scope_headers,
-                    knowledge_request_id, loop_result.knowledge_query,
+                    client,
+                    base_url,
+                    ticket_id,
+                    generation_id,
+                    scope_headers,
+                    knowledge_request_id,
+                    loop_result.knowledge_query,
                 )
             except KnowledgeRetrievalFailure as failure:
                 failed = await _human_handoff(
-                    client, base_url, ticket_id, generation_id, scope_headers,
-                    "TOOL_RETRY_EXHAUSTED", _controlled_summary_facts(facts), action_records,
-                    _completed_run_evidence(loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")),
+                    client,
+                    base_url,
+                    ticket_id,
+                    generation_id,
+                    scope_headers,
+                    "TOOL_RETRY_EXHAUSTED",
+                    _controlled_summary_facts(facts),
+                    action_records,
+                    _completed_run_evidence(
+                        loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                    ),
                     judgment_evidence,
                 )
                 failed["knowledge_failure"] = failure.code.value
@@ -562,12 +582,22 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
             "progress-composing",
             {"type": "PROGRESS", "stage": "COMPOSING_REPLY"},
         )
+
         async def reply_handoff(reason: str) -> BaselineState:
             return await _human_handoff(
-                client, base_url, ticket_id, generation_id, scope_headers, reason,
-                _controlled_summary_facts(facts), action_records,
-                _completed_run_evidence(loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")),
-                judgment_evidence, _communication_call_evidence(communication_audit_offset, reason),
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
+                reason,
+                _controlled_summary_facts(facts),
+                action_records,
+                _completed_run_evidence(
+                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                ),
+                judgment_evidence,
+                _communication_call_evidence(communication_audit_offset, reason),
             )
 
         customer_reply = None
@@ -577,7 +607,8 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                     client, base_url, ticket_id, generation_id, scope_headers
                 )
                 customer_reply = await customer_communication_model.compose(
-                    communication_input, on_body_delta=None if knowledge_result is not None else publish_delta
+                    communication_input,
+                    on_body_delta=None if knowledge_result is not None else publish_delta,
                 )
                 validate_customer_reply_envelope(communication_input, customer_reply)
             except Exception:
@@ -591,10 +622,13 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 completion["customerReply"]["knowledgeRequestId"] = knowledge_request_id
             try:
                 conclusion_response = await _request_with_retries(
-                    lambda: client.post(
+                    lambda completion=completion: client.post(
                         f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/conclusions",
-                        headers={**scope_headers, "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
-                                 "Idempotency-Key": f"{generation_id}:submit-conclusion"},
+                        headers={
+                            **scope_headers,
+                            "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
+                            "Idempotency-Key": f"{generation_id}:submit-conclusion",
+                        },
                         json=completion,
                     )
                 )
@@ -605,11 +639,16 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                     rejection = error.response.json()
                 except ValueError:
                     rejection = {}
-                correctable = (knowledge_result is not None and isinstance(rejection, dict)
-                               and rejection.get("code") == "UNSAFE_KNOWLEDGE")
+                correctable = (
+                    knowledge_result is not None
+                    and isinstance(rejection, dict)
+                    and rejection.get("code") == "UNSAFE_KNOWLEDGE"
+                )
                 if correctable and correction_attempt == 0:
                     continue
-                return await reply_handoff("INVALID_MODEL_OUTPUT" if correctable else "FACT_CONFLICT")
+                return await reply_handoff(
+                    "INVALID_MODEL_OUTPUT" if correctable else "FACT_CONFLICT"
+                )
             if conclusion_response is None:
                 return await reply_handoff("TOOL_RETRY_EXHAUSTED")
             break
@@ -753,30 +792,54 @@ async def _advance_investigation_action_loop(
     async def choose(facts: dict) -> ActionDecision:
         model_context = dict(facts)
         model_context["siblingTickets"] = sibling_tickets
-        if {"delaySeconds", "paid", "existingCompensation", "policyVersion", "orderRuleSummary"}.issubset(facts):
+        if {
+            "delaySeconds",
+            "paid",
+            "existingCompensation",
+            "policyVersion",
+            "orderRuleSummary",
+        }.issubset(facts):
             context = await _read_customer_communication_context(
-                client, base_url, ticket_id, generation_id, scope_headers,
+                client,
+                base_url,
+                ticket_id,
+                generation_id,
+                scope_headers,
             )
             if context is None:
                 raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
-            customer_messages = [message["body"] for message in context["publicConversation"]
-                                 if message["author"] == "CUSTOMER"]
-            model_context["customerQuestion"] = customer_messages[-1] if customer_messages else context["syntheticCustomerText"]
+            customer_messages = [
+                message["body"]
+                for message in context["publicConversation"]
+                if message["author"] == "CUSTOMER"
+            ]
+            model_context["customerQuestion"] = (
+                customer_messages[-1] if customer_messages else context["syntheticCustomerText"]
+            )
         return await investigation_action_model.choose(model_context)
 
     return await ActionLoop(choose, ActionBudget.configured()).advance(checkpoint, execute)
 
 
 async def _search_customer_knowledge(
-    client: httpx.AsyncClient, base_url: str, ticket_id: str, generation_id: str,
-    headers: dict[str, str], request_id: str, query: str,
+    client: httpx.AsyncClient,
+    base_url: str,
+    ticket_id: str,
+    generation_id: str,
+    headers: dict[str, str],
+    request_id: str,
+    query: str,
 ) -> KnowledgeRetrievalResult:
     failure = KnowledgeRetrievalFailure(KnowledgeFailureCode.RETRIEVAL_UNAVAILABLE)
     for attempt in range(_tool_attempt_budget()):
         try:
             response = await client.post(
                 f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/knowledge/search",
-                headers={**headers, "X-Agent-Operation": "SEARCH_KNOWLEDGE", "Idempotency-Key": request_id},
+                headers={
+                    **headers,
+                    "X-Agent-Operation": "SEARCH_KNOWLEDGE",
+                    "Idempotency-Key": request_id,
+                },
                 json={"query": query},
             )
         except httpx.TransportError:

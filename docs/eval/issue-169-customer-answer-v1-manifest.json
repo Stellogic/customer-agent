@@ -1,0 +1,21 @@
+{
+  "schema": "issue169-answer-freeze-v1",
+  "canonicalization": "UTF-8 LF; no BOM",
+  "model_calls_at_freeze": 0,
+  "answered": 36,
+  "unanswered": 12,
+  "semantic_samples": 48,
+  "independent_boundaries": 8,
+  "files": {
+    "docs/eval/issue-169-customer-answer-v1.json": "9e9eb72d117eb37635f34075c1d122653f3a863da08c427aecfc0e7377c92d3c",
+    "docs/eval/issue-169-customer-answer-v1.md": "2c1f0a97e5b7cd38dd24654e1979711d7f1997850a85b654b17d34ba56e33020",
+    "agent/src/baseline_agent/customer_communication_model.py": "8d55f5ff2b922029a3228040a16a1ad54f0e524445caa6722fcac0c5f0144051",
+    "agent/src/baseline_agent/deepseek_customer_communication_model.py": "beedf613ad212500058a55487a5af00cdf428f22b9dad085b8bbac6bfd30415e",
+    "agent/src/baseline_agent/customer_knowledge_answer.py": "51ab84c4c1c6bfe1b2f4a2ac2a5fdaf999ece1b6de93df7388468204984768d9",
+    "agent/tests/issue169_customer_answer_run.py": "a9ff3c5530ac31d172e90970d8dc991ab716503020f6c9679dd493c100282cc0",
+    "agent/tests/issue169_customer_knowledge_acceptance.py": "d0e6d616bb30bfb88ccf8ae49c25205510e5be7dd4583bf29caa534687a907bb",
+    "backend/src/main/resources/knowledge/customer-delivery-help-v1.md": "93089b907795b9116d71aa8301ab3de737ac01e35943185bb48395eb10a194ad",
+    "backend/src/main/resources/knowledge/customer-conversation-help-v1.md": "dc347bfa2aaea8c76db755a033c4c3bcb838910218bca374613b891676561bd5",
+    "backend/src/main/resources/knowledge/customer-privacy-help-v1.md": "718c32899cfa2d1c6b0697c5beb2d648352433fd2b0e6b949ad35352363f072a"
+  }
+}

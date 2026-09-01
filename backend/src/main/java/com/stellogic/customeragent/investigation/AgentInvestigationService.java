@@ -12,7 +12,11 @@ interface AgentInvestigationService {
             UUID ticketId, UUID generationId, String requestId, String query);
 
     AgentKnowledgeResult acceptKnowledgeSearch(
-            UUID ticketId, UUID generationId, String requestId, String query, AgentKnowledgeResult result);
+            UUID ticketId,
+            UUID generationId,
+            String requestId,
+            String query,
+            AgentKnowledgeResult result);
 
     SiblingTicketSummary siblingTicketSummary(UUID ticketId, UUID generationId);
 

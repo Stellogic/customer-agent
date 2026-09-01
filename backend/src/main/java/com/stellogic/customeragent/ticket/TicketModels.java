@@ -17,7 +17,8 @@ record AppendCustomerMessage(String customerId, UUID ticketId, String messageId,
 
 record CustomerMessageResult(UUID ticketId, String outcome, boolean replayed) {}
 
-record PublicMessage(String author, String body, Instant sentAt, CustomerKnowledgeProjection knowledge) {
+record PublicMessage(
+        String author, String body, Instant sentAt, CustomerKnowledgeProjection knowledge) {
     PublicMessage(String author, String body, Instant sentAt) {
         this(author, body, sentAt, null);
     }

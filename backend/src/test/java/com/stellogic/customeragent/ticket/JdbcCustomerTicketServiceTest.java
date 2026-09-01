@@ -28,7 +28,8 @@ class JdbcCustomerTicketServiceTest {
                         new JdbcCustomerTicketService(
                                 jdbc,
                                 Clock.fixed(Instant.parse("2026-08-11T00:00:00Z"), ZoneOffset.UTC),
-                                mock(TicketAuthorityLock.class), mock(tools.jackson.databind.ObjectMapper.class)));
+                                mock(TicketAuthorityLock.class),
+                                mock(tools.jackson.databind.ObjectMapper.class)));
         var snapshot =
                 new CustomerPublicSnapshot(
                         TICKET_ID,

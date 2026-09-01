@@ -3,11 +3,10 @@ package com.stellogic.customeragent.knowledge;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import org.junit.jupiter.api.Test;
-
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import org.junit.jupiter.api.Test;
 
 /** 合成元数据 fixture；不调用检索、数据库或模型，不代表通过真实质量门。 */
 class KnowledgeCitationProjectionTest {

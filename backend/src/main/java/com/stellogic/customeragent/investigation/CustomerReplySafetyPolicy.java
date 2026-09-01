@@ -16,10 +16,18 @@ public final class CustomerReplySafetyPolicy {
                 || PERSON_NAME_CLAIM_PATTERN.matcher(body).find()
                 || PREMATURE_RESOLUTION_PATTERN.matcher(body).find()
                 || Pattern.compile("(?:已|将|已经|为您|本单|您的).{0,10}(?:退款|补偿|支付|到账)").matcher(body).find()
-                || Pattern.compile("(?:您的|本单|这笔|该笔|当前订单|当前包裹|该订单|该包裹).{0,12}(?:已|已经|目前|当前|处于|存在|为).{0,8}(?:签收|丢失|延迟|停滞|配送|支付|退款|补偿|取消|到账)").matcher(body).find()
-                || Pattern.compile("(?:经核验|经核实|核验结果|调查结果).{0,12}(?:签收|丢失|延迟|停滞|支付|退款|补偿|取消|到账)").matcher(body).find()
-                || Pattern.compile("(?i)(https?://|[a-z]:\\\\|sourceFile|chunkId|vectorScore)").matcher(body).find();
+                || Pattern.compile(
+                                "(?:您的|本单|这笔|该笔|当前订单|当前包裹|该订单|该包裹).{0,12}(?:已|已经|目前|当前|处于|存在|为).{0,8}(?:签收|丢失|延迟|停滞|配送|支付|退款|补偿|取消|到账)")
+                        .matcher(body)
+                        .find()
+                || Pattern.compile("(?:经核验|经核实|核验结果|调查结果).{0,12}(?:签收|丢失|延迟|停滞|支付|退款|补偿|取消|到账)")
+                        .matcher(body)
+                        .find()
+                || Pattern.compile("(?i)(https?://|[a-z]:\\\\|sourceFile|chunkId|vectorScore)")
+                        .matcher(body)
+                        .find();
     }
+
     private static final String NUMBER = "(?:\\d+(?:\\.\\d+)?|[零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬]+)";
     private static final Pattern MONEY_PATTERN =
             Pattern.compile(
@@ -118,8 +126,10 @@ public final class CustomerReplySafetyPolicy {
                         : CustomerReplyIntent.NO_COMPENSATION_RESOLUTION;
         boolean basicShapeValid =
                 reply != null
-                        && (("customer-reply-v1".equals(reply.schemaVersion()) && reply.knowledge() == null)
-                            || ("customer-reply-v2".equals(reply.schemaVersion()) && reply.knowledge() != null))
+                        && (("customer-reply-v1".equals(reply.schemaVersion())
+                                        && reply.knowledge() == null)
+                                || ("customer-reply-v2".equals(reply.schemaVersion())
+                                        && reply.knowledge() != null))
                         && reply.body() != null
                         && !reply.body().isBlank()
                         && reply.body().length() <= 1000

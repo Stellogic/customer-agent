@@ -290,10 +290,17 @@ class DeepSeekResponsesCustomerCommunicationModel:
                 backend_fingerprint=(
                     _optional_string(payload.get("system_fingerprint")) if payload else None
                 ),
-                prompt_version=("customer-knowledge-communication-v1"
-                    if request_body["text"]["format"]["schema"]["properties"]["schemaVersion"]["const"]
-                    == CUSTOMER_KNOWLEDGE_REPLY_SCHEMA_VERSION else CUSTOMER_COMMUNICATION_PROMPT_VERSION),
-                schema_version=request_body["text"]["format"]["schema"]["properties"]["schemaVersion"]["const"],
+                prompt_version=(
+                    "customer-knowledge-communication-v1"
+                    if request_body["text"]["format"]["schema"]["properties"]["schemaVersion"][
+                        "const"
+                    ]
+                    == CUSTOMER_KNOWLEDGE_REPLY_SCHEMA_VERSION
+                    else CUSTOMER_COMMUNICATION_PROMPT_VERSION
+                ),
+                schema_version=request_body["text"]["format"]["schema"]["properties"][
+                    "schemaVersion"
+                ]["const"],
                 duration_ms=max(0, round((time.monotonic() - attempt_started) * 1000)),
                 input_tokens=_optional_int(usage.get("input_tokens")),
                 output_tokens=_optional_int(usage.get("output_tokens")),
@@ -370,7 +377,7 @@ async def _read_streamed_response(
                     raise _failure()
                 output_text += delta
                 if model_input.knowledge is not None:
-                    # 知识分支完整缓冲：Spring 验证引用和当前授权前不能向客户公开任何正文。
+                    # 知识分支完整缓冲:Spring 验证引用和当前授权前不能向客户公开任何正文。
                     continue
                 body_prefix = _partial_json_string_field(output_text, "body")
                 if body_prefix is None:
@@ -527,7 +534,8 @@ def _build_request(
                 "Keep body grounded exclusively in authorizedInvestigation using the existing business reply "
                 "rules. Knowledge answer is general guidance only, never an order/payment/refund fact, "
                 "eligibility decision, amount, or execution promise. Reply in Chinese."
-                if model_input.knowledge is not None else ""
+                if model_input.knowledge is not None
+                else ""
             )
         ),
         "input": json.dumps(
@@ -535,7 +543,9 @@ def _build_request(
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        "max_output_tokens": config.knowledge_max_output_tokens if model_input.knowledge is not None else config.max_output_tokens,
+        "max_output_tokens": config.knowledge_max_output_tokens
+        if model_input.knowledge is not None
+        else config.max_output_tokens,
         "reasoning": {"effort": "none"},
         "stream": True,
         "text": {

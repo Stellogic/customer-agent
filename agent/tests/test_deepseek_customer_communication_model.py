@@ -284,20 +284,46 @@ async def test_authorized_body_is_published_from_provider_deltas_before_completi
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("valid_quote", [True, False])
-async def test_knowledge_sufficiency_and_answer_share_one_call_and_never_stream_before_spring(valid_quote):
+async def test_knowledge_sufficiency_and_answer_share_one_call_and_never_stream_before_spring(
+    valid_quote,
+):
     snippet = "包裹未到时，可以在当前工单补充最新情况，客服会结合物流记录继续核实。"
-    model_input = replace(_input(), knowledge=KnowledgeRetrievalResult(7, (KnowledgeSource(
-        "delivery-help", "v1", "delivery-help:1", "配送帮助", "2026-09-01T00:00:00Z",
-        ("CUSTOMER_PUBLIC",), 1, 2, snippet,
-    ),)))
-    response = _completed("订单 ORDER-C129 的调查已完成，补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。")
+    model_input = replace(
+        _input(),
+        knowledge=KnowledgeRetrievalResult(
+            7,
+            (
+                KnowledgeSource(
+                    "delivery-help",
+                    "v1",
+                    "delivery-help:1",
+                    "配送帮助",
+                    "2026-09-01T00:00:00Z",
+                    ("CUSTOMER_PUBLIC",),
+                    1,
+                    2,
+                    snippet,
+                ),
+            ),
+        ),
+    )
+    response = _completed(
+        "订单 ORDER-C129 的调查已完成，补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
+    )
     part = response["output"][0]["content"][0]
     raw = json.loads(part["text"])
     raw["schemaVersion"] = "customer-reply-v2"
     raw["knowledge"] = {
-        "status": "SUPPORTED", "answer": "您可以在当前工单补充最新情况，方便继续核实。",
-        "citations": [{"articleId": "delivery-help", "version": "v1", "chunkId": "delivery-help:1",
-                       "quote": snippet if valid_quote else "系统已经执行退款。"}],
+        "status": "SUPPORTED",
+        "answer": "您可以在当前工单补充最新情况，方便继续核实。",
+        "citations": [
+            {
+                "articleId": "delivery-help",
+                "version": "v1",
+                "chunkId": "delivery-help:1",
+                "quote": snippet if valid_quote else "系统已经执行退款。",
+            }
+        ],
     }
     part["text"] = json.dumps(raw, ensure_ascii=False)
     requests: list[dict] = []
@@ -312,7 +338,9 @@ async def test_knowledge_sufficiency_and_answer_share_one_call_and_never_stream_
         transport=httpx.MockTransport(respond),
     )
     if valid_quote:
-        result = await model.compose(model_input, on_body_delta=lambda value: _capture(published, value))
+        result = await model.compose(
+            model_input, on_body_delta=lambda value: _capture(published, value)
+        )
         assert result.knowledge is not None
         assert result.knowledge.answer == raw["knowledge"]["answer"]
     else:

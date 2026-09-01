@@ -193,28 +193,44 @@ async def test_flash_allows_terminal_action_without_order_parameter() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("query", [None, "包裹显示签收但没有收到，应该如何核实"])
-async def test_final_decision_can_choose_knowledge_without_promoting_customer_text_to_facts(query) -> None:
+async def test_final_decision_can_choose_knowledge_without_promoting_customer_text_to_facts(
+    query,
+) -> None:
     captured: list[dict] = []
 
     def respond(request: httpx.Request) -> httpx.Response:
         captured.append(json.loads(request.content))
         response = _completed_action("SUBMIT_CONCLUSION")
-        response["output"][0]["content"][0]["text"] = json.dumps({
-            "action": "SUBMIT_CONCLUSION", "evidence": _evidence_payload(), "knowledgeQuery": query,
-        })
+        response["output"][0]["content"][0]["text"] = json.dumps(
+            {
+                "action": "SUBMIT_CONCLUSION",
+                "evidence": _evidence_payload(),
+                "knowledgeQuery": query,
+            }
+        )
         return httpx.Response(200, json=response)
 
     model = DeepSeekResponsesInvestigationActionModel(
         DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
         transport=httpx.MockTransport(respond),
     )
-    decision = await model.choose({
-        "matchStatus": "UNIQUE", "orderReference": "ORDER-128", "delayHours": 25,
-        "delaySeconds": 90_000, "paid": True, "cancelled": False, "fullyRefunded": False,
-        "existingCompensation": False, "pendingActionCount": 0, "policyVersion": "delay-policy-v1",
-        "orderRuleSummary": "ADDRESS_CHANGE_AND_CANCEL_RULES_V1", "evidenceCatalog": _evidence_catalog(),
-        "customerQuestion": "包裹显示签收但没有收到，怎么办？",
-    })
+    decision = await model.choose(
+        {
+            "matchStatus": "UNIQUE",
+            "orderReference": "ORDER-128",
+            "delayHours": 25,
+            "delaySeconds": 90_000,
+            "paid": True,
+            "cancelled": False,
+            "fullyRefunded": False,
+            "existingCompensation": False,
+            "pendingActionCount": 0,
+            "policyVersion": "delay-policy-v1",
+            "orderRuleSummary": "ADDRESS_CHANGE_AND_CANCEL_RULES_V1",
+            "evidenceCatalog": _evidence_catalog(),
+            "customerQuestion": "包裹显示签收但没有收到，怎么办？",
+        }
+    )
 
     assert decision.knowledge_query == query
     assert decision.action.parameter_map == {}

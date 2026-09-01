@@ -8,8 +8,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 共用检索投影。外层须在调用前后各自校验当前工单 generation 或 HUMAN assignment。
- * 搜索与普通复核的外层不持事务；通过 Spring 代理使用同一快照。
+ * 共用检索投影。外层须在调用前后各自校验当前工单 generation 或 HUMAN assignment。 搜索与普通复核的外层不持事务；通过 Spring 代理使用同一快照。
  * 最终发布专用方法则要求参与调用方已有短事务，详见方法契约。
  */
 @Service
@@ -49,7 +48,8 @@ public class AgentKnowledgeRetrievalAdapter {
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public AgentKnowledgeResult revalidateSupport(String principalId, AgentKnowledgeResult receipt) {
+    public AgentKnowledgeResult revalidateSupport(
+            String principalId, AgentKnowledgeResult receipt) {
         return revalidate(receipt, supportScopes(principalId));
     }
 
@@ -64,12 +64,16 @@ public class AgentKnowledgeRetrievalAdapter {
         if (!"agent-knowledge-v1".equals(receipt.schema()) || receipt.results().size() > 5) {
             throw new InvalidKnowledgeCitationException();
         }
-        Integer current = jdbc.queryForObject(
-                """
-                select count(*) from knowledge_index_state s join knowledge_vector_state v on s.id=v.id
-                where s.id=1 and s.status in ('READY','EMPTY') and s.failure_code is null
-                  and s.generation=? and s.generation=v.generation and v.revision=?
-                """, Integer.class, receipt.indexGeneration(), KnowledgeEmbeddingGateway.REVISION);
+        Integer current =
+                jdbc.queryForObject(
+                        """
+                        select count(*) from knowledge_index_state s join knowledge_vector_state v on s.id=v.id
+                        where s.id=1 and s.status in ('READY','EMPTY') and s.failure_code is null
+                          and s.generation=? and s.generation=v.generation and v.revision=?
+                        """,
+                        Integer.class,
+                        receipt.indexGeneration(),
+                        KnowledgeEmbeddingGateway.REVISION);
         if (current == null || current != 1) {
             throw new KnowledgeRetrievalUnavailableException("INDEX_STALE");
         }
@@ -85,7 +89,13 @@ public class AgentKnowledgeRetrievalAdapter {
         KnowledgeRetrievalResponse response = retrieval.searchAuthorizedScopes(query, scopes);
         List<AgentKnowledgeResult.Source> results =
                 response.results().stream()
-                        .map(hit -> canonicalSource(hit.articleId(), hit.version(), hit.chunkId(), scopes))
+                        .map(
+                                hit ->
+                                        canonicalSource(
+                                                hit.articleId(),
+                                                hit.version(),
+                                                hit.chunkId(),
+                                                scopes))
                         .toList();
         return new AgentKnowledgeResult("agent-knowledge-v1", response.generation(), results);
     }
@@ -106,16 +116,26 @@ public class AgentKnowledgeRetrievalAdapter {
                                     List.of((String[]) rs.getArray("article_scopes").getArray());
                             List<String> chunkScopes =
                                     List.of((String[]) rs.getArray("chunk_scopes").getArray());
-                            List<String> matching = scopes.stream()
-                                    .filter(articleScopes::contains).filter(chunkScopes::contains).toList();
+                            List<String> matching =
+                                    scopes.stream()
+                                            .filter(articleScopes::contains)
+                                            .filter(chunkScopes::contains)
+                                            .toList();
                             if (matching.isEmpty()) throw new KnowledgeAccessDeniedException();
                             return new AgentKnowledgeResult.Source(
-                                    articleId, version, chunkId,
-                                    rs.getString("title"), rs.getTimestamp("updated_at").toInstant(),
-                                    matching, rs.getInt("start_line"), rs.getInt("end_line"),
+                                    articleId,
+                                    version,
+                                    chunkId,
+                                    rs.getString("title"),
+                                    rs.getTimestamp("updated_at").toInstant(),
+                                    matching,
+                                    rs.getInt("start_line"),
+                                    rs.getInt("end_line"),
                                     rs.getString("content"));
                         },
-                        articleId, version, chunkId);
+                        articleId,
+                        version,
+                        chunkId);
         if (rows.isEmpty()) throw new InvalidKnowledgeCitationException();
         return rows.getFirst();
     }
