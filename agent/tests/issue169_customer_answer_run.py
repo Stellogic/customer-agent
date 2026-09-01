@@ -80,8 +80,13 @@ class BudgetTransport(httpx.AsyncBaseTransport):
         if any(unresolved_attempt(item) for item in self.state["attempts"]):
             raise BudgetStop("存在未结算预留")
         releases = [item for item in self.state["attempts"] if valid_timeout_release(item)]
-        if releases and releases[-1]["release"]["authorized_retry_run"] != run_id:
-            raise BudgetStop("最新超时释放未授权本次运行")
+        if releases:
+            authorized_retry = releases[-1]["release"]["authorized_retry_run"]
+            authorization_consumed = any(
+                item["phase"] == authorized_retry for item in self.state["attempts"]
+            )
+            if not authorization_consumed and authorized_retry != run_id:
+                raise BudgetStop("最新超时释放未授权本次运行")
         self.phase = run_id
         self.state["phases"][run_id] = {
             "status": "RUNNING",

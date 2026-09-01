@@ -197,6 +197,19 @@ def test_latest_release_authorizes_retry_without_reopening_older_release(runner,
     with pytest.raises(runner.BudgetStop, match="最新超时释放未授权本次运行"):
         runner.BudgetTransport(wrong_path, "unapproved-retry")
 
+    consumed_path = tmp_path / "consumed-release.json"
+    consumed = json.loads(json.dumps(state))
+    consumed["attempts"].append(
+        {
+            "phase": "fixed-retry",
+            "status": "SETTLED",
+            "reserved_micro_cny": 3159552,
+            "charged_upper_micro_cny": 12,
+        }
+    )
+    consumed_path.write_text(json.dumps(consumed), encoding="utf-8")
+    runner.BudgetTransport(consumed_path, "authorized-canary")
+
 
 def test_final_pending_total_excludes_valid_timeout_release(runner):
     released = {
