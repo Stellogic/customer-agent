@@ -254,6 +254,83 @@ async def test_schema_description_wrapper_fails_closed_but_records_completed_usa
     assert (record.input_tokens, record.output_tokens, record.total_tokens) == (80, 30, 110)
     assert record.usage_reported is True
     assert record.actual_response_shape_valid is False
+    assert record.validation_diagnostic == {
+        "category": "REQUIRED",
+        "path": "$.schemaVersion",
+        "expected": "present",
+        "actual_type": "missing",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("fault", "expected"),
+    [
+        (
+            "enum",
+            {
+                "category": "ENUM",
+                "path": "$.intent",
+                "actual_type": "string",
+                "actual_value": "UNSAFE_UNKNOWN_INTENT",
+            },
+        ),
+        (
+            "type",
+            {
+                "category": "TYPE",
+                "path": "$.evidenceRefs",
+                "actual_type": "string",
+            },
+        ),
+        (
+            "additional",
+            {
+                "category": "ADDITIONAL_PROPERTIES",
+                "path": "$.unexpected",
+                "actual_type": "string",
+            },
+        ),
+        (
+            "sensitive-enum",
+            {
+                "category": "ENUM",
+                "path": "$.intent",
+                "actual_type": "string",
+            },
+        ),
+    ],
+)
+async def test_schema_failure_diagnostic_is_bounded_and_field_specific(
+    fault: str, expected: dict[str, object]
+) -> None:
+    payload = _completed("等待审批。")
+    part = payload["output"][0]["content"][0]  # type: ignore[index]
+    raw = json.loads(part["text"])
+    if fault == "enum":
+        raw["intent"] = "UNSAFE_UNKNOWN_INTENT"
+    elif fault == "sensitive-enum":
+        raw["intent"] = "Bearer sk-secret Authorization: copied text"
+    elif fault == "type":
+        raw["evidenceRefs"] = "do-not-record-this-value"
+    else:
+        raw["unexpected"] = "do-not-record-this-value"
+    part["text"] = json.dumps(raw, ensure_ascii=False)
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(payload)),
+    )
+
+    with pytest.raises(CustomerCommunicationFailure):
+        await model.compose(_input())
+
+    diagnostic = model.audit_sink.records[0].validation_diagnostic
+    assert diagnostic is not None
+    assert diagnostic.items() >= expected.items()
+    assert "do-not-record-this-value" not in repr(diagnostic)
+    assert "sk-secret" not in repr(diagnostic)
+    if fault == "sensitive-enum":
+        assert "actual_value" not in diagnostic
 
 
 @pytest.mark.asyncio
@@ -283,6 +360,13 @@ async def test_completed_stream_shape_failures_remain_closed_and_audited(failure
     assert record.failure_classification == "SCHEMA_MISMATCH"
     assert record.usage_reported is True
     assert record.total_tokens == 110
+    expected_category = {
+        "multiple-output": "STREAM_MISMATCH",
+        "refusal": "JSON_PARSE",
+        "delta-final-mismatch": "STREAM_MISMATCH",
+    }[failure]
+    assert record.validation_diagnostic is not None
+    assert record.validation_diagnostic["category"] == expected_category
 
 
 @pytest.mark.asyncio

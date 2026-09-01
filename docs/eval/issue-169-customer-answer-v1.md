@@ -14,6 +14,7 @@
 - `deepseek-v4-flash`，`https://api.deepseek.com/responses`，stream=true、reasoning.effort=none；输出必须严格符合 JSON Schema，请求按供应商官方 `text.format` 的 `type/name/schema` 三键发送，不附加未文档化的 `strict` 字段；不新增 temperature 参数。知识分支完全缓冲，接受前不发布正文delta。
 - 知识输出上限1536 tokens，正文≤1500字符、引用≤5；整体公开正文≤2502字符。没有单引文24字限制，截断/解析失败不当资料不足。
 - 产品默认连接3秒、读取12秒、每次compose整体15秒；每次compose最多2次provider尝试，每题最多2次compose（一次受控修正），因此每题最多4次provider尝试，全部共用原累计费用账本。Python格式检查和Spring拒绝共用一次修正机会，不能为修正重检索。外层验收不增加第三次compose；失败保留，供应商/未知usage/余额/预算故障立即停止后续付费调用。
+- 结构失败保持 fail closed；审计只记录首个失败的字段路径、required/type/enum/const/additionalProperties/长度/数量等类别、期望与实际 JSON 类型。仅 schemaVersion、intent、knowledge.status 允许记录最多64字符的合成枚举值；不记录正文、引文、凭据、Authorization 或完整供应商输出。
 - 48条最多96个回答 logical calls / 192次provider attempts；另预留最多3个自主graph个案、每例既有8次action上限及2次communication，共30个logical calls。该数量只是上界，累计费用准入优先，不能保证预算内全部完成。
 
 ## 费用准入

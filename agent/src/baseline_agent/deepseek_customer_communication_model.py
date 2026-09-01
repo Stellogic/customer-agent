@@ -127,6 +127,7 @@ class DeepSeekResponsesCustomerCommunicationModel:
                 payload: object = None
                 published_length = 0
                 published_body = ""
+                validation_diagnostic: dict[str, object] | None = None
 
                 async def publish(delta: str) -> None:
                     nonlocal published_body, published_length
@@ -148,6 +149,9 @@ class DeepSeekResponsesCustomerCommunicationModel:
                     )
                     payload = streamed.payload
                     if not streamed.output_text_matches:
+                        validation_diagnostic = _diagnostic(
+                            "STREAM_MISMATCH", "$.output_text", "delta_equals_completed", "string"
+                        )
                         raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
                 except asyncio.CancelledError:
                     await self._record(
@@ -222,6 +226,7 @@ class DeepSeekResponsesCustomerCommunicationModel:
                         DeepSeekFailureClassification.SCHEMA_MISMATCH,
                         payload if isinstance(payload, dict) else None,
                         provider_http_status=200,
+                        validation_diagnostic=validation_diagnostic,
                     )
                     raise
                 try:
@@ -229,6 +234,10 @@ class DeepSeekResponsesCustomerCommunicationModel:
                     validate_customer_reply_envelope(model_input, envelope)
                     _validate_public_body(envelope)
                 except (json.JSONDecodeError, CustomerCommunicationFailure):
+                    validation_diagnostic = _response_validation_diagnostic(
+                        payload,
+                        request_body["text"]["format"]["schema"],
+                    )
                     await self._record(
                         internal_call_id,
                         attempt_id,
@@ -238,6 +247,7 @@ class DeepSeekResponsesCustomerCommunicationModel:
                         DeepSeekFailureClassification.SCHEMA_MISMATCH,
                         payload if isinstance(payload, dict) else None,
                         provider_http_status=200,
+                        validation_diagnostic=validation_diagnostic,
                     )
                     raise _failure() from None
                 if model_input.knowledge is None and published_body != envelope.body:
@@ -250,6 +260,9 @@ class DeepSeekResponsesCustomerCommunicationModel:
                         DeepSeekFailureClassification.SCHEMA_MISMATCH,
                         payload if isinstance(payload, dict) else None,
                         provider_http_status=200,
+                        validation_diagnostic=_diagnostic(
+                            "STREAM_MISMATCH", "$.body", "published_equals_completed", "string"
+                        ),
                     )
                     raise _failure() from None
                 await self._record(
@@ -286,6 +299,7 @@ class DeepSeekResponsesCustomerCommunicationModel:
         payload: dict[str, Any] | None = None,
         *,
         provider_http_status: int | None = None,
+        validation_diagnostic: dict[str, object] | None = None,
     ) -> None:
         usage = payload.get("usage") if payload else None
         usage = usage if isinstance(usage, dict) else {}
@@ -341,6 +355,7 @@ class DeepSeekResponsesCustomerCommunicationModel:
                 ),
                 cache_metrics_reported=False,
                 reasoning_tokens=None,
+                validation_diagnostic=validation_diagnostic,
             )
         )
 
@@ -618,6 +633,128 @@ def _official_json_schema_requested(request: dict[str, Any]) -> bool:
         and bool(value["name"])
         and isinstance(value.get("schema"), dict)
     )
+
+
+def _response_validation_diagnostic(payload: object, schema: object) -> dict[str, object]:
+    if not isinstance(payload, dict):
+        return _diagnostic("RESPONSE_SHAPE", "$", "completed_response", _json_type(payload))
+    try:
+        text = _response_output_text(payload)
+    except CustomerCommunicationFailure:
+        return _diagnostic("RESPONSE_SHAPE", "$.output", "single_output_text", "array")
+    try:
+        raw = json.loads(text)
+    except json.JSONDecodeError:
+        return _diagnostic("JSON_PARSE", "$", "json_object", "string")
+    if not isinstance(schema, dict):
+        return _diagnostic("LOCAL_SCHEMA", "$", "json_schema", _json_type(schema))
+    return _schema_diagnostic(raw, schema, "$") or _diagnostic(
+        "DOMAIN_VALIDATION", "$", "customer_reply_policy", _json_type(raw)
+    )
+
+
+def _schema_diagnostic(
+    value: object, schema: dict[str, Any], path: str
+) -> dict[str, object] | None:
+    expected_type = schema.get("type")
+    if isinstance(expected_type, str) and not _matches_json_type(value, expected_type):
+        return _diagnostic("TYPE", path, expected_type, _json_type(value))
+    required = schema.get("required")
+    if isinstance(value, dict) and isinstance(required, list):
+        missing = next((name for name in required if name not in value), None)
+        if isinstance(missing, str):
+            return _diagnostic("REQUIRED", f"{path}.{missing}", "present", "missing")
+    properties = schema.get("properties")
+    if isinstance(value, dict) and isinstance(properties, dict):
+        if schema.get("additionalProperties") is False:
+            extra = next((name for name in value if name not in properties), None)
+            if extra is not None:
+                return _diagnostic(
+                    "ADDITIONAL_PROPERTIES", f"{path}.{extra}", "absent", _json_type(value[extra])
+                )
+        for name, child_schema in properties.items():
+            if name in value and isinstance(child_schema, dict):
+                failure = _schema_diagnostic(value[name], child_schema, f"{path}.{name}")
+                if failure is not None:
+                    return failure
+    if "const" in schema and value != schema["const"]:
+        return _diagnostic("CONST", path, "const", _json_type(value), _safe_value(path, value))
+    enum = schema.get("enum")
+    if isinstance(enum, list) and value not in enum:
+        return _diagnostic("ENUM", path, enum, _json_type(value), _safe_value(path, value))
+    if isinstance(value, str):
+        if isinstance(schema.get("minLength"), int) and len(value) < schema["minLength"]:
+            return _diagnostic("MIN_LENGTH", path, schema["minLength"], "string")
+        if isinstance(schema.get("maxLength"), int) and len(value) > schema["maxLength"]:
+            return _diagnostic("MAX_LENGTH", path, schema["maxLength"], "string")
+    if isinstance(value, list):
+        if isinstance(schema.get("maxItems"), int) and len(value) > schema["maxItems"]:
+            return _diagnostic("MAX_ITEMS", path, schema["maxItems"], "array")
+        item_schema = schema.get("items")
+        if isinstance(item_schema, dict):
+            for index, item in enumerate(value):
+                failure = _schema_diagnostic(item, item_schema, f"{path}[{index}]")
+                if failure is not None:
+                    return failure
+    return None
+
+
+def _matches_json_type(value: object, expected: str) -> bool:
+    return {
+        "object": isinstance(value, dict),
+        "array": isinstance(value, list),
+        "string": isinstance(value, str),
+        "boolean": type(value) is bool,
+        "integer": isinstance(value, int) and not isinstance(value, bool),
+        "number": isinstance(value, (int, float)) and not isinstance(value, bool),
+        "null": value is None,
+    }.get(expected, False)
+
+
+def _json_type(value: object) -> str:
+    if value is None:
+        return "null"
+    if type(value) is bool:
+        return "boolean"
+    if isinstance(value, dict):
+        return "object"
+    if isinstance(value, list):
+        return "array"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    return type(value).__name__
+
+
+def _safe_value(path: str, value: object) -> object | None:
+    if not isinstance(value, str):
+        return None
+    if path in {"$.intent", "$.knowledge.status"} and re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", value):
+        return value
+    if path == "$.schemaVersion" and re.fullmatch(r"[a-z][a-z0-9-]{0,63}", value):
+        return value
+    return None
+
+
+def _diagnostic(
+    category: str,
+    path: str,
+    expected: object,
+    actual_type: str,
+    actual_value: object | None = None,
+) -> dict[str, object]:
+    result: dict[str, object] = {
+        "category": category,
+        "path": path,
+        "expected": expected,
+        "actual_type": actual_type,
+    }
+    if actual_value is not None:
+        result["actual_value"] = actual_value
+    return result
 
 
 def _optional_string(value: object) -> str | None:
