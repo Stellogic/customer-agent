@@ -27,18 +27,17 @@ class BudgetStop(Exception):
     pass
 
 
-def unresolved_attempt(item: dict, retry_run_id: str) -> bool:
-    if item["status"] == "SETTLED":
-        return False
+def valid_timeout_release(item: dict) -> bool:
     if item["status"] != "TIMEOUT_RELEASED":
-        return True
+        return False
     release = item.get("release", {})
     observation = item.get("observation", {})
-    return not (
+    return (
         release.get("authority") == "USER"
         and release.get("reason") == "CONNECTION_TIMEOUT_NO_USAGE"
         and release.get("supplier_nonbilling_confirmed") is False
-        and release.get("authorized_retry_run") == retry_run_id
+        and isinstance(release.get("authorized_retry_run"), str)
+        and bool(release["authorized_retry_run"])
         and observation.get("failure_classification") == "CONNECTION_TIMEOUT"
         and observation.get("usage_reported") is False
         and all(
@@ -47,6 +46,25 @@ def unresolved_attempt(item: dict, retry_run_id: str) -> bool:
         )
         and "charged_upper_micro_cny" not in item
     )
+
+
+def unresolved_attempt(item: dict) -> bool:
+    if item["status"] == "SETTLED":
+        return False
+    return not valid_timeout_release(item)
+
+
+def pending_micro_cny(attempts: list[dict]) -> int:
+    return sum(item["reserved_micro_cny"] for item in attempts if unresolved_attempt(item))
+
+
+def provider_transport() -> httpx.AsyncHTTPTransport:
+    proxy = (
+        os.environ.get("HTTPS_PROXY")
+        or os.environ.get("https_proxy")
+        or os.environ.get("ALL_PROXY")
+    )
+    return httpx.AsyncHTTPTransport(proxy=proxy, retries=0)
 
 
 class BudgetTransport(httpx.AsyncBaseTransport):
@@ -59,14 +77,17 @@ class BudgetTransport(httpx.AsyncBaseTransport):
             raise BudgetStop("账本schema不符")
         if run_id in self.state["phases"]:
             raise BudgetStop("同一冻结运行已启动,禁止覆盖结果")
-        if any(unresolved_attempt(item, run_id) for item in self.state["attempts"]):
+        if any(unresolved_attempt(item) for item in self.state["attempts"]):
             raise BudgetStop("存在未结算预留")
+        releases = [item for item in self.state["attempts"] if valid_timeout_release(item)]
+        if releases and releases[-1]["release"]["authorized_retry_run"] != run_id:
+            raise BudgetStop("最新超时释放未授权本次运行")
         self.phase = run_id
         self.state["phases"][run_id] = {
             "status": "RUNNING",
             "dataset": "issue169-customer-answer-v1",
         }
-        self.inner = httpx.AsyncHTTPTransport(retries=0)
+        self.inner = provider_transport()
         self.records = []
         self.responses = []
         self.query_id = ""
@@ -79,7 +100,7 @@ class BudgetTransport(httpx.AsyncBaseTransport):
         body = json.loads(request.content)
         if body["model"] != "deepseek-v4-flash" or not 1 <= body["max_output_tokens"] <= 1536:
             raise BudgetStop("请求超出冻结模型/输出上限")
-        if any(unresolved_attempt(item, self.phase) for item in self.state["attempts"]):
+        if any(unresolved_attempt(item) for item in self.state["attempts"]):
             raise BudgetStop("未知usage,停止后续调用")
         spent = self.state["prior_paid_micro_cny"] + sum(
             item.get("charged_upper_micro_cny", 0) for item in self.state["attempts"]
@@ -285,11 +306,7 @@ async def main() -> None:
             report["ledger_settled_micro_cny"] = budget.state["prior_paid_micro_cny"] + sum(
                 item.get("charged_upper_micro_cny", 0) for item in budget.state["attempts"]
             )
-            report["ledger_pending_micro_cny"] = sum(
-                item["reserved_micro_cny"]
-                for item in budget.state["attempts"]
-                if unresolved_attempt(item, budget.phase)
-            )
+            report["ledger_pending_micro_cny"] = pending_micro_cny(budget.state["attempts"])
             budget.state["phases"][run_id]["status"] = report["status"]
             write_json(budget.path, budget.state)
             await budget.inner.aclose()

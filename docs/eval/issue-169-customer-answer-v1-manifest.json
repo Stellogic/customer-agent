@@ -12,7 +12,7 @@
     "agent/src/baseline_agent/customer_communication_model.py": "8d55f5ff2b922029a3228040a16a1ad54f0e524445caa6722fcac0c5f0144051",
     "agent/src/baseline_agent/deepseek_customer_communication_model.py": "beedf613ad212500058a55487a5af00cdf428f22b9dad085b8bbac6bfd30415e",
     "agent/src/baseline_agent/customer_knowledge_answer.py": "51ab84c4c1c6bfe1b2f4a2ac2a5fdaf999ece1b6de93df7388468204984768d9",
-    "agent/tests/issue169_customer_answer_run.py": "a4b68853d137540d6ef22b2bb65f5e3cd1b60edc8a2225cdea3998e46bf43250",
+    "agent/tests/issue169_customer_answer_run.py": "615da4e2b65cd466b2c171fbb79ff930e38d12cb8e8ba177ff5ed736953a9c0e",
     "agent/tests/issue169_customer_knowledge_acceptance.py": "2a3fefbd2d0f9f4f21cc1ae23a069fb21f6debad7feba5f4044457b0c08943d5",
     "backend/src/main/resources/knowledge/customer-delivery-help-v1.md": "93089b907795b9116d71aa8301ab3de737ac01e35943185bb48395eb10a194ad",
     "backend/src/main/resources/knowledge/customer-conversation-help-v1.md": "dc347bfa2aaea8c76db755a033c4c3bcb838910218bca374613b891676561bd5",
