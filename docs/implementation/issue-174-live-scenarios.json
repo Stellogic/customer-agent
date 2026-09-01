@@ -188,7 +188,7 @@
           "无答案样本采用上游冻结的问题和授权候选，资料不足但检索正常，不能用空候选或基础设施故障假造正常拒答",
           "客服样本使用通过产品流程转入 HUMAN 且由当前负责客服领取的工单，不预写人工状态或领取结果"
         ],
-        "bindingStatus": "PENDING_190_169_170"
+        "bindingStatus": "RETRIEVAL_BOUND_PENDING_169_170_173"
       },
       "customerInputs": ["ORDER-L174-04-<run> 这次延迟适用什么规则？请告诉我依据，我想查看来源。"],
       "actions": [
@@ -206,7 +206,7 @@
         "客户与客服路径分别核对结构合法性、引用真实性、语义充分性与拒答门证据，不合并成绩掩盖未达标"
       ],
       "countingNote": "已有上游费用关联原记录不重复计费，新浏览器场景调用计入项目历史累计共享6元；不新增充分性调用或复制 #190 实验指标。",
-      "pending": ["#190/#169/#170 分层真实报告与 #173 集成", "客服辅助与来源真实路由、字段及冻结有答案/无答案样本绑定，不编造 API", "场景子预算只能来自已对账的项目共享余额"],
+      "pending": ["#169/#170 回答报告与 #173 集成；运行前复核 #190 检索版本对应关系", "客服辅助与来源真实路由、字段及冻结有答案/无答案样本绑定，不编造 API", "场景子预算只能来自已对账的项目共享余额"],
       "sourceReferences": ["frontend/src/App.tsx", "https://github.com/Stellogic/customer-agent/issues/149", "https://github.com/Stellogic/customer-agent/issues/174", "https://github.com/Stellogic/customer-agent/issues/169", "https://github.com/Stellogic/customer-agent/issues/170", "https://github.com/Stellogic/customer-agent/issues/190"]
     },
     {
