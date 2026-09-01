@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:10.561Z" hostname="buildkitsandbox" time="1.695">
+  <properties/>
+  <testcase name="rejectsCapabilityInvocationWithoutStableRequestIdentity()" classname="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" time="0.126"/>
+  <testcase name="acceptsOnlyTheExactVersionedCustomerReplyEnvelope()" classname="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" time="0.065"/>
+  <testcase name="exposesOnlyCurrentSyntheticPublicCommunicationContext()" classname="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" time="0.044"/>
+  <testcase name="invokesOnlyADeclaredCapabilityWithItsExactParameters()" classname="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" time="0.016"/>
+  <testcase name="exposesOnlyTheDeclaredTypedCatalogToTheCurrentAgentScope()" classname="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" time="0.016"/>
+  <testcase name="exposesOnlyMinimumSiblingTicketSummaryForTheCurrentGeneration()" classname="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" time="0.015"/>
+  <testcase name="v2UnsafeKnowledgeRejectionHasAStableCorrectionCode()" classname="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" time="0.015"/>
+  <testcase name="rejectsUnknownCapabilitiesAndAdditionalParameters()" classname="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" time="0.009"/>
+  <testcase name="rejectsConfidenceWithoutAReviewableEvidenceSufficiencyClaim()" classname="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" time="0.008"/>
+  <testcase name="rejectsAdditionalPublicFieldsBeforeTheyReachTheService()" classname="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" time="0.005"/>
+  <testcase name="rejectsWrongMachineGenerationAndOperationScope()" classname="com.stellogic.customeragent.investigation.AgentInvestigationCapabilityControllerTest" time="0.004"/>
+  <system-out><![CDATA[16:08:11.839 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:11.841 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:11.843 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 2 ms
+16:08:11.986 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:11.987 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:11.987 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.063 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.063 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.063 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.116 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.116 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.116 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.139 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.140 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.140 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.165 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.165 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.165 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.187 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.187 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.188 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.208 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.209 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.209 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.226 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.226 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.226 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.240 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.240 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.240 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.250 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.251 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.252 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+]]></system-out>
+  <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/home/gradle/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.18.10/9426d28828bdcdf42666bb7a68c468279ea78f59/byte-buddy-agent-1.18.10.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+</testsuite>

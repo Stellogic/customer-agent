@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:13.527Z" hostname="buildkitsandbox" time="0.031">
+  <properties/>
+  <testcase name="clarificationTextUsesControlledPendingKindInsteadOfModelProse()" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.002"/>
+  <testcase name="customerVisibleTextIsRenderedFromValidatedTypedFields()" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.003"/>
+  <testcase name="onlyExplicitNaturalLanguageOrQuickConfirmationMayAuthorizeCreation()" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.001"/>
+  <testcase name="[1] message = &quot;不要转人工，Agent 继续处理&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.001"/>
+  <testcase name="[2] message = &quot;不要人工处理，Agent 继续处理&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.0"/>
+  <testcase name="[3] message = &quot;别找人工，我自己确认&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.0"/>
+  <testcase name="[4] message = &quot;无需客服协助受理&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.001"/>
+  <testcase name="[5] message = &quot;我不想找人工处理&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.001"/>
+  <testcase name="[6] message = &quot;不要找人工帮助&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.0"/>
+  <testcase name="[7] message = &quot;不要转人工协助受理&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.001"/>
+  <testcase name="[8] message = &quot;我明确要求人工客服处理这张工单&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.001"/>
+  <testcase name="[1] message = &quot;请转人工协助受理&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.001"/>
+  <testcase name="[2] message = &quot;物流没更新，请转人工客服&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.001"/>
+  <testcase name="[3] message = &quot;我想找人工处理物流问题&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.001"/>
+  <testcase name="[4] message = &quot;还没工单，请人工帮我受理&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.001"/>
+  <testcase name="[5] message = &quot;我不需要 Agent，转人工客服&quot;" classname="com.stellogic.customeragent.ticket.CustomerIntakeSafetyPolicyTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

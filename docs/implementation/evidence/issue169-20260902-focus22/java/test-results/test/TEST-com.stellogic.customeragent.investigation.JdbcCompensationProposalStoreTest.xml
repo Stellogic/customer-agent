@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.investigation.JdbcCompensationProposalStoreTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:13.005Z" hostname="buildkitsandbox" time="0.04">
+  <properties/>
+  <testcase name="reusesTheLockProtectedExpiryTimeForTheNewRevision()" classname="com.stellogic.customeragent.investigation.JdbcCompensationProposalStoreTest" time="0.037"/>
+  <testcase name="immutableProposalDigestCoversBothDelayRepresentations()" classname="com.stellogic.customeragent.investigation.JdbcCompensationProposalStoreTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

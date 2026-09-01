@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.ticket.CustomerTicketPrincipalSecurityTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:14.427Z" hostname="buildkitsandbox" time="2.014">
+  <properties/>
+  <testcase name="anonymousAndInternalSessionsCannotUseForgedCustomerHeaders()" classname="com.stellogic.customeragent.ticket.CustomerTicketPrincipalSecurityTest" time="0.143"/>
+  <testcase name="customerWritesRequireTheCurrentSessionCsrfToken()" classname="com.stellogic.customeragent.ticket.CustomerTicketPrincipalSecurityTest" time="0.072"/>
+  <testcase name="v2UsesTheSameCustomerPrincipalAndCsrfBoundaryAsV1()" classname="com.stellogic.customeragent.ticket.CustomerTicketPrincipalSecurityTest" time="0.072"/>
+  <testcase name="forgedCustomerHeaderCannotReplaceTheAuthenticatedCustomerPrincipal()" classname="com.stellogic.customeragent.ticket.CustomerTicketPrincipalSecurityTest" time="0.066"/>
+  <testcase name="naturalLanguageIntakeUsesTheAuthenticatedCustomerAndCsrfBoundary()" classname="com.stellogic.customeragent.ticket.CustomerTicketPrincipalSecurityTest" time="0.061"/>
+  <testcase name="autoResolutionCancellationRequiresCustomerSessionAndCurrentCsrfToken()" classname="com.stellogic.customeragent.ticket.CustomerTicketPrincipalSecurityTest" time="0.124"/>
+  <system-out><![CDATA[16:08:14.596 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.stellogic.customeragent.CustomerAgentApplication for test class com.stellogic.customeragent.ticket.CustomerTicketPrincipalSecurityTest
+16:08:14.604 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.stellogic.customeragent.CustomerAgentApplication for test class com.stellogic.customeragent.ticket.CustomerTicketPrincipalSecurityTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.0)
+
+2026-09-01T16:08:14.896Z  INFO 265 --- [customer-agent-backend] [    Test worker] .c.t.CustomerTicketPrincipalSecurityTest : Starting CustomerTicketPrincipalSecurityTest using Java 25.0.2 with PID 265 (started by root in /workspace)
+2026-09-01T16:08:14.897Z  INFO 265 --- [customer-agent-backend] [    Test worker] .c.t.CustomerTicketPrincipalSecurityTest : The following 1 profile is active: "local-demo"
+2026-09-01T16:08:15.643Z  INFO 265 --- [customer-agent-backend] [    Test worker] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name localDemoHumanUsers
+2026-09-01T16:08:15.860Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:15.861Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:15.862Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-09-01T16:08:15.885Z  INFO 265 --- [customer-agent-backend] [    Test worker] .c.t.CustomerTicketPrincipalSecurityTest : Started CustomerTicketPrincipalSecurityTest in 1.244 seconds (process running for 6.797)
+2026-09-01T16:08:16.031Z  INFO 265 --- [customer-agent-backend] [    Test worker] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+2026-09-01T16:08:16.099Z  INFO 265 --- [customer-agent-backend] [    Test worker] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+2026-09-01T16:08:16.171Z  INFO 265 --- [customer-agent-backend] [    Test worker] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+2026-09-01T16:08:16.245Z  INFO 265 --- [customer-agent-backend] [    Test worker] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+2026-09-01T16:08:16.312Z  INFO 265 --- [customer-agent-backend] [    Test worker] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+2026-09-01T16:08:16.374Z  INFO 265 --- [customer-agent-backend] [    Test worker] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+2026-09-01T16:08:16.436Z  INFO 265 --- [customer-agent-backend] [    Test worker] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

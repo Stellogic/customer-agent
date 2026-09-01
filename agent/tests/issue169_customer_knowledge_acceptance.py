@@ -9,6 +9,7 @@ from pathlib import Path
 
 import httpx
 import psycopg
+
 from smoke import collect_investigation_facts, customer_reply, evidence_sufficiency
 
 ORDER = "ORDER-DELAY-UNDER-24"

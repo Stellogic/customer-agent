@@ -8,6 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 import httpx
+from issue169_customer_knowledge_acceptance import ORDER, prepare, retrieve, submit
 
 from baseline_agent.customer_communication_model import (
     CustomerCommunicationFailure,
@@ -20,7 +21,6 @@ from baseline_agent.deepseek_customer_communication_model import (
 )
 from baseline_agent.knowledge_retrieval import parse_knowledge_response
 from baseline_agent.knowledge_sufficiency_run import write_json
-from issue169_customer_knowledge_acceptance import ORDER, prepare, retrieve, submit
 
 
 class BudgetStop(Exception):
