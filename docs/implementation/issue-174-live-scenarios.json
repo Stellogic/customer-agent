@@ -1,8 +1,8 @@
 {
   "issue": 174,
   "artifactKind": "static-scenario-catalog",
-  "status": "NOT_RUN",
-  "baselineCommit": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "CODE_READY_NO_TESTS",
+  "baselineCommit": "origin/main@e34b601",
   "plan": "issue-174-live-acceptance-plan.md",
   "description": "独立合成场景候选清单；不是 runner 配置、产品协议、运行许可或运行证据。",
   "executionAuthorized": false,
@@ -13,15 +13,35 @@
     "supportAnswer": "#170：自身真实 HUMAN 辅助路径的同一回答门槛，不以客户成绩替代，不自动发送或产生副作用。",
     "release": "#174：核对上游版本化证据并承接真实浏览器发布；#173 保留确定性全栈前置。",
     "dependencyDirection": "#190 独立交付后由 #169/#170 消费；#173/#174 后续汇总，不反向阻塞上游，不增加独立充分性模型。",
-    "evidenceStatus": "NOT_VERIFIED"
+    "evidenceStatus": "RETRIEVAL_BOUND_ANSWER_PENDING",
+    "retrievalEvidence": {
+      "status": "FORMALLY_DELIVERED",
+      "sources": ["docs/eval/rag-layered-v2.md", "docs/implementation/issue-190-layered-validation.md", "PR #203 / Issue #190"],
+      "sampleCount": 64,
+      "recallAt5": 0.9444444444,
+      "mrrAt5": 0.8680555556,
+      "wrongVersionTop5Rate": 0,
+      "wrongScopeTop5Rate": 0,
+      "unauthorizedTop5Rate": 0,
+      "answerQuality": "NOT_EVALUATED"
+    },
+    "answerEvidence": {
+      "customer": "PENDING_DRAFT_PR_208",
+      "support": "PENDING_DRAFT_PR_209",
+      "deterministicFullStack": "PENDING_DRAFT_PR_210_NOT_RUN"
+    }
   },
   "sharedProjectBudget": {
     "currency": "CNY",
     "cumulativeLimit": 6,
-    "historicalSpent": null,
-    "remaining": null,
-    "ledgerReference": null,
-    "policy": "沿用项目原账本累计，含既往失败/STOPPED、重试和在途费用。协议/场景/run 换名不重置、不重复入账；此6元不是本票新增额度，剩余未核对不可付费。USD micro 须按冻结计价/换算并入同一上限。"
+    "archivedCumulativeUpperBound": 0.620805,
+    "archivedUnsettled": 0,
+    "arithmeticRemainingAtSnapshot": 5.379195,
+    "liveLedgerSpent": null,
+    "liveAvailable": null,
+    "issue174Reserved": 0,
+    "ledgerReference": "docs/implementation/issue-190-c6-beta-strict.md（归档协调元数据，不是 live 账本查询）",
+    "policy": "沿用项目原账本累计，含既往失败/STOPPED、重试和在途费用。协议/场景/run 换名不重置、不重复入账；归档快照余量不是当前可用额度，#174 未获费用授权。USD micro 须按冻结计价/换算并入同一上限。"
   },
   "currentStage": {
     "logicalCalls": 0,
@@ -154,7 +174,7 @@
       "title": "客户与客服回答、正常拒答及真实引用的分层承接",
       "status": "NOT_RUN",
       "upstreamEvidence": {
-        "retrievalReport": null,
+        "retrievalReport": "docs/implementation/issue-190-layered-validation.md",
         "customerAnswerReport": null,
         "supportAnswerReport": null,
         "frozenSampleBindings": null,
