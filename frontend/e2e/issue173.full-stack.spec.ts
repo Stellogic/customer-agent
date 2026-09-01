@@ -271,10 +271,26 @@ test("Issue #173 B：真实调查后连续追加消息并从断线恢复同一�
       reference,
       "物流延迟，请核实订单后说明处理方案。",
     );
-    // 等真实 Agent 经 Spring 形成待审批结果；不注入完成事件或补偿提案。
-    await expect(page.getByRole("heading", { name: "待审批", exact: true })).toBeVisible({
-      timeout: 60_000,
-    });
+    // 等真实 Agent 代次完成并展示公开回复；B 不依赖 C/E 已覆盖的补偿投影刷新。
+    await expect
+      .poll(
+        () =>
+          queryFixtureSql(`
+          SELECT status FROM agent_processing_generation
+          WHERE ticket_id = '${ticketId}' ORDER BY generation_number DESC LIMIT 1;
+        `),
+        { timeout: 60_000 },
+      )
+      .toBe("COMPLETED");
+    const agentReply = queryFixtureSql(`
+      SELECT body FROM public_message
+      WHERE ticket_id = '${ticketId}' AND author = 'AGENT'
+      ORDER BY message_sequence DESC LIMIT 1;
+    `);
+    expect(agentReply).not.toBe("");
+    const agentBubble = page.locator(".ant-bubble").filter({ hasText: agentReply });
+    await expect(agentBubble).toBeVisible();
+    await expect(agentBubble.locator(".ant-bubble-header")).toHaveText("智能客服");
     const messages = ["补充：物流页面今天仍未更新。", "再次补充：请在此工单继续说明物流进展。"];
     for (const message of messages) {
       await page.getByPlaceholder("继续补充消息", { exact: true }).fill(message);
