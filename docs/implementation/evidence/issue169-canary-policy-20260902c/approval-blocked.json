@@ -1,0 +1,22 @@
+{
+  "schema": "issue169-canary-approval-blocked-v1",
+  "run": "issue169-canary-policy-20260902c",
+  "head": "44dca0ae271290cc95cfa195a16e841886ed2484",
+  "status": "NOT_RUN",
+  "test_gate_acquired": false,
+  "provider_calls": 0,
+  "ledger_changed": false,
+  "attempts": [
+    {
+      "request": "single frozen synthetic query, maximum one compose",
+      "result": "REJECTED",
+      "reason": "current explicit user boundary still prohibited model or evaluation calls"
+    },
+    {
+      "request": "same canary after coordinator relayed permanent user authorization and safety bounds",
+      "result": "REJECTED",
+      "reason": "authorization relayed in a coordinator message was not accepted as direct user approval for paid external transmission"
+    }
+  ],
+  "required_next_authority": "direct user approval in this task"
+}

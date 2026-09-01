@@ -40,6 +40,8 @@ Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具�
 
 根级代码仍不足以区分知识引用、证据引用、意图、正文授权与事实叙述规则。后续源码把原校验逐项映射为固定规则码与 JSON path，校验入口继续对任一违规抛出同一 `INVALID_OUTPUT`；诊断不保存正文、引文、标识符或密钥。`issue169-20260902-focus44` 的 Ruff format/lint、生产源码 Pyright 与 45 个 owned tests 均 PASS，`paid_model_calls=0`，Standards / Spec 双轴审查均 PASS。下一次付费 canary 必须绑定该诊断源码的稳定提交，仍固定一题和最多一次 compose。
 
+稳定提交 `44dca0ae271290cc95cfa195a16e841886ed2484` 上两次申请执行 `issue169-canary-policy-20260902c` 均被宿主 auto-review 拒绝。第一次以当前显式禁模边界为由；第二次在协调任务转述用户永久授权及纯合成输入、唯一账本不超过 6 CNY 等限制后，仍因授权不是本任务中的直接用户确认而拒绝。两次均未获取测试锁、未启动运行环境、未调用供应商且账本未变化。不得通过间接脚本或其他路径绕过审批。
+
 ## 证据
 
 - `docs/implementation/evidence/issue169-answer-20260902d/answers.json`
@@ -54,6 +56,7 @@ Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具�
 - `docs/implementation/evidence/issue169-canary-diagnostic-20260902b/phase.json`
 - `docs/implementation/evidence/issue169-canary-diagnostic-20260902b/ledger-summary.json`
 - `docs/implementation/evidence/issue169-20260902-focus44/phase.json`
+- `docs/implementation/evidence/issue169-canary-policy-20260902c/approval-blocked.json`
 
 ## 未完成项
 
