@@ -2,7 +2,7 @@
 
 ## 结论
 
-`issue169-answer-20260902d` 证明连接修复有效，但冻结客户回答协议未达到质量门槛。运行在 7 条问题后停止：1 条通过产品解析与 Spring 接受，6 条在各自两次 compose 后仍为 `SCHEMA_MISMATCH`，其余 41 条未运行。冻结协议要求 48 条全部执行，因此本次不能评分为 PASS，也不能进入最终完整门禁、合入或关票。
+回答层现已完成真实隔离运行并证明全栈路径可用，但冻结客户回答协议仍未达到语义质量门槛。最终运行 `issue169-answer-grounded-final-20260902k` 在 48 条中有 42 条通过产品解析与 Spring 接受；独立逐条语义评审为 35/48，其中有答案题 28/36、无答案题正确拒答 7/12。6 条供应商格式失败，另有 7 条包含无依据状态、流程或规则推断。当前状态是运行链路可用、回答质量 FAIL，不能进入最终完整门禁、合入或关票。
 
 不能根据本次模型结果修改 prompt、选参或冻结输入。也不能把供应商返回的 schema 描述包装静默解包成产品回答；该包装不符合 `customer-reply-v2` 顶层契约，接受它会削弱现有严格校验并把评测反馈写回产品行为。
 
@@ -60,6 +60,18 @@ HEAD `3ce5182baa3ac2e5f27cd247bd9b7519dc11d756` 的 `issue169-canary-minimal-202
 
 Spring 原策略把“您的/本单/为您”附近出现退款、补偿或支付词，以及“经核验+状态词”，一律视为危险个案断言，会拒绝“关于您的退款问题，可以在当前工单补充情况”等一般指导。最小修订只保留金额、时限、ORDER ID、敏感/内部标识、注入、明确补偿/退款或支付承诺，以及以“您的/本单/订单/包裹”等主语陈述已签收、已取消等个案状态；不恢复宽泛措辞扫描。新增一般指导允许与裸“包裹已签收”拒绝测试源码，Standards / Spec 双轴审查 PASS；待真实 Spring canary 编译验收。
 
+## 最终回答运行
+
+用户明确要求以尽快跑通为优先，并将 DeepSeek 累计费用硬上限设为 5 CNY。旧预算按模型支持的 1M 理论上下文为每个实际小请求预留，导致余额充足时提前停止；提交 `2233621f9b7b6c2b5ea905cc067311a6cf772fad` 改为按 UTF-8 请求字节数和实际输出上限保守预留，可信 usage 仍按 token 结算，未知 usage 仍保留预留并停机。`issue169-20260902-focus72` 的 Ruff、Pyright 与 71 tests PASS，Standards / Spec 双轴审查 PASS。
+
+HEAD `2233621f9b7b6c2b5ea905cc067311a6cf772fad` 的 `issue169-answer-final-budget-20260902j` 完成全部 48 条：46 条通过结构、引用和 Spring 接受，2 条因供应商返回 schema 描述或非 JSON 而 `MODEL_FAILED`。逐条语义评审仅 34/48 PASS，发现正文把无补偿结论扩写为正常配送/处理中/继续跟进，以及资料不足回答猜测赔偿依据、处理顺序或服务不可用。这些会影响实际使用，因此不以结构通过冒充质量 PASS，也不通过重复运行刷掉失败。
+
+提交 `609704833960445d26a92a1aeb45cc30f4aac35c` 只收紧模型提示：禁止从 `delaySeconds` 或无补偿结论推断物流状态、处理状态、正常范围和后续动作；`INSUFFICIENT_INFORMATION` 只能说明资料缺口或提出必要问题。`issue169-20260902-focus74` 的 Ruff、Pyright 与 71 tests PASS，Standards / Spec 双轴审查 PASS。
+
+修复后的 `issue169-answer-grounded-final-20260902k` 再次完成全部 48 条。确定性 HTTP/PG 29 项、投影 SQL、隔离 Compose 启动与清理均 PASS，锁已释放并回读 `FREE`。42/48 通过结构、引用和 Spring 接受；6 条均为供应商完成响应的格式失败，没有 Spring 安全拒绝。语义评审为 35/48 PASS：有答案题 28/36，无答案题正确拒答 7/12。上一轮多数状态越界已消失，但仍有 7 条无依据状态、跟进动作、赔偿、热线或保修规则推断，说明仅靠提示不能稳定保证知识相关性与公开回答 grounding。
+
+最终运行 66 次 provider attempts，新增保守结算 534897 micro-CNY；唯一账本累计 3810222 micro-CNY（3.810222 CNY）、0 PENDING，低于 5 CNY 硬上限。继续整集重跑只会受随机格式波动影响且不能修复剩余语义问题，因此停止付费运行。后续需要在 #190 的检索相关性契约与回答层之间明确可验证的充分性接缝，或改为确定性组装工单事实正文；在接缝确定前不自造替代检索或假产品结果。
+
 ## 证据
 
 - `docs/implementation/evidence/issue169-answer-20260902d/answers.json`
@@ -90,10 +102,11 @@ Spring 原策略把“您的/本单/为您”附近出现退款、补偿或支�
 - `docs/implementation/evidence/issue169-canary-minimal-20260902f/canary.json`
 - `docs/implementation/evidence/issue169-canary-minimal-20260902f/phase.json`
 - `docs/implementation/evidence/issue169-canary-minimal-20260902f/ledger-summary.json`
+- `docs/implementation/evidence/issue169-answer-grounded-final-20260902k/summary.json`
 
 ## 未完成项
 
-- 48 条完整执行与逐条人工语义评审：`NOT_RUN`。
-- 回答层质量门槛：`FAIL`（供应商正文未满足冻结补偿措辞，整集未完成）。
+- 48 条完整执行与逐条人工语义评审：`RUN`，最终 35/48 PASS。
+- 回答层质量门槛：`FAIL`（6 条供应商格式失败，7 条公开回答语义越界）。
 - 最终 `pwsh ./scripts/check.ps1 -Issue 169`：`NOT_RUN`。
 - 推送、PR Ready、合入、关票、`origin/main` 回读：`NOT_RUN`。
