@@ -9,7 +9,7 @@ $containerOutput = "/tmp/knowledge-$RunId.json"
 $root = Split-Path -Parent $PSScriptRoot
 $headSha = git -C $root rev-parse HEAD
 $baseSha = git -C $root rev-parse origin/main
-$dirtyArgs = if (git -C $root status --porcelain) { @('--working-tree-dirty') } else { @() }
+[string[]] $dirtyArgs = if (git -C $root status --porcelain) { '--working-tree-dirty' } else { @() }
 $nativePreference = $PSNativeCommandUseErrorActionPreference
 $PSNativeCommandUseErrorActionPreference = $false
 try {

@@ -13,7 +13,7 @@ try {
     $env:KNOWLEDGE_MODEL_PATH = (Resolve-Path -LiteralPath $ModelDirectory).Path
     $headSha = git -C $root rev-parse HEAD
     $baseSha = git -C $root rev-parse origin/main
-    $dirtyArgs = if (git -C $root status --porcelain) { @('--working-tree-dirty') } else { @() }
+    [string[]] $dirtyArgs = if (git -C $root status --porcelain) { '--working-tree-dirty' } else { @() }
     $output = Join-Path $root ".local/gate-evidence/$RunId/knowledge-calibration-v1.json"
     Push-Location (Join-Path $root 'agent')
     try {
