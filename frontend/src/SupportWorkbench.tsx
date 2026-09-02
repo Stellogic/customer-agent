@@ -787,6 +787,8 @@ function TicketDetail({
   const replyBusy = replyState === "sending" || replyState === "querying";
   const [reviewedAssistance, setReviewedAssistance] = useState<string | null>(null);
   const assistanceDraft = useRef<string | null>(null);
+  const visibleDraft =
+    !assistanceAvailable && assistanceDraft.current === draft ? "" : draft;
   const clearReviewedAssistance = useCallback(() => {
     setReviewedAssistance(null);
     const handedOffDraft = assistanceDraft.current;
@@ -807,7 +809,7 @@ function TicketDetail({
   }
 
   async function submitReply() {
-    const body = draft.trim();
+    const body = visibleDraft.trim();
     if (!body || replyState === "sending" || replyState === "querying") return;
     const idempotencyKey = createIdempotencyKey();
     setReviewedAssistance(null);
@@ -961,7 +963,7 @@ function TicketDetail({
           </div>
           <textarea
             aria-label="公开回复"
-            value={draft}
+            value={visibleDraft}
             maxLength={2000}
             onChange={(event) => {
               assistanceDraft.current = null;
@@ -991,11 +993,11 @@ function TicketDetail({
             </div>
           )}
           <div className="support-reply-actions">
-            <small>{draft.trim().length}/2000</small>
+            <small>{visibleDraft.trim().length}/2000</small>
             <button
               type="button"
               onClick={() => void submitReply()}
-              disabled={!draft.trim() || replyBusy || replyState === "unknown"}
+              disabled={!visibleDraft.trim() || replyBusy || replyState === "unknown"}
             >
               {replyState === "sending" ? "正在发送…" : "发送公开回复"}
             </button>
