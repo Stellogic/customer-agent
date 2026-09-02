@@ -168,7 +168,8 @@ final class KnowledgeMarkdownParser {
         List<String> values = new ArrayList<>();
         for (String item : content.split(",", -1)) {
             String scope = unquote(item.trim()).toUpperCase(Locale.ROOT);
-            if (!Set.of("CUSTOMER", "INTERNAL", "SUPPORT", "APPROVER").contains(scope)) {
+            if (!Set.of("CUSTOMER", "CUSTOMER_PUBLIC", "INTERNAL", "SUPPORT", "APPROVER")
+                    .contains(scope)) {
                 throw invalid(sourceFile, 1, "不支持的适用范围: " + scope);
             }
             if (values.contains(scope)) {

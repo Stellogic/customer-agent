@@ -1,0 +1,47 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-scope-runtime-20260901b",
+  "head_sha": "eae2cc9772c1581b7f730c157343ef8b7828f905",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Text workspace/user-home/machine prefixes only; original files retained locally. Browser synthetic screenshots are unchanged.",
+  "lock_release_observation": "Own lock released, one FREE read; coordinator notified. See phase cleanup_error separately.",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "compose.log",
+      "source_sha256": "a35cd733d7408d666eb7e019dbfaaa2522ed304409decca381cf9078aed44319",
+      "archived_sha256": "a35cd733d7408d666eb7e019dbfaaa2522ed304409decca381cf9078aed44319"
+    },
+    {
+      "file": "console.log",
+      "source_sha256": "4211d02faf32480cda4526605dbe524e18cbb1e7686afbdf8df0ac3a8ad81462",
+      "archived_sha256": "4211d02faf32480cda4526605dbe524e18cbb1e7686afbdf8df0ac3a8ad81462"
+    },
+    {
+      "file": "phase.json",
+      "source_sha256": "29014a93614bd1cf38f720a1673c512f0008b0bf135ab5ca7c87d8a3baf501e5",
+      "archived_sha256": "29014a93614bd1cf38f720a1673c512f0008b0bf135ab5ca7c87d8a3baf501e5"
+    },
+    {
+      "file": "runtime.log",
+      "source_sha256": "73bede07832a52a65a63e94bc37c331d31e6d7310228fdacdd2dc12be307acbb",
+      "archived_sha256": "7adbd7b0bea87c1297b1b3f733f85a7419c8f3a2a62a9690fc367b44aec6ed5f"
+    },
+    {
+      "file": "browser/.last-run.json",
+      "source_sha256": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903",
+      "archived_sha256": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903"
+    },
+    {
+      "file": "browser/issue190.hybrid-retrieval-Issue-190-真实混合检索与失效状态-1440/hybrid-1440.png",
+      "source_sha256": "b858fd748878fc974fbe79bf77553587c697eeff5a6ec6902189412b9d233bc6",
+      "archived_sha256": "b858fd748878fc974fbe79bf77553587c697eeff5a6ec6902189412b9d233bc6"
+    },
+    {
+      "file": "browser/issue190.hybrid-retrieval-Issue-190-真实混合检索与失效状态-390/hybrid-390.png",
+      "source_sha256": "5642f3ee879c8a1812330f619f68beae7bc28b04854e2de2d21ac8a2a686fae8",
+      "archived_sha256": "5642f3ee879c8a1812330f619f68beae7bc28b04854e2de2d21ac8a2a686fae8"
+    }
+  ]
+}

@@ -4,7 +4,15 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
+from baseline_agent.customer_knowledge_answer import (
+    CustomerKnowledgeAnswer,
+    parse_customer_knowledge_answer,
+    validate_customer_knowledge_citations,
+)
+from baseline_agent.knowledge_retrieval import KnowledgeRetrievalResult
+
 CUSTOMER_REPLY_SCHEMA_VERSION = "customer-reply-v1"
+CUSTOMER_KNOWLEDGE_REPLY_SCHEMA_VERSION = "customer-reply-v2"
 
 
 class CustomerReplyIntent(StrEnum):
@@ -42,6 +50,7 @@ class CustomerCommunicationInput:
     public_conversation: tuple[CustomerConversationMessage, ...] = ()
     risk_scenario: str | None = None
     logistics_status: str | None = None
+    knowledge: KnowledgeRetrievalResult | None = None
 
 
 @dataclass(frozen=True)
@@ -52,6 +61,7 @@ class CustomerReplyEnvelope:
     evidence_refs: tuple[str, ...]
     escalation_required: bool
     referenced_order: str
+    knowledge: CustomerKnowledgeAnswer | None = None
 
     def as_request_value(self) -> dict[str, object]:
         return {
@@ -61,6 +71,11 @@ class CustomerReplyEnvelope:
             "evidenceRefs": list(self.evidence_refs),
             "escalationRequired": self.escalation_required,
             "referencedOrder": self.referenced_order,
+            **(
+                {"knowledge": self.knowledge.as_request_value()}
+                if self.knowledge is not None
+                else {}
+            ),
         }
 
 
@@ -190,7 +205,7 @@ def validate_customer_communication_input(model_input: CustomerCommunicationInpu
         isinstance(message, CustomerConversationMessage)
         and message.author in {"CUSTOMER", "SUPPORT", "AGENT"}
         and bool(message.body.strip())
-        and len(message.body) <= 2_000
+        and len(message.body) <= (3_000 if message.author == "AGENT" else 2_000)
         for message in model_input.public_conversation
     )
     if (
@@ -221,42 +236,68 @@ _SENSITIVE_LEAK_PATTERN = re.compile(
 )
 _PERSON_NAME_CLAIM_PATTERN = re.compile(r"(?:由|被)\s*[\u4e00-\u9fff]{2,4}\s*签收")
 _PREMATURE_TICKET_STATUS_PATTERN = re.compile(
-    r"(?:工单|问题)(?:已经|已)(?:自动)?(?:解决|关闭|结案)|已自动(?:解决|关闭|结案)|关闭等待期"
+    r"工单(?:已经|已)(?:自动)?(?:解决|关闭|结案)|已自动(?:解决|关闭|结案)|关闭等待期"
     r"|(?:五|5)\s*分钟(?:后|内).{0,8}(?:解决|关闭|结案)"
+)
+_DIRECT_COMPENSATION_PROMISE_PATTERN = re.compile(
+    r"(?<!不)(?:已|已经|将|会|承诺|同意)(?:为您)?(?:办理|执行|发放)?(?:补偿|退款)"
+    r"|可以获得(?:补偿|退款)|(?:补偿|退款)(?:已完成|将执行|已发放)"
 )
 
 
 def is_authorized_body_prefix(body: str, order_reference: str, *, complete: bool) -> bool:
+    return customer_reply_body_policy_violation(body, order_reference, complete=complete) is None
+
+
+def customer_reply_body_policy_violation(
+    body: str, order_reference: str, *, complete: bool
+) -> str | None:
+    """Return a fixed body-policy code without exposing the rejected body."""
     if not body or not order_reference or len(body) > 1_000:
-        return False
+        return "REQUIRED_OR_LENGTH"
     if _MONEY_PATTERN.search(body) is not None:
-        return False
+        return "MONEY"
     if _RESPONSE_TIME_PROMISE_PATTERN.search(body) is not None:
-        return False
+        return "RESPONSE_TIME_PROMISE"
     if _SENSITIVE_LEAK_PATTERN.search(body) is not None:
-        return False
+        return "SENSITIVE_LEAK"
     if _PERSON_NAME_CLAIM_PATTERN.search(body) is not None:
-        return False
+        return "PERSON_NAME_CLAIM"
     if _PREMATURE_TICKET_STATUS_PATTERN.search(body) is not None:
-        return False
-    saw_scoped_order = False
+        return "PREMATURE_TICKET_STATUS"
     for match in _ORDER_REFERENCE_PATTERN.finditer(body):
         if match.group(0).upper() != order_reference.upper():
-            return False
-        saw_scoped_order = True
-    if complete:
-        if not saw_scoped_order and order_reference not in body:
-            return False
-        if not _has_only_allowed_compensation_language(
-            body, _infer_intent_from_compensation_language(body)
-        ):
-            return False
-    return True
+            return "ORDER_REFERENCE_SCOPE"
+    if complete and not _has_only_allowed_compensation_language(
+        body, _infer_intent_from_compensation_language(body)
+    ):
+        return "COMPENSATION_LANGUAGE"
+    return None
 
 
 def validate_customer_reply_envelope(
     model_input: CustomerCommunicationInput, envelope: CustomerReplyEnvelope
 ) -> None:
+    if customer_reply_policy_violation(model_input, envelope) is not None:
+        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+
+
+def customer_reply_policy_violation(
+    model_input: CustomerCommunicationInput, envelope: CustomerReplyEnvelope
+) -> tuple[str, str] | None:
+    """Return a bounded policy code and JSON path without exposing reply values."""
+    expected_schema = (
+        CUSTOMER_KNOWLEDGE_REPLY_SCHEMA_VERSION
+        if model_input.knowledge is not None
+        else CUSTOMER_REPLY_SCHEMA_VERSION
+    )
+    if (model_input.knowledge is None) != (envelope.knowledge is None):
+        return ("KNOWLEDGE_PRESENCE", "$.knowledge")
+    if model_input.knowledge is not None and envelope.knowledge is not None:
+        try:
+            validate_customer_knowledge_citations(envelope.knowledge, model_input.knowledge)
+        except ValueError:
+            return ("KNOWLEDGE_CITATIONS", "$.knowledge.citations")
     if envelope.intent is CustomerReplyIntent.HUMAN_HANDOFF:
         valid_intent = customer_requested_human(model_input)
         expected_evidence = model_input.evidence_refs
@@ -276,17 +317,22 @@ def validate_customer_reply_envelope(
         valid_intent = envelope.intent is expected_intent
         expected_evidence = model_input.evidence_refs
         expected_escalation = False
-    if (
-        not isinstance(envelope, CustomerReplyEnvelope)
-        or envelope.schema_version != CUSTOMER_REPLY_SCHEMA_VERSION
-        or not envelope.body
-        or len(envelope.body) > 1_000
-        or not valid_intent
-        or envelope.evidence_refs != expected_evidence
-        or envelope.escalation_required is not expected_escalation
-        or envelope.referenced_order != model_input.order_reference
-    ):
-        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+    if not isinstance(envelope, CustomerReplyEnvelope):
+        return ("ENVELOPE_TYPE", "$")
+    if envelope.schema_version != expected_schema:
+        return ("SCHEMA_VERSION", "$.schemaVersion")
+    if not envelope.body:
+        return ("BODY_REQUIRED", "$.body")
+    if len(envelope.body) > 1_000:
+        return ("BODY_LENGTH", "$.body")
+    if not valid_intent:
+        return ("INTENT", "$.intent")
+    if envelope.evidence_refs != expected_evidence:
+        return ("EVIDENCE_REFS", "$.evidenceRefs")
+    if envelope.escalation_required is not expected_escalation:
+        return ("ESCALATION", "$.escalationRequired")
+    if envelope.referenced_order != model_input.order_reference:
+        return ("REFERENCED_ORDER", "$.referencedOrder")
     if envelope.intent in {
         CustomerReplyIntent.CLARIFICATION_REQUIRED,
         CustomerReplyIntent.HUMAN_HANDOFF,
@@ -299,12 +345,16 @@ def validate_customer_reply_envelope(
             )
             is None
         ):
-            raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
-        return
-    if not is_authorized_body_prefix(envelope.body, model_input.order_reference, complete=True):
-        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+            return ("BODY_TEMPLATE", "$.body")
+        return None
+    body_violation = customer_reply_body_policy_violation(
+        envelope.body, model_input.order_reference, complete=True
+    )
+    if body_violation is not None:
+        return (f"BODY_{body_violation}", "$.body")
     if not _has_grounded_investigation_narrative(model_input, envelope.body):
-        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+        return ("GROUNDED_NARRATIVE", "$.body")
+    return None
 
 
 def _infer_intent_from_compensation_language(body: str) -> CustomerReplyIntent:
@@ -323,47 +373,17 @@ def _has_only_allowed_compensation_language(body: str, intent: CustomerReplyInte
         remaining = remaining.replace(pending, "").replace(no_execution, "")
         return "补偿" not in remaining and "退款" not in remaining
     if intent is CustomerReplyIntent.NO_COMPENSATION_RESOLUTION:
-        ineligible = "当前不符合补偿条件"
-        if ineligible not in remaining:
-            return False
-        remaining = remaining.replace(ineligible, "")
-        # Refund-status explanations may mention 退款 as a fact; ban only action/promise forms.
-        return (
-            "补偿" not in remaining
-            and "将退款" not in remaining
-            and "已退款" not in remaining
-            and "办理退款" not in remaining
-            and "可以获得退款" not in remaining
-        )
+        # Intent and Spring facts carry the decision. Keep natural denial wording while
+        # rejecting concrete compensation/refund actions and positive promises.
+        return _DIRECT_COMPENSATION_PROMISE_PATTERN.search(remaining) is None
     return False
 
 
 def _has_grounded_investigation_narrative(
     model_input: CustomerCommunicationInput, body: str
 ) -> bool:
-    if model_input.order_reference not in body:
-        return False
     if _PERSON_NAME_CLAIM_PATTERN.search(body) is not None:
         return False
-    scenario = model_input.risk_scenario or "LOGISTICS_DELAY"
-    claim_rules = {
-        "签收": {"PACKAGE_SIGNED_NOT_RECEIVED"},
-        "未收到": {"PACKAGE_SIGNED_NOT_RECEIVED"},
-        "丢件": {"PACKAGE_SUSPECTED_LOST"},
-        "丢失": {"PACKAGE_SUSPECTED_LOST"},
-        "停滞": {"LOGISTICS_STALLED"},
-        "重复扣款": {"DUPLICATE_CHARGE"},
-        "疑似丢件": {"PACKAGE_SUSPECTED_LOST"},
-    }
-    for token, allowed_scenarios in claim_rules.items():
-        if token in body and scenario not in allowed_scenarios:
-            if (
-                token == "退款"
-                and "审批完成前不会执行补偿或退款" in body
-                and body.count("退款") == 1
-            ):
-                continue
-            return False
     if model_input.delay_seconds is not None:
         claimed_hours = [int(match.group(1)) for match in re.finditer(r"(\d+)\s*小时", body)]
         authority_hours = model_input.delay_seconds // 3600
@@ -393,6 +413,21 @@ def customer_communication_provider_request(
             "compensationReviewRequired": model_input.compensation_review_required,
             "evidenceRefs": list(model_input.evidence_refs),
         },
+        **(
+            {
+                "untrustedKnowledge": [
+                    {
+                        "articleId": source.article_id,
+                        "version": source.version,
+                        "chunkId": source.chunk_id,
+                        "snippet": source.snippet,
+                    }
+                    for source in model_input.knowledge.sources
+                ],
+            }
+            if model_input.knowledge is not None
+            else {}
+        ),
     }
 
 
@@ -409,14 +444,26 @@ def customer_requested_human(model_input: CustomerCommunicationInput) -> bool:
 
 
 def parse_customer_reply_envelope(raw: Mapping[str, object]) -> CustomerReplyEnvelope:
-    if not isinstance(raw, Mapping) or set(raw) != {
+    if not isinstance(raw, Mapping):
+        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+    expected = {
         "schemaVersion",
         "body",
         "intent",
         "evidenceRefs",
         "escalationRequired",
         "referencedOrder",
-    }:
+    }
+    knowledge = None
+    if raw.get("schemaVersion") == CUSTOMER_KNOWLEDGE_REPLY_SCHEMA_VERSION:
+        expected.add("knowledge")
+        try:
+            knowledge = parse_customer_knowledge_answer(raw.get("knowledge"))
+        except (ValueError, TypeError):
+            raise CustomerCommunicationFailure(
+                CustomerCommunicationFailureCode.INVALID_OUTPUT
+            ) from None
+    if set(raw) != expected:
         raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
     evidence = raw["evidenceRefs"]
     if (
@@ -442,6 +489,7 @@ def parse_customer_reply_envelope(raw: Mapping[str, object]) -> CustomerReplyEnv
         evidence_refs=tuple(evidence),
         escalation_required=raw["escalationRequired"],
         referenced_order=raw["referencedOrder"],
+        knowledge=knowledge,
     )
 
 

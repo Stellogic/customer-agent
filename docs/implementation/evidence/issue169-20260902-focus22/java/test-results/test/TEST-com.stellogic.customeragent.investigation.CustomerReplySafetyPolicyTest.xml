@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.investigation.CustomerReplySafetyPolicyTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:12.756Z" hostname="buildkitsandbox" time="0.011">
+  <properties/>
+  <testcase name="rejectsFabricatedEvidenceAndOrdersOutsideTheTicketScope()" classname="com.stellogic.customeragent.investigation.CustomerReplySafetyPolicyTest" time="0.003"/>
+  <testcase name="rejectsAmountsAndPositiveCompensationOrRefundPromises()" classname="com.stellogic.customeragent.investigation.CustomerReplySafetyPolicyTest" time="0.001"/>
+  <testcase name="rejectsWrongSchemaIntentAndEscalationInsteadOfPublishingThem()" classname="com.stellogic.customeragent.investigation.CustomerReplySafetyPolicyTest" time="0.001"/>
+  <testcase name="acceptsGroundedNaturalLanguageRepliesBeyondFixedTemplates()" classname="com.stellogic.customeragent.investigation.CustomerReplySafetyPolicyTest" time="0.003"/>
+  <testcase name="neitherStreamingNorCompleteRepliesCanDeclareResolutionBeforeSpringDecides()" classname="com.stellogic.customeragent.investigation.CustomerReplySafetyPolicyTest" time="0.001"/>
+  <testcase name="authorizesSafeNaturalLanguagePrefixesWithoutFixedTemplateWhitelist()" classname="com.stellogic.customeragent.investigation.CustomerReplySafetyPolicyTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,8 +1,11 @@
 package com.stellogic.customeragent.investigation;
 
 import com.stellogic.customeragent.compensation.DelayCompensationPolicy;
+import com.stellogic.customeragent.knowledge.AgentKnowledgeResult;
+import com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
+import com.stellogic.customeragent.ticket.CustomerKnowledgeProjection;
 import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -30,6 +33,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private final TicketAuthorityLock authorityLock;
     private final CustomerPublicProjectionAppender publicProjection;
     private final ObjectMapper json;
+    private final AgentKnowledgeRetrievalAdapter knowledge;
     private final DelayCompensationPolicy policy = new DelayCompensationPolicy();
 
     @Autowired
@@ -40,7 +44,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             JdbcCompensationProposalStore proposalStore,
             TicketAuthorityLock authorityLock,
             CustomerPublicProjectionAppender publicProjection,
-            ObjectMapper json) {
+            ObjectMapper json,
+            AgentKnowledgeRetrievalAdapter knowledge) {
         this.jdbc = jdbc;
         this.accessAudit = accessAudit;
         this.clock = clock;
@@ -48,6 +53,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         this.authorityLock = authorityLock;
         this.publicProjection = publicProjection;
         this.json = json;
+        this.knowledge = knowledge;
     }
 
     @Override
@@ -60,6 +66,71 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 java.util.Arrays.stream(InvestigationCapability.values())
                         .map(InvestigationCapability::definition)
                         .toList());
+    }
+
+    @Override
+    @Transactional
+    public AgentKnowledgeResult authorizeKnowledgeSearch(
+            UUID ticketId, UUID generationId, String requestId, String query) {
+        authorityLock.acquire(ticketId);
+        requireActiveGeneration(ticketId, generationId);
+        return knowledgeReceipt(generationId, requestId, query);
+    }
+
+    @Override
+    @Transactional
+    public AgentKnowledgeResult acceptKnowledgeSearch(
+            UUID ticketId,
+            UUID generationId,
+            String requestId,
+            String query,
+            AgentKnowledgeResult result) {
+        authorityLock.acquire(ticketId);
+        requireActiveGeneration(ticketId, generationId);
+        AgentKnowledgeResult previous = knowledgeReceipt(generationId, requestId, query);
+        if (previous != null) {
+            if (!previous.equals(result)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "knowledge receipt changed during concurrent request");
+            }
+            return previous;
+        }
+        jdbc.update(
+                "insert into agent_command_request"
+                        + " (generation_id,request_id,operation,parameter_digest,response_payload,created_at)"
+                        + " values (?,?,'SEARCH_KNOWLEDGE',?,?::jsonb,?)",
+                generationId,
+                requestId,
+                knowledgeQueryDigest(query),
+                json.writeValueAsString(result),
+                Timestamp.from(clock.instant()));
+        return result;
+    }
+
+    private AgentKnowledgeResult knowledgeReceipt(
+            UUID generationId, String requestId, String query) {
+        return jdbc
+                .query(
+                        "select operation,parameter_digest,response_payload::text from"
+                                + " agent_command_request where generation_id=? and request_id=?",
+                        (rs, row) -> {
+                            if (!"SEARCH_KNOWLEDGE".equals(rs.getString(1))
+                                    || !knowledgeQueryDigest(query).equals(rs.getString(2))) {
+                                throw new ResponseStatusException(
+                                        HttpStatus.CONFLICT, "knowledge request identity reused");
+                            }
+                            return json.readValue(rs.getString(3), AgentKnowledgeResult.class);
+                        },
+                        generationId,
+                        requestId)
+                .stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static String knowledgeQueryDigest(String query) {
+        // 复用现有请求表必需的参数摘要，不另建知识请求身份机制。
+        return StableParameterDigest.sha256("SEARCH_KNOWLEDGE", query, "CUSTOMER_PUBLIC");
     }
 
     @Override
@@ -92,23 +163,24 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         String orderReference = requireActiveGeneration(ticketId, generationId);
         List<SiblingTicketSummaryItem> siblings =
                 jdbc.query(
-                        "select sibling.issue_kind, sibling.lifecycle_state, "
-                                + "case when exists (select 1 from customer_clarification_request c "
-                                + "where c.ticket_id = sibling.id and c.status = 'OPEN') then 'CUSTOMER_CLARIFICATION' "
-                                + "when sibling.lifecycle_state = 'WAITING_FOR_EXTERNAL' then 'WAITING_FOR_EXTERNAL' else 'NONE' end, "
-                                + "exists (select 1 from compensation_proposal_revision p where p.ticket_id = sibling.id) "
-                                + "from support_ticket current_ticket join support_ticket sibling "
-                                + "on sibling.customer_id = current_ticket.customer_id "
-                                + "and sibling.order_reference = current_ticket.order_reference "
-                                + "where current_ticket.id = ? and current_ticket.order_reference = ? "
-                                + "and (exists (select 1 from synthetic_order owned_order "
-                                + "where owned_order.customer_id = current_ticket.customer_id "
-                                + "and owned_order.order_reference = current_ticket.order_reference) "
-                                + "or (select count(distinct alias.order_reference) from synthetic_order_alias alias "
-                                + "where alias.customer_id = current_ticket.customer_id "
-                                + "and alias.alias = current_ticket.order_reference) = 1) "
-                                + "and sibling.id <> current_ticket.id "
-                                + "order by sibling.created_at, sibling.id limit 20",
+                        "select sibling.issue_kind, sibling.lifecycle_state, case when exists"
+                                + " (select 1 from customer_clarification_request c where c.ticket_id ="
+                                + " sibling.id and c.status = 'OPEN') then 'CUSTOMER_CLARIFICATION'"
+                                + " when sibling.lifecycle_state = 'WAITING_FOR_EXTERNAL' then"
+                                + " 'WAITING_FOR_EXTERNAL' else 'NONE' end, exists (select 1 from"
+                                + " compensation_proposal_revision p where p.ticket_id = sibling.id)"
+                                + " from support_ticket current_ticket join support_ticket sibling on"
+                                + " sibling.customer_id = current_ticket.customer_id and"
+                                + " sibling.order_reference = current_ticket.order_reference where"
+                                + " current_ticket.id = ? and current_ticket.order_reference = ? and"
+                                + " (exists (select 1 from synthetic_order owned_order where"
+                                + " owned_order.customer_id = current_ticket.customer_id and"
+                                + " owned_order.order_reference = current_ticket.order_reference) or"
+                                + " (select count(distinct alias.order_reference) from"
+                                + " synthetic_order_alias alias where alias.customer_id ="
+                                + " current_ticket.customer_id and alias.alias ="
+                                + " current_ticket.order_reference) = 1) and sibling.id <>"
+                                + " current_ticket.id order by sibling.created_at, sibling.id limit 20",
                         (rs, row) ->
                                 new SiblingTicketSummaryItem(
                                         rs.getString(1),
@@ -136,7 +208,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 generationId + "\n" + requestId);
         boolean duplicate =
                 !jdbc.query(
-                                "select 1 from agent_command_request where generation_id = ? and request_id = ?",
+                                "select 1 from agent_command_request where generation_id = ? and"
+                                        + " request_id = ?",
                                 (rs, row) -> rs.getInt(1),
                                 generationId,
                                 requestId)
@@ -171,7 +244,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         case CONFIRM_ORDER -> throw new IllegalStateException("handled above");
                     };
             jdbc.update(
-                    "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, ?, 'agent-machine', ?)",
+                    "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values"
+                            + " (?, ?, 'agent-machine', ?)",
                     ticketId,
                     "AGENT_CAPABILITY_USED_" + capability.name(),
                     Timestamp.from(now));
@@ -184,8 +258,9 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                                 ? ""
                                 : parameters.orderReference());
         jdbc.update(
-                "insert into agent_command_request (generation_id, request_id, operation, parameter_digest, response_payload, created_at) "
-                        + "values (?, ?, 'USE_INVESTIGATION_CAPABILITY', ?, jsonb_build_object('capability', ?), ?)",
+                "insert into agent_command_request (generation_id, request_id, operation,"
+                        + " parameter_digest, response_payload, created_at) values (?, ?,"
+                        + " 'USE_INVESTIGATION_CAPABILITY', ?, jsonb_build_object('capability', ?), ?)",
                 generationId,
                 requestId,
                 parameterDigest,
@@ -198,10 +273,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             UUID ticketId, UUID generationId, String scopedOrderReference) {
         List<String> ambiguous =
                 jdbc.query(
-                        "select t.order_reference from support_ticket t where t.id = ? "
-                                + "and t.order_reference = ? and (select count(*) from synthetic_order_alias a "
-                                + "where a.alias = t.order_reference and a.customer_id = t.customer_id) > 1 "
-                                + "for update of t",
+                        "select t.order_reference from support_ticket t where t.id = ? and"
+                                + " t.order_reference = ? and (select count(*) from"
+                                + " synthetic_order_alias a where a.alias = t.order_reference and"
+                                + " a.customer_id = t.customer_id) > 1 for update of t",
                         (rs, row) -> rs.getString(1),
                         ticketId,
                         scopedOrderReference);
@@ -227,7 +302,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 "order:" + order.orderReference(),
                 now);
         jdbc.update(
-                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, 'AGENT_CAPABILITY_USED_CONFIRM_ORDER', 'agent-machine', ?)",
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?,"
+                        + " 'AGENT_CAPABILITY_USED_CONFIRM_ORDER', 'agent-machine', ?)",
                 ticketId,
                 Timestamp.from(now));
         return new OrderConfirmationResult(
@@ -359,11 +435,12 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 generationId + "\n" + requestId);
         List<CommandRecord> existing =
                 jdbc.query(
-                        "select r.parameter_digest, g.ticket_id, r.response_payload ->> 'lifecycleState', "
-                                + "r.response_payload ->> 'proposalRevisionId', r.response_payload ->> 'proposalRevision', "
-                                + "r.response_payload ->> 'proposalStatus' from agent_command_request r "
-                                + "join agent_processing_generation g on g.id = r.generation_id "
-                                + "where r.generation_id = ? and r.request_id = ?",
+                        "select r.parameter_digest, g.ticket_id, r.response_payload ->>"
+                                + " 'lifecycleState', r.response_payload ->> 'proposalRevisionId',"
+                                + " r.response_payload ->> 'proposalRevision', r.response_payload ->>"
+                                + " 'proposalStatus' from agent_command_request r join"
+                                + " agent_processing_generation g on g.id = r.generation_id where"
+                                + " r.generation_id = ? and r.request_id = ?",
                         (rs, row) ->
                                 new CommandRecord(
                                         rs.getString(1),
@@ -411,17 +488,36 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         && conclusion.evidenceRefs().equals(expectedEvidence);
         if (!factsMatch) reject(ticketId, "DETERMINISTIC_REVIEW_FAILED");
         validateCustomerReply(ticketId, conclusion, order);
+        CustomerKnowledgeProjection knowledgeProjection =
+                validateKnowledgeReply(generationId, conclusion.customerReply());
 
         if (!conclusion.compensationRequired()) {
             if (requiresHumanAfterGroundedReply(conclusion.reasonCode())) {
                 return acceptGroundedReplyThenHandoff(
-                        ticketId, generationId, requestId, parameterDigest, conclusion);
+                        ticketId,
+                        generationId,
+                        requestId,
+                        parameterDigest,
+                        conclusion,
+                        knowledgeProjection);
             }
             return acceptNoCompensation(
-                    ticketId, generationId, requestId, parameterDigest, conclusion, order);
+                    ticketId,
+                    generationId,
+                    requestId,
+                    parameterDigest,
+                    conclusion,
+                    order,
+                    knowledgeProjection);
         }
         return acceptCompensationProposal(
-                ticketId, generationId, requestId, parameterDigest, conclusion, order);
+                ticketId,
+                generationId,
+                requestId,
+                parameterDigest,
+                conclusion,
+                order,
+                knowledgeProjection);
     }
 
     private static boolean requiresHumanAfterGroundedReply(DecisionReasonCode reasonCode) {
@@ -438,18 +534,18 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             UUID generationId,
             String requestId,
             String parameterDigest,
-            InvestigationConclusion conclusion) {
+            InvestigationConclusion conclusion,
+            CustomerKnowledgeProjection knowledgeProjection) {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publicProjection.completeAgentReplyStream(
-                ticketId, generationId, conclusion.customerReply().body(), now);
-        publicProjection.appendAgentMessage(
-                ticketId, generationId, conclusion.customerReply().body(), now, false);
+        publishCustomerReply(
+                ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
         int updated =
                 jdbc.update(
-                        "update support_ticket set handling_mode = 'HUMAN', human_handoff_reason_code = ? "
-                                + "where id = ? and handling_mode = 'AGENT' and lifecycle_state = 'INVESTIGATING'",
+                        "update support_ticket set handling_mode = 'HUMAN',"
+                                + " human_handoff_reason_code = ? where id = ? and handling_mode ="
+                                + " 'AGENT' and lifecycle_state = 'INVESTIGATING'",
                         conclusion.reasonCode().name(),
                         ticketId);
         if (updated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
@@ -464,9 +560,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 ticketId,
                 databaseTime);
         jdbc.update(
-                "insert into agent_command_request (generation_id, request_id, operation, parameter_digest, response_payload, created_at) "
-                        + "values (?, ?, 'SUBMIT_INVESTIGATION_CONCLUSION', ?, "
-                        + "jsonb_build_object('accepted', true, 'lifecycleState', 'INVESTIGATING'), ?)",
+                "insert into agent_command_request (generation_id, request_id, operation,"
+                        + " parameter_digest, response_payload, created_at) values (?, ?,"
+                        + " 'SUBMIT_INVESTIGATION_CONCLUSION', ?, jsonb_build_object('accepted', true,"
+                        + " 'lifecycleState', 'INVESTIGATING'), ?)",
                 generationId,
                 requestId,
                 parameterDigest,
@@ -480,31 +577,59 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             String requestId,
             String parameterDigest,
             InvestigationConclusion conclusion,
-            ScopedOrder order) {
+            ScopedOrder order,
+            CustomerKnowledgeProjection knowledgeProjection) {
         Instant now = clock.instant();
         String scenario = autoResolutionScenario(ticketId, conclusion, order);
         if (scenario == null) {
             return acceptGroundedReplyThenHandoff(
-                    ticketId, generationId, requestId, parameterDigest, conclusion);
+                    ticketId,
+                    generationId,
+                    requestId,
+                    parameterDigest,
+                    conclusion,
+                    knowledgeProjection);
         }
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publicProjection.completeAgentReplyStream(
-                ticketId, generationId, conclusion.customerReply().body(), now);
-        publicProjection.appendAgentMessage(
-                ticketId, generationId, conclusion.customerReply().body(), now, false);
+        publishCustomerReply(
+                ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
+        if ("KNOWLEDGE_CONVERSATION".equals(scenario)
+                || (conclusion.customerReply().knowledge() != null
+                        && conclusion.customerReply().knowledge().status()
+                                != CustomerKnowledgeStatus.SUPPORTED)) {
+            jdbc.update(
+                    "insert into audit_event (ticket_id,event_type,actor_id,occurred_at) "
+                            + "values (?,'AGENT_CONCLUSION_ACCEPTED','agent-machine',?)",
+                    ticketId,
+                    databaseTime);
+            jdbc.update(
+                    "insert into agent_command_request"
+                            + " (generation_id,request_id,operation,parameter_digest,response_payload,created_at)"
+                            + " values (?,?,'SUBMIT_INVESTIGATION_CONCLUSION',?, "
+                            + "jsonb_build_object('accepted',true,'lifecycleState','INVESTIGATING'),?)",
+                    generationId,
+                    requestId,
+                    parameterDigest,
+                    databaseTime);
+            return new ConclusionAcceptance(
+                    true, TicketLifecycleState.INVESTIGATING, null, null, null);
+        }
         Instant candidateCreatedAt = clock.instant();
         jdbc.update(
-                "insert into ticket_auto_resolution (ticket_id, generation_id, policy_version, scenario, conclusion, "
-                        + "reply_message_id, customer_message_sequence, status, due_at, created_at, updated_at) "
-                        + "values (?, ?, ?, ?, ?::jsonb, "
-                        + "(select id from public_message where ticket_id = ? and author = 'AGENT' order by message_sequence desc limit 1), "
-                        + "(select coalesce(max(message_sequence), 0) from public_message where ticket_id = ? and author = 'CUSTOMER'), "
-                        + "'PENDING', ?, ?, ?) on conflict (ticket_id) do update set "
-                        + "generation_id = excluded.generation_id, policy_version = excluded.policy_version, scenario = excluded.scenario, "
-                        + "conclusion = excluded.conclusion, reply_message_id = excluded.reply_message_id, "
-                        + "customer_message_sequence = excluded.customer_message_sequence, status = 'PENDING', "
-                        + "due_at = excluded.due_at, created_at = excluded.created_at, updated_at = excluded.updated_at",
+                "insert into ticket_auto_resolution (ticket_id, generation_id, policy_version,"
+                        + " scenario, conclusion, reply_message_id, customer_message_sequence, status,"
+                        + " due_at, created_at, updated_at) values (?, ?, ?, ?, ?::jsonb, (select id"
+                        + " from public_message where ticket_id = ? and author = 'AGENT' order by"
+                        + " message_sequence desc limit 1), (select coalesce(max(message_sequence), 0)"
+                        + " from public_message where ticket_id = ? and author = 'CUSTOMER'),"
+                        + " 'PENDING', ?, ?, ?) on conflict (ticket_id) do update set generation_id ="
+                        + " excluded.generation_id, policy_version = excluded.policy_version, scenario"
+                        + " = excluded.scenario, conclusion = excluded.conclusion, reply_message_id ="
+                        + " excluded.reply_message_id, customer_message_sequence ="
+                        + " excluded.customer_message_sequence, status = 'PENDING', due_at ="
+                        + " excluded.due_at, created_at = excluded.created_at, updated_at ="
+                        + " excluded.updated_at",
                 ticketId,
                 generationId,
                 AutoResolutionPolicy.VERSION,
@@ -516,16 +641,18 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 Timestamp.from(candidateCreatedAt),
                 Timestamp.from(candidateCreatedAt));
         jdbc.update(
-                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values "
-                        + "(?, 'AGENT_CONCLUSION_ACCEPTED', 'agent-machine', ?), (?, 'AUTO_RESOLUTION_CANDIDATE_CREATED', 'spring-system', ?)",
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?,"
+                        + " 'AGENT_CONCLUSION_ACCEPTED', 'agent-machine', ?), (?,"
+                        + " 'AUTO_RESOLUTION_CANDIDATE_CREATED', 'spring-system', ?)",
                 ticketId,
                 databaseTime,
                 ticketId,
                 databaseTime);
         jdbc.update(
-                "insert into agent_command_request (generation_id, request_id, operation, parameter_digest, response_payload, created_at) "
-                        + "values (?, ?, 'SUBMIT_INVESTIGATION_CONCLUSION', ?, "
-                        + "jsonb_build_object('accepted', true, 'lifecycleState', 'INVESTIGATING'), ?)",
+                "insert into agent_command_request (generation_id, request_id, operation,"
+                        + " parameter_digest, response_payload, created_at) values (?, ?,"
+                        + " 'SUBMIT_INVESTIGATION_CONCLUSION', ?, jsonb_build_object('accepted', true,"
+                        + " 'lifecycleState', 'INVESTIGATING'), ?)",
                 generationId,
                 requestId,
                 parameterDigest,
@@ -555,21 +682,34 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             UUID ticketId, InvestigationConclusion conclusion, ScopedOrder order) {
         Boolean hasProposal =
                 jdbc.queryForObject(
-                        "select exists(select 1 from compensation_proposal_revision where ticket_id = ? and status in ('PENDING_APPROVAL', 'APPROVED')) "
-                                + "or exists(select 1 from customer_clarification_request where ticket_id = ? and status = 'OPEN')",
+                        "select exists(select 1 from compensation_proposal_revision where ticket_id"
+                                + " = ? and status in ('PENDING_APPROVAL', 'APPROVED')) or"
+                                + " exists(select 1 from customer_clarification_request where ticket_id"
+                                + " = ? and status = 'OPEN')",
                         Boolean.class,
                         ticketId,
                         ticketId);
         if (Boolean.TRUE.equals(hasProposal)) return null;
         return jdbc.queryForObject(
-                "select issue_kind, description || E'\\n' || coalesce((select string_agg(body, E'\\n' order by message_sequence) "
-                        + "from public_message m where m.ticket_id = t.id and m.author = 'CUSTOMER' "
-                        + "and not exists(select 1 from customer_clarification_request c where c.ticket_id = t.id "
-                        + "and c.status = 'ANSWERED' and c.answered_at = m.sent_at and c.answer_summary = trim(m.body))), '') "
-                        + "from support_ticket t where id = ?",
-                (rs, row) ->
-                        AutoResolutionPolicy.scenario(
-                                conclusion, order, rs.getString(1), rs.getString(2)),
+                "select issue_kind, description || E'\\n"
+                        + "' || coalesce((select string_agg(body, E'\\n"
+                        + "' order by message_sequence) from public_message m where m.ticket_id = t.id"
+                        + " and m.author = 'CUSTOMER' and not exists(select 1 from"
+                        + " customer_clarification_request c where c.ticket_id = t.id and c.status ="
+                        + " 'ANSWERED' and c.answered_at = m.sent_at and c.answer_summary ="
+                        + " trim(m.body))), '') from support_ticket t where id = ?",
+                (rs, row) -> {
+                    String scenario =
+                            AutoResolutionPolicy.scenario(
+                                    conclusion, order, rs.getString(1), rs.getString(2));
+                    if (scenario == null
+                            && conclusion.customerReply().knowledge() != null
+                            && AutoResolutionPolicy.canContinueKnowledgeConversation(
+                                    conclusion, order, rs.getString(1), rs.getString(2))) {
+                        return "KNOWLEDGE_CONVERSATION";
+                    }
+                    return scenario;
+                },
                 ticketId);
     }
 
@@ -579,7 +719,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             String requestId,
             String parameterDigest,
             InvestigationConclusion conclusion,
-            ScopedOrder order) {
+            ScopedOrder order,
+            CustomerKnowledgeProjection knowledgeProjection) {
         if (conclusion.reasonCode() != DecisionReasonCode.LOGISTICS_DELAY
                 || !eligibleOrderState(order)
                 || order.existingCompensation()
@@ -626,14 +767,13 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publicProjection.completeAgentReplyStream(
-                ticketId, generationId, conclusion.customerReply().body(), now);
-        publicProjection.appendAgentMessage(
-                ticketId, generationId, conclusion.customerReply().body(), now, false);
+        publishCustomerReply(
+                ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
         jdbc.update(
-                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at, subject_type, subject_id) values "
-                        + "(?, ?, 'spring-system', ?, 'COMPENSATION_PROPOSAL_REVISION', ?), "
-                        + "(?, 'AGENT_GENERATION_COMPLETED', 'spring-system', ?, null, null)",
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at,"
+                        + " subject_type, subject_id) values (?, ?, 'spring-system', ?,"
+                        + " 'COMPENSATION_PROPOSAL_REVISION', ?), (?, 'AGENT_GENERATION_COMPLETED',"
+                        + " 'spring-system', ?, null, null)",
                 ticketId,
                 proposal.created()
                         ? "COMPENSATION_PROPOSAL_REVISION_CREATED"
@@ -643,10 +783,11 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 ticketId,
                 databaseTime);
         jdbc.update(
-                "insert into agent_command_request (generation_id, request_id, operation, parameter_digest, response_payload, created_at) "
-                        + "values (?, ?, 'SUBMIT_INVESTIGATION_CONCLUSION', ?, "
-                        + "jsonb_build_object('accepted', true, 'lifecycleState', 'INVESTIGATING', "
-                        + "'proposalRevisionId', ?::text, 'proposalRevision', ?, 'proposalStatus', 'PENDING_APPROVAL'), ?)",
+                "insert into agent_command_request (generation_id, request_id, operation,"
+                        + " parameter_digest, response_payload, created_at) values (?, ?,"
+                        + " 'SUBMIT_INVESTIGATION_CONCLUSION', ?, jsonb_build_object('accepted', true,"
+                        + " 'lifecycleState', 'INVESTIGATING', 'proposalRevisionId', ?::text,"
+                        + " 'proposalRevision', ?, 'proposalStatus', 'PENDING_APPROVAL'), ?)",
                 generationId,
                 requestId,
                 parameterDigest,
@@ -679,7 +820,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 || conclusion.customerReply().evidenceRefs() == null
                 || conclusion.customerReply().evidenceRefs().size() != 2
                 || conclusion.customerReply().evidenceRefs().stream().anyMatch(Objects::isNull)
-                || conclusion.customerReply().referencedOrder() == null) {
+                || conclusion.customerReply().referencedOrder() == null
+                || (conclusion.customerReply().knowledge() != null
+                        && (conclusion.customerReply().knowledgeRequestId() == null
+                                || conclusion.customerReply().knowledgeRequestId().isBlank()))) {
             accessAudit.rejected(ticketId, "MALFORMED_CONCLUSION");
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "malformed investigation conclusion");
@@ -694,15 +838,74 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         if (rejection != null) reject(ticketId, rejection);
     }
 
-    private static String replyDigest(CustomerReplyEnvelope reply) {
+    private String replyDigest(CustomerReplyEnvelope reply) {
         if (reply == null) return "missing-customer-reply";
-        return StableParameterDigest.sha256(
-                reply.schemaVersion(),
-                reply.body(),
-                reply.intent() == null ? "null" : reply.intent().name(),
-                reply.evidenceRefs() == null ? "null" : String.join("\n", reply.evidenceRefs()),
-                Boolean.toString(reply.escalationRequired()),
-                reply.referencedOrder());
+        String digest =
+                StableParameterDigest.sha256(
+                        reply.schemaVersion(),
+                        reply.body(),
+                        reply.intent() == null ? "null" : reply.intent().name(),
+                        reply.evidenceRefs() == null
+                                ? "null"
+                                : String.join("\n", reply.evidenceRefs()),
+                        Boolean.toString(reply.escalationRequired()),
+                        reply.referencedOrder());
+        return reply.knowledge() == null
+                ? digest
+                : StableParameterDigest.sha256(
+                        digest,
+                        reply.knowledgeRequestId(),
+                        json.writeValueAsString(reply.knowledge()));
+    }
+
+    private CustomerKnowledgeProjection validateKnowledgeReply(
+            UUID generationId, CustomerReplyEnvelope reply) {
+        if (reply.knowledge() == null) return null;
+        if (reply.knowledgeRequestId() == null
+                || reply.knowledgeRequestId().isBlank()
+                || reply.knowledgeRequestId().length() > 200) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_KNOWLEDGE_CITATION");
+        }
+        List<AgentKnowledgeResult> receipts =
+                jdbc.query(
+                        "select response_payload::text from agent_command_request where"
+                                + " generation_id=? and request_id=? and operation='SEARCH_KNOWLEDGE'",
+                        (rs, row) -> json.readValue(rs.getString(1), AgentKnowledgeResult.class),
+                        generationId,
+                        reply.knowledgeRequestId());
+        if (receipts.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_KNOWLEDGE_CITATION");
+        }
+        AgentKnowledgeResult receipt =
+                knowledge.revalidateCustomerForPublication(receipts.getFirst());
+        CustomerKnowledgeReplyPolicy.validatePublicText(reply.publicBody(), receipt);
+        return CustomerKnowledgeReplyPolicy.validate(reply.knowledge(), receipt);
+    }
+
+    private void publishCustomerReply(
+            UUID ticketId,
+            UUID generationId,
+            CustomerReplyEnvelope reply,
+            CustomerKnowledgeProjection projection,
+            Instant now) {
+        if (projection == null) {
+            publicProjection.completeAgentReplyStream(ticketId, generationId, reply.body(), now);
+            publicProjection.appendAgentMessage(ticketId, generationId, reply.body(), now, false);
+            return;
+        }
+        publicProjection.completeBufferedAgentReplyStream(
+                ticketId, generationId, reply.publicBody(), now);
+        publicProjection.appendAgentKnowledgeMessage(
+                ticketId, generationId, reply.publicBody(), projection, now);
+        if (reply.knowledge().status() == CustomerKnowledgeStatus.CONFLICT) {
+            jdbc.update(
+                    "insert into audit_event (ticket_id,event_type,actor_id,occurred_at) "
+                            + "values (?,'KNOWLEDGE_CONFLICT','spring-system',?)",
+                    ticketId,
+                    Timestamp.from(now));
+        }
     }
 
     private static String evidenceDigest(List<ConclusionEvidence> evidence) {
@@ -780,7 +983,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private void completeGeneration(UUID generationId, Timestamp at) {
         int updated =
                 jdbc.update(
-                        "update agent_processing_generation set status = 'COMPLETED', completed_at = ? where id = ? and status = 'ACTIVE'",
+                        "update agent_processing_generation set status = 'COMPLETED', completed_at"
+                                + " = ? where id = ? and status = 'ACTIVE'",
                         at,
                         generationId);
         if (updated != 1)
@@ -810,15 +1014,18 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 orderReference + "\nCOMPENSATION_ALLOWANCE");
         List<ScopedOrder> orders =
                 jdbc.query(
-                        "select o.order_reference, o.delay_hours, o.delay_seconds, o.paid, o.cancelled, o.fully_refunded, "
-                                + "allowance.unquantified_existing_compensation, o.policy_version, o.paid_amount, allowance.total_available_compensation_amount, "
-                                + "(select count(*) from synthetic_pending_action a where a.order_reference = o.order_reference), "
-                                + "allowance.active_reservation_amount, "
-                                + "o.logistics_status, o.order_rule_summary, o.duplicate_charge_suspected "
-                                + "from support_ticket t join synthetic_order o on o.order_reference = t.order_reference "
-                                + "and o.customer_id = t.customer_id "
-                                + "join order_compensation_allowance allowance on allowance.order_reference = o.order_reference "
-                                + "where t.id = ? and o.order_reference = ?",
+                        "select o.order_reference, o.delay_hours, o.delay_seconds, o.paid,"
+                                + " o.cancelled, o.fully_refunded,"
+                                + " allowance.unquantified_existing_compensation, o.policy_version,"
+                                + " o.paid_amount, allowance.total_available_compensation_amount,"
+                                + " (select count(*) from synthetic_pending_action a where"
+                                + " a.order_reference = o.order_reference),"
+                                + " allowance.active_reservation_amount, o.logistics_status,"
+                                + " o.order_rule_summary, o.duplicate_charge_suspected from"
+                                + " support_ticket t join synthetic_order o on o.order_reference ="
+                                + " t.order_reference and o.customer_id = t.customer_id join"
+                                + " order_compensation_allowance allowance on allowance.order_reference"
+                                + " = o.order_reference where t.id = ? and o.order_reference = ?",
                         (rs, row) ->
                                 new ScopedOrder(
                                         rs.getString(1),
@@ -849,14 +1056,14 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private String requireActiveGeneration(UUID ticketId, UUID generationId) {
         List<String> authorized =
                 jdbc.query(
-                        "select t.order_reference from agent_processing_generation g "
-                                + "join support_ticket t on t.id = g.ticket_id "
-                                + "where g.id = ? and g.ticket_id = ? and g.status = 'ACTIVE' "
-                                + "and t.handling_mode = 'AGENT' and t.lifecycle_state = 'INVESTIGATING' "
-                                + "and not t.customer_human_preference "
-                                + "and g.generation_number = (select max(current_generation.generation_number) "
-                                + "from agent_processing_generation current_generation where current_generation.ticket_id = t.id) "
-                                + "for update of g, t",
+                        "select t.order_reference from agent_processing_generation g join"
+                                + " support_ticket t on t.id = g.ticket_id where g.id = ? and"
+                                + " g.ticket_id = ? and g.status = 'ACTIVE' and t.handling_mode ="
+                                + " 'AGENT' and t.lifecycle_state = 'INVESTIGATING' and not"
+                                + " t.customer_human_preference and g.generation_number = (select"
+                                + " max(current_generation.generation_number) from"
+                                + " agent_processing_generation current_generation where"
+                                + " current_generation.ticket_id = t.id) for update of g, t",
                         (rs, row) -> rs.getString(1),
                         generationId,
                         ticketId);
@@ -871,10 +1078,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private void recordFact(
             UUID generationId, String type, String value, String evidence, Instant now) {
         jdbc.update(
-                "insert into investigation_fact (generation_id, fact_type, fact_value, evidence_reference, "
-                        + "recorded_at, source_authority, valid_until, conflict_status) "
-                        + "values (?, ?, ?, ?, ?, 'SPRING_AUTHORIZED_CAPABILITY', ?, 'CLEAR') "
-                        + "on conflict (generation_id, fact_type) do nothing",
+                "insert into investigation_fact (generation_id, fact_type, fact_value,"
+                        + " evidence_reference, recorded_at, source_authority, valid_until,"
+                        + " conflict_status) values (?, ?, ?, ?, ?, 'SPRING_AUTHORIZED_CAPABILITY', ?,"
+                        + " 'CLEAR') on conflict (generation_id, fact_type) do nothing",
                 generationId,
                 type,
                 value,
@@ -885,10 +1092,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
 
     private List<PersistedInvestigationFact> persistedFacts(UUID ticketId, UUID generationId) {
         return jdbc.query(
-                "select f.fact_type, f.fact_value, f.evidence_reference, f.source_authority, "
-                        + "f.recorded_at, f.valid_until, f.conflict_status "
-                        + "from investigation_fact f join agent_processing_generation g "
-                        + "on g.id = f.generation_id where f.generation_id = ? and g.ticket_id = ? for share of f",
+                "select f.fact_type, f.fact_value, f.evidence_reference, f.source_authority,"
+                        + " f.recorded_at, f.valid_until, f.conflict_status from investigation_fact f"
+                        + " join agent_processing_generation g on g.id = f.generation_id where"
+                        + " f.generation_id = ? and g.ticket_id = ? for share of f",
                 (rs, row) ->
                         new PersistedInvestigationFact(
                                 rs.getString(1),
@@ -913,9 +1120,10 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
 
     private boolean mayReplayCompletedCommand(UUID ticketId, UUID generationId) {
         return !jdbc.query(
-                        "select 1 from agent_processing_generation g join support_ticket t on t.id = g.ticket_id "
-                                + "where g.id = ? and g.ticket_id = ? and g.status in ('ACTIVE', 'COMPLETED') "
-                                + "and t.handling_mode = 'AGENT' and not t.customer_human_preference",
+                        "select 1 from agent_processing_generation g join support_ticket t on t.id"
+                                + " = g.ticket_id where g.id = ? and g.ticket_id = ? and g.status in"
+                                + " ('ACTIVE', 'COMPLETED') and t.handling_mode = 'AGENT' and not"
+                                + " t.customer_human_preference",
                         (rs, row) -> rs.getInt(1),
                         generationId,
                         ticketId)

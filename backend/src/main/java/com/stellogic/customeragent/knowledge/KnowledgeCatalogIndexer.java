@@ -53,6 +53,7 @@ final class KnowledgeCatalogIndexer {
         this.migrateOnly = migrateOnly;
     }
 
+    @org.springframework.core.annotation.Order(0)
     @EventListener(ApplicationReadyEvent.class)
     void rebuildOnStartup() {
         if (!migrateOnly) rebuild();
@@ -164,8 +165,8 @@ final class KnowledgeCatalogIndexer {
                             indexStatus.name(),
                             generation,
                             sourceDigest,
-                            indexedAt,
-                            indexedAt,
+                            java.sql.Timestamp.from(indexedAt),
+                            java.sql.Timestamp.from(indexedAt),
                             articles.size(),
                             articles.stream().mapToInt(article -> article.chunks().size()).sum());
                     return new KnowledgeIndexState(
@@ -184,7 +185,8 @@ final class KnowledgeCatalogIndexer {
     private void validateImmutableVersions(List<KnowledgeArticleDocument> articles) {
         Map<String, IndexedVersion> existing = new HashMap<>();
         jdbc.query(
-                        "select article_id, version, content_hash, source_file from knowledge_article",
+                        "select article_id, version, content_hash, source_file from"
+                                + " knowledge_article",
                         (rs, row) ->
                                 new IndexedVersion(
                                         rs.getString(1),
@@ -211,20 +213,20 @@ final class KnowledgeCatalogIndexer {
 
     private void insertArticle(KnowledgeArticleDocument article, Instant indexedAt) {
         jdbc.update(
-                "insert into knowledge_article (article_id, version, title, updated_at, "
-                        + "applicability, publication_status, is_current, source_file, content_hash, body, indexed_at) "
-                        + "values (?, ?, ?, ?, ?::text[], ?, ?, ?, ?, ?, ?)",
+                "insert into knowledge_article (article_id, version, title, updated_at,"
+                        + " applicability, publication_status, is_current, source_file, content_hash,"
+                        + " body, indexed_at) values (?, ?, ?, ?, ?::text[], ?, ?, ?, ?, ?, ?)",
                 article.articleId(),
                 article.version(),
                 article.title(),
-                article.updatedAt(),
+                java.sql.Timestamp.from(article.updatedAt()),
                 article.applicability().toArray(String[]::new),
                 article.publicationStatus().name(),
                 article.current(),
                 article.sourceFile(),
                 article.contentHash(),
                 article.body(),
-                indexedAt);
+                java.sql.Timestamp.from(indexedAt));
     }
 
     private void insertChunk(KnowledgeChunkDocument chunk, Instant indexedAt) {
@@ -241,7 +243,7 @@ final class KnowledgeCatalogIndexer {
                 chunk.endLine(),
                 chunk.applicability().toArray(String[]::new),
                 chunk.content(),
-                indexedAt);
+                java.sql.Timestamp.from(indexedAt));
     }
 
     private KnowledgeIndexState markFailure(
@@ -263,7 +265,7 @@ final class KnowledgeCatalogIndexer {
                                         retained.name(),
                                         code,
                                         safeMessage,
-                                        updatedAt,
+                                        java.sql.Timestamp.from(updatedAt),
                                         baseState.generation())
                                 == 0) {
                             return readState();
@@ -296,8 +298,9 @@ final class KnowledgeCatalogIndexer {
 
     private KnowledgeIndexState readState() {
         return jdbc.queryForObject(
-                "select status, generation, source_digest, indexed_at, updated_at, article_count, "
-                        + "chunk_count, failure_code, failure_message from knowledge_index_state where id = 1",
+                "select status, generation, source_digest, indexed_at, updated_at, article_count,"
+                        + " chunk_count, failure_code, failure_message from knowledge_index_state where"
+                        + " id = 1",
                 (rs, row) ->
                         new KnowledgeIndexState(
                                 KnowledgeIndexStatus.valueOf(rs.getString(1)),

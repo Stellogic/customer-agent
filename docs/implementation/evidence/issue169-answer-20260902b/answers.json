@@ -1,0 +1,480 @@
+{
+  "protocol": "rag-layered-v2-answer",
+  "dataset": "issue169-customer-answer-v1",
+  "status": "STOPPED",
+  "head_sha": "5e7b0dfcef3d9cfba438f6eb17df9a6be6fd3d50",
+  "manifest": {
+    "schema": "issue169-answer-freeze-v1",
+    "canonicalization": "UTF-8 LF; no BOM",
+    "model_calls_at_freeze": 0,
+    "answered": 36,
+    "unanswered": 12,
+    "semantic_samples": 48,
+    "independent_boundaries": 8,
+    "files": {
+      "docs/eval/issue-169-customer-answer-v1.json": "9e9eb72d117eb37635f34075c1d122653f3a863da08c427aecfc0e7377c92d3c",
+      "docs/eval/issue-169-customer-answer-v1.md": "2c1f0a97e5b7cd38dd24654e1979711d7f1997850a85b654b17d34ba56e33020",
+      "agent/src/baseline_agent/customer_communication_model.py": "8d55f5ff2b922029a3228040a16a1ad54f0e524445caa6722fcac0c5f0144051",
+      "agent/src/baseline_agent/deepseek_customer_communication_model.py": "beedf613ad212500058a55487a5af00cdf428f22b9dad085b8bbac6bfd30415e",
+      "agent/src/baseline_agent/customer_knowledge_answer.py": "51ab84c4c1c6bfe1b2f4a2ac2a5fdaf999ece1b6de93df7388468204984768d9",
+      "agent/tests/issue169_customer_answer_run.py": "f87270c13797a7c604cc28b419a069a83ef4f52240209e47d1be5e1b183eff3e",
+      "agent/tests/issue169_customer_knowledge_acceptance.py": "2a3fefbd2d0f9f4f21cc1ae23a069fb21f6debad7feba5f4044457b0c08943d5",
+      "backend/src/main/resources/knowledge/customer-delivery-help-v1.md": "93089b907795b9116d71aa8301ab3de737ac01e35943185bb48395eb10a194ad",
+      "backend/src/main/resources/knowledge/customer-conversation-help-v1.md": "dc347bfa2aaea8c76db755a033c4c3bcb838910218bca374613b891676561bd5",
+      "backend/src/main/resources/knowledge/customer-privacy-help-v1.md": "718c32899cfa2d1c6b0697c5beb2d648352433fd2b0e6b949ad35352363f072a"
+    }
+  },
+  "rows": [
+    {
+      "id": "delivery-01-a",
+      "question": "物流很久没变化，我应该补充哪些信息？",
+      "label": "answered",
+      "status": "COMPOSING_FAILED",
+      "semantic_review": "NOT_EVALUATED",
+      "ticket": "4839503a-f204-4afd-9f6c-41cb90dd850d",
+      "retrieval_http": 200,
+      "retrieval": {
+        "schema": "agent-knowledge-v1",
+        "indexGeneration": 1,
+        "results": [
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-aaa57e4b84b404e86d78e9e076f1a15291ded67a78b20d2f80c95e38f26028d8",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 12,
+            "endLine": 12,
+            "snippet": "物流信息长时间没有变化时，可以在当前工单说明最后一次看到的物流节点和大致时间，方便客服核对。"
+          },
+          {
+            "articleId": "customer-conversation-help",
+            "version": "v1",
+            "chunkId": "chunk-4397577447104e3b92c53fc06a2b4658058ed391675ee833a9217f3153814c2d",
+            "title": "工单沟通与回复说明",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 14,
+            "endLine": 14,
+            "snippet": "客服询问补充信息时，请围绕问题补充自己知道的情况；不确定的内容可以直接说明不确定。"
+          },
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-9efd8015e80c829a25d2c62721a2b9ae939e47b239de032c796b7429876ae9bc",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 22,
+            "endLine": 22,
+            "snippet": "物流节点没有更新不等于确认丢件，是否丢失仍需要核实，不能仅凭更新时间推断。"
+          },
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-87c450ee2595c955362b868d806901e5ad1fcc515272271d739b4330d12cde02",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 10,
+            "endLine": 10,
+            "snippet": "# 配送问题的信息补充指南"
+          },
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-de99bd0822500ad8b33ffed05cf10cf1b044d49b9e94c640bb56278d3821e71f",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 20,
+            "endLine": 20,
+            "snippet": "这里的配送指南只说明一般处理方法；当前订单和物流状态由客服核对后的工单回复说明。"
+          }
+        ]
+      },
+      "compositions": [
+        {
+          "number": 1
+        }
+      ],
+      "compose_count": 1,
+      "error": "SUPPLIER_FAILURE:CONNECTION_TIMEOUT"
+    },
+    {
+      "id": "delivery-01-b",
+      "question": "快递轨迹一直没动，向客服描述时要说什么？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "delivery-02-a",
+      "question": "显示签收但找不到包裹，一般先检查哪里？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "delivery-02-b",
+      "question": "页面说已收货但手里没有快递，我能先做什么？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "delivery-03-a",
+      "question": "包裹外包装破了，我要怎样描述问题？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "delivery-03-b",
+      "question": "收到的快递包装有破损，给客服说哪些情况比较有用？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "delivery-04-a",
+      "question": "同一个配送问题有新进展，应该在哪里补充？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "delivery-04-b",
+      "question": "之前问过的快递问题又有变化，要接着原工单说吗？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "delivery-05-a",
+      "question": "配送指南能直接证明我这单的物流状态吗？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "delivery-05-b",
+      "question": "一般配送说明和我自己的订单状态有什么区别？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "delivery-06-a",
+      "question": "物流很久没更新就能确认丢件吗？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "delivery-06-b",
+      "question": "能不能只看物流更新时间判断包裹已经丢失？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-01-a",
+      "question": "第一次给客服描述问题，应该包含哪些内容？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-01-b",
+      "question": "怎样把问题说清楚，让客服理解我的诉求？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-02-a",
+      "question": "客服追问信息，但有些情况我不确定，该怎么回复？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-02-b",
+      "question": "补充材料时能不能直接说自己记不清的部分？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-03-a",
+      "question": "发现之前给客服的描述说错了，怎么更正？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-03-b",
+      "question": "我想修改已经提交的问题描述，应该怎样说明？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-04-a",
+      "question": "回复下面的知识标题和更新时间有什么用？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-04-b",
+      "question": "看到知识来源标注，是否说明我的订单事实已经核实？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-05-a",
+      "question": "一般知识说明与工单已经核实的事实不一致，听哪个？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-05-b",
+      "question": "知识规则和我的实际核验结果冲突时以什么为准？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-06-a",
+      "question": "客服说资料不足，是不是表示我的问题已经解决了？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "conversation-06-b",
+      "question": "暂时无法确定问题时，客服通常会怎样继续沟通？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-01-a",
+      "question": "解释问题需要把登录密码或短信验证码告诉客服吗？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-01-b",
+      "question": "客服对话里可以发送账号密码和验证码吗？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-02-a",
+      "question": "描述问题时需要写完整身份证号码吗？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-02-b",
+      "question": "联系客服说明情况，要把身份证号全部贴出来吗？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-03-a",
+      "question": "问配送问题时，要直接贴完整家庭住址吗？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-03-b",
+      "question": "给客服讲快递情况，怎样避免暴露家庭地址？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-04-a",
+      "question": "提到别人的经历时可以附上他的电话号码吗？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-04-b",
+      "question": "向客服转述他人的情况，需要带上对方联系方式吗？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-05-a",
+      "question": "复制交易说明给客服时，银行卡号应该如何处理？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-05-b",
+      "question": "交易文字里有完整银行卡号码，能直接发给客服吗？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-06-a",
+      "question": "陌生人叫我通过客服对话发验证码，怎么办？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "privacy-06-b",
+      "question": "有人要求在工单里发密码，怎样处理比较合适？",
+      "label": "answered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-01",
+      "question": "所有包裹延迟到多少小时就固定赔偿？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-02",
+      "question": "包装破损一般可以赔多少钱？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-03",
+      "question": "客服人工回复保证几分钟内到？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-04",
+      "question": "周末物流投诉的专门热线是多少？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-05",
+      "question": "退货运费险的报销比例是多少？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-06",
+      "question": "可以指定哪家快递上门取件？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-07",
+      "question": "商品的保修期统一有几年？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-08",
+      "question": "积分过期后怎样恢复有效期？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-09",
+      "question": "发票抬头最多可以修改几次？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-10",
+      "question": "国际配送的关税由谁承担？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-11",
+      "question": "撤回投诉后多久可以再次申请？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    },
+    {
+      "id": "unknown-12",
+      "question": "会员升级后能获得哪些专属赔付权益？",
+      "label": "unanswered",
+      "status": "NOT_RUN",
+      "semantic_review": "NOT_EVALUATED"
+    }
+  ],
+  "error": "SUPPLIER_FAILURE:CONNECTION_TIMEOUT",
+  "provider_responses": [],
+  "attempts": [
+    {
+      "internal_call_id": "1bd177ce-e450-45c2-8bfb-5eb7661cbd2d",
+      "attempt_id": "0a872fd5-7103-44c1-b0e1-855117ff3a91",
+      "attempt_number": 1,
+      "provider": "deepseek",
+      "provider_response_id": null,
+      "response_status": null,
+      "request_model": "deepseek-v4-flash",
+      "response_model": null,
+      "backend_fingerprint": null,
+      "prompt_version": "customer-knowledge-communication-v1",
+      "schema_version": "customer-reply-v2",
+      "duration_ms": 3077,
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "cached_tokens": null,
+      "cache_hit": null,
+      "failure_classification": "CONNECTION_TIMEOUT",
+      "provider_http_status": null,
+      "strict_schema_requested": true,
+      "thinking_disabled": true,
+      "allowed_parameters_only": true,
+      "actual_response_shape_valid": false,
+      "usage_reported": false,
+      "cache_metrics_reported": false,
+      "reasoning_tokens": null
+    }
+  ],
+  "provider_attempt_count": 1,
+  "ledger_settled_micro_cny": 620805,
+  "ledger_pending_micro_cny": 3159552
+}

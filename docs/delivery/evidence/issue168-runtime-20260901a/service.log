@@ -1,0 +1,107 @@
+spring-migrate-1  | 
+backend-1         | 2026-08-31T18:03:39.883Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:03:41.919Z  INFO 1 --- [customer-agent-backend] [io-8080-exec-10] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:03:44.011Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-4] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:03:46.020Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-5] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:03:48.008Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-7] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:03:50.192Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:03:52.249Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-2] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+backend-1         | 2026-08-31T18:03:53.626Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-8] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+spring-migrate-1  |   .   ____          _            __ _ _
+backend-1         | 2026-08-31T18:03:55.025Z  INFO 1 --- [customer-agent-backend] [io-8080-exec-10] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+spring-migrate-1  |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+spring-migrate-1  | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+spring-migrate-1  |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+spring-migrate-1  |   '  |____| .__|_| |_|_| |_\__, | / / / /
+spring-migrate-1  |  =========|_|==============|___/=/_/_/_/
+spring-migrate-1  | 
+backend-1         | 2026-08-31T18:03:56.394Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-4] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:03:57.824Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-5] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+backend-1         | 2026-08-31T18:03:59.237Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-4] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+spring-migrate-1  |  :: Spring Boot ::                (v4.1.0)
+spring-migrate-1  | 
+backend-1         | 2026-08-31T18:04:00.524Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-6] security.human-session                   : security_event=human_login outcome=success subject_id=support-no-knowledge
+backend-1         | 2026-08-31T18:04:01.830Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-7] security.human-session                   : security_event=human_login outcome=success subject_id=approver-no-knowledge
+spring-migrate-1  | 2026-08-31T17:58:19.688Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Starting CustomerAgentApplication v0.1.0-SNAPSHOT using Java 25.0.3 with PID 1 (/app/app.jar started by app in /app)
+backend-1         | 2026-08-31T18:04:03.211Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-9] security.human-session                   : security_event=human_login outcome=success subject_id=support-no-knowledge
+spring-migrate-1  | 2026-08-31T17:58:19.694Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : No active profile set, falling back to 1 default profile: "default"
+backend-1         | 2026-08-31T18:04:04.546Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-4] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+spring-migrate-1  | 2026-08-31T17:58:21.641Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+spring-migrate-1  | 2026-08-31T17:58:21.654Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+spring-migrate-1  | 2026-08-31T17:58:21.655Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.22]
+spring-migrate-1  | 2026-08-31T17:58:21.680Z  INFO 1 --- [customer-agent-backend] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 1908 ms
+spring-migrate-1  | 2026-08-31T17:58:23.739Z  INFO 1 --- [customer-agent-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name productionHumanUsers
+spring-migrate-1  | 2026-08-31T17:58:24.295Z  INFO 1 --- [customer-agent-backend] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+spring-migrate-1  | 2026-08-31T17:58:24.365Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+spring-migrate-1  | 2026-08-31T17:58:24.376Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Started CustomerAgentApplication in 5.402 seconds (process running for 6.277)
+spring-migrate-1  | 2026-08-31T17:58:24.386Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+backend-1         | 2026-08-31T18:04:05.878Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-3] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:08.177Z  INFO 1 --- [customer-agent-backend] [io-8080-exec-10] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:10.239Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:12.190Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-9] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:14.233Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-7] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+spring-migrate-1  | 2026-08-31T17:58:24.406Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@4a8d4ab
+spring-migrate-1  | 2026-08-31T17:58:24.413Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+spring-migrate-1  | 2026-08-31T17:58:24.486Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+spring-migrate-1  | 2026-08-31T17:58:24.489Z  INFO 1 --- [customer-agent-backend] [tomcat-shutdown] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+spring-migrate-1  | 2026-08-31T17:58:24.497Z  INFO 1 --- [customer-agent-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+spring-migrate-1  | 2026-08-31T17:58:24.501Z  INFO 1 --- [customer-agent-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+backend-1         | 2026-08-31T18:04:16.211Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-6] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:18.287Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-5] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:20.318Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-8] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:22.419Z  INFO 1 --- [customer-agent-backend] [io-8080-exec-10] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:24.321Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-2] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:26.418Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-9] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:28.630Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-7] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:30.972Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-4] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:33.022Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-3] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:34.990Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-8] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:37.083Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:39.112Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-6] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:41.117Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-9] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:43.065Z  INFO 1 --- [customer-agent-backend] [io-8080-exec-10] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:45.364Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-2] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:47.731Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-3] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:49.717Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-7] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:51.794Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-9] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:53.843Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-6] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:04:55.990Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-2] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:04:58.269Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-3] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:05:00.347Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-6] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:05:02.338Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-8] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:05:04.479Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-4] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:05:06.463Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-5] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:05:08.464Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:05:10.518Z  INFO 1 --- [customer-agent-backend] [io-8080-exec-10] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:05:12.460Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-3] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:05:14.658Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-6] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:05:16.580Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-7] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:05:18.508Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-4] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:05:20.529Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-9] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:22.597Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-5] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:24.573Z  INFO 1 --- [customer-agent-backend] [io-8080-exec-10] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:26.576Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-3] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:28.721Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-4] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:30.659Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-7] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:32.720Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-2] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:34.816Z  INFO 1 --- [customer-agent-backend] [io-8080-exec-10] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:36.946Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-5] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:38.792Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-8] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:40.786Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-6] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:42.947Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-4] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:45.184Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:47.488Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-5] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:49.439Z  INFO 1 --- [customer-agent-backend] [io-8080-exec-10] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:51.495Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-7] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:53.683Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-9] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:55.665Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-6] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:05:57.535Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-4] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+backend-1         | 2026-08-31T18:05:58.826Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-8] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+backend-1         | 2026-08-31T18:06:00.125Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-5] security.human-session                   : security_event=human_login outcome=success subject_id=approver-demo
+backend-1         | 2026-08-31T18:06:01.459Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-6] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:06:02.783Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-7] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo
+backend-1         | 2026-08-31T18:06:04.099Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-8] security.human-session                   : security_event=human_login outcome=success subject_id=support-demo
+backend-1         | 2026-08-31T18:06:05.400Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-7] security.human-session                   : security_event=human_login outcome=success subject_id=support-no-knowledge
+backend-1         | 2026-08-31T18:06:06.777Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-2] security.human-session                   : security_event=human_login outcome=success subject_id=approver-no-knowledge
+backend-1         | 2026-08-31T18:06:08.127Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-1] security.human-session                   : security_event=human_login outcome=success subject_id=support-no-knowledge
+backend-1         | 2026-08-31T18:06:09.459Z  INFO 1 --- [customer-agent-backend] [nio-8080-exec-3] security.human-session                   : security_event=human_login outcome=success subject_id=customer-demo

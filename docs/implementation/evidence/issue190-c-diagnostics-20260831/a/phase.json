@@ -1,0 +1,20 @@
+{
+  "run_id": "issue190-c-diagnostics-20260831a",
+  "head_sha": "91feec4e2364d6f9d36da773b1a03b764c512c33",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "ERROR",
+  "phases": [
+    {
+      "name": "focused",
+      "exit_code": 1,
+      "elapsed_seconds": 3.8713649
+    }
+  ],
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "development_replay_run": false,
+  "holdout_or_frozen_evaluation_run": false,
+  "failure": "focused failed: 1",
+  "elapsed_seconds": 3.9269869,
+  "working_tree_changed": true
+}

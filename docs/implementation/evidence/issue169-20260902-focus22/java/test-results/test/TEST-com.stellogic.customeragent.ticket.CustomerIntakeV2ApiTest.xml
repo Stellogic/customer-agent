@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.ticket.CustomerIntakeV2ApiTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:13.559Z" hostname="buildkitsandbox" time="0.241">
+  <properties/>
+  <testcase name="restoresAnArchivedIntakeAgainstItsStableVersion()" classname="com.stellogic.customeragent.ticket.CustomerIntakeV2ApiTest" time="0.042"/>
+  <testcase name="exposesAllProposedIssuesAndTheAtomicTicketCount()" classname="com.stellogic.customeragent.ticket.CustomerIntakeV2ApiTest" time="0.013"/>
+  <testcase name="startsWithNaturalLanguageAndReturnsOnlyAConfirmableCandidate()" classname="com.stellogic.customeragent.ticket.CustomerIntakeV2ApiTest" time="0.015"/>
+  <testcase name="listsOnlyTheAuthenticatedCustomersRecoverableIntakesWithHistory()" classname="com.stellogic.customeragent.ticket.CustomerIntakeV2ApiTest" time="0.014"/>
+  <testcase name="resolvesDuplicateOnlyAfterAnExplicitCustomerChoice()" classname="com.stellogic.customeragent.ticket.CustomerIntakeV2ApiTest" time="0.013"/>
+  <testcase name="rejectsFractionalRestoreVersionsInsteadOfTruncatingThem()" classname="com.stellogic.customeragent.ticket.CustomerIntakeV2ApiTest" time="0.006"/>
+  <testcase name="naturalLanguageAndQuickConfirmationUseTheSameMessageCommand()" classname="com.stellogic.customeragent.ticket.CustomerIntakeV2ApiTest" time="0.012"/>
+  <testcase name="idempotencyConflictReturnsTheRecoverableAuthoritativeResult()" classname="com.stellogic.customeragent.ticket.CustomerIntakeV2ApiTest" time="0.015"/>
+  <testcase name="restoresAnInProgressMultiOrderIntake()" classname="com.stellogic.customeragent.ticket.CustomerIntakeV2ApiTest" time="0.009"/>
+  <system-out><![CDATA[16:08:13.606 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.606 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.606 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:13.657 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.658 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.658 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:13.679 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.679 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.680 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+16:08:13.700 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.700 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.701 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:13.720 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.721 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.721 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:13.741 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.741 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.741 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:13.753 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.753 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.753 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:13.770 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.770 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.771 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+16:08:13.790 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.791 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.791 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

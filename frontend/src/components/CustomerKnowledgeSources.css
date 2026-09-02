@@ -1,0 +1,64 @@
+.customer-knowledge-sources {
+  min-width: 0;
+  max-width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--forest-50);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.customer-knowledge-sources p {
+  margin: 0;
+}
+
+.customer-knowledge-source-title {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.customer-knowledge-sources-toggle {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.customer-knowledge-sources-toggle:focus-visible {
+  outline: 2px solid var(--forest-700);
+  outline-offset: 3px;
+}
+
+.customer-knowledge-source-date,
+.customer-knowledge-sources .customer-knowledge-sources-note {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: normal;
+}
+
+.customer-knowledge-sources .customer-knowledge-sources-note {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.customer-knowledge-sources--conflict {
+  border-color: var(--orange);
+  background: var(--orange-soft);
+}
+
+.customer-knowledge-sources--error {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
+@media (max-width: 600px) {
+  .customer-knowledge-sources {
+    padding: 10px 12px;
+  }
+}

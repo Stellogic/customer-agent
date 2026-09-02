@@ -1,0 +1,11 @@
+usage: knowledge_sufficiency_run.py [-h] --run-id RUN_ID --head-sha HEAD_SHA
+                                    --base-sha BASE_SHA
+                                    --pricing-and-context-verified-date PRICING_AND_CONTEXT_VERIFIED_DATE
+                                    --output OUTPUT [--diagnose-fifth-once]
+knowledge_sufficiency_run.py: error: unrecognized arguments: - - d i a g n o s e - f i f t h - o n c e
+Exception: <WORKTREE>\scripts\knowledge-sufficiency.ps1:37
+Line |
+  37 |  … $LASTEXITCODE -ne 0) { throw "C阶段停止，证据：$output；不重试、不切方法、不进入留出或冻结门。" }
+     |                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     |
+     | C阶段停止，证据：<WORKTREE>\.local\gate-evidence\issue190-c-argv-offline-20260831a-diagnostic\sufficiency-fifth-diagnostic.json；不重试、不切方法、不进入留出或冻结门。

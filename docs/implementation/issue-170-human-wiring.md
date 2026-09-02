@@ -1,0 +1,83 @@
+# #170 HUMAN 辅助接线源码（2026-09-01）
+
+状态：**RISK_REVIEW_FIXED_FOCUSED_PASS**；#169 正式共享契约已接入，集中风险审查的两项 P2 已修复，backend / agent / frontend 聚焦门禁通过，等待最终双轴确认与完整门禁。
+
+已同步 #169 正式合入后的 `origin/main` `6d5ab983ce6b685974f00751fd06afcdb1549064`；分支保留既有 `e61152199c985f2d46b1a1cf1575b14ac8cb3a03` 与 V44，未重写历史。#150/#160/#163/#169/#190 前置均已关闭。共享 Java DTO/适配器、Python 解析器与 V43 已来自 main，本票不再依赖未合入源码。
+
+## 固定共享契约与归属
+
+从 #169 正式 main 回读其契约、实际 Java/Python 源码与 V43。`AgentKnowledgeRetrievalAdapter.searchSupport(principalId, query)` 固定 INTERNAL/SUPPORT 并验证知识 capability；`revalidateSupport(principalId, receipt)` 只校验索引代次、当前已发布版本、范围和 canonical 内容，不再次编码或排名。`AgentKnowledgeResult.Source` 的九字段（含 `updatedAt`）来自 Spring，Python `knowledge_retrieval.py` 为唯一解析。`revalidateCustomerForPublication` 只服务客户最终发布事务，#170 不调用。
+
+本分支只引用这些正式公开类/纯解析，未复制实现，也没有把 #190 内部检索 API 当作 Agent 或工单授权。聚焦门禁已经证明三端可编译、格式/静态检查和自动化测试通过；旧 #190 scope 交集200语义不使用，显式越权由403处理。
+
+协调统一交付顺序：#169 共享实现先交付并使用 V43，#170 后交付，请求表使用 `V44__support_assistance_request.sql`；本票已将未发布的 V43 仅改名为 V44，SQL内容不变。#170仍拥有 queue 下自有文件、SupportWorkbench 中辅助挂载/草稿衔接和 `langgraph.json` 的 support_assistance 注册。运行前须同步 #169 正式 main 并再次核对序号，不修改已发布迁移、不用 outOfOrder 绕过。#169拥有知识适配及客户路径，本票未修改其文件，也未改 App、InternalShell、共享回复/补偿存储、编码器或 #189 资产。
+
+## #169 合入后的串行交接结果
+
+1. 已从 `origin/main@6d5ab983` 回读 #169 的公开 Java DTO/适配器、Python 解析器和 `V43__customer_knowledge_reply.sql`。
+2. 已核对 `searchSupport`、`revalidateSupport`、九字段 Source 与 Python `updatedAt` 解析，#170 消费签名兼容，未复制适配器或修改 #169 文件。
+3. main 最高迁移为 V43，#170 的 `V44__support_assistance_request.sql` 顺序有效；未改已发布迁移，未启用 outOfOrder。
+4. `langgraph.json` 同时保留既有图与 `support_assistance`；未改 encoder、pyproject 或 uv.lock。
+5. 聚焦门禁在共享锁下完成；初次格式/lint失败均按工具输出最小修复并复验通过。最终完整门禁尚未运行。
+6. #169 已记录的答案质量以及 #170 真实回答质量均保持 **KNOWN_LIMITATIONS**；结构、引用和合成计数测试不能替代真实语义质量 PASS。
+
+## 最小运行链路
+
+复用现有 Spring MVC/Security、JdbcTemplate、LangGraph StateGraph、httpx 与 React；依据现有 SupportWorkbench、IntakeUnderstandingGateway/intake_graph 与 DeepSeek Responses 调用源码，不引入依赖或编排框架。
+
+1. 已授权客服详情挂载独立 SupportAssistance。GET `/api/support/workbench/tickets/{ticketId}/assistance/context` 只返回当前 assignmentId；必须 SUPPORT/HUMAN/ACTIVE 且工单非终态。主体取 Authentication，不接受 supportId、scope 或 generation。
+2. POST `/assistance/requests` 使用 `support-assistance-v1`、assignmentId、UUID requestId、四种 kind 和最多200字符查询（与共享检索上限一致）。CSRF/会话复用既有链路。输入只由 Spring 加载当前描述、最近20条公开消息和授权调查事实，不采用浏览器提供的事实/知识。
+3. V44 持久化请求参数和输入投影。按客服/requestId唯一，同 ID 异工单/assignment/type/query 拒绝；参数直接比较，不新增哈希。工单行锁只覆盖申请执行权及保存回执的短事务；重复请求读取原回执，不再次执行。
+4. 外层无事务地检索，之后再次验证 assignment；独立 support_assistance 图在同次 DeepSeek 输出充分性决定和总结/知识说明/政策解释/草稿，不单独调用充分性模型，无业务工具、自动发送或自动重试。
+5. Spring 检查输出结构、长度、文字建议以及引用必须来自本次 Top5及逐字原文，以 canonical metadata 构造浏览器白名单投影；调用 #169 复核选中完整 Source，再验证当前 assignment 才存/返回。每次 GET `/assistance/requests/{requestId}` 也重新验证授权及知识引用，不缓存授权结论。模型 audit/知识原始回执不发送浏览器。最终回执独立投影本次原始检索是否为空；它不改变充分性决定、成功/失败分类或质量计数。
+6. 客服手动插入、编辑并勾选审阅后，只把文字移交既有人工发送区。发送区已有编辑时再次确认替换；发送中/结果未知时禁止移交。最终公开发送仍由原按钮、CSRF、权限与幂等路径执行。详情撤权/断线重同步卸载辅助组件并中止客户端接收。
+
+辅助移交到公开回复区后，宿主只追踪“仍保持原文且未经人工再编辑”的辅助草稿。撤权或详情权限流断开会清除该文本与待替换确认；客服只要在公开回复区人工编辑，文本即转为人工草稿，不因后续辅助撤权被误删。
+
+控制器绑定发起请求时的 HTTP session、sessionId 和主体，慢调用或回执读取后、写响应前复核会话仍有效且未换主体；不能只凭仍有效的 assignment 返回内部内容。详情权限流结束时，在等待详情重读前立即卸载辅助及丢弃待移交确认，重读成功后重新申请辅助权限，不恢复旧私有草稿。
+
+## 失败与恢复边界
+
+- 非正式模型模式明确 MODEL_UNAVAILABLE，调用次数0，没有产品假回答；真实调用失败与 INVALID_ANSWER_FORMAT 分开，不算资料不足。
+- 浏览器未确认POST结果时仅查询原requestId，不自动重复生成。CSRF失败发生在提交前，明确允许重新发起；不伪装已有服务器请求。
+- PENDING只表示没有终态回执，包含进程中断后未确认情形，不声称后台一定还在运行。没有后台重试队列或自动接管；重新打开详情后可显式新建请求，旧记录保留。正式验证须覆盖这一恢复提示，不能将其计入成功样本。
+- 知识403/400/422/503复用 #169 已有异常处理；403清辅助授权与草稿，不降为NO_MATCH。失败回执仅保留通用受控原因，初次知识请求保留原状态码；回执不再次调用检索来重演错误。
+- 模型调用 metadata 在最终授权检查前单独保存，即使生成途中撤权也保留费用证据；HTTP结果不确定记 TRANSPORT_UNCONFIRMED，不能按0调用/0费用处理。该记录写入不赋予任何人结果读取权。
+
+## 本路径生成协议及预算
+
+源码协议 `support-assistance-answer-v2`：默认 DeepSeek v4 flash，Responses strict schema；一次调用包含 decision/text/followUp/suggestions/citations。输出 token 上限1800、正文2000字符、追问500字符、文字建议最多5条且每条最多200字符、引用合计4000字符且最多5条；不设单条24字符限制。这些是当前源码执行参数，**尚未取得真实运行和冻结质量证据**，不得称质量PASS。
+
+`knowledge` / `policy` 类型只有在 `SUPPORTED` 且至少一条引用通过本次 Top5 与逐字原文校验时才能成为 ready；prompt 同样明确这一要求，空引用会在 Python 生成边界和 Spring 投影边界分别判为 `INVALID_ANSWER_FORMAT`。`summary` / `draft` 不强制引用，因为它们可仅依据 Spring 提供的当前工单上下文形成草稿，仍须人工审阅。文字建议只作为同次生成的内部文本展示，不提供执行按钮或业务副作用。
+
+真实产品链路把 `retrievalEmpty` 作为与 ready/insufficient 正交的检索事实展示：“本次未匹配授权知识片段；回答充分性仍由同次 DeepSeek 结合当前工单上下文判断。”该字段直接来自本次原始 `AgentKnowledgeResult.results().isEmpty()`，不从最终引用列表推导，也不把无命中当作资料不足。
+
+没有独立充分性调用或自动修正/重试；故障保留到完整样本分母。调用返回记录 model/responseId、usage、attempts、输出上限和估计费用。估价复用既有函数，不重建成本框架；实际模型/费用和未知 usage 必须在运行账本核对，源码估价不能冒充供应商结算。
+
+真实质量运行前仍需同一累计账本核实剩余额度、冻结完整样本及 prompt/schema/源码记录，**所有相关运行累计不超过人民币6元，不重置旧消费**。本轮真实模型调用0；未知历史余额不表示可用6元。出现未知调用费用应先核对，不开始下一次付费运行。继续使用既有 #170 完整分母计数及三项独立检查，结构/引文通过不等于语义充分；不读验收错题调参。
+
+## 聚焦验证与未验证
+
+新增源码覆盖：同次调用和usage、非正式模式不伪造回答、失败不自动重试、引用归属/长引文、请求重放不再次检索/生成、检索后撤权禁止调用、回执重读复核且不泄露audit、宿主人工移交与未知结果GET恢复。
+
+- backend 聚焦门禁 `issue170-backend-20260902d`：PASS；编译、Spotless、Checkstyle 与测试全部通过。
+- agent 聚焦门禁 `issue170-agent-20260902c`：PASS；Ruff、Pyright（0 errors）与 pytest（448 passed、3 skipped）通过。
+- frontend 聚焦门禁 `issue170-frontend-20260902c`：PASS；Prettier、ESLint、TypeScript、Vitest（206 passed、3 skipped）与 bundle evidence 通过。此前 `issue170-frontend-20260902b` 在新增第二个完整工作台场景后因 Vitest worker 内存耗尽失败；将相同回归断言并入既有撤权场景后成功复验，没有删除产品断言。
+
+测试 transport、Mockito 与合成 HTTP 响应只证明工程边界；真实 DeepSeek 回答质量仍为 **KNOWN_LIMITATIONS**，不得写成 PASS。最终完整 `pwsh ./scripts/check.ps1 -Issue 170` 尚未运行。
+
+集中风险审查在 PR 转 Ready 后发现两项 P2：撤权未清除已移交且未人工再编辑的公开回复草稿，以及 `policy` / `knowledge` 的无引用 `SUPPORTED` 可进入 ready。两项均已按上述最小边界修复并加入三端回归源码；修复后 `issue170-riskfix-backend-20260902b`、`issue170-riskfix-agent-20260902a`、`issue170-riskfix-frontend-20260902b` 聚焦门禁均 PASS。首轮后端只因 Spotless 排版失败、首轮前端只因合成响应缺少 view 身份字段失败，修正后均复验通过。
+
+最终交付仍需一次完整 `pwsh ./scripts/check.ps1 -Issue 170`。完整门禁包含真实 PostgreSQL/Compose、smoke 与浏览器回归；回答质量限制继续单列，不用 #169 检索门禁或本票合成测试替代。CI 关闭，外部审查不阻塞。
+
+## 静态双 CR 记录
+
+固定比较 `git diff --cached 6bc2eff270349f985494dd30f4e1f91fe034930f`，最终23个自有文件。Standards首轮PASS；Spec首轮发现P1原HTTP会话未在慢调用返回前复核、P2详情权限流断开后等待重读期间辅助未卸载。两项均已修复并添加测试源码：会话注销/主体切换拒绝内容返回，慢详情重读尚未完成时辅助编辑区已卸载。复核后 **Standards PASS / Spec PASS，剩余各0项有效发现**。最终文档只补记审查过程，无被测或实测证据；所有运行仍NOT_RUN。
+
+迁移顺序增量：基线 `debe02094eca3f3ad4af8c03a84a7b73fc1ffa84`，仅自有迁移 V43→V44 的100%同内容重命名和本文引用更新；Standards / Spec 各 PASS、0项发现。未运行验证、未查询锁、未修改已发布迁移或他票文件。
+
+最新 main 同步增量：基线 `e61152199c985f2d46b1a1cf1575b14ac8cb3a03`，合并提交 `bc2629b3d509c6e64a91a081c9ebc4991c49e336` 同步 `origin/main` `9995156252e416ac59bfaba24d05ad58319ca572`，并更新本文的 #169 Draft 契约快照与串行交接清单。增量 Standards / Spec 各 PASS、0项发现；仅静态审查，未运行测试、检查、构建、Docker、模型或完整门禁。
+
+最终候选 `9cb53e27e9f3e5fe521c375c5739e2f24f6c5e3f` 固定比较 `origin/main...9cb53e2`：Standards PASS、Spec PASS，各0项阻塞发现。审查确认了人工同文草稿仍需明确替换、`knowledge`/`policy` prompt 与双边引用校验一致、`suggestions` 仅为有界文本投影，以及 `retrievalEmpty` 与充分性决定正交；仍复用 #169 唯一共享适配层。该次审查只读，未运行测试、格式、lint、类型检查、构建、Docker、模型或评测。
+
+首次最终完整门禁 `issue170-final-20260902a` 在任何锁或测试前曾因瞬时 TLS fetch 错误 `PRECHECK_ABORTED`；协调明确该次不计门禁尝试，并授权同 RunId 重试。重试进入真实 Compose 后发现 `scripts/smoke.ps1` 的 Flyway 历史期望仍止于 V43，实际全新数据库已成功执行 `1–37、39–44`，因此在 smoke 前置断言失败；这不是迁移执行失败。修复只把既有精确历史期望补到本票 V44，不补造缺失的 V38，也不放宽逐项成功断言。该失败保留为正式门禁 FAIL，修复后必须重新完成双轴审查及完整门禁，不能沿用先前结果。

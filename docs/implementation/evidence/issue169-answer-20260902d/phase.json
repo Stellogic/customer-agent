@@ -1,0 +1,67 @@
+{
+  "answer_quality": "STOPPED",
+  "error": "answers failed: 1",
+  "image_tag": "gate-issue169-answer-20260902d",
+  "head": "27bba7c30eb895d8bf5fdbcf4c0bd4241feb7820",
+  "steps": [
+    {
+      "exitCode": 0,
+      "name": "python-static"
+    },
+    {
+      "exitCode": 0,
+      "name": "build-backend"
+    },
+    {
+      "exitCode": 0,
+      "name": "build-agent"
+    },
+    {
+      "exitCode": 0,
+      "name": "build-frontend"
+    },
+    {
+      "exitCode": 0,
+      "name": "startup"
+    },
+    {
+      "exitCode": 0,
+      "name": "copy-smoke"
+    },
+    {
+      "exitCode": 0,
+      "name": "copy-acceptance"
+    },
+    {
+      "exitCode": 0,
+      "name": "http-pg"
+    },
+    {
+      "exitCode": 0,
+      "name": "copy-http-pg"
+    },
+    {
+      "exitCode": 0,
+      "name": "copy-sql"
+    },
+    {
+      "exitCode": 0,
+      "name": "projection-sql"
+    },
+    {
+      "exitCode": 0,
+      "name": "copy-answer"
+    },
+    {
+      "exitCode": 1,
+      "name": "answers"
+    }
+  ],
+  "status": "FAIL",
+  "project": "customer-agent-gate-issue169-answer-20260902d",
+  "frontend_port": "50466",
+  "working_tree_dirty": true,
+  "cleanup": "PASS",
+  "run": "issue169-answer-20260902d",
+  "paid_model_calls": 13
+}

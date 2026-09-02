@@ -106,6 +106,7 @@ class ActionDecision:
     action: InvestigationAction
     usage: ActionUsage = ActionUsage()
     evidence_claims: tuple[EvidenceClaim, ...] = ()
+    knowledge_query: str | None = None
 
     @classmethod
     def from_values(
@@ -114,6 +115,7 @@ class ActionDecision:
         parameters: dict[str, str],
         usage: ActionUsage,
         evidence_claims: tuple[EvidenceClaim, ...] = (),
+        knowledge_query: str | None = None,
     ) -> "ActionDecision":
         try:
             controlled_kind: ActionKind = InvestigationCapability(kind)
@@ -135,10 +137,17 @@ class ActionDecision:
             raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION)
         if len({claim.evidence_reference for claim in evidence_claims}) != len(evidence_claims):
             raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION)
+        if knowledge_query is not None and (
+            controlled_kind is not TerminalAction.SUBMIT_CONCLUSION
+            or not isinstance(knowledge_query, str)
+            or not 1 <= len(knowledge_query.strip()) <= 200
+        ):
+            raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION)
         return cls(
             InvestigationAction(controlled_kind, tuple(sorted(parameters.items()))),
             usage,
             evidence_claims,
+            knowledge_query.strip() if knowledge_query is not None else None,
         )
 
 
@@ -214,6 +223,7 @@ class ActionLoopResult:
     provider_attempts: int
     model_calls: tuple[ActionModelCallRecord, ...]
     evidence_claims: tuple[EvidenceClaim, ...]
+    knowledge_query: str | None = None
 
 
 @dataclass(frozen=True)
@@ -379,6 +389,7 @@ class ActionLoop:
                 progress.provider_attempts,
                 tuple(progress.model_calls),
                 decision.evidence_claims,
+                decision.knowledge_query,
             )
         try:
             tool_started = self._clock()

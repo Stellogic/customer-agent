@@ -1,0 +1,38 @@
+{
+  "issue": 190,
+  "pr": 203,
+  "run_id": "issue190-reranker-input-audit-20260831a",
+  "head_sha": "9bbeca00b202e077963c0e8832dd2b2b4dae8994",
+  "code_sha": "04d7ee9c7129e00741db22f04ccc72492253738e",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "redaction": "Only workspace/user-home path prefixes; original files retained locally. Archived launchers are evidence, not run-in-place entrypoints.",
+  "lock_release_observation": "FREE after own release, one read; coordinator notified",
+  "paid_model_calls": 0,
+  "artifacts": [
+    {
+      "file": "launch.json",
+      "source_sha256": "3c833b9d501bb2af12b9f2cfecf61acf31c54fca26bf7e1e9775ce0c5f9089ca",
+      "archived_sha256": "3c833b9d501bb2af12b9f2cfecf61acf31c54fca26bf7e1e9775ce0c5f9089ca"
+    },
+    {
+      "file": "audit.log",
+      "source_sha256": "f1bb4652d6f130ea32e890f31e5e18ba13c78a5f695caafc62343f391b952950",
+      "archived_sha256": "f1bb4652d6f130ea32e890f31e5e18ba13c78a5f695caafc62343f391b952950"
+    },
+    {
+      "file": "input-audit.json",
+      "source_sha256": "1c73f134dfdb5932bc3e2c6b60ce82ef730ef020b6a232311a225ffe6e6d5e89",
+      "archived_sha256": "1c73f134dfdb5932bc3e2c6b60ce82ef730ef020b6a232311a225ffe6e6d5e89"
+    },
+    {
+      "file": "issue190-reranker-input-audit.py",
+      "source_sha256": "c4bcd27db92de493300500bc0f392658be297d6946b55c31f58ee2ea14afb541",
+      "archived_sha256": "c4bcd27db92de493300500bc0f392658be297d6946b55c31f58ee2ea14afb541"
+    },
+    {
+      "file": "issue190-reranker-input-audit.ps1",
+      "source_sha256": "dbaf998e3c0fff5b64e9e8531843d03cc18a38f7bd1e56d30e1ce556550e3dda",
+      "archived_sha256": "dbaf998e3c0fff5b64e9e8531843d03cc18a38f7bd1e56d30e1ce556550e3dda"
+    }
+  ]
+}

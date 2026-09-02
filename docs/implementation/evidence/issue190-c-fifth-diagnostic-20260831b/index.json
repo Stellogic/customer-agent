@@ -1,0 +1,36 @@
+{
+  "schema": "issue190-c-fifth-diagnostic-evidence-v1",
+  "run_id": "issue190-c-fifth-diagnostic-20260831b",
+  "head_sha": "f77e8a50612bedb08f34111fe136a14d42d6e1f3",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "DIAGNOSTIC_COMPLETED",
+  "actual_api_requests": 1,
+  "original_development_phase_unchanged": true,
+  "original_five_attempts_unchanged": true,
+  "original_development_completed": 4,
+  "metrics": null,
+  "new_cost_upper_micro_cny": 1689,
+  "settled_upper_micro_cny": 10773,
+  "unsettled_reserved_micro_cny": 0,
+  "ledger_sha256": "0bd04be15c1c6e1eeb96f96cdadf994aa14b5a0f2d894e38c3426193896b40f8",
+  "evidence": [
+    {
+      "path": "launch.json",
+      "source_sha256": "29ec4489a4e58c073b7bd15b51aa5205b2d3c1d46c230da9ef0822206155f92f",
+      "archived_sha256": "29ec4489a4e58c073b7bd15b51aa5205b2d3c1d46c230da9ef0822206155f92f",
+      "redaction": "none; original bytes"
+    },
+    {
+      "path": "launch.log",
+      "source_sha256": "86db32155fa7e1b0b0e4fee8f3f5aa7d01d27f84c7d8c436dac2c643a3e2acfb",
+      "archived_sha256": "e547a79f2a61c0b4e59ad8597ae9af8bef2fe73309f85a5abc447446e109f747",
+      "redaction": "literal worktree path only"
+    },
+    {
+      "path": "sufficiency-fifth-diagnostic.json",
+      "source_sha256": "339cabcbe8553fd997aad119fbd1f6b062c41534f51e63ebbec20d976442fb56",
+      "archived_sha256": "339cabcbe8553fd997aad119fbd1f6b062c41534f51e63ebbec20d976442fb56",
+      "redaction": "none; original bytes"
+    }
+  ]
+}

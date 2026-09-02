@@ -1,0 +1,92 @@
+<WORKTREE>\agent\approval_queue_time_smoke.py
+  <WORKTREE>\agent\approval_queue_time_smoke.py:6:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\approval_queue_time_smoke.py:7:8 - error: Import "psycopg" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\auto_resolution_smoke.py
+  <WORKTREE>\agent\auto_resolution_smoke.py:11:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\auto_resolution_smoke.py:12:8 - error: Import "psycopg" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\order_allowance_smoke.py
+  <WORKTREE>\agent\order_allowance_smoke.py:11:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\order_allowance_smoke.py:12:8 - error: Import "psycopg" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\smoke.py
+  <WORKTREE>\agent\smoke.py:15:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\smoke.py:16:8 - error: Import "psycopg" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\auth.py
+  <WORKTREE>\agent\src\baseline_agent\auth.py:4:6 - error: Import "langgraph_sdk" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\checkpointer.py
+  <WORKTREE>\agent\src\baseline_agent\checkpointer.py:5:6 - error: Import "langgraph.checkpoint.base" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\checkpointer.py:6:6 - error: Import "langgraph.checkpoint.postgres.aio" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\clarification_retest_evidence.py
+  <WORKTREE>\agent\src\baseline_agent\clarification_retest_evidence.py:8:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\clarification_retest_evidence.py:9:8 - error: Import "psycopg" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\compensation_executor.py
+  <WORKTREE>\agent\src\baseline_agent\compensation_executor.py:7:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\customer_communication_model_runtime.py
+  <WORKTREE>\agent\src\baseline_agent\customer_communication_model_runtime.py:6:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\deepseek_customer_communication_model.py
+  <WORKTREE>\agent\src\baseline_agent\deepseek_customer_communication_model.py:12:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\deepseek_intake_model.py
+  <WORKTREE>\agent\src\baseline_agent\deepseek_intake_model.py:7:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\deepseek_investigation_action_model.py
+  <WORKTREE>\agent\src\baseline_agent\deepseek_investigation_action_model.py:11:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\deepseek_investigation_model.py
+  <WORKTREE>\agent\src\baseline_agent\deepseek_investigation_model.py:14:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\deepseek_model_comparison.py
+  <WORKTREE>\agent\src\baseline_agent\deepseek_model_comparison.py:12:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\deepseek_real_evaluation.py
+  <WORKTREE>\agent\src\baseline_agent\deepseek_real_evaluation.py:9:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\formal_mode_business_smoke.py
+  <WORKTREE>\agent\src\baseline_agent\formal_mode_business_smoke.py:11:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\formal_mode_business_smoke.py:12:8 - error: Import "psycopg" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\formal_mode_metrics.py
+  <WORKTREE>\agent\src\baseline_agent\formal_mode_metrics.py:8:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\formal_mode_metrics.py:9:8 - error: Import "psycopg" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\graph.py
+  <WORKTREE>\agent\src\baseline_agent\graph.py:6:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\graph.py:7:6 - error: Import "langgraph.graph" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\graph.py:8:6 - error: Import "langgraph.types" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\intake_graph.py
+  <WORKTREE>\agent\src\baseline_agent\intake_graph.py:6:6 - error: Import "langgraph.graph" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\investigation_action_model_runtime.py
+  <WORKTREE>\agent\src\baseline_agent\investigation_action_model_runtime.py:6:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\investigation_model_runtime.py
+  <WORKTREE>\agent\src\baseline_agent\investigation_model_runtime.py:6:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\knowledge_answerability.py
+  <WORKTREE>\agent\src\baseline_agent\knowledge_answerability.py:109:10 - error: Import "sklearn.exceptions" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\knowledge_answerability.py:110:10 - error: Import "sklearn.linear_model" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\knowledge_answerability.py:111:10 - error: Import "sklearn.pipeline" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\knowledge_answerability.py:112:10 - error: Import "sklearn.preprocessing" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\knowledge_answerability_run.py
+  <WORKTREE>\agent\src\baseline_agent\knowledge_answerability_run.py:14:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\knowledge_embedding.py
+  <WORKTREE>\agent\src\baseline_agent\knowledge_embedding.py:43:16 - error: Import "torch" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\knowledge_embedding.py:44:14 - error: Import "transformers" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\knowledge_embedding_graph.py
+  <WORKTREE>\agent\src\baseline_agent\knowledge_embedding_graph.py:3:6 - error: Import "langgraph.graph" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\knowledge_evaluation.py
+  <WORKTREE>\agent\src\baseline_agent\knowledge_evaluation.py:15:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\knowledge_evaluation.py:16:8 - error: Import "psycopg" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\knowledge_sufficiency.py
+  <WORKTREE>\agent\src\baseline_agent\knowledge_sufficiency.py:161:17 - error: Operator "+" not supported for "None" (reportOptionalOperand)
+  <WORKTREE>\agent\src\baseline_agent\knowledge_sufficiency.py:161:37 - error: Operator ">" not supported for "None" (reportOptionalOperand)
+  <WORKTREE>\agent\src\baseline_agent\knowledge_sufficiency.py:161:59 - error: Operator ">" not supported for "None" (reportOptionalOperand)
+  <WORKTREE>\agent\src\baseline_agent\knowledge_sufficiency.py:170:21 - error: Operator "<=" not supported for types "int" and "Unknown | None"
+    Operator "<=" not supported for types "int" and "None" (reportOperatorIssue)
+  <WORKTREE>\agent\src\baseline_agent\knowledge_sufficiency.py:171:73 - error: Operator "<=" not supported for types "int" and "Unknown | None"
+    Operator "<=" not supported for types "int" and "None" (reportOperatorIssue)
+  <WORKTREE>\agent\src\baseline_agent\knowledge_sufficiency.py:175:66 - error: Operator "*" not supported for "None" (reportOptionalOperand)
+  <WORKTREE>\agent\src\baseline_agent\knowledge_sufficiency.py:175:79 - error: Operator "*" not supported for "None" (reportOptionalOperand)
+<WORKTREE>\agent\src\baseline_agent\knowledge_sufficiency_run.py
+  <WORKTREE>\agent\src\baseline_agent\knowledge_sufficiency_run.py:16:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\migrate.py
+  <WORKTREE>\agent\src\baseline_agent\migrate.py:4:6 - error: Import "langgraph.checkpoint.postgres.aio" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\migrate.py:5:6 - error: Import "psycopg" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\prepare_knowledge_model.py
+  <WORKTREE>\agent\src\baseline_agent\prepare_knowledge_model.py:6:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\real_shadow_business_smoke.py
+  <WORKTREE>\agent\src\baseline_agent\real_shadow_business_smoke.py:12:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+  <WORKTREE>\agent\src\baseline_agent\real_shadow_business_smoke.py:13:8 - error: Import "psycopg" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\release_evaluation.py
+  <WORKTREE>\agent\src\baseline_agent\release_evaluation.py:7:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+<WORKTREE>\agent\src\baseline_agent\shadow_investigation.py
+  <WORKTREE>\agent\src\baseline_agent\shadow_investigation.py:11:8 - error: Import "httpx" could not be resolved (reportMissingImports)
+56 errors, 0 warnings, 0 informations

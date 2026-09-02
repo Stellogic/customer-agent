@@ -1,0 +1,43 @@
+**********************
+PowerShell transcript start
+Start time: 20260831160244
+Username: LAPTOP-03VLKRQR\lz
+RunAs User: LAPTOP-03VLKRQR\lz
+Configuration Name: 
+Machine: LAPTOP-03VLKRQR (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\Program Files\PowerShell\7\pwsh.dll -NoProfile -File C:\Users\lizhuo\AppData\Local\Temp/issue170-focused-validation-b.ps1
+Process ID: 8948
+PSVersion: 7.6.5
+PSEdition: Core
+GitCommitId: 7.6.5
+OS: Microsoft Windows 10.0.26200
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+TEST_GATE_HELD issue=170 runId=issue170-focused-20260831-b
+head=1783b36b71de6c8785f517d7c6b1b276c012b5e8
+base=c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472
+node=C:\Users\lizhuo\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe
+v24.19.0
+
+
+FORMAT_EXIT=0
+
+TEST_EXIT=0
+
+LINT_EXIT=0
+
+TYPE_EXIT=0
+SOURCE_SHA256 support-assistance.css 71AD3312EA3D0425AD2928AA162C87919FCD8ACA45969EA1EFFC09DDEDFF6315
+SOURCE_SHA256 SupportAssistancePanel.test.tsx 941C9C9E5DF896BBAC40B346CA0B7A6BE1DFCB30993F37062642B4256005B782
+SOURCE_SHA256 SupportAssistancePanel.tsx 230D6D70E31630C5D323CF45F35C75A2FAE5DE1D8920BE70FB74906C1112371D
+SOURCE_SHA256 supportAssistanceState.test.ts C86EED90659E60D7C370ED12F4CE041E12BB8FB0E83B6D7B592214FD35D6A2FD
+SOURCE_SHA256 supportAssistanceState.ts 57F7307C69B5350115A46B87CDF6BF3FCC1E6CF2E80D0F22A0FFFAB24A1E0BB4
+LOCK_RELEASED issue=170 runId=issue170-focused-20260831-b
+**********************
+PowerShell transcript end
+End time: 20260831160310
+**********************

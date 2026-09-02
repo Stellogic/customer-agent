@@ -1,0 +1,7 @@
+{
+  "run": "issue169-20260902-focus44",
+  "status": "PASS",
+  "mode": "OFFLINE_FOCUSED",
+  "paid_model_calls": 0,
+  "head": "9ff05aa70716fd64fb1cca11593a66b4ce597b11"
+}

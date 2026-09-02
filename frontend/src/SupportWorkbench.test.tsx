@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { announceHumanSessionChange } from "./humanSessionLifecycle";
 import { RootApplication } from "./RootApplication";
+import { isRecord } from "./streamProtocol";
 import { SupportWorkbench } from "./SupportWorkbench";
 
 const HANDOFF_TICKET = "26000000-0000-0000-0000-000000000001";
@@ -178,6 +179,95 @@ describe("客服共享队列工作台", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/support/workbench/tickets/${HANDOFF_TICKET}`,
       expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
+
+  it("详情权限流断开时先清辅助草稿，不等待缓慢详情重读", async () => {
+    let detailReads = 0;
+    let endAuthority: (() => void) | undefined;
+    let resolveDetail: ((response: Response) => void) | undefined;
+    const pendingDetail = new Promise<Response>((resolve) => {
+      resolveDetail = resolve;
+    });
+    const authority = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          endAuthority = () => controller.close();
+        },
+      }),
+      { headers: { "Content-Type": "text/event-stream" } },
+    );
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === SNAPSHOT_URL)
+        return snapshotResponse("support-workbench-v2:4", [], [], [HANDOFF_TICKET]);
+      if (path === "/api/support/workbench/events") return openStream();
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
+        detailReads += 1;
+        return detailReads === 1 ? Response.json(humanDetails()) : pendingDetail;
+      }
+      if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) return authority;
+      if (path.endsWith("/assistance/context"))
+        return Response.json({
+          schema: "support-assistance-v1",
+          ticketId: HANDOFF_TICKET,
+          assignmentId: "27000000-0000-0000-0000-000000000001",
+        });
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path.endsWith("/assistance/requests")) {
+        const request: unknown = JSON.parse(String(init?.body));
+        if (!isRecord(request) || typeof request.requestId !== "string") {
+          throw new Error("invalid assistance request");
+        }
+        return Response.json({
+          schema: "support-assistance-v1",
+          ticketId: HANDOFF_TICKET,
+          assignmentId: "27000000-0000-0000-0000-000000000001",
+          requestId: request.requestId,
+          kind: "draft",
+          view: {
+            status: "ready",
+            kind: "draft",
+            requestId: request.requestId,
+            retrievalEmpty: true,
+            text: "需要在撤权时清除的辅助草稿",
+            suggestions: [],
+            citations: [],
+          },
+        });
+      }
+      if (path.endsWith("/compensation-options")) return couponOptions();
+      throw new Error(`unexpected request: ${path}`);
+    });
+    render(<SupportWorkbench />);
+    await screen.findByRole("textbox", { name: "内部编辑区（尚未发送）" });
+    const publicReply = screen.getByRole("textbox", { name: "公开回复" });
+    fireEvent.change(publicReply, { target: { value: "需要在撤权时清除的辅助草稿" } });
+    fireEvent.click(screen.getByRole("button", { name: "回复草稿" }));
+    expect(
+      await screen.findByText(
+        "本次未匹配授权知识片段；回答充分性仍由同次 DeepSeek 结合当前工单上下文判断。",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "插入回复草稿" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "我已核实事实、政策与客户可见措辞" }));
+    fireEvent.click(screen.getByRole("button", { name: "交给人工发送区" }));
+    expect(screen.getByRole("group", { name: "确认替换人工发送区草稿" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "替换发送区草稿" }));
+    expect(publicReply).toHaveValue("需要在撤权时清除的辅助草稿");
+    endAuthority?.();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("textbox", { name: "内部编辑区（尚未发送）" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(detailReads).toBe(2);
+    expect(publicReply).toHaveValue("");
+    resolveDetail?.(new Response(null, { status: 404 }));
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "授权工单详情" })).not.toBeInTheDocument(),
     );
   });
 

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.knowledge.KnowledgeAccessPolicyTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:13.046Z" hostname="buildkitsandbox" time="0.005">
+  <properties/>
+  <testcase name="supportAndApproverReceiveCapabilityBackedScopes()" classname="com.stellogic.customeragent.knowledge.KnowledgeAccessPolicyTest" time="0.003"/>
+  <testcase name="customerAndInternalIdentityWithoutCapabilityAreDenied()" classname="com.stellogic.customeragent.knowledge.KnowledgeAccessPolicyTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,29 @@
+**********************
+PowerShell transcript start
+Start time: 20260901004143
+Username: <HOST>\lz
+RunAs User: <HOST>\lz
+Configuration Name: 
+Machine: <HOST> (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\Program Files\PowerShell\7\pwsh.dll -NoProfile -File .local/issue190-scope-verify.ps1 -RunId issue190-scope-runtime-20260901b
+Process ID: 36876
+PSVersion: 7.6.5
+PSEdition: Core
+GitCommitId: 7.6.5
+OS: Microsoft Windows 10.0.26200
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+
+
+
+
+
+
+**********************
+PowerShell transcript end
+End time: 20260901004455
+**********************

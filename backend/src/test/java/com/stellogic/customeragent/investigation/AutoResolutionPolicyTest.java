@@ -11,6 +11,43 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class AutoResolutionPolicyTest {
     @Test
+    void knowledgeQuestionMayContinueWithoutGrantingAutomaticResolutionOrHidingBusinessRisk() {
+        var conclusion =
+                conclusion(
+                        DecisionReasonCode.DELAY_UNDER_24_HOURS,
+                        InvestigationRiskScenario.LOGISTICS_DELAY);
+        var normal = order(false, false, false, 0, "IN_TRANSIT", 23);
+        assertThat(
+                        AutoResolutionPolicy.scenario(
+                                conclusion, normal, "LOGISTICS_DELAY", "有没有统一客服电话？"))
+                .isNull();
+        assertThat(
+                        AutoResolutionPolicy.canContinueKnowledgeConversation(
+                                conclusion, normal, "LOGISTICS_DELAY", "有没有统一客服电话？"))
+                .isTrue();
+        assertThat(
+                        AutoResolutionPolicy.canContinueKnowledgeConversation(
+                                conclusion, normal, "LOGISTICS_DELAY", "请立即取消订单"))
+                .isFalse();
+        assertThat(
+                        AutoResolutionPolicy.canContinueKnowledgeConversation(
+                                conclusion,
+                                order(false, false, false, 1, "IN_TRANSIT", 23),
+                                "LOGISTICS_DELAY",
+                                "有没有统一客服电话？"))
+                .isFalse();
+        assertThat(
+                        AutoResolutionPolicy.canContinueKnowledgeConversation(
+                                conclusion(
+                                        DecisionReasonCode.DELAY_UNDER_24_HOURS,
+                                        InvestigationRiskScenario.PACKAGE_SUSPECTED_LOST),
+                                normal,
+                                "LOGISTICS_DELAY",
+                                "有没有统一客服电话？"))
+                .isFalse();
+    }
+
+    @Test
     void springWhitelistAllowsOnlyThreeExplicitScenarioAndConclusionPairs() {
         assertThat(AutoResolutionPolicy.WAIT).isEqualTo(Duration.ofSeconds(300));
         assertThat(

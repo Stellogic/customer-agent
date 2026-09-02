@@ -1,0 +1,138 @@
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+ --> src\baseline_agent\knowledge_ablation.py:1:15
+  |
+1 | """#168 独立消融编排；真实分路执行与评分由 #190 集成适配器提供。"""
+  |                     ^^
+2 |
+3 | from __future__ import annotations
+  |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_ablation.py:18:30
+   |
+16 | MODES: tuple[RetrievalMode, ...] = ("lexical", "dense", "rrf")
+17 | # 回调必须返回该模式独立完成硬过滤、拒答判定及 #190 评分后的行。
+18 | # 不能把混合结果的 recall/MRR 复制给两路候选，也不能在此重新实现检索。
+   |                                             ^^
+19 | QueryRunner = Callable[[RetrievalMode, EvalQuery], dict[str, Any]]
+20 | Metrics = Callable[[list[dict[str, Any]]], dict[str, float]]
+   |
+
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+  --> src\baseline_agent\knowledge_ablation.py:53:14
+   |
+51 |     modes: tuple[RetrievalMode, ...] = MODES,
+52 | ) -> dict[str, Any]:
+53 |     """显式执行入口；失败保存已有逐题证据，绝不把异常当作正确拒答。"""
+   |                    ^^
+54 |     if not modes or len(set(modes)) != len(modes) or any(mode not in MODES for mode in modes):
+55 |         raise ValueError("必须显式选择非空、不重复的已知检索模式")
+   |
+
+RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_ablation.py:53:25
+   |
+51 |     modes: tuple[RetrievalMode, ...] = MODES,
+52 | ) -> dict[str, Any]:
+53 |     """显式执行入口；失败保存已有逐题证据，绝不把异常当作正确拒答。"""
+   |                                          ^^
+54 |     if not modes or len(set(modes)) != len(modes) or any(mode not in MODES for mode in modes):
+55 |         raise ValueError("必须显式选择非空、不重复的已知检索模式")
+   |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_ablation.py:88:23
+   |
+86 |                 else "FAIL"
+87 |             )
+88 |         # 三路执行完不代表每路合格，更不代表收益可复现或允许切默认。
+   |                                   ^^
+89 |         report["status"] = "MEASURED" if set(modes) == set(MODES) else "PARTIAL"
+90 |     except Exception as error:
+   |
+
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+   --> src\baseline_agent\knowledge_ablation.py:111:26
+    |
+109 |     output: Path,
+110 | ) -> dict[str, Any]:
+111 |     """适配 PR203 的公开融合评分接口；两条单路保持 NOT_RUN，不冒充完整消融。"""
+    |                                     ^^
+112 |     evaluation = import_module("baseline_agent.knowledge_evaluation")
+113 |     return run_ablation(
+    |
+
+RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+   --> src\baseline_agent\knowledge_ablation.py:111:41
+    |
+109 |     output: Path,
+110 | ) -> dict[str, Any]:
+111 |     """适配 PR203 的公开融合评分接口；两条单路保持 NOT_RUN，不冒充完整消融。"""
+    |                                                           ^^
+112 |     evaluation = import_module("baseline_agent.knowledge_evaluation")
+113 |     return run_ablation(
+    |
+
+RUF002 Docstring contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+ --> src\baseline_agent\knowledge_consistency.py:1:23
+  |
+1 | """比较同一文本/查询的向量与外部检索排序；不实现新的检索器或默认切换。"""
+  |                                         ^^
+2 |
+3 | from __future__ import annotations
+  |
+
+RUF003 Comment contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+  --> src\baseline_agent\knowledge_consistency.py:12:24
+   |
+10 | @dataclass(frozen=True)
+11 | class ConsistencyTolerance:
+12 |     # #189 没有冻结 ONNX 容差；调用者必须提供经审查的独立协议标识，无内置宽松默认。
+   |                              ^^
+13 |     protocol_id: str
+14 |     max_absolute_error: float
+   |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_consistency.py:12:42
+   |
+10 | @dataclass(frozen=True)
+11 | class ConsistencyTolerance:
+12 |     # #189 没有冻结 ONNX 容差；调用者必须提供经审查的独立协议标识，无内置宽松默认。
+   |                                                                  ^^
+13 |     protocol_id: str
+14 |     max_absolute_error: float
+   |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> src\baseline_agent\knowledge_consistency.py:48:36
+   |
+46 | class RankingPair:
+47 |     query_id: str
+48 |     # 唯一标识须包含 article/version/chunk，不能只用 articleId。
+   |                                           ^^
+49 |     pytorch: list[str]
+50 |     onnx: list[str]
+   |
+
+RUF003 Comment contains ambiguous `；` (FULLWIDTH SEMICOLON). Did you mean `;` (SEMICOLON)?
+   --> src\baseline_agent\knowledge_consistency.py:101:28
+    |
+ 99 |                 "pytorch": left,
+100 |                 "onnx": right,
+101 |                 # 双方都拒答视为一致；一方拒答另一方命中则为零。
+    |                                     ^^
+102 |                 "overlap": len(set(left) & set(right)) / denominator if denominator else 1.0,
+103 |                 "exact_order": left == right,
+    |
+
+RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA). Did you mean `,` (COMMA)?
+  --> tests\test_knowledge_consistency.py:12:14
+   |
+11 | def tolerance():
+12 |     # 仅用于算术单测，不是项目 ONNX 验收阈值。
+   |                     ^^
+13 |     return ConsistencyTolerance("synthetic-test-only", 0.01, 0.01, 0.01, 1.0, 1.0, 5)
+   |
+
+Found 13 errors.

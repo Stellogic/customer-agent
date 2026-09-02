@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.knowledge.KnowledgeCitationProjectionTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:13.300Z" hostname="buildkitsandbox" time="0.014">
+  <properties/>
+  <testcase name="mismatchedArticleVersionAndUnknownChunkAreRejected()" classname="com.stellogic.customeragent.knowledge.KnowledgeCitationProjectionTest" time="0.002"/>
+  <testcase name="supportProjectionUsesCanonicalChunkAndOnlyMatchingScopes()" classname="com.stellogic.customeragent.knowledge.KnowledgeCitationProjectionTest" time="0.002"/>
+  <testcase name="retiredAndHistoricalVersionsCannotBeUsedForNewReplies()" classname="com.stellogic.customeragent.knowledge.KnowledgeCitationProjectionTest" time="0.001"/>
+  <testcase name="customerProjectionContainsOnlyCanonicalTitleAndUpdateTime()" classname="com.stellogic.customeragent.knowledge.KnowledgeCitationProjectionTest" time="0.001"/>
+  <testcase name="internalKnowledgeCannotBeProjectedToCustomerAndRevokedScopesCannotReadSnippet()" classname="com.stellogic.customeragent.knowledge.KnowledgeCitationProjectionTest" time="0.001"/>
+  <testcase name="articleAndChunkMustShareAnAuthorizedScope()" classname="com.stellogic.customeragent.knowledge.KnowledgeCitationProjectionTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

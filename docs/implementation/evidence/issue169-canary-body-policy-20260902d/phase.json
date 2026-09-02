@@ -1,0 +1,71 @@
+{
+  "image_tag": "gate-issue169-canary-body-policy-20260902d",
+  "error": "canary failed: 2",
+  "working_tree_dirty": true,
+  "paid_model_calls": 1,
+  "steps": [
+    {
+      "exitCode": 0,
+      "name": "python-static"
+    },
+    {
+      "exitCode": 0,
+      "name": "build-backend"
+    },
+    {
+      "exitCode": 0,
+      "name": "build-agent"
+    },
+    {
+      "exitCode": 0,
+      "name": "build-frontend"
+    },
+    {
+      "exitCode": 0,
+      "name": "startup"
+    },
+    {
+      "exitCode": 0,
+      "name": "copy-smoke"
+    },
+    {
+      "exitCode": 0,
+      "name": "copy-acceptance"
+    },
+    {
+      "exitCode": 0,
+      "name": "http-pg"
+    },
+    {
+      "exitCode": 0,
+      "name": "copy-http-pg"
+    },
+    {
+      "exitCode": 0,
+      "name": "copy-sql"
+    },
+    {
+      "exitCode": 0,
+      "name": "projection-sql"
+    },
+    {
+      "exitCode": 0,
+      "name": "copy-canary-runner"
+    },
+    {
+      "exitCode": 0,
+      "name": "copy-canary-answer"
+    },
+    {
+      "exitCode": 2,
+      "name": "canary"
+    }
+  ],
+  "head": "9b44b254d84cdf666b06e6e1ec72e38325d2be28",
+  "frontend_port": "61247",
+  "status": "FAIL",
+  "run": "issue169-canary-body-policy-20260902d",
+  "answer_quality": "FAIL",
+  "cleanup": "PASS",
+  "project": "customer-agent-gate-issue169-canary-body-policy-20260902d"
+}

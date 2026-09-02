@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.ticket.CustomerAutoResolutionControllerTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:13.420Z" hostname="buildkitsandbox" time="0.106">
+  <properties/>
+  <testcase name="missingCandidateIdentityDoesNotReachTheService()" classname="com.stellogic.customeragent.ticket.CustomerAutoResolutionControllerTest" time="0.032"/>
+  <testcase name="staleCandidateRemainsAConflictInsteadOfReportingCancellation()" classname="com.stellogic.customeragent.ticket.CustomerAutoResolutionControllerTest" time="0.009"/>
+  <testcase name="cancellationUsesAuthenticatedOwnerAndTheExactPresentedCandidate()" classname="com.stellogic.customeragent.ticket.CustomerAutoResolutionControllerTest" time="0.005"/>
+  <system-out><![CDATA[16:08:13.470 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.470 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.470 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:13.501 [Test worker] WARN org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolver -- Resolved [org.springframework.http.converter.HttpMessageNotReadableException: JSON parse error: Cannot map `null` into type `long` (set `DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES` to 'false' to allow)]
+16:08:13.506 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.506 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.507 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+16:08:13.520 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.521 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.521 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

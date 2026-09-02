@@ -1,0 +1,54 @@
+# #170 原生命令终端输出摘录
+
+来源：本任务 2026-08-31 exec/write_stdin 工具返回的真实终端输出。
+PowerShell Start-Transcript 保存了退出码、锁与源码哈希，但没有捕获原生命令 stdout。
+下列内容从对应工具输出摘录，去除空白；不是另一次运行或补造的测试报告。
+
+## Run a: issue170-focused-20260831-a / session 20289
+
+v22.15.0
+10.9.2
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'customer-agent-frontend@0.1.0',
+npm warn EBADENGINE   required: { node: '24.19.0' },
+npm warn EBADENGINE   current: { node: 'v22.15.0', npm: '10.9.2' }
+npm warn EBADENGINE }
+added 506 packages in 24s
+Checking formatting...
+[warn] src/components/support-assistance/support-assistance.css
+[warn] src/components/support-assistance/SupportAssistancePanel.test.tsx
+[warn] src/components/support-assistance/SupportAssistancePanel.tsx
+[warn] src/components/support-assistance/supportAssistanceState.test.ts
+[warn] src/components/support-assistance/supportAssistanceState.ts
+[warn] Code style issues found in 5 files. Run Prettier with --write to fix.
+FORMAT_EXIT=1
+RUN v4.1.0 C:/Users/lizhuo/.codex/worktrees/f5bd/customer-agent/frontend
+Test Files  2 passed (2)
+Tests  25 passed (25)
+Start at  15:59:56
+Duration  31.16s (transform 191ms, setup 6.71s, import 501ms, tests 1.25s, environment 21.76s)
+TEST_EXIT=0
+LINT_EXIT=0
+TYPE_EXIT=0
+LOCK_RELEASED issue=170 runId=issue170-focused-20260831-a
+
+## Run b: issue170-focused-20260831-b / session 48025
+
+v24.19.0
+src/components/support-assistance/support-assistance.css 41ms
+src/components/support-assistance/SupportAssistancePanel.test.tsx 105ms
+src/components/support-assistance/SupportAssistancePanel.tsx 31ms
+src/components/support-assistance/supportAssistanceState.test.ts 12ms
+src/components/support-assistance/supportAssistanceState.ts 9ms
+Checking formatting...
+All matched files use Prettier code style!
+FORMAT_EXIT=0
+RUN v4.1.0 C:/Users/lizhuo/.codex/worktrees/f5bd/customer-agent/frontend
+Test Files  2 passed (2)
+Tests  25 passed (25)
+Start at  16:02:45
+Duration  5.60s (transform 102ms, setup 1.04s, import 209ms, tests 1.14s, environment 2.67s)
+TEST_EXIT=0
+LINT_EXIT=0
+TYPE_EXIT=0
+LOCK_RELEASED issue=170 runId=issue170-focused-20260831-b

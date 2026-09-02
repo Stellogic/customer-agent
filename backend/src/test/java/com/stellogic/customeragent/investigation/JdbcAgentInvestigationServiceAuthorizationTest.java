@@ -9,6 +9,7 @@ import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.stellogic.customeragent.knowledge.AgentKnowledgeResult;
 import com.stellogic.customeragent.reliability.TicketAuthorityLock;
 import com.stellogic.customeragent.ticket.CustomerPublicProjectionAppender;
 import java.time.Clock;
@@ -24,6 +25,48 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 
 class JdbcAgentInvestigationServiceAuthorizationTest {
+    @Test
+    @SuppressWarnings("unchecked")
+    void concurrentWinnerCannotReplaceTheReceiptThatWasActuallyValidated() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        AgentKnowledgeResult previous =
+                new AgentKnowledgeResult("agent-knowledge-v1", 7, List.of());
+        AgentKnowledgeResult validated =
+                new AgentKnowledgeResult("agent-knowledge-v1", 8, List.of());
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenAnswer(
+                        invocation ->
+                                invocation
+                                                .getArgument(0, String.class)
+                                                .startsWith("select t.order_reference")
+                                        ? List.of("ORDER-169")
+                                        : List.of(previous));
+        JdbcAgentInvestigationService service =
+                new JdbcAgentInvestigationService(
+                        jdbc,
+                        mock(AgentAccessAudit.class),
+                        Clock.systemUTC(),
+                        mock(JdbcCompensationProposalStore.class),
+                        mock(TicketAuthorityLock.class),
+                        mock(CustomerPublicProjectionAppender.class),
+                        mock(ObjectMapper.class),
+                        mock(
+                                com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter
+                                        .class));
+
+        assertThatThrownBy(
+                        () ->
+                                service.acceptKnowledgeSearch(
+                                        UUID.randomUUID(),
+                                        UUID.randomUUID(),
+                                        "same-request",
+                                        "配送指引",
+                                        validated))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode().value()).isEqualTo(409));
+    }
+
     @Test
     @SuppressWarnings("unchecked")
     void customerCommunicationContextKeepsTheCompleteOrderedConversation() {
@@ -45,7 +88,10 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                         mock(JdbcCompensationProposalStore.class),
                         mock(TicketAuthorityLock.class),
                         mock(CustomerPublicProjectionAppender.class),
-                        mock(ObjectMapper.class));
+                        mock(ObjectMapper.class),
+                        mock(
+                                com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter
+                                        .class));
 
         service.customerCommunicationContext(UUID.randomUUID(), UUID.randomUUID());
 
@@ -78,7 +124,10 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                         mock(JdbcCompensationProposalStore.class),
                         mock(TicketAuthorityLock.class),
                         mock(CustomerPublicProjectionAppender.class),
-                        mock(ObjectMapper.class));
+                        mock(ObjectMapper.class),
+                        mock(
+                                com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter
+                                        .class));
 
         assertThat(service.siblingTicketSummary(UUID.randomUUID(), UUID.randomUUID()).tickets())
                 .isEmpty();
@@ -113,7 +162,10 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                         mock(JdbcCompensationProposalStore.class),
                         mock(TicketAuthorityLock.class),
                         publicProjection,
-                        mock(ObjectMapper.class));
+                        mock(ObjectMapper.class),
+                        mock(
+                                com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter
+                                        .class));
 
         assertThatThrownBy(
                         () ->

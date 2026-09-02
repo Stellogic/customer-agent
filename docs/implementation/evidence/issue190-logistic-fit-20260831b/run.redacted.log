@@ -1,0 +1,339 @@
+阶段已记录：<WORKTREE>\.local\gate-evidence\issue190-logistic-fit-20260831b-training-prepare；不是冻结质量或完整门禁PASS。
+阶段已记录：<WORKTREE>\.local\gate-evidence\issue190-logistic-fit-20260831b-calibration-prepare；不是冻结质量或完整门禁PASS。
+.                                                                        [100%]
+1 passed in 0.04s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.numeric
+#1 transferring dockerfile: 1.13kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 26.48kB 0.0s done
+#5 DONE 0.0s
+
+#6 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#6 CACHED
+
+#7 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#7 CACHED
+
+#8 [build 4/6] COPY config ./config
+#8 CACHED
+
+#9 [build 2/6] WORKDIR /workspace
+#9 CACHED
+
+#10 [build 5/6] COPY src ./src
+#10 CACHED
+
+#11 [numeric-test 1/1] RUN --mount=type=cache,target=/home/gradle/.gradle gradle --init-script config/gradle-proxy.init.gradle.kts test --tests '*KnowledgeAnswerabilityPolicyTest' --tests '*KnowledgeAnswerabilityFeaturesTest' --no-daemon
+#11 CACHED
+
+#12 exporting to image
+#12 exporting layers done
+#12 writing image sha256:f87607a4b74aac01caddfb7ff671757b4a967ca807a7fa8ccb9e167ee20026c3 done
+#12 naming to docker.io/customer-agent/numeric:gate-issue190-logistic-fit-20260831b done
+#12 DONE 0.0s
+customer-agent-gate-issue190-logistic-fit-20260831b-numeric
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 30B
+#1 transferring dockerfile: 877B done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [runtime 1/5] FROM docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#5 DONE 0.0s
+
+#6 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 26.48kB 0.0s done
+#7 DONE 0.4s
+
+#8 [runtime 4/5] WORKDIR /app
+#8 CACHED
+
+#9 [build 2/6] WORKDIR /workspace
+#9 CACHED
+
+#10 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#10 CACHED
+
+#11 [runtime 2/5] RUN apt-get update     && apt-get install --yes --no-install-recommends curl     && rm -rf /var/lib/apt/lists/*
+#11 CACHED
+
+#12 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#12 CACHED
+
+#13 [build 4/6] COPY config ./config
+#13 CACHED
+
+#14 [build 5/6] COPY src ./src
+#14 CACHED
+
+#15 [runtime 3/5] RUN useradd --system --uid 10001 --create-home app
+#15 CACHED
+
+#16 [runtime 5/5] COPY --from=build /workspace/build/libs/customer-agent-backend-0.1.0-SNAPSHOT.jar app.jar
+#16 CACHED
+
+#17 exporting to image
+#17 exporting layers done
+#17 writing image sha256:2ba81596149f270d840e0f4a5659b9bc7caf8a72520e00813adc2f9c7cc568a4 0.0s done
+#17 naming to docker.io/customer-agent/backend:gate-issue190-logistic-fit-20260831b done
+#17 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 968B done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/python:3.13.14-slim-bookworm
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.1s
+
+#4 [base 1/8] FROM docker.io/library/python:3.13.14-slim-bookworm
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 7.05kB 0.0s done
+#5 DONE 0.1s
+
+#6 [base 4/8] COPY pyproject.toml uv.lock ./
+#6 CACHED
+
+#7 [base 5/8] RUN uv sync --frozen
+#7 CACHED
+
+#8 [base 6/8] COPY langgraph.json ./
+#8 CACHED
+
+#9 [base 3/8] RUN apt-get update     && apt-get install --yes --no-install-recommends libatomic1     && rm -rf /var/lib/apt/lists/*     && pip install --no-cache-dir uv==0.8.22
+#9 CACHED
+
+#10 [base 7/8] COPY src ./src
+#10 CACHED
+
+#11 [base 8/8] COPY tests ./tests
+#11 CACHED
+
+#12 [runtime 1/2] RUN uv sync --frozen --no-dev
+#12 CACHED
+
+#13 [base 2/8] WORKDIR /app
+#13 CACHED
+
+#14 [runtime 2/2] RUN useradd --system --uid 10002 --create-home agent && chown -R agent:agent /app
+#14 CACHED
+
+#15 exporting to image
+#15 exporting layers done
+#15 writing image sha256:277dbae6d5aae6c4612a6974d03396a10899341157c0bda167454fdf266bdd58 0.0s done
+#15 naming to docker.io/customer-agent/agent:gate-issue190-logistic-fit-20260831b done
+#15 DONE 0.1s
+Destructive Compose gate 隔离配置读回通过。
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_provider-egress  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_provider-egress  Created
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_edge  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_edge  Created
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_data  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_data  Created
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_services  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_services  Created
+ Volume "customer-agent-gate-issue190-logistic-fit-20260831b_postgres-data"  Creating
+ Volume "customer-agent-gate-issue190-logistic-fit-20260831b_postgres-data"  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Healthy
+SAFETY_DB_PASS
+阶段已记录：<WORKTREE>\.local\gate-evidence\issue190-logistic-fit-20260831b-training；不是冻结质量或完整门禁PASS。
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_provider-egress  Removing
+ Volume customer-agent-gate-issue190-logistic-fit-20260831b_postgres-data  Removing
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_edge  Removing
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_data  Removing
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_services  Removing
+ Volume customer-agent-gate-issue190-logistic-fit-20260831b_postgres-data  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_edge  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_provider-egress  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_data  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_services  Removed
+Destructive Compose gate 隔离配置读回通过。
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_edge  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_edge  Created
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_data  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_data  Created
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_provider-egress  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_provider-egress  Created
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_services  Creating
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_services  Created
+ Volume "customer-agent-gate-issue190-logistic-fit-20260831b_postgres-data"  Creating
+ Volume "customer-agent-gate-issue190-logistic-fit-20260831b_postgres-data"  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Creating
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Created
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Starting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Started
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Waiting
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Exited
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Healthy
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Healthy
+阶段已记录：<WORKTREE>\.local\gate-evidence\issue190-logistic-fit-20260831b-calibration；不是冻结质量或完整门禁PASS。
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-backend-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-spring-migrate-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-server-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-agent-migrate-1  Removed
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Stopping
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Stopped
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Removing
+ Container customer-agent-gate-issue190-logistic-fit-20260831b-postgres-1  Removed
+ Volume customer-agent-gate-issue190-logistic-fit-20260831b_postgres-data  Removing
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_data  Removing
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_edge  Removing
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_services  Removing
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_provider-egress  Removing
+ Volume customer-agent-gate-issue190-logistic-fit-20260831b_postgres-data  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_data  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_edge  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_provider-egress  Removed
+ Network customer-agent-gate-issue190-logistic-fit-20260831b_services  Removed
+Untagged: customer-agent/backend:gate-issue190-logistic-fit-20260831b
+Deleted: sha256:2ba81596149f270d840e0f4a5659b9bc7caf8a72520e00813adc2f9c7cc568a4
+Untagged: customer-agent/agent:gate-issue190-logistic-fit-20260831b
+Deleted: sha256:277dbae6d5aae6c4612a6974d03396a10899341157c0bda167454fdf266bdd58
+Untagged: customer-agent/numeric:gate-issue190-logistic-fit-20260831b
+Deleted: sha256:f87607a4b74aac01caddfb7ff671757b4a967ca807a7fa8ccb9e167ee20026c3
+OWN_LOCK_RELEASED issue190-logistic-fit-20260831b FAIL
+TEST_GATE_FREE
+status=FREE
+测试门禁空闲。
+NativeCommandExitException: <WORKTREE>\scripts\knowledge-answerability.ps1:53
+Line |
+  53 |          & $Uv run --frozen --group calibration python -m baseline_age …
+     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Program "uv.exe" ended with non-zero exit code: 1 (0x00000001).

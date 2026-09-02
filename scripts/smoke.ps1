@@ -62,7 +62,7 @@ docker compose exec -T agent-server sh -c 'test -z "${EXECUTOR_MACHINE_TOKEN+x}"
 docker compose exec -T compensation-executor sh -c 'test -z "${AGENT_MACHINE_TOKEN+x}"'
 
 $migrationHistory = docker compose exec -T postgres psql -U postgres -d customer_agent -Atc "select version || ':' || success from flyway_schema_history order by installed_rank"
-if (($migrationHistory -join ',') -ne '1:true,2:true,3:true,4:true,5:true,6:true,7:true,8:true,9:true,10:true,11:true,12:true,13:true,14:true,15:true,16:true,17:true,18:true,19:true,20:true,21:true,22:true,23:true,24:true,25:true,26:true,27:true,28:true,29:true,30:true,31:true,32:true,33:true,34:true,35:true,36:true,37:true,39:true,40:true,41:true') {
+if (($migrationHistory -join ',') -ne '1:true,2:true,3:true,4:true,5:true,6:true,7:true,8:true,9:true,10:true,11:true,12:true,13:true,14:true,15:true,16:true,17:true,18:true,19:true,20:true,21:true,22:true,23:true,24:true,25:true,26:true,27:true,28:true,29:true,30:true,31:true,32:true,33:true,34:true,35:true,36:true,37:true,39:true,40:true,41:true,42:true,43:true,44:true') {
     throw "Spring Flyway 迁移历史不完整: $($migrationHistory -join ',')"
 }
 
@@ -261,6 +261,8 @@ if ($Reset) {
 $runtimeLogs = docker compose logs --no-color
 & "$PSScriptRoot/assert-runtime-log-policy.ps1" -LogLines $runtimeLogs
 Write-Host '运行日志应用正文敏感内容扫描通过（Compose 元数据已剥离）'
+
+& "$PSScriptRoot/knowledge-quality-gate.ps1"
 
 $versions = [ordered]@{
     node = (docker run --rm node:24.19.0-bookworm-slim node --version 2>$null)

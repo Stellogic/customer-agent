@@ -1,0 +1,63 @@
+{
+  "schema": "issue169-official-json-schema-canary-v1",
+  "run_id": "issue169-canary-natural-20260902e",
+  "head_sha": "c1ecf5069aab50cf9a992d03e8594e71b78421f9",
+  "authority": "USER_COORDINATION",
+  "frozen_query_id": "delivery-01-a",
+  "maximum_compose_calls": 1,
+  "status": "FAIL",
+  "error_type": "CustomerCommunicationFailure",
+  "provider_attempt_count": 1,
+  "attempts": [
+    {
+      "internal_call_id": "e51e3dcb-abdb-4727-9198-f0c425350afd",
+      "attempt_id": "353eb9d4-136f-48ce-a7fb-e7d9e0deeb65",
+      "attempt_number": 1,
+      "provider": "deepseek",
+      "provider_response_id": "bbc1456f-ea96-420d-8e85-406b97d7d130",
+      "response_status": "completed",
+      "request_model": "deepseek-v4-flash",
+      "response_model": "deepseek-v4-flash",
+      "backend_fingerprint": null,
+      "prompt_version": "customer-knowledge-communication-v1",
+      "schema_version": "customer-reply-v2",
+      "duration_ms": 6053,
+      "input_tokens": 1261,
+      "output_tokens": 896,
+      "total_tokens": 2157,
+      "cached_tokens": null,
+      "cache_hit": null,
+      "failure_classification": "SCHEMA_MISMATCH",
+      "provider_http_status": 200,
+      "strict_schema_requested": true,
+      "thinking_disabled": true,
+      "allowed_parameters_only": true,
+      "actual_response_shape_valid": false,
+      "usage_reported": true,
+      "cache_metrics_reported": false,
+      "reasoning_tokens": null,
+      "validation_diagnostic": {
+        "category": "DOMAIN_BODY_ORDER_REFERENCE_REQUIRED",
+        "path": "$.body",
+        "expected": "customer_reply_policy",
+        "actual_type": "string"
+      }
+    }
+  ],
+  "completed_shape": {
+    "completed_frames": 1,
+    "response_status": "completed",
+    "response_model": "deepseek-v4-flash",
+    "output_top_level_keys": [
+      "body",
+      "escalationRequired",
+      "evidenceRefs",
+      "intent",
+      "knowledge",
+      "referencedOrder",
+      "schemaVersion"
+    ],
+    "schema_description_wrapper": false
+  },
+  "ledger_pending_micro_cny": 0
+}

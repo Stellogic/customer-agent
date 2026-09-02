@@ -1,0 +1,75 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 877B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [runtime 1/5] FROM docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#5 DONE 0.0s
+
+#6 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 1.45MB 0.6s done
+#7 DONE 0.7s
+
+#8 [build 2/6] WORKDIR /workspace
+#8 CACHED
+
+#9 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#9 CACHED
+
+#10 [build 4/6] COPY config ./config
+#10 CACHED
+
+#11 [build 5/6] COPY src ./src
+#11 DONE 0.1s
+
+#12 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#12 1.535 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+#12 2.734 Daemon will be stopped at the end of the build 
+#12 10.33 
+#12 10.33 > Task :compileJava
+#12 10.33 Note: Some input files use or override a deprecated API.
+#12 10.33 Note: Recompile with -Xlint:deprecation for details.
+#12 10.83 
+#12 10.83 > Task :processResources
+#12 10.83 > Task :classes
+#12 10.93 > Task :resolveMainClassName
+#12 11.53 > Task :bootJar
+#12 11.53 
+#12 11.53 [Incubating] Problems report is available at: file:///workspace/build/reports/problems/problems-report.html
+#12 11.53 
+#12 11.53 BUILD SUCCESSFUL in 10s
+#12 11.53 4 actionable tasks: 4 executed
+#12 11.53 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+#12 DONE 11.8s
+
+#13 [runtime 2/5] RUN apt-get update     && apt-get install --yes --no-install-recommends curl     && rm -rf /var/lib/apt/lists/*
+#13 CACHED
+
+#14 [runtime 3/5] RUN useradd --system --uid 10001 --create-home app
+#14 CACHED
+
+#15 [runtime 4/5] WORKDIR /app
+#15 CACHED
+
+#16 [runtime 5/5] COPY --from=build /workspace/build/libs/customer-agent-backend-0.1.0-SNAPSHOT.jar app.jar
+#16 DONE 0.1s
+
+#17 exporting to image
+#17 exporting layers 0.1s done
+#17 writing image sha256:af8cf2f4fc8fb13e402b1997aa641d49bb932c8e15ae826310759b701d5e86c7 done
+#17 naming to docker.io/customer-agent/backend:gate-issue168-runtime-20260901a done
+#17 DONE 0.1s

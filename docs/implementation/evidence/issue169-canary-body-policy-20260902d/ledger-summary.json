@@ -1,0 +1,11 @@
+{
+  "schema": "issue190-sufficiency-cost-v1",
+  "authorized_cap_micro_cny": 5000000,
+  "run": "issue169-canary-body-policy-20260902d",
+  "attempts": 308,
+  "settled": 306,
+  "timeout_released": 2,
+  "pending": 0,
+  "total_charged_micro_cny": 782952.0,
+  "ledger_sha256": "2627bb4fbf09bfe66515ebd393c13064790faa63a0b95a21d987eb3104c2d312"
+}

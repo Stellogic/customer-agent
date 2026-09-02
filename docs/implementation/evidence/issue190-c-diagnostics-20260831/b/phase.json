@@ -1,0 +1,40 @@
+{
+  "run_id": "issue190-c-diagnostics-20260831b",
+  "head_sha": "02fb1743b0ef9bfd123076c48fc783401dcdf42d",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "status": "ERROR",
+  "phases": [
+    {
+      "name": "focused",
+      "exit_code": 0,
+      "elapsed_seconds": 3.484998
+    },
+    {
+      "name": "format",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0711057
+    },
+    {
+      "name": "lint",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0744121
+    },
+    {
+      "name": "format-check",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0695368
+    },
+    {
+      "name": "types",
+      "exit_code": 1,
+      "elapsed_seconds": 15.5323428
+    }
+  ],
+  "paid_model_calls": 0,
+  "paid_model_cost_cny": 0,
+  "development_replay_run": false,
+  "holdout_or_frozen_evaluation_run": false,
+  "failure": "types failed: 1",
+  "elapsed_seconds": 19.3210323,
+  "working_tree_changed": true
+}

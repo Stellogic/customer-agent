@@ -1,0 +1,526 @@
+<WORKTREE>\.local\models\bge-small-zh-v1.5
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 877B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 26.48kB 0.0s done
+#5 DONE 0.0s
+
+#6 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#6 CACHED
+
+#7 [build 5/6] COPY src ./src
+#7 CACHED
+
+#8 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#8 CACHED
+
+#9 [build 4/6] COPY config ./config
+#9 CACHED
+
+#10 [build 2/6] WORKDIR /workspace
+#10 CACHED
+
+#11 [test 1/1] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts check --no-daemon
+#11 CACHED
+
+#12 exporting to image
+#12 exporting layers done
+#12 writing image sha256:11e7a1bc6da3acff1b1dbfd8c74f57ed90cdf23820cfbd8177091ca3cb01ed54 done
+#12 naming to docker.io/customer-agent/backend-test:gate-issue190-startup-20260901a done
+#12 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.04kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.13.14-slim-bookworm
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 96B done
+#3 DONE 0.0s
+
+#4 [base 1/7] FROM docker.io/library/python:3.13.14-slim-bookworm
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 2.59MB 0.1s done
+#5 DONE 0.1s
+
+#6 [base 6/7] COPY langgraph.json ./
+#6 CACHED
+
+#7 [base 7/7] COPY src ./src
+#7 CACHED
+
+#8 [test 4/7] COPY approval_queue_time_smoke.py ./
+#8 CACHED
+
+#9 [base 2/7] WORKDIR /app
+#9 CACHED
+
+#10 [base 3/7] RUN apt-get update     && apt-get install --yes --no-install-recommends libatomic1     && rm -rf /var/lib/apt/lists/*     && pip install --no-cache-dir uv==0.8.22
+#10 CACHED
+
+#11 [test 6/7] COPY order_allowance_smoke.py ./
+#11 CACHED
+
+#12 [base 4/7] COPY pyproject.toml uv.lock ./
+#12 CACHED
+
+#13 [base 5/7] RUN uv sync --frozen
+#13 CACHED
+
+#14 [test 2/7] COPY tests/fixtures/knowledge-history /docs/implementation/evidence
+#14 CACHED
+
+#15 [test 5/7] COPY auto_resolution_smoke.py ./
+#15 CACHED
+
+#16 [test 3/7] COPY smoke.py ./
+#16 CACHED
+
+#17 [test 1/7] COPY tests ./tests
+#17 CACHED
+
+#18 [test 7/7] RUN uv run ruff format --check .     && uv run ruff check .     && uv run pyright     && uv run pytest
+#18 CACHED
+
+#19 exporting to image
+#19 exporting layers done
+#19 writing image sha256:90307aa9ba06b7c8806da369abc099a2816e31ee4cee326330ded1f0546c6cf4 done
+#19 naming to docker.io/customer-agent/agent-test:gate-issue190-startup-20260901a done
+#19 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 DONE 0.0s
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [build 1/8] FROM docker.io/library/node:24.19.0-bookworm-slim
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 2.95kB done
+#5 DONE 0.0s
+
+#6 [build 8/8] RUN npm run build
+#6 CACHED
+
+#7 [build 5/8] COPY tsconfig.json vite.config.ts index.html eslint.config.js .prettierrc.json .prettierignore ./
+#7 CACHED
+
+#8 [build 6/8] COPY scripts ./scripts
+#8 CACHED
+
+#9 [build 2/8] WORKDIR /app
+#9 CACHED
+
+#10 [build 4/8] RUN npm ci
+#10 CACHED
+
+#11 [build 7/8] COPY src ./src
+#11 CACHED
+
+#12 [build 3/8] COPY package.json package-lock.json ./
+#12 CACHED
+
+#13 [test 1/1] RUN npm run check
+#13 CACHED
+
+#14 exporting to image
+#14 exporting layers done
+#14 writing image sha256:c34f19f60b5dac4a6b74982750ad16c3e2d919ae7c9f5715ba026241b2e77525 done
+#14 naming to docker.io/customer-agent/frontend-test:gate-issue190-startup-20260901a done
+#14 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 877B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [runtime 1/5] FROM docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#5 DONE 0.0s
+
+#6 [build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 26.48kB 0.0s done
+#7 DONE 0.0s
+
+#8 [build 2/6] WORKDIR /workspace
+#8 CACHED
+
+#9 [runtime 3/5] RUN useradd --system --uid 10001 --create-home app
+#9 CACHED
+
+#10 [build 5/6] COPY src ./src
+#10 CACHED
+
+#11 [runtime 4/5] WORKDIR /app
+#11 CACHED
+
+#12 [build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#12 CACHED
+
+#13 [build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#13 CACHED
+
+#14 [runtime 2/5] RUN apt-get update     && apt-get install --yes --no-install-recommends curl     && rm -rf /var/lib/apt/lists/*
+#14 CACHED
+
+#15 [build 4/6] COPY config ./config
+#15 CACHED
+
+#16 [runtime 5/5] COPY --from=build /workspace/build/libs/customer-agent-backend-0.1.0-SNAPSHOT.jar app.jar
+#16 CACHED
+
+#17 exporting to image
+#17 exporting layers done
+#17 writing image sha256:0d3541941df75f5ddbcdc3d44068002e306a6da837520953fe03475d3c2f0e60 done
+#17 naming to docker.io/customer-agent/backend:gate-issue190-startup-20260901a done
+#17 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.04kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.13.14-slim-bookworm
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 96B done
+#3 DONE 0.0s
+
+#4 [base 1/7] FROM docker.io/library/python:3.13.14-slim-bookworm
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 6.46kB 0.0s done
+#5 DONE 0.0s
+
+#6 [base 4/7] COPY pyproject.toml uv.lock ./
+#6 CACHED
+
+#7 [runtime 1/2] RUN uv sync --frozen --no-dev
+#7 CACHED
+
+#8 [base 7/7] COPY src ./src
+#8 CACHED
+
+#9 [base 5/7] RUN uv sync --frozen
+#9 CACHED
+
+#10 [base 2/7] WORKDIR /app
+#10 CACHED
+
+#11 [base 3/7] RUN apt-get update     && apt-get install --yes --no-install-recommends libatomic1     && rm -rf /var/lib/apt/lists/*     && pip install --no-cache-dir uv==0.8.22
+#11 CACHED
+
+#12 [base 6/7] COPY langgraph.json ./
+#12 CACHED
+
+#13 [runtime 2/2] RUN useradd --system --uid 10002 --create-home agent && chown -R agent:agent /app
+#13 CACHED
+
+#14 exporting to image
+#14 exporting layers done
+#14 writing image sha256:e9098c930f134141051e85ad29aab21aef18075eb3dd071810b0f30ac6c47640 done
+#14 naming to docker.io/customer-agent/agent:gate-issue190-startup-20260901a done
+#14 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/nginx:1.29.4-alpine
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [build 1/8] FROM docker.io/library/node:24.19.0-bookworm-slim
+#5 DONE 0.0s
+
+#6 [runtime 1/3] FROM docker.io/library/nginx:1.29.4-alpine
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 3.31kB done
+#7 DONE 0.0s
+
+#8 [build 7/8] COPY src ./src
+#8 CACHED
+
+#9 [build 2/8] WORKDIR /app
+#9 CACHED
+
+#10 [build 5/8] COPY tsconfig.json vite.config.ts index.html eslint.config.js .prettierrc.json .prettierignore ./
+#10 CACHED
+
+#11 [build 8/8] RUN npm run build
+#11 CACHED
+
+#12 [build 6/8] COPY scripts ./scripts
+#12 CACHED
+
+#13 [build 4/8] RUN npm ci
+#13 CACHED
+
+#14 [build 3/8] COPY package.json package-lock.json ./
+#14 CACHED
+
+#15 [runtime 2/3] COPY nginx.conf /etc/nginx/conf.d/default.conf
+#15 CACHED
+
+#16 [runtime 3/3] COPY --from=build /app/dist /usr/share/nginx/html
+#16 CACHED
+
+#17 exporting to image
+#17 exporting layers done
+#17 writing image sha256:29f2eff40f86f2f44599b5178061892a80ad4273f1aaaefcf97cefe41fafc575 done
+#17 naming to docker.io/customer-agent/frontend:gate-issue190-startup-20260901a done
+#17 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [browser-test  1/10] FROM docker.io/library/node:24.19.0-bookworm-slim
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 172.44kB 0.0s done
+#5 DONE 0.0s
+
+#6 [browser-test  5/10] RUN rm -f /etc/apt/apt.conf.d/docker-clean     && printf 'Acquire::Retries "10";\nAcquire::http::Timeout "30";\nBinary::apt-get::APT::Keep-Downloaded-Packages "true";\n'     > /etc/apt/apt.conf.d/80-playwright-retries
+#6 CACHED
+
+#7 [browser-test  7/10] RUN for attempt in 1 2 3; do       npx playwright install chromium && exit 0;       echo "Playwright Chromium download attempt ${attempt} failed";     done;     exit 1
+#7 CACHED
+
+#8 [browser-test  6/10] RUN --mount=type=cache,target=/var/cache/apt,sharing=locked     --mount=type=cache,target=/var/lib/apt,sharing=locked     for attempt in 1 2 3 4 5; do       npx playwright install-deps chromium         && apt-get install -y --no-install-recommends postgresql-client         && exit 0;       echo "Playwright system dependency attempt ${attempt} failed";     done;     exit 1
+#8 CACHED
+
+#9 [browser-test  4/10] RUN npm ci
+#9 CACHED
+
+#10 [browser-test  2/10] WORKDIR /app
+#10 CACHED
+
+#11 [browser-test  3/10] COPY package.json package-lock.json ./
+#11 CACHED
+
+#12 [browser-test  8/10] COPY playwright.config.ts ./
+#12 CACHED
+
+#13 [browser-test  9/10] COPY e2e ./e2e
+#13 CACHED
+
+#14 [browser-test 10/10] COPY src/sensitive-content-patterns.json ./src/sensitive-content-patterns.json
+#14 CACHED
+
+#15 exporting to image
+#15 exporting layers done
+#15 writing image sha256:f9d00e3d252632699ed8ce1d479248eec6b5365dd22f6a0ddea15d30460ddbf0 done
+#15 naming to docker.io/customer-agent/frontend-browser-test:gate-issue190-startup-20260901a done
+#15 DONE 0.0s
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.06kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/nginx:1.29.4-alpine
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [browser-server 1/4] FROM docker.io/library/nginx:1.29.4-alpine
+#5 DONE 0.0s
+
+#6 [build 1/8] FROM docker.io/library/node:24.19.0-bookworm-slim
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 644.96kB 0.0s done
+#7 DONE 0.0s
+
+#8 [build 4/8] RUN npm ci
+#8 CACHED
+
+#9 [build 7/8] COPY src ./src
+#9 CACHED
+
+#10 [build 5/8] COPY tsconfig.json vite.config.ts index.html eslint.config.js .prettierrc.json .prettierignore ./
+#10 CACHED
+
+#11 [build 2/8] WORKDIR /app
+#11 CACHED
+
+#12 [build 8/8] RUN npm run build
+#12 CACHED
+
+#13 [browser-server 2/4] RUN apk add --no-cache openssl     && mkdir -p /etc/nginx/tls     && openssl req -x509 -newkey rsa:2048 -nodes -days 1        -subj '/CN=browser-frontend'        -addext 'subjectAltName=DNS:browser-frontend'        -keyout /etc/nginx/tls/key.pem        -out /etc/nginx/tls/cert.pem
+#13 CACHED
+
+#14 [build 3/8] COPY package.json package-lock.json ./
+#14 CACHED
+
+#15 [build 6/8] COPY scripts ./scripts
+#15 CACHED
+
+#16 [browser-server 3/4] COPY nginx.browser.conf /etc/nginx/conf.d/default.conf
+#16 CACHED
+
+#17 [browser-server 4/4] COPY --from=build /app/dist /usr/share/nginx/html
+#17 CACHED
+
+#18 exporting to image
+#18 exporting layers done
+#18 writing image sha256:48f42373dd2e9b515ef42c79e77596f40cda1304dd41ef1cc7b8fef2750d14d1 done
+#18 naming to docker.io/customer-agent/frontend-browser-server:gate-issue190-startup-20260901a done
+#18 DONE 0.0s
+ Network customer-agent-issue190-startup-20260901a_data  Creating
+ Network customer-agent-issue190-startup-20260901a_data  Created
+ Volume "customer-agent-issue190-startup-20260901a_postgres-data"  Creating
+ Volume "customer-agent-issue190-startup-20260901a_postgres-data"  Created
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Creating
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Created
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Starting
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Started
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Waiting
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Healthy
+ Network customer-agent-issue190-startup-20260901a_services  Creating
+ Network customer-agent-issue190-startup-20260901a_services  Created
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.0)
+
+2026-08-31T17:09:39.263Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Starting CustomerAgentApplication v0.1.0-SNAPSHOT using Java 25.0.3 with PID 1 (/app/app.jar started by app in /app)
+2026-08-31T17:09:39.269Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : No active profile set, falling back to 1 default profile: "default"
+2026-08-31T17:09:40.750Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+2026-08-31T17:09:40.762Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-08-31T17:09:40.763Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.22]
+2026-08-31T17:09:40.785Z  INFO 1 --- [customer-agent-backend] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 1451 ms
+2026-08-31T17:09:42.541Z  INFO 1 --- [customer-agent-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name productionHumanUsers
+2026-08-31T17:09:43.065Z  INFO 1 --- [customer-agent-backend] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+2026-08-31T17:09:43.119Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+2026-08-31T17:09:43.130Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Started CustomerAgentApplication in 4.339 seconds (process running for 4.848)
+2026-08-31T17:09:43.141Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-08-31T17:09:43.159Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@6879c1a3
+2026-08-31T17:09:43.165Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-08-31T17:09:43.208Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-08-31T17:09:43.210Z  INFO 1 --- [customer-agent-backend] [tomcat-shutdown] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-08-31T17:09:43.217Z  INFO 1 --- [customer-agent-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-08-31T17:09:43.220Z  INFO 1 --- [customer-agent-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+CREATE TABLE
+INSERT 0 1
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Restarting
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Started
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Running
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Waiting
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Healthy
+You are now connected to database "customer_agent" as user "postgres".
+CREATE EXTENSION
+You are now connected to database "customer_agent" as user "postgres".
+psql:/docker-entrypoint-initdb.d/002-knowledge-vector.sql:2: NOTICE:  extension "vector" already exists, skipping
+CREATE EXTENSION
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.0)
+
+2026-08-31T17:09:51.511Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Starting CustomerAgentApplication v0.1.0-SNAPSHOT using Java 25.0.3 with PID 1 (/app/app.jar started by app in /app)
+2026-08-31T17:09:51.515Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : No active profile set, falling back to 1 default profile: "default"
+2026-08-31T17:09:53.030Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+2026-08-31T17:09:53.043Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-08-31T17:09:53.043Z  INFO 1 --- [customer-agent-backend] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.22]
+2026-08-31T17:09:53.066Z  INFO 1 --- [customer-agent-backend] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 1484 ms
+2026-08-31T17:09:54.314Z  INFO 1 --- [customer-agent-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name productionHumanUsers
+2026-08-31T17:09:54.817Z  INFO 1 --- [customer-agent-backend] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+2026-08-31T17:09:54.878Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+2026-08-31T17:09:54.890Z  INFO 1 --- [customer-agent-backend] [           main] c.s.c.CustomerAgentApplication           : Started CustomerAgentApplication in 3.884 seconds (process running for 4.387)
+2026-08-31T17:09:54.900Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-08-31T17:09:54.919Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@70f1930f
+2026-08-31T17:09:54.924Z  INFO 1 --- [customer-agent-backend] [   scheduling-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-08-31T17:09:54.968Z  INFO 1 --- [customer-agent-backend] [           main] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
+2026-08-31T17:09:54.971Z  INFO 1 --- [customer-agent-backend] [tomcat-shutdown] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
+2026-08-31T17:09:54.978Z  INFO 1 --- [customer-agent-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-08-31T17:09:54.980Z  INFO 1 --- [customer-agent-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Stopping
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Stopped
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Removing
+ Container customer-agent-issue190-startup-20260901a-postgres-1  Removed
+ Network customer-agent-issue190-startup-20260901a_services  Removing
+ Network customer-agent-issue190-startup-20260901a_data  Removing
+ Volume customer-agent-issue190-startup-20260901a_postgres-data  Removing
+ Volume customer-agent-issue190-startup-20260901a_postgres-data  Removed
+ Network customer-agent-issue190-startup-20260901a_data  Removed
+ Network customer-agent-issue190-startup-20260901a_services  Removed

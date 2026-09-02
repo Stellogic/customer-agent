@@ -80,6 +80,53 @@ def test_public_reply_rejects_premature_ticket_state_even_during_streaming(promi
     assert not is_authorized_body_prefix(body, "ORDER-162", complete=True)
 
 
+def test_no_compensation_reply_allows_natural_denial_wording() -> None:
+    body = "经核验，订单 ORDER-162 的物流延迟不足 24 小时，暂不满足申请补偿的条件。"
+
+    assert is_authorized_body_prefix(body, "ORDER-162", complete=True)
+
+
+def test_customer_question_about_resolution_is_not_a_ticket_status_change() -> None:
+    body = "您问资料不足是不是表示问题已经解决；当前结论仍以页面状态为准。"
+
+    assert is_authorized_body_prefix(body, "ORDER-162", complete=True)
+
+
+def test_reply_may_omit_redundant_order_reference() -> None:
+    assert is_authorized_body_prefix(
+        "经核验，本次物流延迟不足 24 小时。", "ORDER-162", complete=True
+    )
+
+
+@pytest.mark.parametrize(
+    "promise",
+    [
+        "将补偿",
+        "已补偿",
+        "可以获得补偿",
+        "会补偿您一张优惠券",
+        "不久后会补偿您一张优惠券",
+        "承诺补偿",
+        "将退款",
+        "会为您退款",
+        "不会补偿，但会退款",
+        "暂不处理，但会为您退款",
+        "同意退款",
+    ],
+)
+def test_no_compensation_reply_still_rejects_positive_actions(promise: str) -> None:
+    body = f"订单 ORDER-162 的核验已完成，我们{promise}。"
+
+    assert not is_authorized_body_prefix(body, "ORDER-162", complete=True)
+
+
+@pytest.mark.parametrize("denial", ["不会为您退款", "无法提供补偿", "未达到补偿条件"])
+def test_no_compensation_reply_does_not_treat_denial_as_a_promise(denial: str) -> None:
+    body = f"经核验，订单 ORDER-162 的物流延迟不足 24 小时，{denial}。"
+
+    assert is_authorized_body_prefix(body, "ORDER-162", complete=True)
+
+
 @pytest.mark.asyncio
 async def test_communication_input_rejects_evidence_outside_the_order_scope() -> None:
     with pytest.raises(CustomerCommunicationFailure) as failure:

@@ -1,0 +1,16 @@
+{
+  "run_id": "issue168-deps-20260901a",
+  "status": "ERROR",
+  "phases": [
+    {
+      "name": "install-uv",
+      "exit_code": 0
+    },
+    {
+      "name": "lock",
+      "exit_code": 1
+    }
+  ],
+  "lock_released": true,
+  "error": "lock failed: 1"
+}

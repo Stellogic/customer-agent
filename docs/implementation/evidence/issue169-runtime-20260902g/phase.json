@@ -1,0 +1,61 @@
+{
+  "working_tree_dirty": true,
+  "status": "PASS",
+  "image_tag": "gate-issue169-runtime-20260902g",
+  "frontend_port": "65300",
+  "paid_model_calls": 0,
+  "cleanup": "PASS",
+  "steps": [
+    {
+      "name": "python-static",
+      "exitCode": 0
+    },
+    {
+      "name": "build-backend",
+      "exitCode": 0
+    },
+    {
+      "name": "build-agent",
+      "exitCode": 0
+    },
+    {
+      "name": "build-frontend",
+      "exitCode": 0
+    },
+    {
+      "name": "startup",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-smoke",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-acceptance",
+      "exitCode": 0
+    },
+    {
+      "name": "http-pg",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-http-pg",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-sql",
+      "exitCode": 0
+    },
+    {
+      "name": "projection-sql",
+      "exitCode": 0
+    },
+    {
+      "name": "browser",
+      "exitCode": 0
+    }
+  ],
+  "head": "0a09c958ac606b5fb3554a69b971aa43e8b941e1",
+  "run": "issue169-runtime-20260902g",
+  "project": "customer-agent-gate-issue169-runtime-20260902g"
+}
