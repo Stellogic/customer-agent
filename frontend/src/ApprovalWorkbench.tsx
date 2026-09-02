@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StatusNotice } from "./components/SystemState";
+import { ApprovalContextEntries, ApprovalQueueEntries } from "./components/internal/ContextEntries";
+import { focusContextTarget } from "./components/internal/focusContextTarget";
 import { loadCsrfToken } from "./csrf";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import {
@@ -371,6 +373,7 @@ function Queue({
         </div>
         <strong>{queue.length} 项</strong>
       </header>
+      <ApprovalQueueEntries />
       {queue.length ? (
         <div className="approval-table" role="table" aria-label="待审批提案">
           <div className="approval-table-row approval-table-heading" role="row">
@@ -424,8 +427,34 @@ function Detail({
   snapshot: Snapshot;
   onAction: (value: Exclude<Action, null>) => void;
 }) {
+  const eligibilityRef = useRef<HTMLElement>(null);
+  const policyRef = useRef<HTMLElement>(null);
+  const delayRef = useRef<HTMLSpanElement>(null);
+  const chainRef = useRef<HTMLElement>(null);
   return (
     <div className="approval-detail-grid">
+      <div className="approval-context-entry-row">
+        <ApprovalContextEntries
+          projectionKey={`${snapshot.proposalRevisionId}:${snapshot.leaseVersion}:${snapshot.cursor}`}
+          entries={{
+            policy: { kind: "available", onOpen: () => focusContextTarget(policyRef.current) },
+            proposalLog: {
+              kind: "available",
+              onOpen: () => focusContextTarget(chainRef.current),
+              description: "查看当前提案的授权责任链。",
+            },
+            logistics: {
+              kind: "available",
+              onOpen: () => focusContextTarget(delayRef.current),
+              description: "查看当前审批延迟事实，完整物流轨迹尚未接入。",
+            },
+            eligibility: {
+              kind: "available",
+              onOpen: () => focusContextTarget(eligibilityRef.current),
+            },
+          }}
+        />
+      </div>
       <section className="approval-card approval-summary">
         <header>
           <div>
@@ -452,11 +481,18 @@ function Detail({
           <Fact name="提案版本">第 {snapshot.proposalRevision} 版</Fact>
           <Fact name="原因代码">{snapshot.reasonCode}</Fact>
           <Fact name="延迟事实">
-            {snapshot.delayHours} 小时（{snapshot.delaySeconds} 秒）
+            <span ref={delayRef} tabIndex={-1} className="context-entry-target">
+              {snapshot.delayHours} 小时（{snapshot.delaySeconds} 秒）
+            </span>
           </Fact>
         </dl>
       </section>
-      <section className="approval-card approval-authority">
+      <section
+        ref={eligibilityRef}
+        tabIndex={-1}
+        className="approval-card approval-authority context-entry-target"
+        aria-label="资格与金额"
+      >
         <p className="queue-kicker">资格与金额</p>
         <h2>权威金额</h2>
         <strong className="authority-amount">{money(snapshot.authoritativeAmount)}</strong>
@@ -467,7 +503,12 @@ function Detail({
           ))}
         </ul>
       </section>
-      <section className="approval-card">
+      <section
+        ref={policyRef}
+        tabIndex={-1}
+        className="approval-card context-entry-target"
+        aria-label="政策信息"
+      >
         <p className="queue-kicker">版本化规则</p>
         <h2>政策信息</h2>
         <dl className="approval-facts compact">
@@ -493,7 +534,12 @@ function Detail({
           ))}
         </dl>
       </section>
-      <section className="approval-card approval-chain">
+      <section
+        ref={chainRef}
+        tabIndex={-1}
+        className="approval-card approval-chain context-entry-target"
+        aria-label="责任链"
+      >
         <p className="queue-kicker">责任边界</p>
         <h2>责任链</h2>
         {snapshot.responsibilityChain.length ? (

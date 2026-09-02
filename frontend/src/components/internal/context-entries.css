@@ -1,0 +1,75 @@
+.context-entries {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface, #fffefa);
+  padding: 18px;
+  color: var(--ink);
+}
+
+.context-entries header p {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.context-entries h3 {
+  margin: 0 0 16px;
+  font-family: var(--font-display);
+}
+
+.context-entry-list {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+  gap: 10px;
+  list-style: none;
+}
+
+.context-entry-list li {
+  display: flex;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.context-entry-list button {
+  min-height: 40px;
+  border: 1px solid var(--forest-200);
+  border-radius: 8px;
+  background: transparent;
+  padding: 8px 12px;
+  color: var(--forest-800);
+  font: inherit;
+  cursor: pointer;
+}
+
+.context-entry-list button:hover:not(:disabled) {
+  background: var(--forest-50, #edf3eb);
+}
+
+.context-entry-list button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.context-entry-list small {
+  max-width: 34em;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.context-entry-list button:focus-visible {
+  outline: 3px solid #3977c6;
+  outline-offset: 3px;
+}
+
+.context-entry-target:focus {
+  outline: 3px solid #3977c6;
+  outline-offset: 3px;
+}
+
+.approval-context-entry-row {
+  grid-column: 1 / -1;
+}

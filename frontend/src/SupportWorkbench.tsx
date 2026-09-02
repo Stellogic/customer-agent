@@ -12,6 +12,8 @@ import { StatusNotice } from "./components/SystemState";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import { IntakeAssistancePanel } from "./IntakeAssistancePanel";
 import { SupportCompensationPanel } from "./SupportCompensationPanel";
+import { SupportContextEntries } from "./components/internal/ContextEntries";
+import { focusContextTarget } from "./components/internal/focusContextTarget";
 import { SupportAssistance } from "./components/support-assistance/SupportAssistance";
 import { clearPendingReply, readPendingReply, storePendingReply } from "./supportReplyStorage";
 
@@ -768,6 +770,10 @@ function TicketDetail({
   onRelease: () => void;
 }) {
   const storedPendingReply = readPendingReply(details.ticketId);
+  const orderRef = useRef<HTMLDivElement>(null);
+  const replyRef = useRef<HTMLElement>(null);
+  const factsRef = useRef<HTMLElement>(null);
+  const assistanceRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(() => storedPendingReply?.body ?? "");
   const [replyState, setReplyState] = useState<
     "idle" | "sending" | "unknown" | "querying" | "error"
@@ -780,9 +786,12 @@ function TicketDetail({
   );
   const replyBusy = replyState === "sending" || replyState === "querying";
   const [reviewedAssistance, setReviewedAssistance] = useState<string | null>(null);
+  const [assistanceDraftActive, setAssistanceDraftActive] = useState(false);
   const assistanceDraft = useRef<string | null>(null);
+  const visibleDraft = !assistanceAvailable && assistanceDraftActive ? "" : draft;
   const clearReviewedAssistance = useCallback(() => {
     setReviewedAssistance(null);
+    setAssistanceDraftActive(false);
     const handedOffDraft = assistanceDraft.current;
     if (handedOffDraft !== null) {
       setDraft((current) => (current === handedOffDraft ? "" : current));
@@ -796,12 +805,13 @@ function TicketDetail({
       setReviewedAssistance(text);
     } else {
       assistanceDraft.current = text;
+      setAssistanceDraftActive(true);
       setDraft(text);
     }
   }
 
   async function submitReply() {
-    const body = draft.trim();
+    const body = visibleDraft.trim();
     if (!body || replyState === "sending" || replyState === "querying") return;
     const idempotencyKey = createIdempotencyKey();
     setReviewedAssistance(null);
@@ -813,6 +823,7 @@ function TicketDetail({
       await onSendReply(details.ticketId, idempotencyKey, body);
       clearPendingReply(details.ticketId);
       assistanceDraft.current = null;
+      setAssistanceDraftActive(false);
       setDraft("");
       setPendingIdempotencyKey(null);
       setReplyState("idle");
@@ -838,6 +849,7 @@ function TicketDetail({
       await onQueryReply(details.ticketId, pendingIdempotencyKey);
       clearPendingReply(details.ticketId);
       assistanceDraft.current = null;
+      setAssistanceDraftActive(false);
       setDraft("");
       setPendingIdempotencyKey(null);
       setReplyState("idle");
@@ -872,13 +884,51 @@ function TicketDetail({
         </div>
       </header>
 
+      <SupportContextEntries
+        projectionKey={`${details.ticketId}:${details.assignedSupportId ?? ""}:${details.handlingMode}`}
+        entries={{
+          transfer: { kind: "developing" },
+          more: { kind: "developing" },
+          order: {
+            kind: "available",
+            onOpen: () => focusContextTarget(orderRef.current),
+            description: "查看当前工单的订单引用，不额外读取订单详情。",
+          },
+          logistics: {
+            kind: "available",
+            onOpen: () => focusContextTarget(factsRef.current),
+            description: "查看现有调查事实，是否含物流信息以当前投影为准。",
+          },
+          contact:
+            details.handlingMode === "HUMAN"
+              ? { kind: "available", onOpen: () => focusContextTarget(replyRef.current) }
+              : { kind: "unavailable", reason: "当前非人工处理模式，不能发送公开回复。" },
+          similarCases:
+            details.handlingMode === "HUMAN" && assistanceAvailable
+              ? {
+                  kind: "available",
+                  onOpen: () => focusContextTarget(assistanceRef.current),
+                  description: "在当前工单的 AI 智能辅助中使用知识检索。",
+                }
+              : { kind: "unavailable", reason: "当前没有可用的人工辅助权限。" },
+          suggestedActions:
+            details.handlingMode === "HUMAN" && assistanceAvailable
+              ? {
+                  kind: "available",
+                  onOpen: () => focusContextTarget(assistanceRef.current),
+                  description: "在当前工单的 AI 智能辅助中查看建议。",
+                }
+              : { kind: "unavailable", reason: "当前没有可用的人工辅助权限。" },
+        }}
+      />
+
       <div className="support-detail-summary">
         <dl aria-label="工单基本信息">
           <div>
             <dt>客户标识</dt>
             <dd>{details.customerId}</dd>
           </div>
-          <div>
+          <div ref={orderRef} tabIndex={-1} className="context-entry-target">
             <dt>订单引用</dt>
             <dd>{details.orderReference}</dd>
           </div>
@@ -902,7 +952,12 @@ function TicketDetail({
       </div>
 
       {details.handlingMode === "HUMAN" && (
-        <section className="support-reply-composer" aria-labelledby="support-reply-title">
+        <section
+          ref={replyRef}
+          tabIndex={-1}
+          className="support-reply-composer context-entry-target"
+          aria-labelledby="support-reply-title"
+        >
           <div className="support-reply-heading">
             <div>
               <p className="eyebrow">客户可见</p>
@@ -912,10 +967,11 @@ function TicketDetail({
           </div>
           <textarea
             aria-label="公开回复"
-            value={draft}
+            value={visibleDraft}
             maxLength={2000}
             onChange={(event) => {
               assistanceDraft.current = null;
+              setAssistanceDraftActive(false);
               setDraft(event.target.value);
               setReviewedAssistance(null);
             }}
@@ -930,6 +986,7 @@ function TicketDetail({
                 type="button"
                 onClick={() => {
                   assistanceDraft.current = reviewedAssistance;
+                  setAssistanceDraftActive(true);
                   setDraft(reviewedAssistance);
                   setReviewedAssistance(null);
                 }}
@@ -942,11 +999,11 @@ function TicketDetail({
             </div>
           )}
           <div className="support-reply-actions">
-            <small>{draft.trim().length}/2000</small>
+            <small>{visibleDraft.trim().length}/2000</small>
             <button
               type="button"
               onClick={() => void submitReply()}
-              disabled={!draft.trim() || replyBusy || replyState === "unknown"}
+              disabled={!visibleDraft.trim() || replyBusy || replyState === "unknown"}
             >
               {replyState === "sending" ? "正在发送…" : "发送公开回复"}
             </button>
@@ -974,6 +1031,7 @@ function TicketDetail({
 
       {details.handlingMode === "HUMAN" && assistanceAvailable && (
         <SupportAssistance
+          hostRef={assistanceRef}
           ticketId={details.ticketId}
           defaultQuery={details.description}
           onReviewDraft={replyBusy || replyState === "unknown" ? null : reviewAssistance}
@@ -1010,6 +1068,7 @@ function TicketDetail({
         />
         <DetailSection
           eyebrow="INTERNAL FACTS"
+          sectionRef={factsRef}
           title="调查事实"
           empty="暂无调查事实"
           items={details.investigationFacts.map((fact, index) => (
@@ -1048,15 +1107,22 @@ function DetailSection({
   title,
   empty,
   items,
+  sectionRef,
 }: {
   eyebrow: string;
   title: string;
   empty: string;
   items: ReactNode[];
+  sectionRef?: React.RefObject<HTMLElement | null>;
 }) {
   const id = `support-${title}`;
   return (
-    <section className="support-detail-section" aria-labelledby={id}>
+    <section
+      ref={sectionRef}
+      tabIndex={sectionRef ? -1 : undefined}
+      className={`support-detail-section${sectionRef ? " context-entry-target" : ""}`}
+      aria-labelledby={id}
+    >
       <header>
         <p className="eyebrow">{eyebrow}</p>
         <h3 id={id}>{title}</h3>
