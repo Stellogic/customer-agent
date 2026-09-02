@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -15,6 +16,7 @@ import com.stellogic.customeragent.knowledge.AgentKnowledgeResult;
 import com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -80,12 +82,48 @@ class SupportAssistanceServiceTest {
         assertEquals(false, response.has("knowledge"));
     }
 
+    @Test
+    void supportedPolicyWithoutCitationIsRejectedAsInvalidFormat() {
+        var policyRequest =
+                new SupportAssistanceRequest(
+                        assignment, id, SupportAssistanceKind.policy, "合成政策查询");
+        var stored = new AtomicReference<String>();
+        when(requests.begin("support-demo", ticket, policyRequest))
+                .thenReturn(receipt(null, true, SupportAssistanceKind.policy));
+        when(requests.read("support-demo", ticket, id))
+                .thenAnswer(ignored -> receipt(stored.get(), false, SupportAssistanceKind.policy));
+        when(knowledge.searchSupport("support-demo", policyRequest.query()))
+                .thenReturn(new AgentKnowledgeResult("agent-knowledge-v1", 1, List.of()));
+        when(gateway.generate(eq(SupportAssistanceKind.policy), anyString(), any(), any()))
+                .thenReturn(
+                        json.readTree(
+                                "{\"status\":\"completed\",\"answer\":{\"decision\":\"SUPPORTED\",\"text\":\"合成政策回答\",\"followUp\":null,\"citations\":[]},\"audit\":{}}"));
+        doAnswer(
+                        invocation -> {
+                            stored.set(invocation.getArgument(3));
+                            return null;
+                        })
+                .when(requests)
+                .finish(eq("support-demo"), eq(ticket), eq(id), anyString(), eq(true));
+
+        var response = service.request("support-demo", ticket, policyRequest);
+
+        assertEquals("error", response.path("view").path("status").asString());
+        assertEquals("format", response.path("view").path("reason").asString());
+        verify(knowledge, never()).revalidateSupport(anyString(), any());
+    }
+
     private SupportAssistanceReceipt receipt(String result, boolean execute) {
+        return receipt(result, execute, SupportAssistanceKind.draft);
+    }
+
+    private SupportAssistanceReceipt receipt(
+            String result, boolean execute, SupportAssistanceKind kind) {
         return new SupportAssistanceReceipt(
                 ticket,
                 assignment,
                 id,
-                SupportAssistanceKind.draft,
+                kind,
                 result == null ? "PENDING" : "COMPLETED",
                 result,
                 execute,

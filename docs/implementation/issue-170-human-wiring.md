@@ -1,6 +1,6 @@
 # #170 HUMAN 辅助接线源码（2026-09-01）
 
-状态：**INTEGRATED_FOCUSED_PASS**；#169 正式共享契约已接入，backend / agent / frontend 聚焦门禁通过，等待集中风险审查、最终双轴确认与完整门禁。
+状态：**RISK_REVIEW_FIXED_FOCUSED_PASS**；#169 正式共享契约已接入，集中风险审查的两项 P2 已修复，backend / agent / frontend 聚焦门禁通过，等待最终双轴确认与完整门禁。
 
 已同步 #169 正式合入后的 `origin/main` `6d5ab983ce6b685974f00751fd06afcdb1549064`；分支保留既有 `e61152199c985f2d46b1a1cf1575b14ac8cb3a03` 与 V44，未重写历史。#150/#160/#163/#169/#190 前置均已关闭。共享 Java DTO/适配器、Python 解析器与 V43 已来自 main，本票不再依赖未合入源码。
 
@@ -32,6 +32,8 @@
 5. Spring 检查输出结构、长度、引用必须来自本次 Top5及逐字原文，以 canonical metadata 构造浏览器白名单投影；调用 #169 复核选中完整 Source，再验证当前 assignment 才存/返回。每次 GET `/assistance/requests/{requestId}` 也重新验证授权及知识引用，不缓存授权结论。模型 audit/知识原始回执不发送浏览器。
 6. 客服手动插入、编辑并勾选审阅后，只把文字移交既有人工发送区。发送区已有编辑时再次确认替换；发送中/结果未知时禁止移交。最终公开发送仍由原按钮、CSRF、权限与幂等路径执行。详情撤权/断线重同步卸载辅助组件并中止客户端接收。
 
+辅助移交到公开回复区后，宿主只追踪“仍保持原文且未经人工再编辑”的辅助草稿。撤权或详情权限流断开会清除该文本与待替换确认；客服只要在公开回复区人工编辑，文本即转为人工草稿，不因后续辅助撤权被误删。
+
 控制器绑定发起请求时的 HTTP session、sessionId 和主体，慢调用或回执读取后、写响应前复核会话仍有效且未换主体；不能只凭仍有效的 assignment 返回内部内容。详情权限流结束时，在等待详情重读前立即卸载辅助及丢弃待移交确认，重读成功后重新申请辅助权限，不恢复旧私有草稿。
 
 ## 失败与恢复边界
@@ -46,6 +48,8 @@
 
 源码协议 `support-assistance-answer-v1`：默认 DeepSeek v4 flash，Responses strict schema；一次调用包含 decision/text/followUp/citations。输出 token 上限1800、正文2000字符、追问500字符、引用合计4000字符、最多5条；不设单条24字符限制。这些是当前源码执行参数，**尚未取得真实运行和冻结质量证据**，不得称质量PASS。
 
+`knowledge` / `policy` 类型只有在 `SUPPORTED` 且至少一条引用通过本次 Top5 与逐字原文校验时才能成为 ready；空引用会在 Python 生成边界和 Spring 投影边界分别判为 `INVALID_ANSWER_FORMAT`。`summary` / `draft` 不强制引用，因为它们可仅依据 Spring 提供的当前工单上下文形成草稿，仍须人工审阅。
+
 没有独立充分性调用或自动修正/重试；故障保留到完整样本分母。调用返回记录 model/responseId、usage、attempts、输出上限和估计费用。估价复用既有函数，不重建成本框架；实际模型/费用和未知 usage 必须在运行账本核对，源码估价不能冒充供应商结算。
 
 真实质量运行前仍需同一累计账本核实剩余额度、冻结完整样本及 prompt/schema/源码记录，**所有相关运行累计不超过人民币6元，不重置旧消费**。本轮真实模型调用0；未知历史余额不表示可用6元。出现未知调用费用应先核对，不开始下一次付费运行。继续使用既有 #170 完整分母计数及三项独立检查，结构/引文通过不等于语义充分；不读验收错题调参。
@@ -55,12 +59,14 @@
 新增源码覆盖：同次调用和usage、非正式模式不伪造回答、失败不自动重试、引用归属/长引文、请求重放不再次检索/生成、检索后撤权禁止调用、回执重读复核且不泄露audit、宿主人工移交与未知结果GET恢复。
 
 - backend 聚焦门禁：PASS；编译、Spotless、Checkstyle 与测试全部通过。
-- agent 聚焦门禁：PASS；Ruff、Pyright（0 errors）与 pytest（445 passed、3 skipped）通过。
+- agent 聚焦门禁：PASS；Ruff、Pyright（0 errors）与 pytest（447 passed、3 skipped）通过。
 - frontend 聚焦门禁：PASS；Prettier、ESLint、TypeScript、Vitest（206 passed、3 skipped）与 bundle evidence 通过。
 
 测试 transport、Mockito 与合成 HTTP 响应只证明工程边界；真实 DeepSeek 回答质量仍为 **KNOWN_LIMITATIONS**，不得写成 PASS。最终完整 `pwsh ./scripts/check.ps1 -Issue 170` 尚未运行。
 
-最终交付仍需集中风险审查、Standards / Spec 双轴确认和一次完整 `pwsh ./scripts/check.ps1 -Issue 170`。完整门禁包含真实 PostgreSQL/Compose、smoke 与浏览器回归；回答质量限制继续单列，不用 #169 检索门禁或本票合成测试替代。CI 关闭，外部审查不阻塞。
+集中风险审查在 PR 转 Ready 后发现两项 P2：撤权未清除已移交且未人工再编辑的公开回复草稿，以及 `policy` / `knowledge` 的无引用 `SUPPORTED` 可进入 ready。两项均已按上述最小边界修复并加入三端回归源码；修复后 `issue170-riskfix-backend-20260902b`、`issue170-riskfix-agent-20260902a`、`issue170-riskfix-frontend-20260902b` 聚焦门禁均 PASS。首轮后端只因 Spotless 排版失败、首轮前端只因合成响应缺少 view 身份字段失败，修正后均复验通过。
+
+最终交付仍需 Standards / Spec 双轴确认和一次完整 `pwsh ./scripts/check.ps1 -Issue 170`。完整门禁包含真实 PostgreSQL/Compose、smoke 与浏览器回归；回答质量限制继续单列，不用 #169 检索门禁或本票合成测试替代。CI 关闭，外部审查不阻塞。
 
 ## 静态双 CR 记录
 

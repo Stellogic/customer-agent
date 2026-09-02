@@ -50,7 +50,7 @@ SCHEMA = {
 }
 
 
-def validate_answer(value: object, knowledge: object) -> dict[str, Any]:
+def validate_answer(value: object, knowledge: object, kind: str) -> dict[str, Any]:
     """只校验结构和本次引用归属; 语义是否充分仍须独立评估及人工审阅。"""
     sources = {
         source.chunk_id: source for source in parse_knowledge_response(200, knowledge).sources
@@ -66,6 +66,8 @@ def validate_answer(value: object, knowledge: object) -> dict[str, Any]:
         raise ValueError("invalid follow-up")
     if not isinstance(citations, list) or len(citations) > 5:
         raise ValueError("invalid citations")
+    if value["decision"] == "SUPPORTED" and kind in {"knowledge", "policy"} and not citations:
+        raise ValueError("supported knowledge answer requires citations")
     total_quote_length = 0
     for citation in citations:
         if not isinstance(citation, dict) or set(citation) != {"chunkId", "quote"}:
@@ -162,7 +164,7 @@ async def generate_support_answer(
         ]
         if len(texts) != 1:
             return {"status": "failed", "code": "MODEL_UNAVAILABLE", "audit": audit}
-        answer = validate_answer(json.loads(texts[0]), request["knowledge"])
+        answer = validate_answer(json.loads(texts[0]), request["knowledge"], request["kind"])
         return {"status": "completed", "answer": answer, "audit": audit}
     except httpx.HTTPError:
         return {"status": "failed", "code": "MODEL_UNAVAILABLE", "audit": audit}

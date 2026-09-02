@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { announceHumanSessionChange } from "./humanSessionLifecycle";
 import { RootApplication } from "./RootApplication";
+import { isRecord } from "./streamProtocol";
 import { SupportWorkbench } from "./SupportWorkbench";
 
 const HANDOFF_TICKET = "26000000-0000-0000-0000-000000000001";
@@ -196,7 +197,7 @@ describe("客服共享队列工作台", () => {
       }),
       { headers: { "Content-Type": "text/event-stream" } },
     );
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const path = String(input);
       if (path === SNAPSHOT_URL)
         return snapshotResponse("support-workbench-v2:4", [], [], [HANDOFF_TICKET]);
@@ -212,13 +213,42 @@ describe("客服共享队列工作台", () => {
           ticketId: HANDOFF_TICKET,
           assignmentId: "27000000-0000-0000-0000-000000000001",
         });
+      if (path === "/api/auth/csrf") {
+        return Response.json({ token: "support-csrf", headerName: "X-CSRF-TOKEN" });
+      }
+      if (path.endsWith("/assistance/requests")) {
+        const request: unknown = JSON.parse(String(init?.body));
+        if (!isRecord(request) || typeof request.requestId !== "string") {
+          throw new Error("invalid assistance request");
+        }
+        return Response.json({
+          schema: "support-assistance-v1",
+          ticketId: HANDOFF_TICKET,
+          assignmentId: "27000000-0000-0000-0000-000000000001",
+          requestId: request.requestId,
+          kind: "draft",
+          view: {
+            status: "ready",
+            kind: "draft",
+            requestId: request.requestId,
+            text: "需要在撤权时清除的辅助草稿",
+            suggestions: [],
+            citations: [],
+          },
+        });
+      }
       if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
     render(<SupportWorkbench />);
-    fireEvent.change(await screen.findByRole("textbox", { name: "内部编辑区（尚未发送）" }), {
-      target: { value: "需要在重同步时清除的草稿" },
-    });
+    await screen.findByRole("textbox", { name: "内部编辑区（尚未发送）" });
+    fireEvent.click(screen.getByRole("button", { name: "回复草稿" }));
+    fireEvent.click(await screen.findByRole("button", { name: "插入回复草稿" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "我已核实事实、政策与客户可见措辞" }));
+    fireEvent.click(screen.getByRole("button", { name: "交给人工发送区" }));
+    expect(screen.getByRole("textbox", { name: "公开回复" })).toHaveValue(
+      "需要在撤权时清除的辅助草稿",
+    );
     endAuthority?.();
     await waitFor(() =>
       expect(
@@ -226,7 +256,7 @@ describe("客服共享队列工作台", () => {
       ).not.toBeInTheDocument(),
     );
     expect(detailReads).toBe(2);
-    expect(screen.queryByText("需要在重同步时清除的草稿")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "公开回复" })).toHaveValue("");
     resolveDetail?.(new Response(null, { status: 404 }));
     await waitFor(() =>
       expect(screen.queryByRole("heading", { name: "授权工单详情" })).not.toBeInTheDocument(),

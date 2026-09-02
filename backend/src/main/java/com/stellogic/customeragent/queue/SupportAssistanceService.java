@@ -119,7 +119,11 @@ class SupportAssistanceService {
                 || answer.text().length() > 2000
                 || answer.followUp() != null && answer.followUp().length() > 500
                 || answer.citations() == null
-                || answer.citations().size() > 5) {
+                || answer.citations().size() > 5
+                || "SUPPORTED".equals(answer.decision())
+                        && List.of(SupportAssistanceKind.knowledge, SupportAssistanceKind.policy)
+                                .contains(receipt.kind())
+                        && answer.citations().isEmpty()) {
             throw new IllegalArgumentException("invalid assistance answer");
         }
         List<AgentKnowledgeResult.Source> selected = new ArrayList<>();

@@ -100,9 +100,17 @@ def test_no_match_may_become_explicit_insufficiency_but_is_not_a_decision_itself
         "followUp": "请补充适用情形。",
         "citations": [],
     }
-    assert validate_answer(answer, {**KNOWLEDGE, "results": []}) == answer
+    assert validate_answer(answer, {**KNOWLEDGE, "results": []}, "knowledge") == answer
     with pytest.raises(ValueError):
-        validate_answer({**answer, "decision": "NO_MATCH"}, {**KNOWLEDGE, "results": []})
+        validate_answer(
+            {**answer, "decision": "NO_MATCH"}, {**KNOWLEDGE, "results": []}, "knowledge"
+        )
+
+
+@pytest.mark.parametrize("kind", ["knowledge", "policy"])
+def test_supported_knowledge_and_policy_require_at_least_one_citation(kind):
+    with pytest.raises(ValueError):
+        validate_answer({**ANSWER, "citations": []}, KNOWLEDGE, kind)
 
 
 @pytest.mark.parametrize(
@@ -114,9 +122,9 @@ def test_no_match_may_become_explicit_insufficiency_but_is_not_a_decision_itself
 )
 def test_citation_identity_and_verbatim_quote_must_match_this_top_five(citation):
     with pytest.raises(ValueError):
-        validate_answer({**ANSWER, "citations": [citation]}, KNOWLEDGE)
+        validate_answer({**ANSWER, "citations": [citation]}, KNOWLEDGE, "knowledge")
 
 
 def test_model_metadata_and_reasoning_are_not_accepted():
     with pytest.raises(ValueError):
-        validate_answer({**ANSWER, "reasoning": "不允许输出"}, KNOWLEDGE)
+        validate_answer({**ANSWER, "reasoning": "不允许输出"}, KNOWLEDGE, "knowledge")
