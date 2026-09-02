@@ -1,5 +1,6 @@
 """客户知识回答的结构与引用约束;不检索、不调用模型,也不判定语义正确。"""
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -70,7 +71,30 @@ def parse_customer_knowledge_answer(raw: object) -> CustomerKnowledgeAnswer:
         )
     if (status is CustomerKnowledgeStatus.SUPPORTED) != bool(parsed):
         raise ValueError("only a supported answer may cite knowledge")
-    return CustomerKnowledgeAnswer(status, answer, tuple(parsed))
+    public_answer = _without_inline_citation_ids(answer, parsed)
+    if not public_answer:
+        raise ValueError("invalid customer knowledge answer")
+    return CustomerKnowledgeAnswer(status, public_answer, tuple(parsed))
+
+
+def _without_inline_citation_ids(answer: str, citations: list[CustomerKnowledgeCitation]) -> str:
+    identifiers = sorted(
+        {
+            identifier
+            for citation in citations
+            for identifier in (citation.article_id, citation.chunk_id)
+        },
+        key=len,
+        reverse=True,
+    )
+    cleaned = answer
+    for identifier in identifiers:
+        escaped = re.escape(identifier)
+        cleaned = re.sub(rf"\s*[（(][^（）()]*{escaped}[^（）()]*[）)]", "", cleaned)
+        cleaned = cleaned.replace(identifier, "")
+    cleaned = re.sub(r"[（(]\s*[）)]", "", cleaned)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    return cleaned.strip()
 
 
 def validate_customer_knowledge_citations(

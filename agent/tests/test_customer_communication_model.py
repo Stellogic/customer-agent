@@ -86,6 +86,12 @@ def test_no_compensation_reply_allows_natural_denial_wording() -> None:
     assert is_authorized_body_prefix(body, "ORDER-162", complete=True)
 
 
+def test_customer_question_about_resolution_is_not_a_ticket_status_change() -> None:
+    body = "您问资料不足是不是表示问题已经解决；当前结论仍以页面状态为准。"
+
+    assert is_authorized_body_prefix(body, "ORDER-162", complete=True)
+
+
 def test_reply_may_omit_redundant_order_reference() -> None:
     assert is_authorized_body_prefix(
         "经核验，本次物流延迟不足 24 小时。", "ORDER-162", complete=True

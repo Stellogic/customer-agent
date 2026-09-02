@@ -52,6 +52,24 @@ def test_keeps_a_complete_long_quote_without_claiming_semantic_sufficiency():
     assert answer.as_request_value() == payload()
 
 
+def test_removes_inline_citation_identifiers_from_the_public_answer():
+    value = payload()
+    value["answer"] = "请先检查代收点（signed-package v1 signed-package:1），再补充最新情况。"
+
+    answer = parse_customer_knowledge_answer(value)
+
+    assert answer.answer == "请先检查代收点，再补充最新情况。"
+    assert answer.citations[0].chunk_id == "signed-package:1"
+
+
+def test_rejects_an_answer_that_only_contains_a_bare_chunk_identifier():
+    value = payload()
+    value["answer"] = "signed-package:1"
+
+    with pytest.raises(ValueError, match="invalid customer knowledge answer"):
+        parse_customer_knowledge_answer(value)
+
+
 @pytest.mark.parametrize(
     "changes", [{"version": "v0"}, {"articleId": "other"}, {"quote": "已经为您退款"}]
 )

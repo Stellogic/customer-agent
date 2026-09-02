@@ -236,7 +236,7 @@ _SENSITIVE_LEAK_PATTERN = re.compile(
 )
 _PERSON_NAME_CLAIM_PATTERN = re.compile(r"(?:由|被)\s*[\u4e00-\u9fff]{2,4}\s*签收")
 _PREMATURE_TICKET_STATUS_PATTERN = re.compile(
-    r"(?:工单|问题)(?:已经|已)(?:自动)?(?:解决|关闭|结案)|已自动(?:解决|关闭|结案)|关闭等待期"
+    r"工单(?:已经|已)(?:自动)?(?:解决|关闭|结案)|已自动(?:解决|关闭|结案)|关闭等待期"
     r"|(?:五|5)\s*分钟(?:后|内).{0,8}(?:解决|关闭|结案)"
 )
 _DIRECT_COMPENSATION_PROMISE_PATTERN = re.compile(
