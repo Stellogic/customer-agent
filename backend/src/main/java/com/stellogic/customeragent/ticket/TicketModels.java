@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.ticket;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -18,7 +19,10 @@ record AppendCustomerMessage(String customerId, UUID ticketId, String messageId,
 record CustomerMessageResult(UUID ticketId, String outcome, boolean replayed) {}
 
 record PublicMessage(
-        String author, String body, Instant sentAt, CustomerKnowledgeProjection knowledge) {
+        String author,
+        String body,
+        Instant sentAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) CustomerKnowledgeProjection knowledge) {
     PublicMessage(String author, String body, Instant sentAt) {
         this(author, body, sentAt, null);
     }

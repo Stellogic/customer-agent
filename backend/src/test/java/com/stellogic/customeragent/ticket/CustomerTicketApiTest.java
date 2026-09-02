@@ -106,6 +106,8 @@ class CustomerTicketApiTest {
                 .andExpect(jsonPath("$.ticket.agentGeneration").value(1))
                 .andExpect(jsonPath("$.ticket.firstRespondedAt").exists())
                 .andExpect(jsonPath("$.messages.length()").value(2))
+                .andExpect(jsonPath("$.messages[0].knowledge").doesNotExist())
+                .andExpect(jsonPath("$.messages[1].knowledge").doesNotExist())
                 .andExpect(jsonPath("$.autoResolution").doesNotExist())
                 .andExpect(jsonPath("$.internalNotes").doesNotExist())
                 .andExpect(jsonPath("$.threadId").doesNotExist());
