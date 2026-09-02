@@ -49,6 +49,10 @@ public final class CustomerReplySafetyPolicy {
             Pattern.compile(
                     "工单.{0,5}已.{0,3}(解决|关闭)|关闭等待期|(?:ticket|case).{0,12}(?:resolved|closed)",
                     Pattern.CASE_INSENSITIVE);
+    private static final Pattern DIRECT_COMPENSATION_PROMISE_PATTERN =
+            Pattern.compile(
+                    "(?<!不)(?:已|已经|将|会|承诺|同意|可以|可).{0,10}(?:补偿|退款)"
+                            + "|(?:补偿|退款).{0,10}(?:已完成|将执行|已发放)");
 
     private static final Map<InvestigationRiskScenario, Set<String>> SCENARIO_CLAIM_TOKENS =
             Map.of(
@@ -238,15 +242,9 @@ public final class CustomerReplySafetyPolicy {
             return !remaining.contains("补偿") && !remaining.contains("退款");
         }
         if (intent == CustomerReplyIntent.NO_COMPENSATION_RESOLUTION) {
-            String ineligible = "当前不符合补偿条件";
-            if (!remaining.contains(ineligible)) return false;
-            remaining = remaining.replace(ineligible, "");
-            // Refund-status explanations may mention 退款 as a fact; ban only action/promise forms.
-            return !remaining.contains("补偿")
-                    && !remaining.contains("将退款")
-                    && !remaining.contains("已退款")
-                    && !remaining.contains("办理退款")
-                    && !remaining.contains("可以获得退款");
+            // Intent and Spring facts carry the decision. Keep natural denial wording while
+            // rejecting concrete compensation/refund actions and positive promises.
+            return !DIRECT_COMPENSATION_PROMISE_PATTERN.matcher(remaining).find();
         }
         return false;
     }

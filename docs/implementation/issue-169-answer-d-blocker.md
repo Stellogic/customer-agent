@@ -50,6 +50,8 @@ Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具�
 
 本次 1261 input / 866 output / 2127 total tokens，已结算 11577 micro-CNY。唯一账本最终为 306 `SETTLED`、2 `TIMEOUT_RELEASED`、0 `PENDING`，累计 782952 micro-CNY（0.782952 CNY，低于用户直接授权的 5 CNY 上限），SHA-256 `2627bb4fbf09bfe66515ebd393c13064790faa63a0b95a21d987eb3104c2d312`。确定性 HTTP/PG 29 项、投影 SQL、Compose 清理和锁释放均 PASS。
 
+用户随后明确要求优先尽快跑通，并允许在不影响实际使用的前提下放宽过严规则。仓库 ADR 0008 要求自然语言不受少数固定模板限制，Issue #149 测试决策也禁止逐字断言自然语言；因此“必须逐字包含当前不符合补偿条件”属于展示文案约束，不是业务安全边界。修订后由结构化 intent 与 Spring 权威事实承载补偿结论，正文仍拒绝明确的已/将/会/承诺/同意补偿或退款、金额、时限承诺、敏感内容、错订单、提前结案与无依据事实，但允许自然否定表达。正文不触发任何补偿或退款执行。`issue169-20260902-focus50` 的 Ruff、生产源码 Pyright、60 tests 和 Standards / Spec 双轴审查均 PASS；Java 测试源码已补，待下一次真实 Spring canary 重新编译并验收。
+
 ## 证据
 
 - `docs/implementation/evidence/issue169-answer-20260902d/answers.json`
@@ -72,6 +74,7 @@ Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具�
 - `docs/implementation/evidence/issue169-canary-body-policy-20260902d/canary.json`
 - `docs/implementation/evidence/issue169-canary-body-policy-20260902d/phase.json`
 - `docs/implementation/evidence/issue169-canary-body-policy-20260902d/ledger-summary.json`
+- `docs/implementation/evidence/issue169-20260902-focus50/phase.json`
 
 ## 未完成项
 

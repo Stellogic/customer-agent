@@ -239,6 +239,10 @@ _PREMATURE_TICKET_STATUS_PATTERN = re.compile(
     r"(?:工单|问题)(?:已经|已)(?:自动)?(?:解决|关闭|结案)|已自动(?:解决|关闭|结案)|关闭等待期"
     r"|(?:五|5)\s*分钟(?:后|内).{0,8}(?:解决|关闭|结案)"
 )
+_DIRECT_COMPENSATION_PROMISE_PATTERN = re.compile(
+    r"(?<!不)(?:已|已经|将|会|承诺|同意|可以|可).{0,10}(?:补偿|退款)"
+    r"|(?:补偿|退款).{0,10}(?:已完成|将执行|已发放)"
+)
 
 
 def is_authorized_body_prefix(body: str, order_reference: str, *, complete: bool) -> bool:
@@ -374,18 +378,9 @@ def _has_only_allowed_compensation_language(body: str, intent: CustomerReplyInte
         remaining = remaining.replace(pending, "").replace(no_execution, "")
         return "补偿" not in remaining and "退款" not in remaining
     if intent is CustomerReplyIntent.NO_COMPENSATION_RESOLUTION:
-        ineligible = "当前不符合补偿条件"
-        if ineligible not in remaining:
-            return False
-        remaining = remaining.replace(ineligible, "")
-        # Refund-status explanations may mention 退款 as a fact; ban only action/promise forms.
-        return (
-            "补偿" not in remaining
-            and "将退款" not in remaining
-            and "已退款" not in remaining
-            and "办理退款" not in remaining
-            and "可以获得退款" not in remaining
-        )
+        # Intent and Spring facts carry the decision. Keep natural denial wording while
+        # rejecting concrete compensation/refund actions and positive promises.
+        return _DIRECT_COMPENSATION_PROMISE_PATTERN.search(remaining) is None
     return False
 
 

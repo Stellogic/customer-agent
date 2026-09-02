@@ -52,6 +52,14 @@ class CustomerReplySafetyPolicyTest {
                                 InvestigationRiskScenario.REFUND_STATUS,
                                 DecisionReasonCode.REFUND_STATUS_EXPLAINED))
                 .isNull();
+        assertThat(
+                        rejection(
+                                reply(
+                                        "经核验，订单 ORDER-122 的物流延迟不足 24 小时，暂不满足申请补偿的条件；如仍需帮助，请继续回复。",
+                                        EVIDENCE,
+                                        ORDER),
+                                false))
+                .isNull();
     }
 
     @Test
@@ -67,6 +75,20 @@ class CustomerReplySafetyPolicyTest {
         assertThat(rejection(reply("订单 ORDER-122 可以获得补偿。", EVIDENCE, ORDER)))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
         assertThat(rejection(reply("订单 ORDER-122 将为您办理退款。", EVIDENCE, ORDER)))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
+        assertThat(rejection(reply("订单 ORDER-122 会补偿您一张优惠券。", EVIDENCE, ORDER), false))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
+        assertThat(rejection(reply("订单 ORDER-122 不久后会补偿您一张优惠券。", EVIDENCE, ORDER), false))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
+        assertThat(rejection(reply("订单 ORDER-122 会为您退款。", EVIDENCE, ORDER), false))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
+        assertThat(rejection(reply("订单 ORDER-122 不会补偿，但会退款。", EVIDENCE, ORDER), false))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
+        assertThat(rejection(reply("订单 ORDER-122 暂不处理，但会为您退款。", EVIDENCE, ORDER), false))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
+        assertThat(rejection(reply("订单 ORDER-122 承诺补偿。", EVIDENCE, ORDER), false))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
+        assertThat(rejection(reply("订单 ORDER-122 同意退款。", EVIDENCE, ORDER), false))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
         assertThat(rejection(reply("订单 ORDER-122：退款处理完成，补偿金额为二十元。", EVIDENCE, ORDER)))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_AMOUNT");
