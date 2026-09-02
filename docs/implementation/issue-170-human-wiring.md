@@ -79,3 +79,5 @@
 最新 main 同步增量：基线 `e61152199c985f2d46b1a1cf1575b14ac8cb3a03`，合并提交 `bc2629b3d509c6e64a91a081c9ebc4991c49e336` 同步 `origin/main` `9995156252e416ac59bfaba24d05ad58319ca572`，并更新本文的 #169 Draft 契约快照与串行交接清单。增量 Standards / Spec 各 PASS、0项发现；仅静态审查，未运行测试、检查、构建、Docker、模型或完整门禁。
 
 最终候选 `9cb53e27e9f3e5fe521c375c5739e2f24f6c5e3f` 固定比较 `origin/main...9cb53e2`：Standards PASS、Spec PASS，各0项阻塞发现。审查确认了人工同文草稿仍需明确替换、`knowledge`/`policy` prompt 与双边引用校验一致、`suggestions` 仅为有界文本投影，以及 `retrievalEmpty` 与充分性决定正交；仍复用 #169 唯一共享适配层。该次审查只读，未运行测试、格式、lint、类型检查、构建、Docker、模型或评测。
+
+首次最终完整门禁 `issue170-final-20260902a` 在任何锁或测试前曾因瞬时 TLS fetch 错误 `PRECHECK_ABORTED`；协调明确该次不计门禁尝试，并授权同 RunId 重试。重试进入真实 Compose 后发现 `scripts/smoke.ps1` 的 Flyway 历史期望仍止于 V43，实际全新数据库已成功执行 `1–37、39–44`，因此在 smoke 前置断言失败；这不是迁移执行失败。修复只把既有精确历史期望补到本票 V44，不补造缺失的 V38，也不放宽逐项成功断言。该失败保留为正式门禁 FAIL，修复后必须重新完成双轴审查及完整门禁，不能沿用先前结果。
