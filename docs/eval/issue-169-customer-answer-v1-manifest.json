@@ -8,7 +8,7 @@
   "independent_boundaries": 8,
   "files": {
     "docs/eval/issue-169-customer-answer-v1.json": "9e9eb72d117eb37635f34075c1d122653f3a863da08c427aecfc0e7377c92d3c",
-    "agent/src/baseline_agent/customer_communication_model.py": "ffd06fa9b060da48db69a61da0cc57b958e3b2f00613a2cee8336363695459fc",
+    "agent/src/baseline_agent/customer_communication_model.py": "5bc17b21b0e910f4aa09c661859163abb4c06c354b34c127fec462f09a3d1af7",
     "agent/src/baseline_agent/customer_knowledge_answer.py": "51ab84c4c1c6bfe1b2f4a2ac2a5fdaf999ece1b6de93df7388468204984768d9",
     "agent/tests/issue169_customer_answer_run.py": "f79cd7728e82578cead5122d118afb0fe1435c3ecdb15048ff5143fe87bf43ae",
     "agent/tests/issue169_customer_knowledge_acceptance.py": "2a3fefbd2d0f9f4f21cc1ae23a069fb21f6debad7feba5f4044457b0c08943d5",
@@ -16,7 +16,7 @@
     "backend/src/main/resources/knowledge/customer-conversation-help-v1.md": "dc347bfa2aaea8c76db755a033c4c3bcb838910218bca374613b891676561bd5",
     "backend/src/main/resources/knowledge/customer-privacy-help-v1.md": "718c32899cfa2d1c6b0697c5beb2d648352433fd2b0e6b949ad35352363f072a",
     "docs/eval/issue-169-customer-answer-v1.md": "3a676c27a99c51ff6e231d29d61dbbfa2c71b6773f1f4fb54b5e2860adf78588",
-    "agent/src/baseline_agent/deepseek_customer_communication_model.py": "c6b7fdd34e4bcd3d9a24c88599c19c38cf3f2cc87ba82cb19ed5f4993e7837ea",
+    "agent/src/baseline_agent/deepseek_customer_communication_model.py": "5f045a66ddf91e410f82fea111c54fabce2a356146cae8b21f2f671b37d2a25b",
     "agent/src/baseline_agent/deepseek_investigation_model.py": "2f4378a5af5a8c5eabd37754c5863daa05ae6e559886b0dd16443537a492873a"
   }
 }
