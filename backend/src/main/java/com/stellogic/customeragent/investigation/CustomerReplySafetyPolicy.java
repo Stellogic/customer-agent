@@ -102,15 +102,12 @@ public final class CustomerReplySafetyPolicy {
         if (PERSON_NAME_CLAIM_PATTERN.matcher(body).find()) return false;
         if (PREMATURE_RESOLUTION_PATTERN.matcher(body).find()) return false;
         Matcher referencedOrders = ORDER_REFERENCE_PATTERN.matcher(body);
-        boolean sawScopedOrder = false;
         while (referencedOrders.find()) {
             if (!scopedOrderReference.equalsIgnoreCase(referencedOrders.group())) {
                 return false;
             }
-            sawScopedOrder = true;
         }
         if (complete) {
-            if (!sawScopedOrder && !body.contains(scopedOrderReference)) return false;
             if (!hasOnlyAllowedCompensationLanguage(
                     body, inferIntentFromCompensationLanguage(body))) {
                 return false;
@@ -140,8 +137,7 @@ public final class CustomerReplySafetyPolicy {
                         && reply.intent() == expectedIntent
                         && !reply.escalationRequired()
                         && scopedOrderReference.equals(reply.referencedOrder())
-                        && scopedEvidence.equals(reply.evidenceRefs())
-                        && reply.body().contains(scopedOrderReference);
+                        && scopedEvidence.equals(reply.evidenceRefs());
         if (!basicShapeValid) return "UNSAFE_CUSTOMER_REPLY";
         if (PREMATURE_RESOLUTION_PATTERN.matcher(reply.body()).find()) {
             return "CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE";
@@ -210,7 +206,7 @@ public final class CustomerReplySafetyPolicy {
         }
         // Natural language wrappers are allowed; person-linked delivery claims and
         // scenario-mismatched tokens are rejected above.
-        return body.contains(conclusion.orderReference()) && !authorized.isEmpty();
+        return !authorized.isEmpty();
     }
 
     private static int countOccurrences(String body, String token) {

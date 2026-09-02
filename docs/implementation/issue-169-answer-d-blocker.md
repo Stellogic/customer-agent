@@ -52,6 +52,10 @@ Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具�
 
 用户随后明确要求优先尽快跑通，并允许在不影响实际使用的前提下放宽过严规则。仓库 ADR 0008 要求自然语言不受少数固定模板限制，Issue #149 测试决策也禁止逐字断言自然语言；因此“必须逐字包含当前不符合补偿条件”属于展示文案约束，不是业务安全边界。修订后由结构化 intent 与 Spring 权威事实承载补偿结论，正文仍拒绝明确的已/将/会/承诺/同意补偿或退款、金额、时限承诺、敏感内容、错订单、提前结案与无依据事实，但允许自然否定表达。正文不触发任何补偿或退款执行。`issue169-20260902-focus50` 的 Ruff、生产源码 Pyright、60 tests 和 Standards / Spec 双轴审查均 PASS；Java 测试源码已补，待下一次真实 Spring canary 重新编译并验收。
 
+HEAD `c1ecf5069aab50cf9a992d03e8594e71b78421f9` 的 `issue169-canary-natural-20260902e` 重新编译了 Spring 并执行一次单题 compose。自然补偿措辞已不再阻塞，新的固定失败码为 `DOMAIN_BODY_ORDER_REFERENCE_REQUIRED`：结构化 `referencedOrder` 正确，但正文没有重复打印订单号。本次 1261 input / 896 output / 2157 total tokens，结算 11847 micro-CNY；账本 307 `SETTLED`、2 `TIMEOUT_RELEASED`、0 `PENDING`、累计 794799 micro-CNY，SHA-256 `7305f21b6b66017597a391367beb06b65c665e9501839e8890d66480bbaf3ac1`。
+
+订单号重复同样是展示格式。修订允许正文省略当前订单号，但正文显式出现任何其他 `ORDER-*` 仍拒绝；结构化 `referencedOrder`、evidence 与当前工单继续精确绑定，场景词和数值事实 grounding 保留。`issue169-20260902-focus52` 的 Ruff、生产源码 Pyright、61 tests PASS，最终 Standards / Spec 双轴复审均 PASS；Java 完成流入口的重复检查也已删除并补正反测试源码。
+
 ## 证据
 
 - `docs/implementation/evidence/issue169-answer-20260902d/answers.json`
@@ -75,6 +79,10 @@ Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具�
 - `docs/implementation/evidence/issue169-canary-body-policy-20260902d/phase.json`
 - `docs/implementation/evidence/issue169-canary-body-policy-20260902d/ledger-summary.json`
 - `docs/implementation/evidence/issue169-20260902-focus50/phase.json`
+- `docs/implementation/evidence/issue169-canary-natural-20260902e/canary.json`
+- `docs/implementation/evidence/issue169-canary-natural-20260902e/phase.json`
+- `docs/implementation/evidence/issue169-canary-natural-20260902e/ledger-summary.json`
+- `docs/implementation/evidence/issue169-20260902-focus52/phase.json`
 
 ## 未完成项
 

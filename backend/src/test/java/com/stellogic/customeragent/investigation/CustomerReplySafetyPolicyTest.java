@@ -18,6 +18,20 @@ class CustomerReplySafetyPolicyTest {
     }
 
     @Test
+    void completeNaturalReplyMayOmitRedundantOrderReference() {
+        assertThat(
+                        CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(
+                                "经核验，本次物流延迟不足 24 小时，暂不满足申请补偿的条件。",
+                                ORDER,
+                                true))
+                .isTrue();
+        assertThat(
+                        CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(
+                                "经核验，订单 ORDER-OTHER 暂不满足申请补偿的条件。", ORDER, true))
+                .isFalse();
+    }
+
+    @Test
     void acceptsGroundedNaturalLanguageRepliesBeyondFixedTemplates() {
         assertThat(rejection(safeReply())).isNull();
         assertThat(
@@ -38,6 +52,14 @@ class CustomerReplySafetyPolicyTest {
                         rejection(
                                 reply(
                                         "经核验，订单 ORDER-122 的物流延迟不足 24 小时，当前不符合补偿条件，本次核对结论已给出，后续处理以页面状态为准。如仍有问题，请继续回复。",
+                                        EVIDENCE,
+                                        ORDER),
+                                false))
+                .isNull();
+        assertThat(
+                        rejection(
+                                reply(
+                                        "经核验，本次物流延迟不足 24 小时，暂不满足申请补偿的条件。",
                                         EVIDENCE,
                                         ORDER),
                                 false))

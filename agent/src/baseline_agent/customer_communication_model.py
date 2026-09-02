@@ -265,18 +265,13 @@ def customer_reply_body_policy_violation(
         return "PERSON_NAME_CLAIM"
     if _PREMATURE_TICKET_STATUS_PATTERN.search(body) is not None:
         return "PREMATURE_TICKET_STATUS"
-    saw_scoped_order = False
     for match in _ORDER_REFERENCE_PATTERN.finditer(body):
         if match.group(0).upper() != order_reference.upper():
             return "ORDER_REFERENCE_SCOPE"
-        saw_scoped_order = True
-    if complete:
-        if not saw_scoped_order and order_reference not in body:
-            return "ORDER_REFERENCE_REQUIRED"
-        if not _has_only_allowed_compensation_language(
-            body, _infer_intent_from_compensation_language(body)
-        ):
-            return "COMPENSATION_LANGUAGE"
+    if complete and not _has_only_allowed_compensation_language(
+        body, _infer_intent_from_compensation_language(body)
+    ):
+        return "COMPENSATION_LANGUAGE"
     return None
 
 
@@ -387,8 +382,6 @@ def _has_only_allowed_compensation_language(body: str, intent: CustomerReplyInte
 def _has_grounded_investigation_narrative(
     model_input: CustomerCommunicationInput, body: str
 ) -> bool:
-    if model_input.order_reference not in body:
-        return False
     if _PERSON_NAME_CLAIM_PATTERN.search(body) is not None:
         return False
     scenario = model_input.risk_scenario or "LOGISTICS_DELAY"

@@ -86,6 +86,12 @@ def test_no_compensation_reply_allows_natural_denial_wording() -> None:
     assert is_authorized_body_prefix(body, "ORDER-162", complete=True)
 
 
+def test_reply_may_omit_redundant_order_reference() -> None:
+    assert is_authorized_body_prefix(
+        "经核验，本次物流延迟不足 24 小时。", "ORDER-162", complete=True
+    )
+
+
 @pytest.mark.parametrize(
     "promise",
     [
