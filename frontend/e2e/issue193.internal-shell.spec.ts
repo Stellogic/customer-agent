@@ -1,8 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { newAcceptanceContext } from "./support/browser-context";
 
-// 独立壳层视觉源码：浏览器使用合成 Session，不代表真实后端授权验收。
-// 未加入 scripts/browser-acceptance-plan.psd1；执行须另获协调任务放行。
+// 壳层视觉验收使用合成 Session；真实授权仍由 Spring 接口验收负责。
 const identities = [
   {
     id: "support-shell-fixture",

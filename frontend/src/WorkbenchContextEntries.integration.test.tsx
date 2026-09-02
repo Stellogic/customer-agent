@@ -15,6 +15,9 @@ import { resetHumanSessionLifecycleForTests } from "./humanSessionLifecycle";
 
 // 本票只验证入口与宿主的连接；标准补偿仍由 #164 的测试覆盖。
 vi.mock("./SupportCompensationPanel", () => ({ SupportCompensationPanel: () => null }));
+vi.mock("./components/support-assistance/SupportAssistance", () => ({
+  SupportAssistance: () => <div>合成辅助宿主</div>,
+}));
 
 const ticketId = "19300000-0000-0000-0000-000000000001";
 const revisionId = "19300000-0000-0000-0000-000000000002";
@@ -122,8 +125,10 @@ describe("#193 现有授权工作台入口接线", () => {
     fireEvent.click(within(entries).getByRole("button", { name: "联系客户" }));
     expect(screen.getByRole("region", { name: "人工公开回复" })).toHaveFocus();
     expect(screen.getByRole("textbox", { name: "公开回复" })).toHaveValue("");
-    expect(within(entries).getByRole("button", { name: "建议动作" })).toBeDisabled();
-    expect(within(entries).getByRole("button", { name: "相似案例" })).toBeDisabled();
+    for (const label of ["建议动作", "相似案例"]) {
+      fireEvent.click(within(entries).getByRole("button", { name: label }));
+      expect(screen.getByRole("region", { name: "AI 智能辅助" })).toHaveFocus();
+    }
     fireEvent.click(within(entries).getByRole("button", { name: "转派" }));
     await screen.findByRole("dialog", { name: "转派 · 开发中" });
     expect(fetchMock).toHaveBeenCalledTimes(before);

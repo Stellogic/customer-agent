@@ -773,6 +773,7 @@ function TicketDetail({
   const orderRef = useRef<HTMLDivElement>(null);
   const replyRef = useRef<HTMLElement>(null);
   const factsRef = useRef<HTMLElement>(null);
+  const assistanceRef = useRef<HTMLElement>(null);
   const [draft, setDraft] = useState(() => storedPendingReply?.body ?? "");
   const [replyState, setReplyState] = useState<
     "idle" | "sending" | "unknown" | "querying" | "error"
@@ -896,8 +897,22 @@ function TicketDetail({
             details.handlingMode === "HUMAN"
               ? { kind: "available", onOpen: () => focusContextTarget(replyRef.current) }
               : { kind: "unavailable", reason: "当前非人工处理模式，不能发送公开回复。" },
-          similarCases: { kind: "unavailable", reason: "相似案例检索尚未接入。" },
-          suggestedActions: { kind: "unavailable", reason: "客服辅助建议动作尚未接入。" },
+          similarCases:
+            details.handlingMode === "HUMAN" && assistanceAvailable
+              ? {
+                  kind: "available",
+                  onOpen: () => focusContextTarget(assistanceRef.current),
+                  description: "在当前工单的 AI 智能辅助中使用知识检索。",
+                }
+              : { kind: "unavailable", reason: "当前没有可用的人工辅助权限。" },
+          suggestedActions:
+            details.handlingMode === "HUMAN" && assistanceAvailable
+              ? {
+                  kind: "available",
+                  onOpen: () => focusContextTarget(assistanceRef.current),
+                  description: "在当前工单的 AI 智能辅助中查看建议。",
+                }
+              : { kind: "unavailable", reason: "当前没有可用的人工辅助权限。" },
         }}
       />
 
@@ -1007,12 +1022,19 @@ function TicketDetail({
       )}
 
       {details.handlingMode === "HUMAN" && assistanceAvailable && (
-        <SupportAssistance
-          ticketId={details.ticketId}
-          defaultQuery={details.description}
-          onReviewDraft={replyBusy || replyState === "unknown" ? null : reviewAssistance}
-          onClearDraft={clearReviewedAssistance}
-        />
+        <section
+          ref={assistanceRef}
+          tabIndex={-1}
+          className="context-entry-target"
+          aria-label="AI 智能辅助"
+        >
+          <SupportAssistance
+            ticketId={details.ticketId}
+            defaultQuery={details.description}
+            onReviewDraft={replyBusy || replyState === "unknown" ? null : reviewAssistance}
+            onClearDraft={clearReviewedAssistance}
+          />
+        </section>
       )}
 
       {details.handlingMode === "HUMAN" && (
