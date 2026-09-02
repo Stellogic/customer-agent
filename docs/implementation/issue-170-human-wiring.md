@@ -68,7 +68,7 @@
 
 集中风险审查在 PR 转 Ready 后发现两项 P2：撤权未清除已移交且未人工再编辑的公开回复草稿，以及 `policy` / `knowledge` 的无引用 `SUPPORTED` 可进入 ready。两项均已按上述最小边界修复并加入三端回归源码；修复后 `issue170-riskfix-backend-20260902b`、`issue170-riskfix-agent-20260902a`、`issue170-riskfix-frontend-20260902b` 聚焦门禁均 PASS。首轮后端只因 Spotless 排版失败、首轮前端只因合成响应缺少 view 身份字段失败，修正后均复验通过。
 
-最终交付仍需 Standards / Spec 双轴确认和一次完整 `pwsh ./scripts/check.ps1 -Issue 170`。完整门禁包含真实 PostgreSQL/Compose、smoke 与浏览器回归；回答质量限制继续单列，不用 #169 检索门禁或本票合成测试替代。CI 关闭，外部审查不阻塞。
+最终交付仍需一次完整 `pwsh ./scripts/check.ps1 -Issue 170`。完整门禁包含真实 PostgreSQL/Compose、smoke 与浏览器回归；回答质量限制继续单列，不用 #169 检索门禁或本票合成测试替代。CI 关闭，外部审查不阻塞。
 
 ## 静态双 CR 记录
 
@@ -77,3 +77,5 @@
 迁移顺序增量：基线 `debe02094eca3f3ad4af8c03a84a7b73fc1ffa84`，仅自有迁移 V43→V44 的100%同内容重命名和本文引用更新；Standards / Spec 各 PASS、0项发现。未运行验证、未查询锁、未修改已发布迁移或他票文件。
 
 最新 main 同步增量：基线 `e61152199c985f2d46b1a1cf1575b14ac8cb3a03`，合并提交 `bc2629b3d509c6e64a91a081c9ebc4991c49e336` 同步 `origin/main` `9995156252e416ac59bfaba24d05ad58319ca572`，并更新本文的 #169 Draft 契约快照与串行交接清单。增量 Standards / Spec 各 PASS、0项发现；仅静态审查，未运行测试、检查、构建、Docker、模型或完整门禁。
+
+最终候选 `9cb53e27e9f3e5fe521c375c5739e2f24f6c5e3f` 固定比较 `origin/main...9cb53e2`：Standards PASS、Spec PASS，各0项阻塞发现。审查确认了人工同文草稿仍需明确替换、`knowledge`/`policy` prompt 与双边引用校验一致、`suggestions` 仅为有界文本投影，以及 `retrievalEmpty` 与充分性决定正交；仍复用 #169 唯一共享适配层。该次审查只读，未运行测试、格式、lint、类型检查、构建、Docker、模型或评测。
