@@ -16,7 +16,7 @@
     "backend/src/main/resources/knowledge/customer-conversation-help-v1.md": "dc347bfa2aaea8c76db755a033c4c3bcb838910218bca374613b891676561bd5",
     "backend/src/main/resources/knowledge/customer-privacy-help-v1.md": "718c32899cfa2d1c6b0697c5beb2d648352433fd2b0e6b949ad35352363f072a",
     "docs/eval/issue-169-customer-answer-v1.md": "3a676c27a99c51ff6e231d29d61dbbfa2c71b6773f1f4fb54b5e2860adf78588",
-    "agent/src/baseline_agent/deepseek_customer_communication_model.py": "9ea3dad1c53647e1bf60fe2995721df9f5cf2ba309cd8c77e690179e5e722d9f",
+    "agent/src/baseline_agent/deepseek_customer_communication_model.py": "53a4ac9d85c4ddb295a6c912f16e1d22d600806c7a5973561b4baeb3255e8e9b",
     "agent/src/baseline_agent/deepseek_investigation_model.py": "2f4378a5af5a8c5eabd37754c5863daa05ae6e559886b0dd16443537a492873a"
   }
 }
