@@ -1,0 +1,447 @@
+{
+  "mode": "DETERMINISTIC_REAL_HTTP_PG",
+  "paid_model_calls": 0,
+  "checks": [
+    {
+      "name": "customer-search",
+      "actual": 200,
+      "expected": 200
+    },
+    {
+      "name": "only-public",
+      "actual": true,
+      "expected": true
+    },
+    {
+      "name": "replay-same-receipt",
+      "actual": {
+        "schema": "agent-knowledge-v1",
+        "indexGeneration": 1,
+        "results": [
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-9efd8015e80c829a25d2c62721a2b9ae939e47b239de032c796b7429876ae9bc",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 22,
+            "endLine": 22,
+            "snippet": "物流节点没有更新不等于确认丢件，是否丢失仍需要核实，不能仅凭更新时间推断。"
+          },
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-aaa57e4b84b404e86d78e9e076f1a15291ded67a78b20d2f80c95e38f26028d8",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 12,
+            "endLine": 12,
+            "snippet": "物流信息长时间没有变化时，可以在当前工单说明最后一次看到的物流节点和大致时间，方便客服核对。"
+          },
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-de99bd0822500ad8b33ffed05cf10cf1b044d49b9e94c640bb56278d3821e71f",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 20,
+            "endLine": 20,
+            "snippet": "这里的配送指南只说明一般处理方法；当前订单和物流状态由客服核对后的工单回复说明。"
+          },
+          {
+            "articleId": "customer-conversation-help",
+            "version": "v1",
+            "chunkId": "chunk-278d6809b6258ae9fbe8a42b6ff9e9d96c821f277487c4fc157191dd24b7c10a",
+            "title": "工单沟通与回复说明",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 18,
+            "endLine": 18,
+            "snippet": "回复中的知识来源标题和更新时间用于说明一般规则的出处，不代表已经核实了当前订单的事实。"
+          },
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-7361efb65c72331b30bd034e1a9462086a64914d5038483accfdfdb6c0f7e774",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 14,
+            "endLine": 14,
+            "snippet": "页面显示签收但没有找到包裹时，可以先查看代收点，并询问同住人员是否代收；仍未找到时在当前工单说明情况。"
+          }
+        ]
+      },
+      "expected": {
+        "schema": "agent-knowledge-v1",
+        "indexGeneration": 1,
+        "results": [
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-9efd8015e80c829a25d2c62721a2b9ae939e47b239de032c796b7429876ae9bc",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 22,
+            "endLine": 22,
+            "snippet": "物流节点没有更新不等于确认丢件，是否丢失仍需要核实，不能仅凭更新时间推断。"
+          },
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-aaa57e4b84b404e86d78e9e076f1a15291ded67a78b20d2f80c95e38f26028d8",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 12,
+            "endLine": 12,
+            "snippet": "物流信息长时间没有变化时，可以在当前工单说明最后一次看到的物流节点和大致时间，方便客服核对。"
+          },
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-de99bd0822500ad8b33ffed05cf10cf1b044d49b9e94c640bb56278d3821e71f",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 20,
+            "endLine": 20,
+            "snippet": "这里的配送指南只说明一般处理方法；当前订单和物流状态由客服核对后的工单回复说明。"
+          },
+          {
+            "articleId": "customer-conversation-help",
+            "version": "v1",
+            "chunkId": "chunk-278d6809b6258ae9fbe8a42b6ff9e9d96c821f277487c4fc157191dd24b7c10a",
+            "title": "工单沟通与回复说明",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 18,
+            "endLine": 18,
+            "snippet": "回复中的知识来源标题和更新时间用于说明一般规则的出处，不代表已经核实了当前订单的事实。"
+          },
+          {
+            "articleId": "customer-delivery-help",
+            "version": "v1",
+            "chunkId": "chunk-7361efb65c72331b30bd034e1a9462086a64914d5038483accfdfdb6c0f7e774",
+            "title": "配送问题的信息补充指南",
+            "updatedAt": "2026-09-01T00:00:00Z",
+            "applicability": [
+              "CUSTOMER_PUBLIC"
+            ],
+            "startLine": 14,
+            "endLine": 14,
+            "snippet": "页面显示签收但没有找到包裹时，可以先查看代收点，并询问同住人员是否代收；仍未找到时在当前工单说明情况。"
+          }
+        ]
+      }
+    },
+    {
+      "name": "same-key-different-query",
+      "actual": 409,
+      "expected": 409
+    },
+    {
+      "name": "publish-buffered",
+      "actual": 200,
+      "expected": 200
+    },
+    {
+      "name": "saved-body",
+      "actual": "经核验，订单 ORDER-DELAY-UNDER-24 的本次物流延迟不足 24 小时，当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。\n\n物流节点没有更新不等于确认丢件，是否丢失仍需要核实，不能仅凭更新时间推断。",
+      "expected": "经核验，订单 ORDER-DELAY-UNDER-24 的本次物流延迟不足 24 小时，当前不符合补偿条件。本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。\n\n物流节点没有更新不等于确认丢件，是否丢失仍需要核实，不能仅凭更新时间推断。"
+    },
+    {
+      "name": "safe-source-fields",
+      "actual": [
+        "title",
+        "updatedAt"
+      ],
+      "expected": [
+        "title",
+        "updatedAt"
+      ]
+    },
+    {
+      "name": "no-prepublication-delta",
+      "actual": 0,
+      "expected": 0
+    },
+    {
+      "name": "insufficient-search",
+      "actual": 200,
+      "expected": 200
+    },
+    {
+      "name": "insufficient-accept",
+      "actual": 200,
+      "expected": 200
+    },
+    {
+      "name": "insufficient-not-closed",
+      "actual": [
+        "INVESTIGATING",
+        "AGENT"
+      ],
+      "expected": [
+        "INVESTIGATING",
+        "AGENT"
+      ]
+    },
+    {
+      "name": "insufficient-no-auto-resolution",
+      "actual": 0,
+      "expected": 0
+    },
+    {
+      "name": "before-revocation",
+      "actual": 200,
+      "expected": 200
+    },
+    {
+      "name": "after-revocation",
+      "actual": 403,
+      "expected": 403
+    },
+    {
+      "name": "revoked-publication",
+      "actual": 403,
+      "expected": 403
+    },
+    {
+      "name": "conflict-accepted",
+      "actual": 200,
+      "expected": 200
+    },
+    {
+      "name": "conflict-audited",
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "name": "conflict-no-sources",
+      "actual": [],
+      "expected": []
+    },
+    {
+      "name": "stale-index-http",
+      "actual": 503,
+      "expected": 503
+    },
+    {
+      "name": "stale-index-not-empty",
+      "actual": "INDEX_STALE",
+      "expected": "INDEX_STALE"
+    },
+    {
+      "name": "injection-retrieval",
+      "actual": 200,
+      "expected": 200
+    },
+    {
+      "name": "injection-cited-chunk",
+      "actual": "chunk-9efd8015e80c829a25d2c62721a2b9ae939e47b239de032c796b7429876ae9bc",
+      "expected": "chunk-9efd8015e80c829a25d2c62721a2b9ae939e47b239de032c796b7429876ae9bc"
+    },
+    {
+      "name": "injection-not-published",
+      "actual": 422,
+      "expected": 422
+    },
+    {
+      "name": "injection-rejection-code",
+      "actual": "UNSAFE_KNOWLEDGE",
+      "expected": "UNSAFE_KNOWLEDGE"
+    },
+    {
+      "name": "injection-no-public-message",
+      "actual": 0,
+      "expected": 0
+    },
+    {
+      "name": "before-version-change",
+      "actual": 200,
+      "expected": 200
+    },
+    {
+      "name": "publication-waited-for-catalog-transaction",
+      "actual": true,
+      "expected": true
+    },
+    {
+      "name": "old-version-not-published",
+      "actual": 422,
+      "expected": 422
+    },
+    {
+      "name": "old-version-no-public-message",
+      "actual": 0,
+      "expected": 0
+    }
+  ],
+  "status": "PASS",
+  "first_search_response": {
+    "schema": "agent-knowledge-v1",
+    "indexGeneration": 1,
+    "results": [
+      {
+        "articleId": "customer-delivery-help",
+        "version": "v1",
+        "chunkId": "chunk-9efd8015e80c829a25d2c62721a2b9ae939e47b239de032c796b7429876ae9bc",
+        "title": "配送问题的信息补充指南",
+        "updatedAt": "2026-09-01T00:00:00Z",
+        "applicability": [
+          "CUSTOMER_PUBLIC"
+        ],
+        "startLine": 22,
+        "endLine": 22,
+        "snippet": "物流节点没有更新不等于确认丢件，是否丢失仍需要核实，不能仅凭更新时间推断。"
+      },
+      {
+        "articleId": "customer-delivery-help",
+        "version": "v1",
+        "chunkId": "chunk-aaa57e4b84b404e86d78e9e076f1a15291ded67a78b20d2f80c95e38f26028d8",
+        "title": "配送问题的信息补充指南",
+        "updatedAt": "2026-09-01T00:00:00Z",
+        "applicability": [
+          "CUSTOMER_PUBLIC"
+        ],
+        "startLine": 12,
+        "endLine": 12,
+        "snippet": "物流信息长时间没有变化时，可以在当前工单说明最后一次看到的物流节点和大致时间，方便客服核对。"
+      },
+      {
+        "articleId": "customer-delivery-help",
+        "version": "v1",
+        "chunkId": "chunk-de99bd0822500ad8b33ffed05cf10cf1b044d49b9e94c640bb56278d3821e71f",
+        "title": "配送问题的信息补充指南",
+        "updatedAt": "2026-09-01T00:00:00Z",
+        "applicability": [
+          "CUSTOMER_PUBLIC"
+        ],
+        "startLine": 20,
+        "endLine": 20,
+        "snippet": "这里的配送指南只说明一般处理方法；当前订单和物流状态由客服核对后的工单回复说明。"
+      },
+      {
+        "articleId": "customer-conversation-help",
+        "version": "v1",
+        "chunkId": "chunk-278d6809b6258ae9fbe8a42b6ff9e9d96c821f277487c4fc157191dd24b7c10a",
+        "title": "工单沟通与回复说明",
+        "updatedAt": "2026-09-01T00:00:00Z",
+        "applicability": [
+          "CUSTOMER_PUBLIC"
+        ],
+        "startLine": 18,
+        "endLine": 18,
+        "snippet": "回复中的知识来源标题和更新时间用于说明一般规则的出处，不代表已经核实了当前订单的事实。"
+      },
+      {
+        "articleId": "customer-delivery-help",
+        "version": "v1",
+        "chunkId": "chunk-7361efb65c72331b30bd034e1a9462086a64914d5038483accfdfdb6c0f7e774",
+        "title": "配送问题的信息补充指南",
+        "updatedAt": "2026-09-01T00:00:00Z",
+        "applicability": [
+          "CUSTOMER_PUBLIC"
+        ],
+        "startLine": 14,
+        "endLine": 14,
+        "snippet": "页面显示签收但没有找到包裹时，可以先查看代收点，并询问同住人员是否代收；仍未找到时在当前工单说明情况。"
+      }
+    ]
+  },
+  "browser_ticket": "9d838015-7eb8-4974-a683-477ac253e212",
+  "conflict_receipt": {
+    "schema": "agent-knowledge-v1",
+    "indexGeneration": 1,
+    "results": [
+      {
+        "articleId": "customer-delivery-help",
+        "version": "v1",
+        "chunkId": "chunk-de99bd0822500ad8b33ffed05cf10cf1b044d49b9e94c640bb56278d3821e71f",
+        "title": "配送问题的信息补充指南",
+        "updatedAt": "2026-09-01T00:00:00Z",
+        "applicability": [
+          "CUSTOMER_PUBLIC"
+        ],
+        "startLine": 20,
+        "endLine": 20,
+        "snippet": "这里的配送指南只说明一般处理方法；当前订单和物流状态由客服核对后的工单回复说明。"
+      },
+      {
+        "articleId": "customer-conversation-help",
+        "version": "v1",
+        "chunkId": "chunk-199d0171969a2e99f2aa45949033a6b9505cce4796187f4b7a0a990933d81266",
+        "title": "工单沟通与回复说明",
+        "updatedAt": "2026-09-01T00:00:00Z",
+        "applicability": [
+          "CUSTOMER_PUBLIC"
+        ],
+        "startLine": 20,
+        "endLine": 20,
+        "snippet": "一般知识说明与当前工单已核验的事实不一致时，应以当前工单已核验的业务事实为准。"
+      },
+      {
+        "articleId": "customer-conversation-help",
+        "version": "v1",
+        "chunkId": "chunk-278d6809b6258ae9fbe8a42b6ff9e9d96c821f277487c4fc157191dd24b7c10a",
+        "title": "工单沟通与回复说明",
+        "updatedAt": "2026-09-01T00:00:00Z",
+        "applicability": [
+          "CUSTOMER_PUBLIC"
+        ],
+        "startLine": 18,
+        "endLine": 18,
+        "snippet": "回复中的知识来源标题和更新时间用于说明一般规则的出处，不代表已经核实了当前订单的事实。"
+      },
+      {
+        "articleId": "customer-delivery-help",
+        "version": "v1",
+        "chunkId": "chunk-7361efb65c72331b30bd034e1a9462086a64914d5038483accfdfdb6c0f7e774",
+        "title": "配送问题的信息补充指南",
+        "updatedAt": "2026-09-01T00:00:00Z",
+        "applicability": [
+          "CUSTOMER_PUBLIC"
+        ],
+        "startLine": 14,
+        "endLine": 14,
+        "snippet": "页面显示签收但没有找到包裹时，可以先查看代收点，并询问同住人员是否代收；仍未找到时在当前工单说明情况。"
+      },
+      {
+        "articleId": "customer-delivery-help",
+        "version": "v1",
+        "chunkId": "chunk-aaa57e4b84b404e86d78e9e076f1a15291ded67a78b20d2f80c95e38f26028d8",
+        "title": "配送问题的信息补充指南",
+        "updatedAt": "2026-09-01T00:00:00Z",
+        "applicability": [
+          "CUSTOMER_PUBLIC"
+        ],
+        "startLine": 12,
+        "endLine": 12,
+        "snippet": "物流信息长时间没有变化时，可以在当前工单说明最后一次看到的物流节点和大致时间，方便客服核对。"
+      }
+    ]
+  }
+}

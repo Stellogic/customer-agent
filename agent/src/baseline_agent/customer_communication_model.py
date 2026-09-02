@@ -242,31 +242,38 @@ _PREMATURE_TICKET_STATUS_PATTERN = re.compile(
 
 
 def is_authorized_body_prefix(body: str, order_reference: str, *, complete: bool) -> bool:
+    return customer_reply_body_policy_violation(body, order_reference, complete=complete) is None
+
+
+def customer_reply_body_policy_violation(
+    body: str, order_reference: str, *, complete: bool
+) -> str | None:
+    """Return a fixed body-policy code without exposing the rejected body."""
     if not body or not order_reference or len(body) > 1_000:
-        return False
+        return "REQUIRED_OR_LENGTH"
     if _MONEY_PATTERN.search(body) is not None:
-        return False
+        return "MONEY"
     if _RESPONSE_TIME_PROMISE_PATTERN.search(body) is not None:
-        return False
+        return "RESPONSE_TIME_PROMISE"
     if _SENSITIVE_LEAK_PATTERN.search(body) is not None:
-        return False
+        return "SENSITIVE_LEAK"
     if _PERSON_NAME_CLAIM_PATTERN.search(body) is not None:
-        return False
+        return "PERSON_NAME_CLAIM"
     if _PREMATURE_TICKET_STATUS_PATTERN.search(body) is not None:
-        return False
+        return "PREMATURE_TICKET_STATUS"
     saw_scoped_order = False
     for match in _ORDER_REFERENCE_PATTERN.finditer(body):
         if match.group(0).upper() != order_reference.upper():
-            return False
+            return "ORDER_REFERENCE_SCOPE"
         saw_scoped_order = True
     if complete:
         if not saw_scoped_order and order_reference not in body:
-            return False
+            return "ORDER_REFERENCE_REQUIRED"
         if not _has_only_allowed_compensation_language(
             body, _infer_intent_from_compensation_language(body)
         ):
-            return False
-    return True
+            return "COMPENSATION_LANGUAGE"
+    return None
 
 
 def validate_customer_reply_envelope(
@@ -341,8 +348,11 @@ def customer_reply_policy_violation(
         ):
             return ("BODY_TEMPLATE", "$.body")
         return None
-    if not is_authorized_body_prefix(envelope.body, model_input.order_reference, complete=True):
-        return ("BODY_AUTHORIZATION", "$.body")
+    body_violation = customer_reply_body_policy_violation(
+        envelope.body, model_input.order_reference, complete=True
+    )
+    if body_violation is not None:
+        return (f"BODY_{body_violation}", "$.body")
     if not _has_grounded_investigation_narrative(model_input, envelope.body):
         return ("GROUNDED_NARRATIVE", "$.body")
     return None

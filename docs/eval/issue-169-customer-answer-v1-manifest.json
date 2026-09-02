@@ -8,7 +8,7 @@
   "independent_boundaries": 8,
   "files": {
     "docs/eval/issue-169-customer-answer-v1.json": "9e9eb72d117eb37635f34075c1d122653f3a863da08c427aecfc0e7377c92d3c",
-    "agent/src/baseline_agent/customer_communication_model.py": "f2df8d80683e4106ffa5d56091ef3dc5cf34435268670731535b491b5b4b5587",
+    "agent/src/baseline_agent/customer_communication_model.py": "e630ed0762fa21b66148730e22ce7ae7b441007ebd106afc244f0d23ad62acce",
     "agent/src/baseline_agent/customer_knowledge_answer.py": "51ab84c4c1c6bfe1b2f4a2ac2a5fdaf999ece1b6de93df7388468204984768d9",
     "agent/tests/issue169_customer_answer_run.py": "f79cd7728e82578cead5122d118afb0fe1435c3ecdb15048ff5143fe87bf43ae",
     "agent/tests/issue169_customer_knowledge_acceptance.py": "2a3fefbd2d0f9f4f21cc1ae23a069fb21f6debad7feba5f4044457b0c08943d5",

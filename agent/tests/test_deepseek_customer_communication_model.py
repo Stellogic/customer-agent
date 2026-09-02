@@ -361,7 +361,7 @@ async def test_schema_failure_diagnostic_is_bounded_and_field_specific(
     [
         ("citations", "DOMAIN_KNOWLEDGE_CITATIONS", "$.knowledge.citations"),
         ("evidence", "DOMAIN_EVIDENCE_REFS", "$.evidenceRefs"),
-        ("body", "DOMAIN_BODY_AUTHORIZATION", "$.body"),
+        ("body", "DOMAIN_BODY_SENSITIVE_LEAK", "$.body"),
     ],
 )
 async def test_domain_failure_diagnostic_uses_fixed_code_without_reply_values(

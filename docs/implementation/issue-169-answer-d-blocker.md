@@ -42,6 +42,10 @@ Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具�
 
 稳定提交 `44dca0ae271290cc95cfa195a16e841886ed2484` 上两次申请执行 `issue169-canary-policy-20260902c` 均被宿主 auto-review 拒绝。第一次以当前显式禁模边界为由；第二次在协调任务转述用户永久授权及纯合成输入、唯一账本不超过 6 CNY 等限制后，仍因授权不是本任务中的直接用户确认而拒绝。两次均未获取测试锁、未启动运行环境、未调用供应商且账本未变化。不得通过间接脚本或其他路径绕过审批。
 
+用户随后在本任务直接授权所有 DeepSeek 调用，并把唯一累计上限收紧到 5 CNY。`issue169-canary-policy-20260902c` 因而在 HEAD `73926b5e6f9a1ed65a809fdcc8d5bbd0ef7ca10e` 合法执行一次：HTTP 200 completed、JSON Schema 和顶层七键通过，失败定位为 `DOMAIN_BODY_AUTHORIZATION` at `$.body`。该次 1261 input / 892 output / 2153 total tokens，已结算 11811 micro-CNY；账本变为 305 `SETTLED`、2 `TIMEOUT_RELEASED`、0 `PENDING`、累计 771375 micro-CNY，SHA-256 `bd8b1e50f18a965d2ee10434103aa7e59c32123423edbe81de9fe3df6defc14b`。确定性 HTTP/PG 29 项、投影 SQL、清理均 PASS。
+
+`BODY_AUTHORIZATION` 仍合并金额、时限承诺、敏感泄露、姓名签收、工单状态、订单号范围与补偿措辞等规则，不能据此判断具体失败接缝。后续继续复用同一正文策略函数，仅把原 `False` 等价映射为有限固定子码；不记录正文、匹配片段或实际值，也不改变拒绝顺序。`issue169-20260902-focus45` 的 Ruff、生产源码 Pyright、45 tests 和 Standards / Spec 双轴审查均 PASS，`paid_model_calls=0`。
+
 ## 证据
 
 - `docs/implementation/evidence/issue169-answer-20260902d/answers.json`
@@ -57,6 +61,10 @@ Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具�
 - `docs/implementation/evidence/issue169-canary-diagnostic-20260902b/ledger-summary.json`
 - `docs/implementation/evidence/issue169-20260902-focus44/phase.json`
 - `docs/implementation/evidence/issue169-canary-policy-20260902c/approval-blocked.json`
+- `docs/implementation/evidence/issue169-canary-policy-20260902c/canary.json`
+- `docs/implementation/evidence/issue169-canary-policy-20260902c/phase.json`
+- `docs/implementation/evidence/issue169-canary-policy-20260902c/ledger-summary.json`
+- `docs/implementation/evidence/issue169-20260902-focus45/phase.json`
 
 ## 未完成项
 
