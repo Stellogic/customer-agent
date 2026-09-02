@@ -12,6 +12,7 @@ import pytest
 def runner(monkeypatch):
     monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring-test")
     monkeypatch.setenv("SPRING_DATABASE_URI", "postgresql://test")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1]))
     monkeypatch.syspath_prepend(str(Path(__file__).parent))
     return importlib.import_module("issue169_customer_answer_run")
 

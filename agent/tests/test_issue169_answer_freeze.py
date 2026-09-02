@@ -4,9 +4,15 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).parents[2]
 DATASET = REPO / "docs/eval/issue-169-customer-answer-v1.json"
 MANIFEST = REPO / "docs/eval/issue-169-customer-answer-v1-manifest.json"
+pytestmark = pytest.mark.skipif(
+    not DATASET.is_file() and not MANIFEST.is_file(),
+    reason="仓库级冻结资料不在 Agent 单目录镜像构建上下文中",
+)
 
 
 def canonical_sha256(path: Path) -> str:
