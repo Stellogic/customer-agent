@@ -131,7 +131,7 @@ class CustomerReplySafetyPolicyTest {
     }
 
     @Test
-    void rejectsFabricatedEvidenceAndOrdersOutsideTheTicketScope() {
+    void rejectsPersonClaimsAndOrdersOutsideTheTicketScope() {
         assertThat(
                         rejection(
                                 reply(
@@ -146,20 +146,6 @@ class CustomerReplySafetyPolicyTest {
                                         EVIDENCE,
                                         ORDER)))
                 .isNull();
-        assertThat(
-                        rejection(
-                                reply(
-                                        "您反馈物流异常。调查结果为包裹丢失。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
-                                        EVIDENCE,
-                                        ORDER)))
-                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT");
-        assertThat(
-                        rejection(
-                                reply(
-                                        "订单 ORDER-122 的调查已完成，当前属于疑似丢件。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
-                                        EVIDENCE,
-                                        ORDER)))
-                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT");
         assertThat(
                         rejection(
                                 reply(

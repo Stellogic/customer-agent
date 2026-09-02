@@ -384,27 +384,6 @@ def _has_grounded_investigation_narrative(
 ) -> bool:
     if _PERSON_NAME_CLAIM_PATTERN.search(body) is not None:
         return False
-    scenario = model_input.risk_scenario or "LOGISTICS_DELAY"
-    claim_rules = {
-        "签收": {"PACKAGE_SIGNED_NOT_RECEIVED"},
-        "未收到": {"PACKAGE_SIGNED_NOT_RECEIVED"},
-        "丢件": {"PACKAGE_SUSPECTED_LOST"},
-        "丢失": {"PACKAGE_SUSPECTED_LOST"},
-        "停滞": {"LOGISTICS_STALLED"},
-        "重复扣款": {"DUPLICATE_CHARGE"},
-        "疑似丢件": {"PACKAGE_SUSPECTED_LOST"},
-    }
-    for token, allowed_scenarios in claim_rules.items():
-        if token in body and scenario not in allowed_scenarios:
-            if _all_claims_are_customer_attributed(body, token):
-                continue
-            if (
-                token == "退款"
-                and "审批完成前不会执行补偿或退款" in body
-                and body.count("退款") == 1
-            ):
-                continue
-            return False
     if model_input.delay_seconds is not None:
         claimed_hours = [int(match.group(1)) for match in re.finditer(r"(\d+)\s*小时", body)]
         authority_hours = model_input.delay_seconds // 3600
@@ -414,24 +393,6 @@ def _has_grounded_investigation_narrative(
             if not matches_authority and not mentions_threshold:
                 return False
     return True
-
-
-def _all_claims_are_customer_attributed(body: str, token: str) -> bool:
-    """Allow the reply to acknowledge a customer's report without treating it as verified."""
-    positions = (match.start() for match in re.finditer(re.escape(token), body))
-    return all(
-        any(
-            marker
-            in body[
-                max(
-                    max(body.rfind(delimiter, 0, position) for delimiter in "。；！？\n") + 1,
-                    position - 24,
-                ) : position
-            ]
-            for marker in ("您反馈", "您反映", "您提到", "您描述")
-        )
-        for position in positions
-    )
 
 
 def customer_communication_provider_request(

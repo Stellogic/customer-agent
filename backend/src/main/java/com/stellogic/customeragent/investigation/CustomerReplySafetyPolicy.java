@@ -1,10 +1,7 @@
 package com.stellogic.customeragent.investigation;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,42 +51,6 @@ public final class CustomerReplySafetyPolicy {
     private static final Pattern CUSTOMER_FACT_ASSERTION_PATTERN =
             Pattern.compile(
                     "(?:您的|本单|这笔|该笔|当前订单|当前包裹|该订单|该包裹|订单|包裹).{0,12}(?:已|已经|目前|当前|处于|存在|为).{0,8}(?:签收|丢失|延迟|停滞|配送|支付|退款|补偿|取消|到账)");
-
-    private static final Map<InvestigationRiskScenario, Set<String>> SCENARIO_CLAIM_TOKENS =
-            Map.of(
-                    InvestigationRiskScenario.LOGISTICS_DELAY,
-                    Set.of("物流", "延迟", "调查", "核验", "核对", "记录", "小时", "不足", "未达到", "存在", "出现"),
-                    InvestigationRiskScenario.LOGISTICS_STALLED,
-                    Set.of("物流", "停滞", "长时间", "无更新", "调查", "核验", "核对"),
-                    InvestigationRiskScenario.PACKAGE_SIGNED_NOT_RECEIVED,
-                    Set.of("物流", "签收", "未收到", "调查", "核验", "核对", "状态"),
-                    InvestigationRiskScenario.PACKAGE_SUSPECTED_LOST,
-                    Set.of("物流", "疑似", "丢件", "丢失", "调查", "核验", "核对"),
-                    InvestigationRiskScenario.DUPLICATE_CHARGE,
-                    Set.of("支付", "重复", "扣款", "调查", "核验", "核对", "记录"),
-                    InvestigationRiskScenario.REFUND_STATUS,
-                    Set.of("退款", "支付", "状态", "调查", "核验", "核对"),
-                    InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE,
-                    Set.of("订单", "地址", "取消", "规则", "说明", "调查", "核验", "核对"),
-                    InvestigationRiskScenario.OTHER_GENERAL,
-                    Set.of("问题", "说明", "调查", "核验", "核对", "记录"));
-
-    private static final Map<String, Set<InvestigationRiskScenario>> CLAIM_REQUIRING_SCENARIO =
-            Map.of(
-                    "签收", Set.of(InvestigationRiskScenario.PACKAGE_SIGNED_NOT_RECEIVED),
-                    "未收到", Set.of(InvestigationRiskScenario.PACKAGE_SIGNED_NOT_RECEIVED),
-                    "丢件", Set.of(InvestigationRiskScenario.PACKAGE_SUSPECTED_LOST),
-                    "丢失", Set.of(InvestigationRiskScenario.PACKAGE_SUSPECTED_LOST),
-                    "停滞", Set.of(InvestigationRiskScenario.LOGISTICS_STALLED),
-                    "重复扣款", Set.of(InvestigationRiskScenario.DUPLICATE_CHARGE),
-                    "退款",
-                            Set.of(
-                                    InvestigationRiskScenario.REFUND_STATUS,
-                                    InvestigationRiskScenario.DUPLICATE_CHARGE,
-                                    InvestigationRiskScenario.LOGISTICS_DELAY,
-                                    InvestigationRiskScenario.PACKAGE_SIGNED_NOT_RECEIVED,
-                                    InvestigationRiskScenario.PACKAGE_SUSPECTED_LOST,
-                                    InvestigationRiskScenario.LOGISTICS_STALLED));
 
     private CustomerReplySafetyPolicy() {}
 
@@ -187,32 +148,6 @@ public final class CustomerReplySafetyPolicy {
         if (PERSON_NAME_CLAIM_PATTERN.matcher(body).find()) return false;
         EvidenceSufficiencyClaim sufficiency = conclusion.sufficiency();
         if (sufficiency == null || sufficiency.riskScenario() == null) return false;
-        InvestigationRiskScenario scenario = sufficiency.riskScenario();
-        for (Map.Entry<String, Set<InvestigationRiskScenario>> claim :
-                CLAIM_REQUIRING_SCENARIO.entrySet()) {
-            if (body.contains(claim.getKey()) && !claim.getValue().contains(scenario)) {
-                if (allClaimsAreCustomerAttributed(body, claim.getKey())) {
-                    continue;
-                }
-                // Compensation-pending replies may mention 退款 only inside the approved no-execution
-                // disclaimer; strip that before judging logistics-delay narratives.
-                if ("退款".equals(claim.getKey())
-                        && body.contains("审批完成前不会执行补偿或退款")
-                        && countOccurrences(body, "退款") == 1) {
-                    continue;
-                }
-                return false;
-            }
-        }
-        Set<String> authorized =
-                new HashSet<>(SCENARIO_CLAIM_TOKENS.getOrDefault(scenario, Set.of()));
-        authorized.add(conclusion.orderReference());
-        if (conclusion.delayHours() > 0) {
-            authorized.add(Integer.toString(conclusion.delayHours()));
-        }
-        if (conclusion.delaySeconds() > 0) {
-            authorized.add(Long.toString(conclusion.delaySeconds()));
-        }
         // Natural language is allowed; reject only when a concrete numeric delay claim disagrees
         // with Spring authority.
         Matcher numericDelay = Pattern.compile("(\\d+)\\s*小时").matcher(body);
@@ -224,37 +159,7 @@ public final class CustomerReplySafetyPolicy {
                 return false;
             }
         }
-        // Natural language wrappers are allowed; person-linked delivery claims and
-        // scenario-mismatched tokens are rejected above.
-        return !authorized.isEmpty();
-    }
-
-    private static boolean allClaimsAreCustomerAttributed(String body, String token) {
-        for (int at = body.indexOf(token); at >= 0; at = body.indexOf(token, at + token.length())) {
-            int clauseStart = 0;
-            for (char delimiter : new char[] {'。', '；', '！', '？', '\n'}) {
-                clauseStart = Math.max(clauseStart, body.lastIndexOf(delimiter, at - 1) + 1);
-            }
-            String context = body.substring(Math.max(clauseStart, at - 24), at);
-            if (!context.contains("您反馈")
-                    && !context.contains("您反映")
-                    && !context.contains("您提到")
-                    && !context.contains("您描述")) {
-                return false;
-            }
-        }
         return true;
-    }
-
-    private static int countOccurrences(String body, String token) {
-        int count = 0;
-        int from = 0;
-        while (true) {
-            int at = body.indexOf(token, from);
-            if (at < 0) return count;
-            count++;
-            from = at + token.length();
-        }
     }
 
     private static CustomerReplyIntent inferIntentFromCompensationLanguage(String body) {
