@@ -54,7 +54,13 @@ def test_provider_transport_propagates_container_https_proxy(runner, monkeypatch
 async def test_budget_blocks_before_transport_when_remaining_cannot_reserve_full_call(
     runner, tmp_path
 ):
-    path = ledger_file(tmp_path, 3_000_000)
+    request = httpx.Request(
+        "POST",
+        "https://provider-test",
+        json={"model": "deepseek-v4-flash", "max_output_tokens": 1536},
+    )
+    reserve = runner.request_reserve_micro_cny(request.content, 1536)
+    path = ledger_file(tmp_path, runner.BUDGET_LIMIT_MICRO_CNY - reserve + 1)
     budget = runner.BudgetTransport(path, "test-budget-bound")
 
     def forbidden(_):
@@ -62,11 +68,6 @@ async def test_budget_blocks_before_transport_when_remaining_cannot_reserve_full
 
     await budget.inner.aclose()
     budget.inner = httpx.MockTransport(forbidden)
-    request = httpx.Request(
-        "POST",
-        "https://provider-test",
-        json={"model": "deepseek-v4-flash", "max_output_tokens": 1536},
-    )
     with pytest.raises(runner.BudgetStop, match="BUDGET_INCOMPLETE"):
         await budget.handle_async_request(request)
     assert json.loads(path.read_text())["attempts"] == []
@@ -95,7 +96,9 @@ async def test_unknown_usage_retains_reservation_and_blocks_next_request(runner,
     saved = json.loads(path.read_text())
     assert len(calls) == 1
     assert saved["prior_paid_micro_cny"] == 620805
-    assert saved["attempts"][0]["reserved_micro_cny"] == 3159552
+    assert saved["attempts"][0]["reserved_micro_cny"] == runner.request_reserve_micro_cny(
+        request.content, 1536
+    )
     assert saved["attempts"][0]["status"] == "PENDING"
 
 

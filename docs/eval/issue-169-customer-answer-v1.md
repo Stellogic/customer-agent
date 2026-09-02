@@ -19,9 +19,9 @@
 
 ## 费用准入
 
-唯一累计账本为 `D:\customer-agent\.local\issue190-sufficiency\cost-ledger.json`。执行前读回289条SETTLED、620805微元，无PENDING；总上限6000000微元，绝不重置。每次实际provider请求前原子写入PENDING；有未结算预留立即停止；可信usage按高峰非缓存输入3元/百万token、输出9元/百万token保守结算，不预支缓存或夜间折扣。未知usage保留预留并上报。
+唯一累计账本为 `D:\customer-agent\.local\issue190-sufficiency\cost-ledger.json`。执行前读回289条SETTLED、620805微元，无PENDING；总上限5000000微元，绝不重置。每次实际provider请求前原子写入PENDING；有未结算预留立即停止；可信usage按高峰非缓存输入3元/百万token、输出9元/百万token保守结算，不预支缓存或夜间折扣。未知usage保留预留并上报。
 
-2026-09-01复核[官方人民币价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)：Flash仍是1M上下文，最高输入3元/百万、输出9元/百万。沿已有全上下文上界1048576 tokens，知识调用单次预留3159552微元（1048576×3+1536×9）；其他模型请求按实际输出上限计算。绝不把字符数当计费token。输入4096 token的粗估每次26112微元，48次约1.253376元，**只是预测而非账单或完成保证**。任一次累计已结算加预留超过6元即停止，不缩题或降低门槛。SDK无额外暗重试；重试每次独立记账。
+2026-09-01复核[官方人民币价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)：Flash仍是1M上下文，最高输入3元/百万、输出9元/百万。每次请求按“UTF-8请求字节数×3 + 本次最大输出token数×9”微元预留；UTF-8 BPE输入token数不会超过请求字节数，因此该输入预留仍是保守上界，同时避免把模型支持的1M理论上下文误当成每次实际请求。可信usage返回后以实际token数结算；usage未知时保留整笔预留并停止。输入4096 token的粗估每次26112微元，48次约1.253376元，**只是预测而非账单或完成保证**。任一次累计已结算加预留超过5元即停止，不缩题或降低门槛。SDK无额外暗重试；重试每次独立记账。
 
 ## 评分与边界
 

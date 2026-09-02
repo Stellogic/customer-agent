@@ -27,6 +27,14 @@ class BudgetStop(Exception):
     pass
 
 
+BUDGET_LIMIT_MICRO_CNY = 5_000_000
+
+
+def request_reserve_micro_cny(request_content: bytes, max_output_tokens: int) -> int:
+    # UTF-8 BPE input tokens cannot outnumber input bytes; output is capped by the request.
+    return len(request_content) * 3 + max_output_tokens * 9
+
+
 def valid_timeout_release(item: dict) -> bool:
     if item["status"] != "TIMEOUT_RELEASED":
         return False
@@ -110,8 +118,8 @@ class BudgetTransport(httpx.AsyncBaseTransport):
         spent = self.state["prior_paid_micro_cny"] + sum(
             item.get("charged_upper_micro_cny", 0) for item in self.state["attempts"]
         )
-        reserve = 1048576 * 3 + body["max_output_tokens"] * 9
-        if spent + reserve > 6000000:
+        reserve = request_reserve_micro_cny(request.content, body["max_output_tokens"])
+        if spent + reserve > BUDGET_LIMIT_MICRO_CNY:
             raise BudgetStop("BUDGET_INCOMPLETE")
         self.state["attempts"].append(
             {
