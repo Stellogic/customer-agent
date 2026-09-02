@@ -2,7 +2,7 @@
 
 ## 第五阶段：前置完成后的正式集成（2026-09-03，当前状态）
 
-状态为 **READY_FOR_REVIEW**。已同步包含 #170 的 `origin/main@76e38ff11bbd7ae549cdc905a2b61443d37801ee`；唯一冲突是 `SupportWorkbench.tsx` 的 import，合并提交 `d8b76cc` 同时保留 #170 `SupportAssistance` 与 #193 `SupportContextEntries`，没有复制前置实现。本票无迁移，主线最新迁移为 #170 的 V44。
+状态为 **READY_FOR_FINAL_GATE**。已同步包含 #170 的 `origin/main@76e38ff11bbd7ae549cdc905a2b61443d37801ee`；唯一冲突是 `SupportWorkbench.tsx` 的 import，合并提交 `d8b76cc` 同时保留 #170 `SupportAssistance` 与 #193 `SupportContextEntries`，没有复制前置实现。本票无迁移，主线最新迁移为 #170 的 V44。
 
 - HUMAN 且当前辅助权限有效时，“相似案例”“建议动作”现在定位同一工单的真实客服辅助区域；当前无人工辅助权限时保持不可用。入口本身不发请求，客服仍须在 #170 面板内选择知识检索、总结、政策或草稿操作。
 - `SupportAssistance` 仅增加可选 `hostRef`，把既有根节点作为聚焦目标；不增加接口、请求或业务动作。真实辅助撤权时，若发送区内容仍是 AI 移交草稿，父组件以 state 在同次渲染中隐藏该内容；用户重新人工编辑会立即解除辅助草稿标记。
@@ -20,7 +20,9 @@
 
 每次结束均已向协调任务发送 `LOCK_RELEASED` 并读回 `TEST_GATE_FREE`。日志保留在 worktree 忽略目录 `.local/issue193-*.log`。失败由有效工程证据逐步收窄；没有降低断言、增加超时或重复运行无关套件。
 
-当前尚未运行 #193 真实 Chromium 或最终完整门禁。下一步按正式顺序只把 Draft PR 转 Ready 一次，处理集中风险审查的有效问题，完成最新主线差异的 Standards / Spec 双轴确认，然后在不再产生跟踪文件改动的 HEAD 上运行一次 `pwsh ./scripts/check.ps1 -Issue 193`。CI 关闭。
+PR #205 已从 Draft 转 Ready 一次。集中安全审查因外部 Codex 额度不可用而未产出，集中 Code Review 长时间停留在 Running 且无发现；按本任务已确认边界，这类外部审查不可用不阻塞交付，也未手动触发第二轮。随后以 `origin/main@76e38ff11bbd7ae549cdc905a2b61443d37801ee` 为固定点，对当前非空差异完成独立 Standards / Spec 双轴审查：两轴均为 **PASS，0 项阻塞发现**，且都未运行测试或门禁。
+
+当前尚未运行 #193 真实 Chromium 或最终完整门禁。下一步在本次证据提交之后不再修改跟踪文件，先回读最新 `origin/main`，然后持权威锁运行一次 `pwsh ./scripts/check.ps1 -Issue 193`。CI 关闭。
 
 ## 第四阶段：定向复验通过（2026-08-31，历史记录）
 
