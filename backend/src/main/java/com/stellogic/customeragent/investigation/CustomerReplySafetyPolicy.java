@@ -15,14 +15,9 @@ public final class CustomerReplySafetyPolicy {
                 || SENSITIVE_LEAK_PATTERN.matcher(body).find()
                 || PERSON_NAME_CLAIM_PATTERN.matcher(body).find()
                 || PREMATURE_RESOLUTION_PATTERN.matcher(body).find()
-                || Pattern.compile("(?:已|将|已经|为您|本单|您的).{0,10}(?:退款|补偿|支付|到账)").matcher(body).find()
-                || Pattern.compile(
-                                "(?:您的|本单|这笔|该笔|当前订单|当前包裹|该订单|该包裹).{0,12}(?:已|已经|目前|当前|处于|存在|为).{0,8}(?:签收|丢失|延迟|停滞|配送|支付|退款|补偿|取消|到账)")
-                        .matcher(body)
-                        .find()
-                || Pattern.compile("(?:经核验|经核实|核验结果|调查结果).{0,12}(?:签收|丢失|延迟|停滞|支付|退款|补偿|取消|到账)")
-                        .matcher(body)
-                        .find()
+                || DIRECT_COMPENSATION_PROMISE_PATTERN.matcher(body).find()
+                || DIRECT_PAYMENT_PROMISE_PATTERN.matcher(body).find()
+                || CUSTOMER_FACT_ASSERTION_PATTERN.matcher(body).find()
                 || Pattern.compile("(?i)(https?://|[a-z]:\\\\|sourceFile|chunkId|vectorScore)")
                         .matcher(body)
                         .find();
@@ -53,6 +48,11 @@ public final class CustomerReplySafetyPolicy {
             Pattern.compile(
                     "(?<!不)(?:已|已经|将|会|承诺|同意|可以|可).{0,10}(?:补偿|退款)"
                             + "|(?:补偿|退款).{0,10}(?:已完成|将执行|已发放)");
+    private static final Pattern DIRECT_PAYMENT_PROMISE_PATTERN =
+            Pattern.compile("(?:已|已经|将).{0,10}(?:支付|到账)");
+    private static final Pattern CUSTOMER_FACT_ASSERTION_PATTERN =
+            Pattern.compile(
+                    "(?:您的|本单|这笔|该笔|当前订单|当前包裹|该订单|该包裹|订单|包裹).{0,12}(?:已|已经|目前|当前|处于|存在|为).{0,8}(?:签收|丢失|延迟|停滞|配送|支付|退款|补偿|取消|到账)");
 
     private static final Map<InvestigationRiskScenario, Set<String>> SCENARIO_CLAIM_TOKENS =
             Map.of(

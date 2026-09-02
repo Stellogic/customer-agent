@@ -79,6 +79,27 @@ class CustomerKnowledgeReplyPolicyTest {
                                         inventedLogistics, receipt(TEXT, "CUSTOMER_PUBLIC")))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("UNSAFE_KNOWLEDGE");
+        var bareCaseFact =
+                new CustomerKnowledgeReply(supplied.status(), "包裹已签收。", supplied.citations());
+        assertThatThrownBy(
+                        () ->
+                                CustomerKnowledgeReplyPolicy.validate(
+                                        bareCaseFact, receipt(TEXT, "CUSTOMER_PUBLIC")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("UNSAFE_KNOWLEDGE");
+    }
+
+    @Test
+    void allowsNaturalGeneralGuidanceAddressedToTheCustomer() {
+        var supplied = reply("v1", TEXT);
+        var guidance =
+                new CustomerKnowledgeReply(
+                        supplied.status(),
+                        "关于您的退款问题，可以在当前工单补充最新情况，方便客服继续核实。",
+                        supplied.citations());
+
+        assertThat(CustomerKnowledgeReplyPolicy.validate(guidance, receipt(TEXT, "CUSTOMER_PUBLIC")))
+                .isNotNull();
     }
 
     @Test

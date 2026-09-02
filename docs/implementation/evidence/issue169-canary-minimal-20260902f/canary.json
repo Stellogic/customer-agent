@@ -1,0 +1,62 @@
+{
+  "schema": "issue169-official-json-schema-canary-v1",
+  "run_id": "issue169-canary-minimal-20260902f",
+  "head_sha": "3ce5182baa3ac2e5f27cd247bd9b7519dc11d756",
+  "authority": "USER_COORDINATION",
+  "frozen_query_id": "delivery-01-a",
+  "maximum_compose_calls": 1,
+  "status": "SPRING_REJECTED",
+  "acceptance_http": 422,
+  "acceptance_body": {
+    "message": "知识回复未通过公开校验",
+    "code": "UNSAFE_KNOWLEDGE"
+  },
+  "provider_attempt_count": 1,
+  "attempts": [
+    {
+      "internal_call_id": "1c7f76bd-f75d-415a-a32f-2fb73b9d6a2c",
+      "attempt_id": "82d1f79d-ac62-48e7-8a12-4f963332e25d",
+      "attempt_number": 1,
+      "provider": "deepseek",
+      "provider_response_id": "4d1c64b2-173a-4b48-a13c-dbe3ac773ce7",
+      "response_status": "completed",
+      "request_model": "deepseek-v4-flash",
+      "response_model": "deepseek-v4-flash",
+      "backend_fingerprint": null,
+      "prompt_version": "customer-knowledge-communication-v1",
+      "schema_version": "customer-reply-v2",
+      "duration_ms": 5210,
+      "input_tokens": 1261,
+      "output_tokens": 758,
+      "total_tokens": 2019,
+      "cached_tokens": null,
+      "cache_hit": null,
+      "failure_classification": null,
+      "provider_http_status": 200,
+      "strict_schema_requested": true,
+      "thinking_disabled": true,
+      "allowed_parameters_only": true,
+      "actual_response_shape_valid": true,
+      "usage_reported": true,
+      "cache_metrics_reported": false,
+      "reasoning_tokens": null,
+      "validation_diagnostic": null
+    }
+  ],
+  "completed_shape": {
+    "completed_frames": 1,
+    "response_status": "completed",
+    "response_model": "deepseek-v4-flash",
+    "output_top_level_keys": [
+      "body",
+      "escalationRequired",
+      "evidenceRefs",
+      "intent",
+      "knowledge",
+      "referencedOrder",
+      "schemaVersion"
+    ],
+    "schema_description_wrapper": false
+  },
+  "ledger_pending_micro_cny": 0
+}

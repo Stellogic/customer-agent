@@ -56,6 +56,10 @@ HEAD `c1ecf5069aab50cf9a992d03e8594e71b78421f9` 的 `issue169-canary-natural-202
 
 订单号重复同样是展示格式。修订允许正文省略当前订单号，但正文显式出现任何其他 `ORDER-*` 仍拒绝；结构化 `referencedOrder`、evidence 与当前工单继续精确绑定，场景词和数值事实 grounding 保留。`issue169-20260902-focus52` 的 Ruff、生产源码 Pyright、61 tests PASS，最终 Standards / Spec 双轴复审均 PASS；Java 完成流入口的重复检查也已删除并补正反测试源码。
 
+HEAD `3ce5182baa3ac2e5f27cd247bd9b7519dc11d756` 的 `issue169-canary-minimal-20260902f` 证明 Agent 侧已经完全通过：`actual_response_shape_valid=true`、无失败分类与诊断。真实 Spring 返回 422 `UNSAFE_KNOWLEDGE`，说明剩余阻塞仅在知识公开文本策略。本次 1261 input / 758 output / 2019 total tokens，结算 10605 micro-CNY；账本 308 `SETTLED`、2 `TIMEOUT_RELEASED`、0 `PENDING`、累计 805404 micro-CNY，SHA-256 `bcb59127aa2986675b909d453ff53726ceeb0feb4fb0c1880876d0fbbae79aab`。
+
+Spring 原策略把“您的/本单/为您”附近出现退款、补偿或支付词，以及“经核验+状态词”，一律视为危险个案断言，会拒绝“关于您的退款问题，可以在当前工单补充情况”等一般指导。最小修订只保留金额、时限、ORDER ID、敏感/内部标识、注入、明确补偿/退款或支付承诺，以及以“您的/本单/订单/包裹”等主语陈述已签收、已取消等个案状态；不恢复宽泛措辞扫描。新增一般指导允许与裸“包裹已签收”拒绝测试源码，Standards / Spec 双轴审查 PASS；待真实 Spring canary 编译验收。
+
 ## 证据
 
 - `docs/implementation/evidence/issue169-answer-20260902d/answers.json`
@@ -83,6 +87,9 @@ HEAD `c1ecf5069aab50cf9a992d03e8594e71b78421f9` 的 `issue169-canary-natural-202
 - `docs/implementation/evidence/issue169-canary-natural-20260902e/phase.json`
 - `docs/implementation/evidence/issue169-canary-natural-20260902e/ledger-summary.json`
 - `docs/implementation/evidence/issue169-20260902-focus52/phase.json`
+- `docs/implementation/evidence/issue169-canary-minimal-20260902f/canary.json`
+- `docs/implementation/evidence/issue169-canary-minimal-20260902f/phase.json`
+- `docs/implementation/evidence/issue169-canary-minimal-20260902f/ledger-summary.json`
 
 ## 未完成项
 
