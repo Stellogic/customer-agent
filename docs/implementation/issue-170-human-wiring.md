@@ -29,7 +29,7 @@
 2. POST `/assistance/requests` 使用 `support-assistance-v1`、assignmentId、UUID requestId、四种 kind 和最多200字符查询（与共享检索上限一致）。CSRF/会话复用既有链路。输入只由 Spring 加载当前描述、最近20条公开消息和授权调查事实，不采用浏览器提供的事实/知识。
 3. V44 持久化请求参数和输入投影。按客服/requestId唯一，同 ID 异工单/assignment/type/query 拒绝；参数直接比较，不新增哈希。工单行锁只覆盖申请执行权及保存回执的短事务；重复请求读取原回执，不再次执行。
 4. 外层无事务地检索，之后再次验证 assignment；独立 support_assistance 图在同次 DeepSeek 输出充分性决定和总结/知识说明/政策解释/草稿，不单独调用充分性模型，无业务工具、自动发送或自动重试。
-5. Spring 检查输出结构、长度、引用必须来自本次 Top5及逐字原文，以 canonical metadata 构造浏览器白名单投影；调用 #169 复核选中完整 Source，再验证当前 assignment 才存/返回。每次 GET `/assistance/requests/{requestId}` 也重新验证授权及知识引用，不缓存授权结论。模型 audit/知识原始回执不发送浏览器。
+5. Spring 检查输出结构、长度、文字建议以及引用必须来自本次 Top5及逐字原文，以 canonical metadata 构造浏览器白名单投影；调用 #169 复核选中完整 Source，再验证当前 assignment 才存/返回。每次 GET `/assistance/requests/{requestId}` 也重新验证授权及知识引用，不缓存授权结论。模型 audit/知识原始回执不发送浏览器。最终回执独立投影本次原始检索是否为空；它不改变充分性决定、成功/失败分类或质量计数。
 6. 客服手动插入、编辑并勾选审阅后，只把文字移交既有人工发送区。发送区已有编辑时再次确认替换；发送中/结果未知时禁止移交。最终公开发送仍由原按钮、CSRF、权限与幂等路径执行。详情撤权/断线重同步卸载辅助组件并中止客户端接收。
 
 辅助移交到公开回复区后，宿主只追踪“仍保持原文且未经人工再编辑”的辅助草稿。撤权或详情权限流断开会清除该文本与待替换确认；客服只要在公开回复区人工编辑，文本即转为人工草稿，不因后续辅助撤权被误删。
@@ -46,9 +46,11 @@
 
 ## 本路径生成协议及预算
 
-源码协议 `support-assistance-answer-v1`：默认 DeepSeek v4 flash，Responses strict schema；一次调用包含 decision/text/followUp/citations。输出 token 上限1800、正文2000字符、追问500字符、引用合计4000字符、最多5条；不设单条24字符限制。这些是当前源码执行参数，**尚未取得真实运行和冻结质量证据**，不得称质量PASS。
+源码协议 `support-assistance-answer-v2`：默认 DeepSeek v4 flash，Responses strict schema；一次调用包含 decision/text/followUp/suggestions/citations。输出 token 上限1800、正文2000字符、追问500字符、文字建议最多5条且每条最多200字符、引用合计4000字符且最多5条；不设单条24字符限制。这些是当前源码执行参数，**尚未取得真实运行和冻结质量证据**，不得称质量PASS。
 
-`knowledge` / `policy` 类型只有在 `SUPPORTED` 且至少一条引用通过本次 Top5 与逐字原文校验时才能成为 ready；空引用会在 Python 生成边界和 Spring 投影边界分别判为 `INVALID_ANSWER_FORMAT`。`summary` / `draft` 不强制引用，因为它们可仅依据 Spring 提供的当前工单上下文形成草稿，仍须人工审阅。
+`knowledge` / `policy` 类型只有在 `SUPPORTED` 且至少一条引用通过本次 Top5 与逐字原文校验时才能成为 ready；prompt 同样明确这一要求，空引用会在 Python 生成边界和 Spring 投影边界分别判为 `INVALID_ANSWER_FORMAT`。`summary` / `draft` 不强制引用，因为它们可仅依据 Spring 提供的当前工单上下文形成草稿，仍须人工审阅。文字建议只作为同次生成的内部文本展示，不提供执行按钮或业务副作用。
+
+真实产品链路把 `retrievalEmpty` 作为与 ready/insufficient 正交的检索事实展示：“本次未匹配授权知识片段；回答充分性仍由同次 DeepSeek 结合当前工单上下文判断。”该字段直接来自本次原始 `AgentKnowledgeResult.results().isEmpty()`，不从最终引用列表推导，也不把无命中当作资料不足。
 
 没有独立充分性调用或自动修正/重试；故障保留到完整样本分母。调用返回记录 model/responseId、usage、attempts、输出上限和估计费用。估价复用既有函数，不重建成本框架；实际模型/费用和未知 usage 必须在运行账本核对，源码估价不能冒充供应商结算。
 
@@ -58,9 +60,9 @@
 
 新增源码覆盖：同次调用和usage、非正式模式不伪造回答、失败不自动重试、引用归属/长引文、请求重放不再次检索/生成、检索后撤权禁止调用、回执重读复核且不泄露audit、宿主人工移交与未知结果GET恢复。
 
-- backend 聚焦门禁：PASS；编译、Spotless、Checkstyle 与测试全部通过。
-- agent 聚焦门禁：PASS；Ruff、Pyright（0 errors）与 pytest（447 passed、3 skipped）通过。
-- frontend 聚焦门禁：PASS；Prettier、ESLint、TypeScript、Vitest（206 passed、3 skipped）与 bundle evidence 通过。
+- backend 聚焦门禁 `issue170-backend-20260902d`：PASS；编译、Spotless、Checkstyle 与测试全部通过。
+- agent 聚焦门禁 `issue170-agent-20260902c`：PASS；Ruff、Pyright（0 errors）与 pytest（448 passed、3 skipped）通过。
+- frontend 聚焦门禁 `issue170-frontend-20260902c`：PASS；Prettier、ESLint、TypeScript、Vitest（206 passed、3 skipped）与 bundle evidence 通过。此前 `issue170-frontend-20260902b` 在新增第二个完整工作台场景后因 Vitest worker 内存耗尽失败；将相同回归断言并入既有撤权场景后成功复验，没有删除产品断言。
 
 测试 transport、Mockito 与合成 HTTP 响应只证明工程边界；真实 DeepSeek 回答质量仍为 **KNOWN_LIMITATIONS**，不得写成 PASS。最终完整 `pwsh ./scripts/check.ps1 -Issue 170` 尚未运行。
 

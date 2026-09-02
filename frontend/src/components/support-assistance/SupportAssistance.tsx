@@ -232,7 +232,8 @@ export function decodeAssistanceResponse(
   if (
     view.status === "insufficient" &&
     typeof view.explanation === "string" &&
-    (view.followUp === null || typeof view.followUp === "string")
+    (view.followUp === null || typeof view.followUp === "string") &&
+    typeof view.retrievalEmpty === "boolean"
   )
     return {
       status: "insufficient",
@@ -240,10 +241,12 @@ export function decodeAssistanceResponse(
       requestId: request.requestId,
       explanation: view.explanation,
       followUp: view.followUp,
+      retrievalEmpty: view.retrievalEmpty,
     };
   if (
     view.status === "ready" &&
     typeof view.text === "string" &&
+    typeof view.retrievalEmpty === "boolean" &&
     Array.isArray(view.suggestions) &&
     view.suggestions.every((item) => typeof item === "string") &&
     Array.isArray(view.citations) &&
@@ -265,6 +268,7 @@ export function decodeAssistanceResponse(
       requestId: request.requestId,
       text: view.text,
       suggestions: view.suggestions,
+      retrievalEmpty: view.retrievalEmpty,
       citations: view.citations as Extract<AssistanceView, { status: "ready" }>["citations"],
     };
   }

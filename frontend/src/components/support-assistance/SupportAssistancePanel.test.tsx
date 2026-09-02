@@ -20,6 +20,7 @@ const fixture: AssistanceView = {
   requestId: "fixture-request-1",
   text: "您好，我们会继续核实物流情况。",
   suggestions: ["人工核实签收信息"],
+  retrievalEmpty: false,
   citations: [
     {
       title: "合成物流政策",
@@ -243,11 +244,17 @@ describe("独立客服辅助展示与草稿", () => {
           requestId: "fixture-request-1",
           explanation: "现有资料未说明该情形的处理规则，不能据此给出结论。",
           followUp: "请确认您希望了解的是哪项规则。",
+          retrievalEmpty: true,
         })}
         onReviewDraft={onReviewDraft}
       />,
     );
     expect(screen.getByRole("heading", { name: "资料不足" })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "本次未匹配授权知识片段；回答充分性仍由同次 DeepSeek 结合当前工单上下文判断。",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText(/可补充确认/)).toBeInTheDocument();
     expect(editor()).toHaveValue("已有人工草稿");
     expect(onReviewDraft).not.toHaveBeenCalled();

@@ -34,6 +34,7 @@ describe("客服辅助真实宿主边界（合成HTTP响应）", () => {
             status: "ready",
             kind: "draft",
             requestId: body.requestId,
+            retrievalEmpty: false,
             text: "合成客服草稿",
             suggestions: [],
             citations: [],

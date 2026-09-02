@@ -792,7 +792,7 @@ function TicketDetail({
 
   function reviewAssistance(text: string) {
     if (!assistanceAvailable || replyBusy || replyState === "unknown") return;
-    if (draft.trim() && draft !== text) {
+    if (draft.trim()) {
       setReviewedAssistance(text);
     } else {
       assistanceDraft.current = text;

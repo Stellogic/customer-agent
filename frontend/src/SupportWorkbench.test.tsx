@@ -231,6 +231,7 @@ describe("客服共享队列工作台", () => {
             status: "ready",
             kind: "draft",
             requestId: request.requestId,
+            retrievalEmpty: true,
             text: "需要在撤权时清除的辅助草稿",
             suggestions: [],
             citations: [],
@@ -242,13 +243,20 @@ describe("客服共享队列工作台", () => {
     });
     render(<SupportWorkbench />);
     await screen.findByRole("textbox", { name: "内部编辑区（尚未发送）" });
+    const publicReply = screen.getByRole("textbox", { name: "公开回复" });
+    fireEvent.change(publicReply, { target: { value: "需要在撤权时清除的辅助草稿" } });
     fireEvent.click(screen.getByRole("button", { name: "回复草稿" }));
+    expect(
+      await screen.findByText(
+        "本次未匹配授权知识片段；回答充分性仍由同次 DeepSeek 结合当前工单上下文判断。",
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "插入回复草稿" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "我已核实事实、政策与客户可见措辞" }));
     fireEvent.click(screen.getByRole("button", { name: "交给人工发送区" }));
-    expect(screen.getByRole("textbox", { name: "公开回复" })).toHaveValue(
-      "需要在撤权时清除的辅助草稿",
-    );
+    expect(screen.getByRole("group", { name: "确认替换人工发送区草稿" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "替换发送区草稿" }));
+    expect(publicReply).toHaveValue("需要在撤权时清除的辅助草稿");
     endAuthority?.();
     await waitFor(() =>
       expect(
@@ -256,7 +264,7 @@ describe("客服共享队列工作台", () => {
       ).not.toBeInTheDocument(),
     );
     expect(detailReads).toBe(2);
-    expect(screen.getByRole("textbox", { name: "公开回复" })).toHaveValue("");
+    expect(publicReply).toHaveValue("");
     resolveDetail?.(new Response(null, { status: 404 }));
     await waitFor(() =>
       expect(screen.queryByRole("heading", { name: "授权工单详情" })).not.toBeInTheDocument(),

@@ -12,6 +12,7 @@ export type AssistanceView =
       requestId: string;
       explanation: string;
       followUp: string | null;
+      retrievalEmpty: boolean;
     }
   | {
       status: "error";
@@ -23,6 +24,7 @@ export type AssistanceView =
       requestId: string;
       text: string;
       suggestions: string[];
+      retrievalEmpty: boolean;
       citations: Array<{
         title: string;
         version: string;

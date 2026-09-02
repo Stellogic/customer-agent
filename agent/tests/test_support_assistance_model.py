@@ -31,6 +31,7 @@ ANSWER = {
     "decision": "SUPPORTED",
     "text": "合成测试建议",
     "followUp": None,
+    "suggestions": ["人工核实合成工单事实"],
     "citations": [{"chunkId": "chunk", "quote": KNOWLEDGE["results"][0]["snippet"]}],
 }
 REQUEST = {
@@ -69,6 +70,8 @@ async def test_one_call_both_decides_and_drafts_and_retains_usage():
     assert result["answer"] == ANSWER
     assert result["audit"]["total_tokens"] == 70
     assert calls[0]["text"]["format"]["schema"]["properties"]["decision"]
+    assert calls[0]["text"]["format"]["schema"]["properties"]["suggestions"]
+    assert "知识回答与政策结论须引用至少一条本次片段" in calls[0]["instructions"]
     assert calls[0]["max_output_tokens"] == 1800
 
 
@@ -98,6 +101,7 @@ def test_no_match_may_become_explicit_insufficiency_but_is_not_a_decision_itself
         "decision": "INSUFFICIENT_INFORMATION",
         "text": "现有资料不足，无法确定规则。",
         "followUp": "请补充适用情形。",
+        "suggestions": [],
         "citations": [],
     }
     assert validate_answer(answer, {**KNOWLEDGE, "results": []}, "knowledge") == answer
@@ -128,3 +132,23 @@ def test_citation_identity_and_verbatim_quote_must_match_this_top_five(citation)
 def test_model_metadata_and_reasoning_are_not_accepted():
     with pytest.raises(ValueError):
         validate_answer({**ANSWER, "reasoning": "不允许输出"}, KNOWLEDGE, "knowledge")
+
+
+def test_suggestions_are_bounded_internal_text_in_the_same_answer():
+    assert validate_answer(ANSWER, KNOWLEDGE, "knowledge")["suggestions"] == [
+        "人工核实合成工单事实"
+    ]
+    with pytest.raises(ValueError):
+        validate_answer({**ANSWER, "suggestions": [""]}, KNOWLEDGE, "knowledge")
+    with pytest.raises(ValueError):
+        validate_answer({**ANSWER, "suggestions": ["合成" * 101]}, KNOWLEDGE, "knowledge")
+    with pytest.raises(ValueError):
+        validate_answer(
+            {
+                **ANSWER,
+                "decision": "INSUFFICIENT_INFORMATION",
+                "suggestions": ["不应在资料不足时给出建议"],
+            },
+            KNOWLEDGE,
+            "knowledge",
+        )

@@ -106,10 +106,11 @@ class SupportAssistanceService {
             AgentKnowledgeResult retrieved,
             JsonNode audit) {
         if (!raw.isObject()
-                || raw.size() != 4
+                || raw.size() != 5
                 || !raw.has("decision")
                 || !raw.has("text")
                 || !raw.has("followUp")
+                || !raw.has("suggestions")
                 || !raw.has("citations")) throw new IllegalArgumentException("invalid schema");
         var answer = json.treeToValue(raw, SupportAssistanceAnswer.class);
         if (answer == null
@@ -118,6 +119,12 @@ class SupportAssistanceService {
                 || answer.text().isBlank()
                 || answer.text().length() > 2000
                 || answer.followUp() != null && answer.followUp().length() > 500
+                || answer.suggestions() == null
+                || answer.suggestions().size() > 5
+                || answer.suggestions().stream()
+                        .anyMatch(item -> item == null || item.isBlank() || item.length() > 200)
+                || "INSUFFICIENT_INFORMATION".equals(answer.decision())
+                        && !answer.suggestions().isEmpty()
                 || answer.citations() == null
                 || answer.citations().size() > 5
                 || "SUPPORTED".equals(answer.decision())
@@ -158,9 +165,10 @@ class SupportAssistanceService {
             view.set("followUp", json.valueToTree(answer.followUp()));
         } else {
             view.put("status", "ready").put("text", answer.text());
-            view.set("suggestions", json.valueToTree(List.of()));
+            view.set("suggestions", json.valueToTree(answer.suggestions()));
             view.set("citations", json.valueToTree(citations));
         }
+        view.put("retrievalEmpty", retrieved.results().isEmpty());
         return json.valueToTree(
                 Map.of(
                         "view",

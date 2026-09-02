@@ -25,7 +25,11 @@ record SupportAssistanceReceipt(
 
 /** 工作者只返回引用选择，不让模型生成 title/version/权限等 metadata。 */
 record SupportAssistanceAnswer(
-        String decision, String text, String followUp, List<Quote> citations) {
+        String decision,
+        String text,
+        String followUp,
+        List<String> suggestions,
+        List<Quote> citations) {
     record Quote(String chunkId, String quote) {}
 }
 

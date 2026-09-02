@@ -100,6 +100,11 @@ function AuthorizedAssistance({
       </p>
 
       <div className="support-assistance__result" aria-busy={view.status === "loading"}>
+        {"retrievalEmpty" in view && view.retrievalEmpty && (
+          <p role="status">
+            本次未匹配授权知识片段；回答充分性仍由同次 DeepSeek 结合当前工单上下文判断。
+          </p>
+        )}
         {view.status === "idle" && <p>暂无辅助结果，可继续人工编辑回复。</p>}
         {view.status === "loading" && <p role="status">正在准备{assistanceLabels[view.kind]}…</p>}
         {view.status === "empty" && (

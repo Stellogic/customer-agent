@@ -20,6 +20,7 @@ const insufficient = {
   requestId: "request-a",
   explanation: "现有资料不足。",
   followUp: null,
+  retrievalEmpty: true,
 } as const;
 
 describe("HUMAN 辅助 assignment 与请求绑定", () => {

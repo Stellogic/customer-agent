@@ -97,7 +97,7 @@ class SupportAssistanceServiceTest {
         when(gateway.generate(eq(SupportAssistanceKind.policy), anyString(), any(), any()))
                 .thenReturn(
                         json.readTree(
-                                "{\"status\":\"completed\",\"answer\":{\"decision\":\"SUPPORTED\",\"text\":\"合成政策回答\",\"followUp\":null,\"citations\":[]},\"audit\":{}}"));
+                                "{\"status\":\"completed\",\"answer\":{\"decision\":\"SUPPORTED\",\"text\":\"合成政策回答\",\"followUp\":null,\"suggestions\":[],\"citations\":[]},\"audit\":{}}"));
         doAnswer(
                         invocation -> {
                             stored.set(invocation.getArgument(3));
@@ -111,6 +111,33 @@ class SupportAssistanceServiceTest {
         assertEquals("error", response.path("view").path("status").asString());
         assertEquals("format", response.path("view").path("reason").asString());
         verify(knowledge, never()).revalidateSupport(anyString(), any());
+    }
+
+    @Test
+    void readyDraftProjectsSuggestionsAndIndependentEmptyRetrievalFlag() {
+        var stored = new AtomicReference<String>();
+        when(requests.begin("support-demo", ticket, request)).thenReturn(receipt(null, true));
+        when(requests.read("support-demo", ticket, id))
+                .thenAnswer(ignored -> receipt(stored.get(), false));
+        when(knowledge.searchSupport("support-demo", request.query()))
+                .thenReturn(new AgentKnowledgeResult("agent-knowledge-v1", 1, List.of()));
+        when(gateway.generate(eq(SupportAssistanceKind.draft), anyString(), any(), any()))
+                .thenReturn(
+                        json.readTree(
+                                "{\"status\":\"completed\",\"answer\":{\"decision\":\"SUPPORTED\",\"text\":\"合成回复草稿\",\"followUp\":null,\"suggestions\":[\"人工核实物流节点\"],\"citations\":[]},\"audit\":{}}"));
+        doAnswer(
+                        invocation -> {
+                            stored.set(invocation.getArgument(3));
+                            return null;
+                        })
+                .when(requests)
+                .finish(eq("support-demo"), eq(ticket), eq(id), anyString(), eq(false));
+
+        var response = service.request("support-demo", ticket, request);
+
+        assertEquals("ready", response.path("view").path("status").asString());
+        assertEquals(true, response.path("view").path("retrievalEmpty").asBoolean());
+        assertEquals("人工核实物流节点", response.path("view").path("suggestions").get(0).asString());
     }
 
     private SupportAssistanceReceipt receipt(String result, boolean execute) {
