@@ -1,0 +1,32 @@
+{
+  "run_id": "issue168-pure-20260831b",
+  "head_sha": "0ec0fb7f0e29a9bd5388651c02b3f375ec9a4653",
+  "base_sha": "c19a7ebe8ec31f7ed21048ea75fbfcfd61df1472",
+  "scope": "ablation-and-numeric-consistency-only",
+  "phases": [
+    {
+      "name": "environment",
+      "exit_code": 0
+    },
+    {
+      "name": "format-check",
+      "exit_code": 0
+    },
+    {
+      "name": "lint",
+      "exit_code": 0
+    },
+    {
+      "name": "types",
+      "exit_code": 0
+    },
+    {
+      "name": "focused",
+      "exit_code": 0
+    }
+  ],
+  "status": "PASS",
+  "model_calls": 0,
+  "lock_released": true,
+  "elapsed_seconds": 5.139257
+}
