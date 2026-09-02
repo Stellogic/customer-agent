@@ -178,6 +178,37 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
 
 
 @pytest.mark.asyncio
+async def test_customer_report_may_be_acknowledged_without_promoting_it_to_verified_fact() -> None:
+    body = (
+        "您反馈物流长期停滞，我们会结合现有记录继续核实。"
+        "补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
+    )
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(_completed(body))),
+    )
+
+    envelope = await model.compose(_input())
+
+    assert envelope.body == body
+
+
+@pytest.mark.asyncio
+async def test_customer_attribution_does_not_apply_to_a_later_fact_claim() -> None:
+    body = (
+        "您反馈物流异常。调查结果为包裹丢失。"
+        "补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
+    )
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(_completed(body))),
+    )
+
+    with pytest.raises(CustomerCommunicationFailure):
+        await model.compose(_input())
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("premature_resolution", [False, True])
 async def test_flash_no_compensation_reply_preserves_spring_ticket_authority(
     premature_resolution: bool,

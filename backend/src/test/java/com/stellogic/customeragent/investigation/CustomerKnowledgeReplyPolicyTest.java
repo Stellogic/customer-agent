@@ -98,7 +98,9 @@ class CustomerKnowledgeReplyPolicyTest {
                         "关于您的退款问题，可以在当前工单补充最新情况，方便客服继续核实。",
                         supplied.citations());
 
-        assertThat(CustomerKnowledgeReplyPolicy.validate(guidance, receipt(TEXT, "CUSTOMER_PUBLIC")))
+        assertThat(
+                        CustomerKnowledgeReplyPolicy.validate(
+                                guidance, receipt(TEXT, "CUSTOMER_PUBLIC")))
                 .isNotNull();
     }
 

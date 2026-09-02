@@ -2,6 +2,7 @@ package com.stellogic.customeragent.investigation;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -46,8 +47,8 @@ public final class CustomerReplySafetyPolicy {
                     Pattern.CASE_INSENSITIVE);
     private static final Pattern DIRECT_COMPENSATION_PROMISE_PATTERN =
             Pattern.compile(
-                    "(?<!不)(?:已|已经|将|会|承诺|同意|可以|可).{0,10}(?:补偿|退款)"
-                            + "|(?:补偿|退款).{0,10}(?:已完成|将执行|已发放)");
+                    "(?<!不)(?:已|已经|将|会|承诺|同意)(?:为您)?(?:办理|执行|发放)?(?:补偿|退款)"
+                            + "|可以获得(?:补偿|退款)|(?:补偿|退款)(?:已完成|将执行|已发放)");
     private static final Pattern DIRECT_PAYMENT_PROMISE_PATTERN =
             Pattern.compile("(?:已|已经|将).{0,10}(?:支付|到账)");
     private static final Pattern CUSTOMER_FACT_ASSERTION_PATTERN =
@@ -108,12 +109,28 @@ public final class CustomerReplySafetyPolicy {
             }
         }
         if (complete) {
+            if (endsWithIncompleteScopedOrder(body, scopedOrderReference)) return false;
             if (!hasOnlyAllowedCompensationLanguage(
                     body, inferIntentFromCompensationLanguage(body))) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static boolean endsWithIncompleteScopedOrder(String body, String scopedOrderReference) {
+        String upperBody = body.toUpperCase(Locale.ROOT);
+        String upperOrder = scopedOrderReference.toUpperCase(Locale.ROOT);
+        for (int length = 3; length < upperOrder.length(); length++) {
+            String prefix = upperOrder.substring(0, length);
+            if (upperBody.endsWith(prefix)) {
+                int start = upperBody.length() - length;
+                if (start == 0 || !Character.isLetterOrDigit(upperBody.charAt(start - 1))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     static String rejectionReason(
@@ -174,6 +191,9 @@ public final class CustomerReplySafetyPolicy {
         for (Map.Entry<String, Set<InvestigationRiskScenario>> claim :
                 CLAIM_REQUIRING_SCENARIO.entrySet()) {
             if (body.contains(claim.getKey()) && !claim.getValue().contains(scenario)) {
+                if (allClaimsAreCustomerAttributed(body, claim.getKey())) {
+                    continue;
+                }
                 // Compensation-pending replies may mention 退款 only inside the approved no-execution
                 // disclaimer; strip that before judging logistics-delay narratives.
                 if ("退款".equals(claim.getKey())
@@ -207,6 +227,23 @@ public final class CustomerReplySafetyPolicy {
         // Natural language wrappers are allowed; person-linked delivery claims and
         // scenario-mismatched tokens are rejected above.
         return !authorized.isEmpty();
+    }
+
+    private static boolean allClaimsAreCustomerAttributed(String body, String token) {
+        for (int at = body.indexOf(token); at >= 0; at = body.indexOf(token, at + token.length())) {
+            int clauseStart = 0;
+            for (char delimiter : new char[] {'。', '；', '！', '？', '\n'}) {
+                clauseStart = Math.max(clauseStart, body.lastIndexOf(delimiter, at - 1) + 1);
+            }
+            String context = body.substring(Math.max(clauseStart, at - 24), at);
+            if (!context.contains("您反馈")
+                    && !context.contains("您反映")
+                    && !context.contains("您提到")
+                    && !context.contains("您描述")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int countOccurrences(String body, String token) {

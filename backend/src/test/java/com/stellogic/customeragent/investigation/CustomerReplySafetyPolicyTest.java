@@ -21,9 +21,7 @@ class CustomerReplySafetyPolicyTest {
     void completeNaturalReplyMayOmitRedundantOrderReference() {
         assertThat(
                         CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(
-                                "经核验，本次物流延迟不足 24 小时，暂不满足申请补偿的条件。",
-                                ORDER,
-                                true))
+                                "经核验，本次物流延迟不足 24 小时，暂不满足申请补偿的条件。", ORDER, true))
                 .isTrue();
         assertThat(
                         CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(
@@ -58,10 +56,8 @@ class CustomerReplySafetyPolicyTest {
                 .isNull();
         assertThat(
                         rejection(
-                                reply(
-                                        "经核验，本次物流延迟不足 24 小时，暂不满足申请补偿的条件。",
-                                        EVIDENCE,
-                                        ORDER),
+                                replyNoCompensation(
+                                        "经核验，本次物流延迟不足 24 小时，暂不满足申请补偿的条件。", EVIDENCE, ORDER),
                                 false))
                 .isNull();
         assertThat(
@@ -76,7 +72,7 @@ class CustomerReplySafetyPolicyTest {
                 .isNull();
         assertThat(
                         rejection(
-                                reply(
+                                replyNoCompensation(
                                         "经核验，订单 ORDER-122 的物流延迟不足 24 小时，暂不满足申请补偿的条件；如仍需帮助，请继续回复。",
                                         EVIDENCE,
                                         ORDER),
@@ -98,19 +94,31 @@ class CustomerReplySafetyPolicyTest {
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
         assertThat(rejection(reply("订单 ORDER-122 将为您办理退款。", EVIDENCE, ORDER)))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
-        assertThat(rejection(reply("订单 ORDER-122 会补偿您一张优惠券。", EVIDENCE, ORDER), false))
+        assertThat(
+                        rejection(
+                                replyNoCompensation("订单 ORDER-122 会补偿您一张优惠券。", EVIDENCE, ORDER),
+                                false))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
-        assertThat(rejection(reply("订单 ORDER-122 不久后会补偿您一张优惠券。", EVIDENCE, ORDER), false))
+        assertThat(
+                        rejection(
+                                replyNoCompensation("订单 ORDER-122 不久后会补偿您一张优惠券。", EVIDENCE, ORDER),
+                                false))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
-        assertThat(rejection(reply("订单 ORDER-122 会为您退款。", EVIDENCE, ORDER), false))
+        assertThat(rejection(replyNoCompensation("订单 ORDER-122 会为您退款。", EVIDENCE, ORDER), false))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
-        assertThat(rejection(reply("订单 ORDER-122 不会补偿，但会退款。", EVIDENCE, ORDER), false))
+        assertThat(
+                        rejection(
+                                replyNoCompensation("订单 ORDER-122 不会补偿，但会退款。", EVIDENCE, ORDER),
+                                false))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
-        assertThat(rejection(reply("订单 ORDER-122 暂不处理，但会为您退款。", EVIDENCE, ORDER), false))
+        assertThat(
+                        rejection(
+                                replyNoCompensation("订单 ORDER-122 暂不处理，但会为您退款。", EVIDENCE, ORDER),
+                                false))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
-        assertThat(rejection(reply("订单 ORDER-122 承诺补偿。", EVIDENCE, ORDER), false))
+        assertThat(rejection(replyNoCompensation("订单 ORDER-122 承诺补偿。", EVIDENCE, ORDER), false))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
-        assertThat(rejection(reply("订单 ORDER-122 同意退款。", EVIDENCE, ORDER), false))
+        assertThat(rejection(replyNoCompensation("订单 ORDER-122 同意退款。", EVIDENCE, ORDER), false))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE");
         assertThat(rejection(reply("订单 ORDER-122：退款处理完成，补偿金额为二十元。", EVIDENCE, ORDER)))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_AMOUNT");
@@ -128,6 +136,20 @@ class CustomerReplySafetyPolicyTest {
                         rejection(
                                 reply(
                                         "订单 ORDER-122 的调查已完成，包裹已由张三签收。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+                                        EVIDENCE,
+                                        ORDER)))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT");
+        assertThat(
+                        rejection(
+                                reply(
+                                        "您反馈物流长期停滞，我们会结合现有记录继续核实。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
+                                        EVIDENCE,
+                                        ORDER)))
+                .isNull();
+        assertThat(
+                        rejection(
+                                reply(
+                                        "您反馈物流异常。调查结果为包裹丢失。补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。",
                                         EVIDENCE,
                                         ORDER)))
                 .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT");
@@ -188,6 +210,8 @@ class CustomerReplySafetyPolicyTest {
                 .isFalse();
         assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("根据调查，订单 ORD", ORDER, true))
                 .isFalse();
+        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("请确认订单 ORDER-122", ORDER, true))
+                .isTrue();
     }
 
     private static String rejection(CustomerReplyEnvelope reply) {
@@ -258,5 +282,16 @@ class CustomerReplySafetyPolicyTest {
                         : CustomerReplyIntent.COMPENSATION_REVIEW_PENDING;
         return new CustomerReplyEnvelope(
                 "customer-reply-v1", body, intent, evidence, false, referencedOrder);
+    }
+
+    private static CustomerReplyEnvelope replyNoCompensation(
+            String body, List<String> evidence, String referencedOrder) {
+        return new CustomerReplyEnvelope(
+                "customer-reply-v1",
+                body,
+                CustomerReplyIntent.NO_COMPENSATION_RESOLUTION,
+                evidence,
+                false,
+                referencedOrder);
     }
 }

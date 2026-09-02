@@ -240,8 +240,8 @@ _PREMATURE_TICKET_STATUS_PATTERN = re.compile(
     r"|(?:五|5)\s*分钟(?:后|内).{0,8}(?:解决|关闭|结案)"
 )
 _DIRECT_COMPENSATION_PROMISE_PATTERN = re.compile(
-    r"(?<!不)(?:已|已经|将|会|承诺|同意|可以|可).{0,10}(?:补偿|退款)"
-    r"|(?:补偿|退款).{0,10}(?:已完成|将执行|已发放)"
+    r"(?<!不)(?:已|已经|将|会|承诺|同意)(?:为您)?(?:办理|执行|发放)?(?:补偿|退款)"
+    r"|可以获得(?:补偿|退款)|(?:补偿|退款)(?:已完成|将执行|已发放)"
 )
 
 
@@ -396,6 +396,8 @@ def _has_grounded_investigation_narrative(
     }
     for token, allowed_scenarios in claim_rules.items():
         if token in body and scenario not in allowed_scenarios:
+            if _all_claims_are_customer_attributed(body, token):
+                continue
             if (
                 token == "退款"
                 and "审批完成前不会执行补偿或退款" in body
@@ -412,6 +414,24 @@ def _has_grounded_investigation_narrative(
             if not matches_authority and not mentions_threshold:
                 return False
     return True
+
+
+def _all_claims_are_customer_attributed(body: str, token: str) -> bool:
+    """Allow the reply to acknowledge a customer's report without treating it as verified."""
+    positions = (match.start() for match in re.finditer(re.escape(token), body))
+    return all(
+        any(
+            marker
+            in body[
+                max(
+                    max(body.rfind(delimiter, 0, position) for delimiter in "。；！？\n") + 1,
+                    position - 24,
+                ) : position
+            ]
+            for marker in ("您反馈", "您反映", "您提到", "您描述")
+        )
+        for position in positions
+    )
 
 
 def customer_communication_provider_request(
