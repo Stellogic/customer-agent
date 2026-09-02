@@ -13,7 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 final class CustomerKnowledgeReplyPolicy {
     private static final Pattern INSTRUCTION =
             Pattern.compile(
-                    "(?i)(忽略.{0,12}(指令|规则|提示)|泄露|系统提示词|developer message|system"
+                    "(?i)(忽略.{0,12}(指令|规则|提示)|泄露.{0,12}(系统提示词|指令|规则|prompt)|系统提示词|developer message|system"
                             + " message|ignore.{0,30}(instruction|rule|prompt)|api[_"
                             + " -]?key|bearer\\s|<\\|.*?\\|>)");
 
