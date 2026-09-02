@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:12.638Z" hostname="buildkitsandbox" time="0.087">
+  <properties/>
+  <testcase name="[1] message = &quot;包裹签收但没有收到&quot;" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.039"/>
+  <testcase name="[2] message = &quot;怀疑丢件&quot;" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.001"/>
+  <testcase name="[3] message = &quot;发生重复扣款&quot;" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.001"/>
+  <testcase name="[4] message = &quot;退款一直不到账&quot;" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.0"/>
+  <testcase name="[5] message = &quot;请修改收货地址&quot;" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.0"/>
+  <testcase name="[6] message = &quot;帮我取消订单&quot;" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.001"/>
+  <testcase name="[7] message = &quot;申请补偿&quot;" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.001"/>
+  <testcase name="[8] message = &quot;我不同意这个结论&quot;" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.0"/>
+  <testcase name="aRuleQuestionMustNotHideAnOrderOperationRequest()" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.001"/>
+  <testcase name="currentPendingActionsCompensationAndLogisticsRiskBlockAnOtherwiseAllowedConclusion()" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.0"/>
+  <testcase name="issueKindOrAnAllowedReasonCannotOverrideTheRiskScenario()" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.0"/>
+  <testcase name="knowledgeQuestionMayContinueWithoutGrantingAutomaticResolutionOrHidingBusinessRisk()" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.001"/>
+  <testcase name="springWhitelistAllowsOnlyThreeExplicitScenarioAndConclusionPairs()" classname="com.stellogic.customeragent.investigation.AutoResolutionPolicyTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -2,6 +2,8 @@ package com.stellogic.customeragent.knowledge;
 
 final class KnowledgeAccessDeniedException extends RuntimeException {}
 
+final class InvalidKnowledgeCitationException extends RuntimeException {}
+
 final class KnowledgeArticleNotFoundException extends RuntimeException {}
 
 final class KnowledgeInvalidQueryException extends RuntimeException {

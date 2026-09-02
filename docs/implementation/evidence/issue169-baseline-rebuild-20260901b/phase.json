@@ -1,0 +1,30 @@
+{
+  "run": "issue169-baseline-rebuild-20260901b",
+  "source": "e34b60113a3bbcfe28a4fcd247900127ffbd234a",
+  "project": "customer-agent-baseline",
+  "old_data_restored": false,
+  "status": "PASS",
+  "steps": [
+    {
+      "name": "postgres-up",
+      "exitCode": 0
+    },
+    {
+      "name": "vector-extension",
+      "exitCode": 0
+    },
+    {
+      "name": "applications-up",
+      "exitCode": 0
+    },
+    {
+      "name": "readiness",
+      "exitCode": 0
+    },
+    {
+      "name": "fixture-count",
+      "exitCode": 0
+    }
+  ],
+  "resource_count": 12
+}

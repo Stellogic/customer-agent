@@ -66,6 +66,36 @@ def retrieval_metrics(rows: list[dict[str, Any]]) -> dict[str, float]:
     return values
 
 
+def frozen_corpus_differences(
+    actual: list[tuple[Any, ...]], expected: list[tuple[Any, ...]]
+) -> dict[str, Any] | None:
+    """冻结条目必须原样保留。后续正式发布的知识作为真实检索干扰项参与评测。"""
+    actual_by_version = {(row[0], row[1]): row for row in actual}
+    missing_versions: list[list[str]] = []
+    mismatched_columns: dict[str, list[int]] = {}
+    for target in expected:
+        key = (target[0], target[1])
+        row = actual_by_version.get(key)
+        if row is None:
+            missing_versions.append(list(key))
+            continue
+        changed = [
+            index
+            for index, (value, wanted) in enumerate(zip(row, target, strict=True))
+            if value != wanted
+        ]
+        if changed:
+            mismatched_columns[f"{key[0]}:{key[1]}"] = changed
+    if not missing_versions and not mismatched_columns:
+        return None
+    return {
+        "actual_count": len(actual),
+        "expected_count": len(expected),
+        "missing_versions": missing_versions,
+        "mismatched_columns": mismatched_columns,
+    }
+
+
 def login(client: httpx.Client, query: EvalQuery) -> None:
     principal = query.principal
     if principal.subject_type == "CUSTOMER":
@@ -251,21 +281,14 @@ def main() -> None:
                 (a.article_id, a.version, a.body, a.status, a.current, list(a.applicability))
                 for a in dataset.protocol.corpus_snapshot
             )
-            if articles != expected:
-                report["corpus_differences"] = {
-                    "actual_count": len(articles),
-                    "expected_count": len(expected),
-                    "actual_versions": [list(row[:2]) for row in articles],
-                    "mismatched_columns": [
-                        [
-                            index
-                            for index, (actual, wanted) in enumerate(zip(row, target, strict=True))
-                            if actual != wanted
-                        ]
-                        for row, target in zip(articles, expected, strict=False)
-                    ],
-                }
+            differences = frozen_corpus_differences(articles, expected)
+            if differences:
+                report["corpus_differences"] = differences
                 raise ValueError("数据库语料与冻结正文/权限/版本不符")
+            expected_versions = {(row[0], row[1]) for row in expected}
+            report["corpus_additions"] = [
+                list(row[:2]) for row in articles if (row[0], row[1]) not in expected_versions
+            ]
             report["environment"]["postgres"] = connection.execute("select version()").fetchall()[
                 0
             ][0]

@@ -1,0 +1,67 @@
+{
+  "frontend_port": "59310",
+  "answer_quality": "STOPPED",
+  "paid_model_calls": 1,
+  "run": "issue169-answer-20260902c",
+  "project": "customer-agent-gate-issue169-answer-20260902c",
+  "status": "FAIL",
+  "image_tag": "gate-issue169-answer-20260902c",
+  "error": "answers failed: 1",
+  "cleanup": "PASS",
+  "steps": [
+    {
+      "name": "python-static",
+      "exitCode": 0
+    },
+    {
+      "name": "build-backend",
+      "exitCode": 0
+    },
+    {
+      "name": "build-agent",
+      "exitCode": 0
+    },
+    {
+      "name": "build-frontend",
+      "exitCode": 0
+    },
+    {
+      "name": "startup",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-smoke",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-acceptance",
+      "exitCode": 0
+    },
+    {
+      "name": "http-pg",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-http-pg",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-sql",
+      "exitCode": 0
+    },
+    {
+      "name": "projection-sql",
+      "exitCode": 0
+    },
+    {
+      "name": "copy-answer",
+      "exitCode": 0
+    },
+    {
+      "name": "answers",
+      "exitCode": 1
+    }
+  ],
+  "working_tree_dirty": true,
+  "head": "b63eacb05e8485654e7551b478e4c7384e0a3370"
+}

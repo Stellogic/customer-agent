@@ -2,6 +2,7 @@ package com.stellogic.customeragent.investigation;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -24,7 +25,12 @@ class AgentInvestigationCapabilityControllerTest {
             org.mockito.Mockito.mock(AgentInvestigationService.class);
     private final MockMvc mvc =
             MockMvcBuilders.standaloneSetup(
-                            new AgentInvestigationController(service, "agent-token"))
+                            new AgentInvestigationController(
+                                    service,
+                                    "agent-token",
+                                    mock(
+                                            com.stellogic.customeragent.knowledge
+                                                    .AgentKnowledgeRetrievalAdapter.class)))
                     .build();
 
     @Test
@@ -319,34 +325,54 @@ class AgentInvestigationCapabilityControllerTest {
 
     private static String validConclusion(String additionalReplyField) {
         return """
-                {
-                  "compensationRequired": true,
-                  "reasonCode": "LOGISTICS_DELAY",
-                  "delayHours": 80,
-                  "delaySeconds": 288000,
-                  "orderReference": "ORDER-122",
-                  "evidenceRefs": ["order:ORDER-122", "logistics:ORDER-122"],
-                  "riskScenario": "LOGISTICS_DELAY",
-                  "sufficiencyPolicyVersion": "evidence-sufficiency-v1",
-                  "evidence": [
-                    {"evidenceReference":"order:ORDER-122","applicability":["ORDER_IDENTITY"]},
-                    {"evidenceReference":"logistics:ORDER-122","applicability":["DELAY_DURATION"]},
-                    {"evidenceReference":"payment:ORDER-122","applicability":["ORDER_ELIGIBILITY"]},
-                    {"evidenceReference":"compensation:ORDER-122","applicability":["EXISTING_COMPENSATION"]},
-                    {"evidenceReference":"order-actions:ORDER-122","applicability":["PENDING_ACTIONS"]},
-                    {"evidenceReference":"policy:delay-policy-v1","applicability":["POLICY_BASIS"]}
-                  ],
-                  "customerReply": {
-                    "schemaVersion": "customer-reply-v1",
-                    "body": "订单 ORDER-122 的调查已完成，正在等待人工审批。",
-                    "intent": "COMPENSATION_REVIEW_PENDING",
-                    "evidenceRefs": ["order:ORDER-122", "logistics:ORDER-122"],
-                    "escalationRequired": false,
-                    "referencedOrder": "ORDER-122"%s
-                  }
-                }
-                """
+        {
+          "compensationRequired": true,
+          "reasonCode": "LOGISTICS_DELAY",
+          "delayHours": 80,
+          "delaySeconds": 288000,
+          "orderReference": "ORDER-122",
+          "evidenceRefs": ["order:ORDER-122", "logistics:ORDER-122"],
+          "riskScenario": "LOGISTICS_DELAY",
+          "sufficiencyPolicyVersion": "evidence-sufficiency-v1",
+          "evidence": [
+            {"evidenceReference":"order:ORDER-122","applicability":["ORDER_IDENTITY"]},
+            {"evidenceReference":"logistics:ORDER-122","applicability":["DELAY_DURATION"]},
+            {"evidenceReference":"payment:ORDER-122","applicability":["ORDER_ELIGIBILITY"]},
+            {"evidenceReference":"compensation:ORDER-122","applicability":["EXISTING_COMPENSATION"]},
+            {"evidenceReference":"order-actions:ORDER-122","applicability":["PENDING_ACTIONS"]},
+            {"evidenceReference":"policy:delay-policy-v1","applicability":["POLICY_BASIS"]}
+          ],
+          "customerReply": {
+            "schemaVersion": "customer-reply-v1",
+            "body": "订单 ORDER-122 的调查已完成，正在等待人工审批。",
+            "intent": "COMPENSATION_REVIEW_PENDING",
+            "evidenceRefs": ["order:ORDER-122", "logistics:ORDER-122"],
+            "escalationRequired": false,
+            "referencedOrder": "ORDER-122"%s
+          }
+        }
+        """
                 .formatted(additionalReplyField);
+    }
+
+    @Test
+    void v2UnsafeKnowledgeRejectionHasAStableCorrectionCode() throws Exception {
+        when(service.submit(eq(TICKET_ID), eq(GENERATION_ID), eq("reply-request"), any()))
+                .thenThrow(new CustomerKnowledgeReplyPolicy.Rejected("UNSAFE_KNOWLEDGE"));
+        String body =
+                validConclusion(
+                                ",\"knowledgeRequestId\":\"knowledge-request\",\"knowledge\":{\"status\":\"INSUFFICIENT_INFORMATION\",\"answer\":\"资料不足，请补充情况。\",\"citations\":[]}")
+                        .replace("customer-reply-v1", "customer-reply-v2");
+        mvc.perform(
+                        post(
+                                        "/internal/agent/tickets/{ticketId}/generations/{generationId}/conclusions",
+                                        TICKET_ID,
+                                        GENERATION_ID)
+                                .headers(conclusionHeaders())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("UNSAFE_KNOWLEDGE"));
     }
 
     private static org.springframework.http.HttpHeaders conclusionHeaders() {

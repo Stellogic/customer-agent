@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.ticket.JdbcCustomerTicketServiceTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:17.700Z" hostname="buildkitsandbox" time="0.046">
+  <properties/>
+  <testcase name="trimmedReplayHistoryRequiresAnAuthoritativeSnapshot()" classname="com.stellogic.customeragent.ticket.JdbcCustomerTicketServiceTest" time="0.046"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

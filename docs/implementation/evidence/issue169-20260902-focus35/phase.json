@@ -1,0 +1,36 @@
+{
+  "steps": [
+    {
+      "name": "format",
+      "exitCode": 0
+    },
+    {
+      "name": "lint",
+      "exitCode": 0
+    },
+    {
+      "name": "types",
+      "exitCode": 0
+    },
+    {
+      "name": "tests",
+      "exitCode": 0
+    }
+  ],
+  "base": "9995156252e416ac59bfaba24d05ad58319ca572",
+  "paidModelCalls": 0,
+  "runId": "issue169-20260902-focus35",
+  "head": "dccc92b7d13172b67c67c514d63677a9ade22f13",
+  "selection": [
+    "tests/test_customer_communication_model.py",
+    "tests/test_customer_knowledge_answer.py",
+    "tests/test_deepseek_customer_communication_model.py",
+    "tests/test_deepseek_investigation_action_model.py",
+    "tests/test_graph.py",
+    "tests/test_investigation_action_loop.py",
+    "tests/test_issue169_answer_budget.py",
+    "tests/test_issue169_answer_freeze.py",
+    "tests/test_knowledge_retrieval.py"
+  ],
+  "part": "python"
+}

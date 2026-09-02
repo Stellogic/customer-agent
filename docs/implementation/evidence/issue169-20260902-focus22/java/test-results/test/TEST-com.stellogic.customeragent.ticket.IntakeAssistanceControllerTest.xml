@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.ticket.IntakeAssistanceControllerTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:17.044Z" hostname="buildkitsandbox" time="0.072">
+  <properties/>
+  <testcase name="supportProposalCannotConfirmOrCreateTickets()" classname="com.stellogic.customeragent.ticket.IntakeAssistanceControllerTest" time="0.007"/>
+  <testcase name="currentClaimUnlocksOnlyTheInformationNeededToFinishIntake()" classname="com.stellogic.customeragent.ticket.IntakeAssistanceControllerTest" time="0.007"/>
+  <testcase name="queueSnapshotUsesASeparateViewAndOnlyAClippedSummary()" classname="com.stellogic.customeragent.ticket.IntakeAssistanceControllerTest" time="0.006"/>
+  <system-out><![CDATA[2026-09-01T16:08:17.087Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:17.087Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:17.087Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-09-01T16:08:17.098Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:17.098Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:17.099Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-09-01T16:08:17.110Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:17.110Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:17.110Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

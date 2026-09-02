@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="63" failures="0" errors="0" time="9.944459">
+    <testsuite name="src/App.test.tsx" timestamp="2026-09-01T16:07:39.420Z" hostname="LAPTOP-03VLKRQR" tests="56" failures="0" errors="0" skipped="0" time="9.6593895">
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 客户恢复快照只展示已接受来源标题时间，完成流不重复正文" time="0.390007">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 来源快照含内部字段时拒绝整份投影而不展示旧来源" time="0.0375632">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 返回帮助中心时自动加载订单工单总览" time="0.0651136">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; Issue #192 帮助中心首页呈现信任说明与三块能力边界" time="0.1890303">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 自然语言受理确认后读取 PUBLIC_CONVERSATION v2 权威快照" time="0.3541942">
+            <system-err>
+`NaN` is an invalid value for the `height` css style property.
+
+            </system-err>
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 不选择订单或问题类型即可看到候选、问题理解与确认边界" time="0.2599145">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 一次展示同订单的多个拟建问题与原子创建数量" time="0.3561487">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 疑似重复问题由客户选择继续既有工单且不展示新建结果" time="0.2761208">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 完成当前订单后保留原始描述并要求重新确认下一订单" time="0.2883176">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 重新登录后列出归档受理并在恢复期间禁止直接确认" time="0.3258616">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 刷新受理链接后从恢复端点重建事实变化提示与完整消息" time="0.0634024">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 完成态受理刷新后恢复已创建工单入口" time="0.1726593">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 受理记录查询区分无记录与加载失败" time="0.1689756">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; Agent 处理中仍可用稳定消息身份追加信息并从新权威代次继续" time="0.2275371">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清恢复响应丢失时按稳定 resumeRequestId 查询而不创建第二次恢复" time="0.1752408">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清恢复记录已找到但快照连接中断时保留稳定身份并提示手动刷新" time="0.1855238">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清回复网络中断且恢复结果未知时重试复用两种稳定身份" time="0.2978587">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清回复 422 显示输入校验错误且不用恢复端点，修正后使用新的幂等身份" time="0.2773075">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清回复 409 刷新 Spring 权威快照并说明原澄清已失效" time="0.2953703">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清回复 409 即使快照刷新失败也不把确定性拒绝送入恢复对账" time="0.162547">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清回复 401 按授权或资源状态处理且不进入恢复对账" time="0.2436303">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清回复 403 按授权或资源状态处理且不进入恢复对账" time="0.2639276">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清回复 404 按授权或资源状态处理且不进入恢复对账" time="0.2636342">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清回复 5xx 使用提交时的稳定 resumeRequestId 对账" time="0.2820321">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清回复成功后清理本次幂等身份" time="0.2547354">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 澄清回复已成功但快照刷新失败时不进入 resume 对账" time="0.2270452">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 转人工响应丢失时按稳定请求身份对账并从权威快照恢复" time="0.6366068">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 转人工后忽略旧代次迟到的 Agent 公开消息" time="0.0292741">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 忽略重复和旧序号，只按严格下一序号应用增量" time="0.0322173">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 按关闭等待期事件更新为最终关闭" time="0.0278833">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 按等待期内同一问题回复事件更新为调查中" time="0.0277937">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 已解决工单可从客户界面重开或进入关联新工单" time="0.1846204">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 序号缺口时关闭旧流并整体替换为新的权威快照" time="0.0296658">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 未知事件不进入页面并触发快照恢复" time="0.0319603">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 已知事件含内部字段时也拒绝 payload 并从快照恢复" time="0.0288099">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 在 AGENT 模式下也用公开 generation fence 忽略旧代次迟到事件" time="0.0269202">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 快照中的待审批补偿只展示安全类型、金额和待审批" time="0.1712804">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; COMPENSATION_REVIEW_PENDING 事件把客户投影更新为待审批" time="0.1567062">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 审批公开消息到达后从 Spring 权威快照移除旧待审批投影" time="0.2327217">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 驳回状态事件直接清除客户待审批投影" time="0.2050991">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 拒绝落后 cursor 的补偿刷新快照" time="0.1233331">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 在首个内容片段到达前持续显示可读的等待状态" time="0.0292697">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 从权威流状态恢复慢首字，并按真实内容片段持续更新直到完成" time="0.1100241">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 刷新后从权威快照恢复已持久化回复的完成态且不重复正文" time="0.1092802">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 窄屏下仍可读取会话状态并使用主要操作" time="0.0924509">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 拒绝包含未知顶层字段的 v2 权威快照" time="0.0092631">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 拒绝包含畸形澄清的 v2 权威快照" time="0.013448">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 用客户可理解的文案同时呈现 NEW 与 AGENT" time="0.0258317">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 用客户可理解的文案同时呈现 INVESTIGATING 与 AGENT" time="0.034145">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 用客户可理解的文案同时呈现 WAITING_FOR_CUSTOMER 与 AGENT" time="0.0463934">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 用客户可理解的文案同时呈现 WAITING_FOR_EXTERNAL 与 AGENT" time="0.0309047">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 用客户可理解的文案同时呈现 RESOLVED 与 HUMAN" time="0.0359225">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 用客户可理解的文案同时呈现 CLOSED 与 HUMAN" time="0.0210328">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 稳定缩略展示工单 UUID，并通过明确操作复制完整值" time="0.0871951">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; SSE 恢复失败时清除旧投影并保留权威重同步入口，不退回创建表单" time="0.0666888">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="客户帮助中心 &gt; 转人工结果未知时只提供权威结果查询，不提供普通重复提交路径" time="0.8964348">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/CustomerKnowledgeSources.test.tsx" timestamp="2026-09-01T16:07:39.434Z" hostname="LAPTOP-03VLKRQR" tests="7" failures="0" errors="0" skipped="0" time="0.2850695">
+        <testcase classname="src/components/CustomerKnowledgeSources.test.tsx" name="Issue #169 独立客户知识来源展示（未接入检索） &gt; 只渲染标题和更新时间，不把内部元数据或链接转交给来源组件" time="0.1412219">
+        </testcase>
+        <testcase classname="src/components/CustomerKnowledgeSources.test.tsx" name="Issue #169 独立客户知识来源展示（未接入检索） &gt; 从就绪转为 loading 时不保留旧来源" time="0.0370548">
+        </testcase>
+        <testcase classname="src/components/CustomerKnowledgeSources.test.tsx" name="Issue #169 独立客户知识来源展示（未接入检索） &gt; 从就绪转为 empty 时不保留旧来源" time="0.0282822">
+        </testcase>
+        <testcase classname="src/components/CustomerKnowledgeSources.test.tsx" name="Issue #169 独立客户知识来源展示（未接入检索） &gt; 从就绪转为 conflict 时不保留旧来源" time="0.017717">
+        </testcase>
+        <testcase classname="src/components/CustomerKnowledgeSources.test.tsx" name="Issue #169 独立客户知识来源展示（未接入检索） &gt; 从就绪转为 error 时不保留旧来源" time="0.0188226">
+        </testcase>
+        <testcase classname="src/components/CustomerKnowledgeSources.test.tsx" name="Issue #169 独立客户知识来源展示（未接入检索） &gt; 从就绪转为 recovering 时不保留旧来源" time="0.0175992">
+        </testcase>
+        <testcase classname="src/components/CustomerKnowledgeSources.test.tsx" name="Issue #169 独立客户知识来源展示（未接入检索） &gt; 恢复后仅展示调用方新传入的来源，空结果不假装有来源" time="0.0232146">
+        </testcase>
+    </testsuite>
+</testsuites>

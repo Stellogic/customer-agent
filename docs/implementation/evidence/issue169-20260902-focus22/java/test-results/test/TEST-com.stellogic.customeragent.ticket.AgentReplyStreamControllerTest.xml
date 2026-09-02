@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.ticket.AgentReplyStreamControllerTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:13.353Z" hostname="buildkitsandbox" time="0.058">
+  <properties/>
+  <testcase name="rejectsInternalFieldsBeforeTheyReachTheProductEventLog()" classname="com.stellogic.customeragent.ticket.AgentReplyStreamControllerTest" time="0.043"/>
+  <testcase name="acceptsARealContentDeltaThroughTheGenerationScopedMachineBoundary()" classname="com.stellogic.customeragent.ticket.AgentReplyStreamControllerTest" time="0.015"/>
+  <system-out><![CDATA[16:08:13.391 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.391 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.392 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+16:08:13.400 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.400 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.401 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

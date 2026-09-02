@@ -210,7 +210,42 @@ record CustomerReplyEnvelope(
         CustomerReplyIntent intent,
         List<String> evidenceRefs,
         boolean escalationRequired,
-        String referencedOrder) {}
+        String referencedOrder,
+        String knowledgeRequestId,
+        CustomerKnowledgeReply knowledge) {
+    CustomerReplyEnvelope(
+            String schemaVersion,
+            String body,
+            CustomerReplyIntent intent,
+            List<String> evidenceRefs,
+            boolean escalationRequired,
+            String referencedOrder) {
+        this(
+                schemaVersion,
+                body,
+                intent,
+                evidenceRefs,
+                escalationRequired,
+                referencedOrder,
+                null,
+                null);
+    }
+
+    String publicBody() {
+        return knowledge == null ? body : body + "\n\n" + knowledge.answer();
+    }
+}
+
+record CustomerKnowledgeReply(
+        CustomerKnowledgeStatus status, String answer, List<CustomerKnowledgeCitation> citations) {}
+
+record CustomerKnowledgeCitation(String articleId, String version, String chunkId, String quote) {}
+
+enum CustomerKnowledgeStatus {
+    SUPPORTED,
+    INSUFFICIENT_INFORMATION,
+    CONFLICT
+}
 
 enum CustomerReplyIntent {
     NO_COMPENSATION_RESOLUTION,

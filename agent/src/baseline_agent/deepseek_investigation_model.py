@@ -138,6 +138,7 @@ class ModelCallAttemptRecord:
     usage_reported: bool = False
     cache_metrics_reported: bool = False
     reasoning_tokens: int | None = None
+    validation_diagnostic: dict[str, object] | None = None
 
 
 class ModelCallAuditSink(Protocol):

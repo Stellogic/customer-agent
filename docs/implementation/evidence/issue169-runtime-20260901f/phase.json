@@ -1,0 +1,15 @@
+{
+  "run": "issue169-runtime-20260901f",
+  "error": "python-static failed: 1",
+  "cleanup": "PASS",
+  "paid_model_calls": 0,
+  "steps": [
+    {
+      "name": "python-static",
+      "exitCode": 1
+    }
+  ],
+  "status": "FAIL",
+  "head": "915fb683ae7abc0ddabdd40f7297fc35d1f4afb7",
+  "working_tree_dirty": true
+}

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.ticket.CustomerTicketV2ApiTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:16.445Z" hostname="buildkitsandbox" time="0.598">
+  <properties/>
+  <testcase name="createsTheCurrentLogisticsConversationThroughTheExplicitV2Contract()" classname="com.stellogic.customeragent.ticket.CustomerTicketV2ApiTest" time="0.005"/>
+  <testcase name="returnsAnIndependentMinimalV2Snapshot()" classname="com.stellogic.customeragent.ticket.CustomerTicketV2ApiTest" time="0.012"/>
+  <testcase name="exposesOnlyPublicAutoResolutionStateAndAcceptsItsEvent()" classname="com.stellogic.customeragent.ticket.CustomerTicketV2ApiTest" time="0.008"/>
+  <testcase name="replaysV2SseWithAnIndependentCursorAndEnvelope()" classname="com.stellogic.customeragent.ticket.CustomerTicketV2ApiTest" time="0.507"/>
+  <testcase name="rejectsUnknownEventsAndV1OrFutureCursors()" classname="com.stellogic.customeragent.ticket.CustomerTicketV2ApiTest" time="0.004"/>
+  <testcase name="acceptsAnAdditionalCustomerMessageWithStableIdentityWhileAgentIsProcessing()" classname="com.stellogic.customeragent.ticket.CustomerTicketV2ApiTest" time="0.005"/>
+  <testcase name="rejectsUnknownFieldsAndIncompatibleRequestVersions()" classname="com.stellogic.customeragent.ticket.CustomerTicketV2ApiTest" time="0.007"/>
+  <testcase name="pendingCompensationProjectionOnlyExposesSafeTypeAmountAndReviewStatus()" classname="com.stellogic.customeragent.ticket.CustomerTicketV2ApiTest" time="0.006"/>
+  <system-out><![CDATA[2026-09-01T16:08:16.451Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:16.451Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:16.451Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-09-01T16:08:16.459Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:16.460Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:16.460Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-09-01T16:08:16.475Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:16.476Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:16.476Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-09-01T16:08:16.487Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:16.488Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:16.488Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-09-01T16:08:17.000Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:17.000Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:17.001Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-09-01T16:08:17.009Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:17.009Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:17.009Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-09-01T16:08:17.017Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:17.018Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:17.018Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-09-01T16:08:17.036Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.mock.web.MockServletContext          : Initializing Spring TestDispatcherServlet ''
+2026-09-01T16:08:17.037Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-09-01T16:08:17.037Z  INFO 265 --- [customer-agent-backend] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

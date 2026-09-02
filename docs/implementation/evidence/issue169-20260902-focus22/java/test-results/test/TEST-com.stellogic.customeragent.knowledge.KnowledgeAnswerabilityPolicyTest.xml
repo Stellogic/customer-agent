@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.knowledge.KnowledgeAnswerabilityPolicyTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:13.079Z" hostname="buildkitsandbox" time="0.042">
+  <properties/>
+  <testcase name="incompatibleFeatureOrderStopsInsteadOfApplyingWeightsToOtherSignals()" classname="com.stellogic.customeragent.knowledge.KnowledgeAnswerabilityPolicyTest" time="0.015"/>
+  <testcase name="exportedScaleAndWeightsMatchTheHandCalculatedPythonContractIncludingBoundary()" classname="com.stellogic.customeragent.knowledge.KnowledgeAnswerabilityPolicyTest" time="0.024"/>
+  <testcase name="unmeasuredConfigurationCannotFallBackToTheHistoricalCosineThreshold()" classname="com.stellogic.customeragent.knowledge.KnowledgeAnswerabilityPolicyTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

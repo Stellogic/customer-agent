@@ -14,6 +14,11 @@ import { humanSessionFetch } from "./humanSessionLifecycle";
 import { OrderTicketGroups } from "./OrderTicketGroups";
 import { AutoResolutionNotice, type AutoResolution } from "./AutoResolutionNotice";
 import { CustomerCapabilityGuide, CustomerTrustStrip } from "./components/CustomerHelpTrust";
+import {
+  CustomerKnowledgeSources,
+  type CustomerKnowledgeSource,
+  type CustomerKnowledgeSourcesState,
+} from "./components/CustomerKnowledgeSources";
 
 const PUBLIC_CONVERSATION_SCHEMA = "public-conversation-v2" as const;
 const PUBLIC_CONVERSATION_BASE = "/api/customer/v2/tickets";
@@ -31,7 +36,15 @@ type Snapshot = {
     handlingMode: string;
     agentGeneration: number;
   };
-  messages: Array<{ author: string; body: string; sentAt: string }>;
+  messages: Array<{
+    author: string;
+    body: string;
+    sentAt: string;
+    knowledge?: {
+      status: "SUPPORTED" | "INSUFFICIENT_INFORMATION" | "CONFLICT";
+      sources: CustomerKnowledgeSource[];
+    } | null;
+  }>;
   clarification: { id: string; promptCode: string; question: string } | null;
   autoResolution?: AutoResolution | null;
   replyStream?: {
@@ -874,7 +887,7 @@ export function App() {
           ...current,
           cursor: event.id,
           messages: duplicate ? current.messages : [...current.messages, message],
-          replyStream: current.replyStream,
+          replyStream: message.knowledge ? null : current.replyStream,
         };
       }
     } else if (event.type === "AGENT_PROCESSING_TERMINATED") {
@@ -1054,6 +1067,7 @@ export function App() {
           <h2>正在重新同步工单</h2>
           <p>旧内容已清除。我们正在从服务端重新读取最新状态，无需重复创建或提交操作。</p>
           <p className="ticket-reference">工单 {shortTicketId(recoveringTicketId)}</p>
+          <CustomerKnowledgeSources state={{ status: "recovering" }} />
           <button
             type="button"
             className="recovery-action"
@@ -1441,6 +1455,7 @@ export function App() {
                 (message) =>
                   !(
                     message.author === "AGENT" &&
+                    !message.knowledge &&
                     snapshot.replyStream?.status === "COMPLETED" &&
                     snapshot.replyStream.body === message.body
                   ),
@@ -1451,6 +1466,11 @@ export function App() {
                   placement={message.author === "CUSTOMER" ? "end" : "start"}
                   variant={message.author === "AGENT" ? "outlined" : "filled"}
                   content={message.body}
+                  footer={
+                    message.author === "AGENT" ? (
+                      <CustomerKnowledgeSources state={knowledgeSourcesState(message.knowledge)} />
+                    ) : undefined
+                  }
                   header={
                     message.author === "CUSTOMER"
                       ? "你"
@@ -1460,43 +1480,56 @@ export function App() {
                   }
                 />
               ))}
-            {snapshot.replyStream && (
-              <>
-                <Bubble
-                  key={`stream-${snapshot.ticket.agentGeneration}`}
-                  placement="start"
-                  variant="outlined"
-                  content={
-                    snapshot.replyStream.body || progressLabel(snapshot.replyStream.progressStage)
-                  }
-                  header="智能客服"
-                  loading={snapshot.replyStream.status === "LOADING"}
-                  streaming={snapshot.replyStream.status === "STREAMING"}
-                  footer={
-                    snapshot.replyStream.status === "LOADING"
-                      ? undefined
-                      : replyStreamFooter(snapshot.replyStream.status)
-                  }
-                />
-                {snapshot.replyStream.status === "LOADING" && (
-                  <p className="reply-stream-status" role="status">
-                    等待首个内容片段
-                  </p>
-                )}
-                {["STREAMING", "COMPLETED"].includes(snapshot.replyStream.status) && (
-                  <Sources
-                    rootClassName="reply-sources"
-                    title="本次回复依据"
-                    defaultExpanded
-                    items={[
-                      { key: "conversation", title: "当前工单公开对话" },
-                      { key: "business-facts", title: "已核对的订单与物流事实" },
-                      { key: "policy", title: "适用的客服规则" },
-                    ]}
+            {snapshot.replyStream &&
+              !snapshot.messages.some(
+                (message) => message.knowledge && message.body === snapshot.replyStream?.body,
+              ) && (
+                <>
+                  <Bubble
+                    key={`stream-${snapshot.ticket.agentGeneration}`}
+                    placement="start"
+                    variant="outlined"
+                    content={
+                      snapshot.replyStream.body || progressLabel(snapshot.replyStream.progressStage)
+                    }
+                    header="智能客服"
+                    loading={snapshot.replyStream.status === "LOADING"}
+                    streaming={snapshot.replyStream.status === "STREAMING"}
+                    footer={
+                      snapshot.replyStream.status === "LOADING"
+                        ? undefined
+                        : replyStreamFooter(snapshot.replyStream.status)
+                    }
                   />
-                )}
-              </>
-            )}
+                  {snapshot.replyStream.status === "LOADING" && (
+                    <p className="reply-stream-status" role="status">
+                      等待首个内容片段
+                    </p>
+                  )}
+                  {["STREAMING", "COMPLETED"].includes(snapshot.replyStream.status) && (
+                    <Sources
+                      rootClassName="reply-sources"
+                      title="本次回复依据"
+                      defaultExpanded
+                      items={[
+                        { key: "conversation", title: "当前工单公开对话" },
+                        { key: "business-facts", title: "已核对的订单与物流事实" },
+                      ]}
+                    />
+                  )}
+                  {((snapshot.replyStream.status === "LOADING" &&
+                    ["QUERYING_RULES", "COMPOSING_REPLY"].includes(
+                      snapshot.replyStream.progressStage,
+                    )) ||
+                    snapshot.replyStream.status === "FAILED") && (
+                    <CustomerKnowledgeSources
+                      state={{
+                        status: snapshot.replyStream.status === "FAILED" ? "error" : "loading",
+                      }}
+                    />
+                  )}
+                </>
+              )}
           </div>
           {snapshot.messages.length === 0 && !snapshot.replyStream && (
             <p className="empty-conversation">新消息会在这里出现。</p>
@@ -1740,7 +1773,7 @@ function isReplyStream(value: unknown): value is NonNullable<Snapshot["replyStre
       hasOnlyKeys(value, ["status", "body", "progressStage"]) &&
       ["LOADING", "STREAMING", "COMPLETED", "ABORTED", "FAILED"].includes(String(value.status)) &&
       typeof value.body === "string" &&
-      value.body.length <= 1_000 &&
+      value.body.length <= (value.status === "COMPLETED" ? 2_502 : 1_000) &&
       ["UNDERSTANDING", "VERIFYING_FACTS", "QUERYING_RULES", "COMPOSING_REPLY"].includes(
         String(value.progressStage),
       ))
@@ -2103,11 +2136,45 @@ function isClarification(value: unknown): value is Snapshot["clarification"] {
 function isPublicMessage(value: unknown): value is Snapshot["messages"][number] {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ["author", "body", "sentAt"]) &&
+    hasOnlyKeys(value, ["author", "body", "sentAt", "knowledge"]) &&
     ["CUSTOMER", "SUPPORT", "AGENT"].includes(String(value.author)) &&
     typeof value.body === "string" &&
-    typeof value.sentAt === "string"
+    typeof value.sentAt === "string" &&
+    (value.knowledge == null || (value.author === "AGENT" && isPublicKnowledge(value.knowledge)))
   );
+}
+
+function isPublicKnowledge(
+  value: unknown,
+): value is NonNullable<Snapshot["messages"][number]["knowledge"]> {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["status", "sources"]) ||
+    !["SUPPORTED", "INSUFFICIENT_INFORMATION", "CONFLICT"].includes(String(value.status)) ||
+    !Array.isArray(value.sources) ||
+    value.sources.length > 5
+  )
+    return false;
+  return (
+    (value.status === "SUPPORTED") === value.sources.length > 0 &&
+    value.sources.every(
+      (source) =>
+        isRecord(source) &&
+        hasOnlyKeys(source, ["title", "updatedAt"]) &&
+        typeof source.title === "string" &&
+        source.title.trim().length > 0 &&
+        typeof source.updatedAt === "string" &&
+        !Number.isNaN(Date.parse(source.updatedAt)),
+    )
+  );
+}
+
+function knowledgeSourcesState(
+  knowledge: Snapshot["messages"][number]["knowledge"],
+): CustomerKnowledgeSourcesState {
+  if (!knowledge || knowledge.status === "INSUFFICIENT_INFORMATION") return { status: "empty" };
+  if (knowledge.status === "CONFLICT") return { status: "conflict" };
+  return { status: "ready", sources: knowledge.sources };
 }
 
 function isTicketTransition(

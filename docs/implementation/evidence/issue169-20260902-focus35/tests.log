@@ -1,0 +1,20 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0
+rootdir: C:\Users\lizhuo\.codex\worktrees\c0f3\customer-agent\agent
+configfile: pyproject.toml
+plugins: anyio-4.14.2, langsmith-0.10.17, asyncio-1.1.0
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 142 items
+
+tests\test_customer_communication_model.py .................             [ 11%]
+tests\test_customer_knowledge_answer.py .......                          [ 16%]
+tests\test_deepseek_customer_communication_model.py ...............      [ 27%]
+tests\test_deepseek_investigation_action_model.py ...................    [ 40%]
+tests\test_graph.py ...............................                      [ 62%]
+tests\test_investigation_action_loop.py .................                [ 74%]
+tests\test_issue169_answer_budget.py ......                              [ 78%]
+tests\test_issue169_answer_freeze.py ..                                  [ 80%]
+tests\test_knowledge_retrieval.py ............................           [100%]
+
+- generated xml file: C:\Users\lizhuo\.codex\worktrees\c0f3\customer-agent\docs\implementation\evidence\issue169-20260902-focus35\results.xml -
+============================= 142 passed in 3.12s =============================
