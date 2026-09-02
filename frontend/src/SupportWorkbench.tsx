@@ -786,10 +786,12 @@ function TicketDetail({
   );
   const replyBusy = replyState === "sending" || replyState === "querying";
   const [reviewedAssistance, setReviewedAssistance] = useState<string | null>(null);
+  const [assistanceDraftActive, setAssistanceDraftActive] = useState(false);
   const assistanceDraft = useRef<string | null>(null);
-  const visibleDraft = !assistanceAvailable && assistanceDraft.current === draft ? "" : draft;
+  const visibleDraft = !assistanceAvailable && assistanceDraftActive ? "" : draft;
   const clearReviewedAssistance = useCallback(() => {
     setReviewedAssistance(null);
+    setAssistanceDraftActive(false);
     const handedOffDraft = assistanceDraft.current;
     if (handedOffDraft !== null) {
       setDraft((current) => (current === handedOffDraft ? "" : current));
@@ -803,6 +805,7 @@ function TicketDetail({
       setReviewedAssistance(text);
     } else {
       assistanceDraft.current = text;
+      setAssistanceDraftActive(true);
       setDraft(text);
     }
   }
@@ -820,6 +823,7 @@ function TicketDetail({
       await onSendReply(details.ticketId, idempotencyKey, body);
       clearPendingReply(details.ticketId);
       assistanceDraft.current = null;
+      setAssistanceDraftActive(false);
       setDraft("");
       setPendingIdempotencyKey(null);
       setReplyState("idle");
@@ -845,6 +849,7 @@ function TicketDetail({
       await onQueryReply(details.ticketId, pendingIdempotencyKey);
       clearPendingReply(details.ticketId);
       assistanceDraft.current = null;
+      setAssistanceDraftActive(false);
       setDraft("");
       setPendingIdempotencyKey(null);
       setReplyState("idle");
@@ -966,6 +971,7 @@ function TicketDetail({
             maxLength={2000}
             onChange={(event) => {
               assistanceDraft.current = null;
+              setAssistanceDraftActive(false);
               setDraft(event.target.value);
               setReviewedAssistance(null);
             }}
@@ -980,6 +986,7 @@ function TicketDetail({
                 type="button"
                 onClick={() => {
                   assistanceDraft.current = reviewedAssistance;
+                  setAssistanceDraftActive(true);
                   setDraft(reviewedAssistance);
                   setReviewedAssistance(null);
                 }}
