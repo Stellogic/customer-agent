@@ -125,13 +125,17 @@
 
 .internal-shell-extras a:focus-visible,
 .internal-shell-extras button:focus-visible {
-  outline: 3px solid #3977c6;
+  outline: 3px solid var(--forest-300);
   outline-offset: 3px;
 }
 
 @media (max-width: 991px) {
   .internal-shell.internal-shell-extras.ant-layout {
     flex-direction: column;
+  }
+
+  .internal-shell.internal-shell-extras.ant-layout > .internal-shell-body.ant-layout {
+    width: 100%;
   }
 
   .internal-shell-extras .internal-shell-sider:not(.ant-layout-sider-collapsed) {

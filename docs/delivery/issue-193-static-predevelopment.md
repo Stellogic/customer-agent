@@ -17,12 +17,16 @@
 | `issue193-recheck-20260903c` | Prettier 在测试前发现一处分行，未运行后续检查。 |
 | `issue193-recheck-20260903d` | 格式通过；lint 在测试前禁止 render 读取 ref，未运行后续检查。 |
 | `issue193-recheck-20260903e` | Node 24.19.0；格式、目标 lint、全前端类型、浏览器验收清单契约通过；3 文件定向 **7 PASS**、26 未选中。 |
+| `issue193-final-20260903a` | 完整门禁前序检查、构建和全栈持久化通过；冻结 RAG 在 0/64 处因本 worktree 忽略目录缺少离线 BGE 模型而报 `ValueError`。证据记录 64 项未运行、付费模型成本 0。 |
+| `issue193-final-20260903b` | 逐文件按当前协议校验并复用既有冻结模型后，RAG 检索层通过；真实 Chromium 为 46 PASS、8 FAIL。失败收敛为本票 CSS 的焦点色覆盖，以及窄屏列布局下 Ant 内层 Layout 保留 `width: 0`。 |
+| `issue193-browser-recheck-20260903a` | 首次 CSS 聚焦复验 19 PASS、7 FAIL；统一焦点色修复已通过，初版窄屏宽度规则因选择器权重不足未生效。 |
+| `issue193-browser-recheck-20260903b` | 高权重直接子选择器覆盖 Ant 布局约束；6 个受影响文件真实 Chromium **24/24 PASS**，隔离容器、网络、卷和镜像清理后锁为 FREE。 |
 
 每次结束均已向协调任务发送 `LOCK_RELEASED` 并读回 `TEST_GATE_FREE`。日志保留在 worktree 忽略目录 `.local/issue193-*.log`。失败由有效工程证据逐步收窄；没有降低断言、增加超时或重复运行无关套件。
 
 PR #205 已从 Draft 转 Ready 一次。集中安全审查因外部 Codex 额度不可用而未产出，集中 Code Review 长时间停留在 Running 且无发现；按本任务已确认边界，这类外部审查不可用不阻塞交付，也未手动触发第二轮。随后以 `origin/main@76e38ff11bbd7ae549cdc905a2b61443d37801ee` 为固定点，对当前非空差异完成独立 Standards / Spec 双轴审查：两轴均为 **PASS，0 项阻塞发现**，且都未运行测试或门禁。
 
-当前尚未运行 #193 真实 Chromium 或最终完整门禁。下一步在本次证据提交之后不再修改跟踪文件，先回读最新 `origin/main`，然后持权威锁运行一次 `pwsh ./scripts/check.ps1 -Issue 193`。CI 关闭。
+当前 #193 真实 Chromium、客服/知识窄屏回归与跨角色焦点一致性均已取得通过证据；完整门禁尚未最终通过。下一步在本次证据与 CSS 修复提交后完成增量 Standards / Spec 双轴确认，不再修改跟踪文件，再回读最新 `origin/main` 并持权威锁运行 `pwsh ./scripts/check.ps1 -Issue 193`。CI 关闭。
 
 ## 第四阶段：定向复验通过（2026-08-31，历史记录）
 
