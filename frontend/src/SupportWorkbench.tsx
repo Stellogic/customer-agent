@@ -787,8 +787,7 @@ function TicketDetail({
   const replyBusy = replyState === "sending" || replyState === "querying";
   const [reviewedAssistance, setReviewedAssistance] = useState<string | null>(null);
   const assistanceDraft = useRef<string | null>(null);
-  const visibleDraft =
-    !assistanceAvailable && assistanceDraft.current === draft ? "" : draft;
+  const visibleDraft = !assistanceAvailable && assistanceDraft.current === draft ? "" : draft;
   const clearReviewedAssistance = useCallback(() => {
     setReviewedAssistance(null);
     const handedOffDraft = assistanceDraft.current;
