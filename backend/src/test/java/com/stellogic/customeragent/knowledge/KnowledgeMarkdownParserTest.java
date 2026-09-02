@@ -15,6 +15,22 @@ class KnowledgeMarkdownParserTest {
     private final KnowledgeMarkdownParser parser = new KnowledgeMarkdownParser();
 
     @Test
+    void parsesExplicitCustomerPublicArticlesWithoutGrantingInternalScopes() throws Exception {
+        for (String name : List.of("delivery", "conversation", "privacy")) {
+            KnowledgeArticleDocument article =
+                    parser.parse(
+                            new ClassPathResource("knowledge/customer-" + name + "-help-v1.md"));
+            assertThat(article.applicability()).containsExactly("CUSTOMER_PUBLIC");
+            assertThat(article.current()).isTrue();
+            assertThat(article.chunks())
+                    .allSatisfy(
+                            chunk ->
+                                    assertThat(chunk.applicability())
+                                            .containsExactly("CUSTOMER_PUBLIC"));
+        }
+    }
+
+    @Test
     void parsesRequiredMetadataAndStableChunksFromShippedCurrentArticle() throws Exception {
         KnowledgeArticleDocument article =
                 parser.parse(new ClassPathResource("knowledge/logistics-delay-v2.md"));

@@ -2,7 +2,12 @@ import httpx
 import pytest
 
 from baseline_agent import knowledge_evaluation
-from baseline_agent.knowledge_evaluation import failure_observation, metrics, retrieval_metrics
+from baseline_agent.knowledge_evaluation import (
+    failure_observation,
+    frozen_corpus_differences,
+    metrics,
+    retrieval_metrics,
+)
 from baseline_agent.rag_eval_v1 import EvalPrincipal, EvalQuery
 
 
@@ -61,6 +66,20 @@ def test_layered_retrieval_does_not_treat_legal_candidates_as_an_answer():
         [row("answered", ["supported"]), row("unanswered", ["retired"], ["wrong_version"])]
     )
     assert forbidden["wrong_version_top5_hit_rate"] == 0.5
+
+
+def test_frozen_corpus_allows_additions_but_rejects_missing_or_changed_rows():
+    frozen = [("refund-policy", "v1", "body", "PUBLISHED", True, ["INTERNAL"])]
+    addition = ("customer-help", "v1", "new body", "PUBLISHED", True, ["CUSTOMER_PUBLIC"])
+
+    assert frozen_corpus_differences([*frozen, addition], frozen) is None
+    assert frozen_corpus_differences([addition], frozen)["missing_versions"] == [
+        ["refund-policy", "v1"]
+    ]
+    changed = [("refund-policy", "v1", "changed", "PUBLISHED", True, ["INTERNAL"])]
+    assert frozen_corpus_differences(changed, frozen)["mismatched_columns"] == {
+        "refund-policy:v1": [2]
+    }
 
 
 def test_failed_query_evidence_keeps_location_without_response_or_credentials():

@@ -59,8 +59,10 @@ public class AutoResolutionService {
         Instant now = clock.instant();
         List<Candidate> candidates =
                 jdbc.query(
-                        "select generation_id, policy_version, scenario, conclusion::text, customer_message_sequence, reply_message_id "
-                                + "from ticket_auto_resolution where ticket_id = ? and status = 'PENDING' and due_at <= ? for update",
+                        "select generation_id, policy_version, scenario, conclusion::text,"
+                                + " customer_message_sequence, reply_message_id from"
+                                + " ticket_auto_resolution where ticket_id = ? and status = 'PENDING'"
+                                + " and due_at <= ? for update",
                         (rs, row) ->
                                 new Candidate(
                                         rs.getObject(1, UUID.class),
@@ -76,16 +78,21 @@ public class AutoResolutionService {
         Candidate candidate = candidates.getFirst();
         Boolean current =
                 jdbc.queryForObject(
-                        "select exists(select 1 from support_ticket t join agent_processing_generation g on g.ticket_id = t.id "
-                                + "join public_message m on m.id = ? and m.ticket_id = t.id and m.author = 'AGENT' and m.body = ? "
-                                + "where t.id = ? and t.lifecycle_state = 'INVESTIGATING' and t.handling_mode = 'AGENT' "
-                                + "and not t.customer_human_preference and g.id = ? and g.status = 'COMPLETED' "
-                                + "and g.generation_number = (select max(generation_number) from agent_processing_generation where ticket_id = t.id) "
-                                + "and ? = (select coalesce(max(message_sequence), 0) from public_message where ticket_id = t.id and author = 'CUSTOMER') "
-                                + "and not exists(select 1 from agent_public_reply_stream where generation_id = g.id and status <> 'COMPLETED'))",
+                        "select exists(select 1 from support_ticket t join"
+                                + " agent_processing_generation g on g.ticket_id = t.id join"
+                                + " public_message m on m.id = ? and m.ticket_id = t.id and m.author ="
+                                + " 'AGENT' and m.body = ? where t.id = ? and t.lifecycle_state ="
+                                + " 'INVESTIGATING' and t.handling_mode = 'AGENT' and not"
+                                + " t.customer_human_preference and g.id = ? and g.status = 'COMPLETED'"
+                                + " and g.generation_number = (select max(generation_number) from"
+                                + " agent_processing_generation where ticket_id = t.id) and ? = (select"
+                                + " coalesce(max(message_sequence), 0) from public_message where"
+                                + " ticket_id = t.id and author = 'CUSTOMER') and not exists(select 1"
+                                + " from agent_public_reply_stream where generation_id = g.id and"
+                                + " status <> 'COMPLETED'))",
                         Boolean.class,
                         candidate.replyId(),
-                        candidate.conclusion().customerReply().body(),
+                        candidate.conclusion().customerReply().publicBody(),
                         ticketId,
                         candidate.generationId(),
                         candidate.customerSequence());
@@ -107,10 +114,11 @@ public class AutoResolutionService {
             throw new IllegalStateException("locked auto-resolution ticket lost authority");
         changeStatus(ticketId, "RESOLVED", now);
         jdbc.update(
-                "insert into customer_public_event (ticket_id, epoch, sequence, event_type, payload, occurred_at) "
-                        + "select ?, 'customer-public-v1', coalesce(max(sequence), 0) + 1, 'TICKET_RESOLVED', "
-                        + "jsonb_build_object('lifecycleState', 'RESOLVED'), ? from customer_public_event "
-                        + "where ticket_id = ? and epoch = 'customer-public-v1'",
+                "insert into customer_public_event (ticket_id, epoch, sequence, event_type,"
+                        + " payload, occurred_at) select ?, 'customer-public-v1',"
+                        + " coalesce(max(sequence), 0) + 1, 'TICKET_RESOLVED',"
+                        + " jsonb_build_object('lifecycleState', 'RESOLVED'), ? from"
+                        + " customer_public_event where ticket_id = ? and epoch = 'customer-public-v1'",
                 ticketId,
                 Timestamp.from(now),
                 ticketId);
@@ -127,7 +135,8 @@ public class AutoResolutionService {
         authorityLock.acquire(ticketId);
         List<String> tickets =
                 jdbc.query(
-                        "select lifecycle_state from support_ticket where id = ? and customer_id = ? for update",
+                        "select lifecycle_state from support_ticket where id = ? and customer_id ="
+                                + " ? for update",
                         (rs, row) -> rs.getString(1),
                         ticketId,
                         customerId);
@@ -135,9 +144,10 @@ public class AutoResolutionService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "ticket not found");
         List<String> states =
                 jdbc.query(
-                        "select a.status from ticket_auto_resolution a "
-                                + "join agent_processing_generation g on g.id = a.generation_id "
-                                + "where a.ticket_id = ? and a.due_at = ? and g.generation_number = ? for update of a",
+                        "select a.status from ticket_auto_resolution a join"
+                                + " agent_processing_generation g on g.id = a.generation_id where"
+                                + " a.ticket_id = ? and a.due_at = ? and g.generation_number = ? for"
+                                + " update of a",
                         (rs, row) -> rs.getString(1),
                         ticketId,
                         Timestamp.from(candidateDueAt),
@@ -156,7 +166,8 @@ public class AutoResolutionService {
                 Timestamp.from(now),
                 ticketId);
         jdbc.update(
-                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?, ?, 'spring-system', ?)",
+                "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) values (?,"
+                        + " ?, 'spring-system', ?)",
                 ticketId,
                 "AUTO_RESOLUTION_" + status,
                 Timestamp.from(now));

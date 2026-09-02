@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.investigation.AgentKnowledgeControllerTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:12.258Z" hostname="buildkitsandbox" time="0.085">
+  <properties/>
+  <testcase name="deniedGenerationDoesNotCallRetrieval()" classname="com.stellogic.customeragent.investigation.AgentKnowledgeControllerTest" time="0.005"/>
+  <testcase name="generationRevokedDuringSearchCannotReturnTheReceipt()" classname="com.stellogic.customeragent.investigation.AgentKnowledgeControllerTest" time="0.01"/>
+  <testcase name="authorizesBeforeSearchAndRechecksBeforeAcceptingEvenAnEmptyReceipt()" classname="com.stellogic.customeragent.investigation.AgentKnowledgeControllerTest" time="0.015"/>
+  <testcase name="requestCannotChooseItsOwnScope()" classname="com.stellogic.customeragent.investigation.AgentKnowledgeControllerTest" time="0.006"/>
+  <testcase name="machineOperationScopeIsRequired()" classname="com.stellogic.customeragent.investigation.AgentKnowledgeControllerTest" time="0.004"/>
+  <testcase name="retryRevalidatesTheSavedReceiptWithoutAnotherRetrieval()" classname="com.stellogic.customeragent.investigation.AgentKnowledgeControllerTest" time="0.01"/>
+  <system-out><![CDATA[16:08:12.264 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.264 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.264 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.274 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.275 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.275 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.289 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.290 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.290 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.312 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.312 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.312 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.323 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.323 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.323 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:12.333 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:12.333 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:12.333 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

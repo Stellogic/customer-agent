@@ -9,6 +9,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public final class KnowledgeCatalogExceptionHandler {
+    @ExceptionHandler(InvalidKnowledgeCitationException.class)
+    ResponseEntity<Map<String, String>> invalidCitation() {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .cacheControl(CacheControl.noStore())
+                .body(Map.of("code", "INVALID_KNOWLEDGE_CITATION", "message", "知识引用已失效或与授权资料不符"));
+    }
+
     @ExceptionHandler(KnowledgeRetrievalUnavailableException.class)
     ResponseEntity<Map<String, String>> retrievalUnavailable(
             KnowledgeRetrievalUnavailableException exception) {

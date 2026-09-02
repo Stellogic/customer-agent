@@ -1,0 +1,101 @@
+{
+  "schema": "issue169-saved-response-settlement-v1",
+  "ledger_before_sha256": "9362d1c6cbd47988f9a323973c138809cece6525c1f40286a1f554376729ffe5",
+  "ledger_after_sha256": "6977d70206e53c30371b79243a5a55ba7b49fe983bcac64c20d383c449040a8b",
+  "answers_sha256": "9e2598b7764b428d0b53fe84d4dc3c01259b198af79dc7ec6fddb87e02e9a711",
+  "completed_response": {
+    "id": "76b5a155-3c2a-43a1-ba03-bf71be30d79d",
+    "status": "completed",
+    "model": "deepseek-v4-flash",
+    "usage": {
+      "input_tokens": 1250,
+      "input_tokens_details": {
+        "cached_tokens": 768
+      },
+      "output_tokens": 314,
+      "output_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "total_tokens": 1564
+    }
+  },
+  "before_attempt": {
+    "phase": "issue169-answer-20260902d",
+    "query_id": "delivery-04-a",
+    "request_sha256": "798069ddd4e83bff5d74e1d56de3642dd4cad972001cf91685281f9e112e1d0e",
+    "status": "PENDING",
+    "reserved_micro_cny": 3159552,
+    "observation": {
+      "internal_call_id": "612c81cb-75db-4d42-b4f3-ebc5b9e07c1a",
+      "attempt_id": "46900971-9c40-4cbc-9baa-82449b9fa4f3",
+      "attempt_number": 1,
+      "provider": "deepseek",
+      "provider_response_id": null,
+      "response_status": null,
+      "request_model": "deepseek-v4-flash",
+      "response_model": null,
+      "backend_fingerprint": null,
+      "prompt_version": "customer-knowledge-communication-v1",
+      "schema_version": "customer-reply-v2",
+      "duration_ms": 2697,
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "cached_tokens": null,
+      "cache_hit": null,
+      "failure_classification": "SCHEMA_MISMATCH",
+      "provider_http_status": 200,
+      "strict_schema_requested": true,
+      "thinking_disabled": true,
+      "allowed_parameters_only": true,
+      "actual_response_shape_valid": false,
+      "usage_reported": false,
+      "cache_metrics_reported": false,
+      "reasoning_tokens": null
+    }
+  },
+  "after_attempt": {
+    "phase": "issue169-answer-20260902d",
+    "query_id": "delivery-04-a",
+    "request_sha256": "798069ddd4e83bff5d74e1d56de3642dd4cad972001cf91685281f9e112e1d0e",
+    "status": "SETTLED",
+    "reserved_micro_cny": 3159552,
+    "observation": {
+      "internal_call_id": "612c81cb-75db-4d42-b4f3-ebc5b9e07c1a",
+      "attempt_id": "46900971-9c40-4cbc-9baa-82449b9fa4f3",
+      "attempt_number": 1,
+      "provider": "deepseek",
+      "provider_response_id": "76b5a155-3c2a-43a1-ba03-bf71be30d79d",
+      "response_status": "completed",
+      "request_model": "deepseek-v4-flash",
+      "response_model": "deepseek-v4-flash",
+      "backend_fingerprint": null,
+      "prompt_version": "customer-knowledge-communication-v1",
+      "schema_version": "customer-reply-v2",
+      "duration_ms": 2697,
+      "input_tokens": 1250,
+      "output_tokens": 314,
+      "total_tokens": 1564,
+      "cached_tokens": 768,
+      "cache_hit": null,
+      "failure_classification": "SCHEMA_MISMATCH",
+      "provider_http_status": 200,
+      "strict_schema_requested": true,
+      "thinking_disabled": true,
+      "allowed_parameters_only": true,
+      "actual_response_shape_valid": false,
+      "usage_reported": true,
+      "cache_metrics_reported": true,
+      "reasoning_tokens": 0
+    },
+    "charged_upper_micro_cny": 6576,
+    "reconciliation": {
+      "source": "docs/implementation/evidence/issue169-answer-20260902d/answers.json",
+      "source_sha256": "9e2598b7764b428d0b53fe84d4dc3c01259b198af79dc7ec6fddb87e02e9a711",
+      "event": "response.completed"
+    }
+  },
+  "settled_charged_micro_cny": 739938,
+  "unresolved_attempts": 0,
+  "note": "供应商HTTP 200完成帧已归档；按该帧的模型身份与usage结算，schema失败保持不变。"
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "issue190-sufficiency-cost-v1",
+  "authorized_cap_micro_cny": 5000000,
+  "run": "issue169-canary-minimal-20260902f",
+  "attempts": 310,
+  "settled": 308,
+  "timeout_released": 2,
+  "pending": 0,
+  "total_charged_micro_cny": 805404.0,
+  "ledger_sha256": "bcb59127aa2986675b909d453ff53726ceeb0feb4fb0c1880876d0fbbae79aab"
+}

@@ -1,0 +1,63 @@
+{
+  "schema": "issue169-official-json-schema-canary-v1",
+  "run_id": "issue169-canary-policy-20260902c",
+  "head_sha": "73926b5e6f9a1ed65a809fdcc8d5bbd0ef7ca10e",
+  "authority": "USER_COORDINATION",
+  "frozen_query_id": "delivery-01-a",
+  "maximum_compose_calls": 1,
+  "status": "FAIL",
+  "error_type": "CustomerCommunicationFailure",
+  "provider_attempt_count": 1,
+  "attempts": [
+    {
+      "internal_call_id": "966e8cd2-6ee0-482f-8b0b-998c9d5d7821",
+      "attempt_id": "d6403163-1995-47f9-96cf-5056f730f681",
+      "attempt_number": 1,
+      "provider": "deepseek",
+      "provider_response_id": "67156090-f292-489c-8b8d-d2444868a276",
+      "response_status": "completed",
+      "request_model": "deepseek-v4-flash",
+      "response_model": "deepseek-v4-flash",
+      "backend_fingerprint": null,
+      "prompt_version": "customer-knowledge-communication-v1",
+      "schema_version": "customer-reply-v2",
+      "duration_ms": 6060,
+      "input_tokens": 1261,
+      "output_tokens": 892,
+      "total_tokens": 2153,
+      "cached_tokens": null,
+      "cache_hit": null,
+      "failure_classification": "SCHEMA_MISMATCH",
+      "provider_http_status": 200,
+      "strict_schema_requested": true,
+      "thinking_disabled": true,
+      "allowed_parameters_only": true,
+      "actual_response_shape_valid": false,
+      "usage_reported": true,
+      "cache_metrics_reported": false,
+      "reasoning_tokens": null,
+      "validation_diagnostic": {
+        "category": "DOMAIN_BODY_AUTHORIZATION",
+        "path": "$.body",
+        "expected": "customer_reply_policy",
+        "actual_type": "string"
+      }
+    }
+  ],
+  "completed_shape": {
+    "completed_frames": 1,
+    "response_status": "completed",
+    "response_model": "deepseek-v4-flash",
+    "output_top_level_keys": [
+      "body",
+      "escalationRequired",
+      "evidenceRefs",
+      "intent",
+      "knowledge",
+      "referencedOrder",
+      "schemaVersion"
+    ],
+    "schema_description_wrapper": false
+  },
+  "ledger_pending_micro_cny": 0
+}

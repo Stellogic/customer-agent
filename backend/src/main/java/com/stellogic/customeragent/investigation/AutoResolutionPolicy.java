@@ -41,18 +41,7 @@ final class AutoResolutionPolicy {
             String issueKind,
             String customerText) {
         String scenario = SCENARIOS.get(conclusion.reasonCode());
-        if (scenario == null
-                || conclusion.compensationRequired()
-                || conclusion.customerReply().escalationRequired()
-                || Set.of("PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE").contains(issueKind)
-                || DISPUTE_OR_ACTION.matcher(customerText).find()
-                || !order.paid()
-                || order.cancelled()
-                || order.existingCompensation()
-                || order.duplicateChargeSuspected()
-                || order.pendingActionCount() != 0
-                || order.activeReservationAmount().signum() != 0
-                || Set.of("STALLED", "SUSPECTED_LOST").contains(order.logisticsStatus()))
+        if (scenario == null || requiresHumanHandling(conclusion, order, issueKind, customerText))
             return null;
         return switch (conclusion.reasonCode()) {
             case DELAY_UNDER_24_HOURS ->
@@ -75,6 +64,41 @@ final class AutoResolutionPolicy {
                             : null;
             default -> null;
         };
+    }
+
+    static boolean canContinueKnowledgeConversation(
+            InvestigationConclusion conclusion,
+            JdbcAgentInvestigationService.ScopedOrder order,
+            String issueKind,
+            String customerText) {
+        return SCENARIOS.containsKey(conclusion.reasonCode())
+                && !order.fullyRefunded()
+                && ((conclusion.reasonCode() == DecisionReasonCode.DELAY_UNDER_24_HOURS
+                                && conclusion.sufficiency().riskScenario()
+                                        == InvestigationRiskScenario.LOGISTICS_DELAY
+                                && order.delaySeconds() < Duration.ofHours(24).toSeconds())
+                        || (conclusion.reasonCode() == DecisionReasonCode.ORDER_RULE_EXPLAINED
+                                && conclusion.sufficiency().riskScenario()
+                                        == InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE))
+                && !requiresHumanHandling(conclusion, order, issueKind, customerText);
+    }
+
+    private static boolean requiresHumanHandling(
+            InvestigationConclusion conclusion,
+            JdbcAgentInvestigationService.ScopedOrder order,
+            String issueKind,
+            String customerText) {
+        return conclusion.compensationRequired()
+                || conclusion.customerReply().escalationRequired()
+                || Set.of("PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE").contains(issueKind)
+                || DISPUTE_OR_ACTION.matcher(customerText).find()
+                || !order.paid()
+                || order.cancelled()
+                || order.existingCompensation()
+                || order.duplicateChargeSuspected()
+                || order.pendingActionCount() != 0
+                || order.activeReservationAmount().signum() != 0
+                || Set.of("STALLED", "SUSPECTED_LOST").contains(order.logisticsStatus());
     }
 
     private static boolean onlyQuestions(String customerText, Pattern question) {

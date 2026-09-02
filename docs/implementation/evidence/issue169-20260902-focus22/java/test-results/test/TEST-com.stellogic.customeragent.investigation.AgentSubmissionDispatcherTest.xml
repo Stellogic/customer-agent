@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.investigation.AgentSubmissionDispatcherTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:12.343Z" hostname="buildkitsandbox" time="0.135">
+  <properties/>
+  <testcase name="unknownRunResponseIsReconciledByStableSubmissionMetadata()" classname="com.stellogic.customeragent.investigation.AgentSubmissionDispatcherTest" time="0.116"/>
+  <testcase name="terminalFailedRunCreatesAnotherRunOnTheStableThread()" classname="com.stellogic.customeragent.investigation.AgentSubmissionDispatcherTest" time="0.017"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

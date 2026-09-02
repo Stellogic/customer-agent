@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.ticket.CustomerTicketApiTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:13.800Z" hostname="buildkitsandbox" time="0.625">
+  <properties/>
+  <testcase name="incompatibleOrTrimmedCursorRequiresANewAuthoritativeSnapshot()" classname="com.stellogic.customeragent.ticket.CustomerTicketApiTest" time="0.007"/>
+  <testcase name="reusedRequestIdentityWithDifferentParametersIsAnExplicitConflict()" classname="com.stellogic.customeragent.ticket.CustomerTicketApiTest" time="0.005"/>
+  <testcase name="eventArrivingBetweenInitialReplayAndLivePollingIsDeliveredWithoutAGap()" classname="com.stellogic.customeragent.ticket.CustomerTicketApiTest" time="0.52"/>
+  <testcase name="publicEventUsesViewScopedSchemaEnvelope()" classname="com.stellogic.customeragent.ticket.CustomerTicketApiTest" time="0.001"/>
+  <testcase name="eventReplayRechecksTicketOwnership()" classname="com.stellogic.customeragent.ticket.CustomerTicketApiTest" time="0.003"/>
+  <testcase name="customerSnapshotIsCompleteAndOtherCustomersReceiveNonEnumerableDenial()" classname="com.stellogic.customeragent.ticket.CustomerTicketApiTest" time="0.011"/>
+  <testcase name="customerCreatesTicketThroughThePublicProductApi()" classname="com.stellogic.customeragent.ticket.CustomerTicketApiTest" time="0.005"/>
+  <system-out><![CDATA[16:08:13.848 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.848 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.849 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 1 ms
+16:08:13.861 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.861 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.861 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:13.870 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:13.870 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:13.870 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:14.394 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:14.395 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:14.395 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:14.398 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:14.399 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:14.399 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:14.405 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:14.406 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:14.406 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+16:08:14.420 [Test worker] INFO org.springframework.mock.web.MockServletContext -- Initializing Spring TestDispatcherServlet ''
+16:08:14.420 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Initializing Servlet ''
+16:08:14.420 [Test worker] INFO org.springframework.test.web.servlet.TestDispatcherServlet -- Completed initialization in 0 ms
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

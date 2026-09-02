@@ -54,7 +54,11 @@ async function observeBrowserEvidence(page: Page): Promise<BrowserEvidence> {
   page.on("response", async (response) => {
     const url = new URL(response.url());
     try {
-      if (url.pathname.startsWith("/api/") && !url.pathname.endsWith("/events")) {
+      if (
+        url.pathname.startsWith("/api/") &&
+        !url.pathname.endsWith("/events") &&
+        url.pathname !== "/api/auth/csrf"
+      ) {
         evidence.apiBodies.push(await response.text());
       } else if (url.pathname.startsWith("/assets/") && url.pathname.endsWith(".js")) {
         evidence.bundleBodies.push(await response.text());

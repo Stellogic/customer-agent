@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.knowledge.KnowledgeCatalogIndexerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:13.122Z" hostname="buildkitsandbox" time="0.003">
+  <properties/>
+  <testcase name="failedRebuildKeepsPreviousReadyOrEmptyCatalogSearchable()" classname="com.stellogic.customeragent.knowledge.KnowledgeCatalogIndexerTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

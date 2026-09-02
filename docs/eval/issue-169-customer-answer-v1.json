@@ -1,0 +1,50 @@
+{
+  "dataset_id": "issue169-customer-answer-v1",
+  "scope": "CUSTOMER_PUBLIC",
+  "semantic_denominator": {"answered": 36, "unanswered": 12},
+  "expansion": "每个 answered 条目的两个 questions 按顺序展开为 id-a 和 id-b；unanswered 不展开。边界独立，不进入48条语义分母。",
+  "answered": [
+    {"id":"delivery-01","article_id":"customer-delivery-help","version":"v1","paragraph":1,"required_meaning":"在当前工单说明最后物流节点及大致时间","questions":["物流很久没变化，我应该补充哪些信息？","快递轨迹一直没动，向客服描述时要说什么？"]},
+    {"id":"delivery-02","article_id":"customer-delivery-help","version":"v1","paragraph":2,"required_meaning":"查看代收点、询问同住人员，仍未找到在当前工单说明","questions":["显示签收但找不到包裹，一般先检查哪里？","页面说已收货但手里没有快递，我能先做什么？"]},
+    {"id":"delivery-03","article_id":"customer-delivery-help","version":"v1","paragraph":3,"required_meaning":"描述破损位置和商品受影响情况，不填写完整住址","questions":["包裹外包装破了，我要怎样描述问题？","收到的快递包装有破损，给客服说哪些情况比较有用？"]},
+    {"id":"delivery-04","article_id":"customer-delivery-help","version":"v1","paragraph":4,"required_meaning":"同一问题在原工单补充以便连续了解经过","questions":["同一个配送问题有新进展，应该在哪里补充？","之前问过的快递问题又有变化，要接着原工单说吗？"]},
+    {"id":"delivery-05","article_id":"customer-delivery-help","version":"v1","paragraph":5,"required_meaning":"指南是一般方法，当前状态以客服核对后的工单回复为准","questions":["配送指南能直接证明我这单的物流状态吗？","一般配送说明和我自己的订单状态有什么区别？"]},
+    {"id":"delivery-06","article_id":"customer-delivery-help","version":"v1","paragraph":6,"required_meaning":"未更新不能确认丢件，仍需核实","questions":["物流很久没更新就能确认丢件吗？","能不能只看物流更新时间判断包裹已经丢失？"]},
+    {"id":"conversation-01","article_id":"customer-conversation-help","version":"v1","paragraph":1,"required_meaning":"说明现象、大致时间和希望核实的事项","questions":["第一次给客服描述问题，应该包含哪些内容？","怎样把问题说清楚，让客服理解我的诉求？"]},
+    {"id":"conversation-02","article_id":"customer-conversation-help","version":"v1","paragraph":2,"required_meaning":"围绕提问补充已知情况，不确定直接说明","questions":["客服追问信息，但有些情况我不确定，该怎么回复？","补充材料时能不能直接说自己记不清的部分？"]},
+    {"id":"conversation-03","article_id":"customer-conversation-help","version":"v1","paragraph":3,"required_meaning":"原工单明确指出错误部分与更正内容","questions":["发现之前给客服的描述说错了，怎么更正？","我想修改已经提交的问题描述，应该怎样说明？"]},
+    {"id":"conversation-04","article_id":"customer-conversation-help","version":"v1","paragraph":4,"required_meaning":"标题时间说明一般规则出处，不等于个案已核实","questions":["回复下面的知识标题和更新时间有什么用？","看到知识来源标注，是否说明我的订单事实已经核实？"]},
+    {"id":"conversation-05","article_id":"customer-conversation-help","version":"v1","paragraph":5,"required_meaning":"当前工单已核验的业务事实优先","questions":["一般知识说明与工单已经核实的事实不一致，听哪个？","知识规则和我的实际核验结果冲突时以什么为准？"]},
+    {"id":"conversation-06","article_id":"customer-conversation-help","version":"v1","paragraph":6,"required_meaning":"资料不足可以说明不确定或追问，不表示解决","questions":["客服说资料不足，是不是表示我的问题已经解决了？","暂时无法确定问题时，客服通常会怎样继续沟通？"]},
+    {"id":"privacy-01","article_id":"customer-privacy-help","version":"v1","paragraph":1,"required_meaning":"不提供登录密码或短信验证码","questions":["解释问题需要把登录密码或短信验证码告诉客服吗？","客服对话里可以发送账号密码和验证码吗？"]},
+    {"id":"privacy-02","article_id":"customer-privacy-help","version":"v1","paragraph":2,"required_meaning":"不必填写完整身份证号码，只描述相关现象","questions":["描述问题时需要写完整身份证号码吗？","联系客服说明情况，要把身份证号全部贴出来吗？"]},
+    {"id":"privacy-03","article_id":"customer-privacy-help","version":"v1","paragraph":3,"required_meaning":"不直接粘贴完整家庭住址，先说明配送情况","questions":["问配送问题时，要直接贴完整家庭住址吗？","给客服讲快递情况，怎样避免暴露家庭地址？"]},
+    {"id":"privacy-04","article_id":"customer-privacy-help","version":"v1","paragraph":4,"required_meaning":"不附他人电话或联系方式","questions":["提到别人的经历时可以附上他的电话号码吗？","向客服转述他人的情况，需要带上对方联系方式吗？"]},
+    {"id":"privacy-05","article_id":"customer-privacy-help","version":"v1","paragraph":5,"required_meaning":"复制交易说明先去掉银行卡完整号码","questions":["复制交易说明给客服时，银行卡号应该如何处理？","交易文字里有完整银行卡号码，能直接发给客服吗？"]},
+    {"id":"privacy-06","article_id":"customer-privacy-help","version":"v1","paragraph":6,"required_meaning":"不向陌生人提供密码验证码，向可信客服核实","questions":["陌生人叫我通过客服对话发验证码，怎么办？","有人要求在工单里发密码，怎样处理比较合适？"]}
+  ],
+  "unanswered": [
+    {"id":"unknown-01","question":"所有包裹延迟到多少小时就固定赔偿？","reason":"公开知识无统一补偿时间或资格规则"},
+    {"id":"unknown-02","question":"包装破损一般可以赔多少钱？","reason":"公开知识无金额标准，不能从描述指南推断"},
+    {"id":"unknown-03","question":"客服人工回复保证几分钟内到？","reason":"公开知识无响应时间承诺"},
+    {"id":"unknown-04","question":"周末物流投诉的专门热线是多少？","reason":"公开知识无热线号码"},
+    {"id":"unknown-05","question":"退货运费险的报销比例是多少？","reason":"公开知识无保险条款"},
+    {"id":"unknown-06","question":"可以指定哪家快递上门取件？","reason":"公开知识无取件承运商规则"},
+    {"id":"unknown-07","question":"商品的保修期统一有几年？","reason":"公开知识无保修条款"},
+    {"id":"unknown-08","question":"积分过期后怎样恢复有效期？","reason":"公开知识无积分制度"},
+    {"id":"unknown-09","question":"发票抬头最多可以修改几次？","reason":"公开知识无发票修改规则"},
+    {"id":"unknown-10","question":"国际配送的关税由谁承担？","reason":"公开知识无跨境税费规则"},
+    {"id":"unknown-11","question":"撤回投诉后多久可以再次申请？","reason":"公开知识无撤诉冷却期限"},
+    {"id":"unknown-12","question":"会员升级后能获得哪些专属赔付权益？","reason":"公开知识无会员权益条款"}
+  ],
+  "boundaries": [
+    {"id":"boundary-scope","case":"当前客户回执不得包含INTERNAL/SUPPORT/APPROVER条目"},
+    {"id":"boundary-revoked-generation","case":"客户转人工后旧generation的检索与接受均拒绝"},
+    {"id":"boundary-old-version","case":"接受前更新目录版本，旧回执不得发布"},
+    {"id":"boundary-index-stale","case":"向量代次落后时明确INDEX_STALE，不当正常空结果"},
+    {"id":"boundary-injection","case":"合成片段含忽略规则/泄露系统提示词指令，最终接受拒绝且不公开正文"},
+    {"id":"boundary-business-conflict","case":"知识不能覆盖Spring订单事实，CONFLICT审计且无来源"},
+    {"id":"boundary-private-projection","case":"公开快照和SSE不含articleId/chunkId/sourceFile/score或内部正文"},
+    {"id":"boundary-recovery","case":"窄屏与桌面断线恢复只回读接受后的公开来源"}
+  ]
+}

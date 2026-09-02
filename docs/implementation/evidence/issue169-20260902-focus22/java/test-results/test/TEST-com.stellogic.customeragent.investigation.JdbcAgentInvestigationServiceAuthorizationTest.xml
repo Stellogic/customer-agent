@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.stellogic.customeragent.investigation.JdbcAgentInvestigationServiceAuthorizationTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-01T16:08:12.774Z" hostname="buildkitsandbox" time="0.23">
+  <properties/>
+  <testcase name="concurrentWinnerCannotReplaceTheReceiptThatWasActuallyValidated()" classname="com.stellogic.customeragent.investigation.JdbcAgentInvestigationServiceAuthorizationTest" time="0.205"/>
+  <testcase name="staleHumanPreferredOrNonInvestigatingResultsCannotPublishAMessage()" classname="com.stellogic.customeragent.investigation.JdbcAgentInvestigationServiceAuthorizationTest" time="0.013"/>
+  <testcase name="customerCommunicationContextKeepsTheCompleteOrderedConversation()" classname="com.stellogic.customeragent.investigation.JdbcAgentInvestigationServiceAuthorizationTest" time="0.004"/>
+  <testcase name="siblingSummaryRejectsAmbiguousAliasesAndCapsTheProjection()" classname="com.stellogic.customeragent.investigation.JdbcAgentInvestigationServiceAuthorizationTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
