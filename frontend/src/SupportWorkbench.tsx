@@ -773,7 +773,7 @@ function TicketDetail({
   const orderRef = useRef<HTMLDivElement>(null);
   const replyRef = useRef<HTMLElement>(null);
   const factsRef = useRef<HTMLElement>(null);
-  const assistanceRef = useRef<HTMLElement>(null);
+  const assistanceRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(() => storedPendingReply?.body ?? "");
   const [replyState, setReplyState] = useState<
     "idle" | "sending" | "unknown" | "querying" | "error"
@@ -1022,19 +1022,13 @@ function TicketDetail({
       )}
 
       {details.handlingMode === "HUMAN" && assistanceAvailable && (
-        <section
-          ref={assistanceRef}
-          tabIndex={-1}
-          className="context-entry-target"
-          aria-label="AI 智能辅助"
-        >
-          <SupportAssistance
-            ticketId={details.ticketId}
-            defaultQuery={details.description}
-            onReviewDraft={replyBusy || replyState === "unknown" ? null : reviewAssistance}
-            onClearDraft={clearReviewedAssistance}
-          />
-        </section>
+        <SupportAssistance
+          hostRef={assistanceRef}
+          ticketId={details.ticketId}
+          defaultQuery={details.description}
+          onReviewDraft={replyBusy || replyState === "unknown" ? null : reviewAssistance}
+          onClearDraft={clearReviewedAssistance}
+        />
       )}
 
       {details.handlingMode === "HUMAN" && (

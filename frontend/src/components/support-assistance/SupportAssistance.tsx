@@ -1,4 +1,4 @@
-import { useEffect, useId, useReducer, useRef, useState } from "react";
+import { useEffect, useId, useReducer, useRef, useState, type Ref } from "react";
 import { loadCsrfToken } from "../../csrf";
 import { humanSessionFetch } from "../../humanSessionLifecycle";
 import { isRecord } from "../../streamProtocol";
@@ -18,11 +18,13 @@ export function SupportAssistance({
   defaultQuery,
   onReviewDraft,
   onClearDraft,
+  hostRef,
 }: {
   ticketId: string;
   defaultQuery: string;
   onReviewDraft: ((text: string) => void) | null;
   onClearDraft: () => void;
+  hostRef?: Ref<HTMLDivElement>;
 }) {
   const sessionKey = useId();
   const [state, dispatch] = useReducer(reduceSupportAssistance, null, createSupportAssistanceState);
@@ -172,7 +174,13 @@ export function SupportAssistance({
   }
 
   return (
-    <div className="support-assistance-host">
+    <div
+      ref={hostRef}
+      role={hostRef ? "region" : undefined}
+      aria-label={hostRef ? "客服辅助入口" : undefined}
+      tabIndex={hostRef ? -1 : undefined}
+      className={`support-assistance-host${hostRef ? " context-entry-target" : ""}`}
+    >
       {state.assignment && (
         <label>
           辅助查询（最多200字）
