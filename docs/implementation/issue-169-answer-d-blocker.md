@@ -46,6 +46,10 @@ Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具�
 
 `BODY_AUTHORIZATION` 仍合并金额、时限承诺、敏感泄露、姓名签收、工单状态、订单号范围与补偿措辞等规则，不能据此判断具体失败接缝。后续继续复用同一正文策略函数，仅把原 `False` 等价映射为有限固定子码；不记录正文、匹配片段或实际值，也不改变拒绝顺序。`issue169-20260902-focus45` 的 Ruff、生产源码 Pyright、45 tests 和 Standards / Spec 双轴审查均 PASS，`paid_model_calls=0`。
 
+稳定 HEAD `9b44b254d84cdf666b06e6e1ec72e38325d2be28` 的最终定向 canary `issue169-canary-body-policy-20260902d` 再次只执行 `delivery-01-a` 一次 compose。供应商返回 HTTP 200 completed，JSON Schema 与顶层七键通过，但固定子码明确为 `DOMAIN_BODY_COMPENSATION_LANGUAGE` at `$.body`：生成正文没有满足冻结的补偿措辞规则。该规则已经由冻结 prompt 明确要求，按模型结果放宽正文或修改 prompt/schema 都会降低门槛并污染评测，因此不存在合法的本地映射或兼容接缝；付费诊断路线在此停止，回答质量保持 FAIL。
+
+本次 1261 input / 866 output / 2127 total tokens，已结算 11577 micro-CNY。唯一账本最终为 306 `SETTLED`、2 `TIMEOUT_RELEASED`、0 `PENDING`，累计 782952 micro-CNY（0.782952 CNY，低于用户直接授权的 5 CNY 上限），SHA-256 `2627bb4fbf09bfe66515ebd393c13064790faa63a0b95a21d987eb3104c2d312`。确定性 HTTP/PG 29 项、投影 SQL、Compose 清理和锁释放均 PASS。
+
 ## 证据
 
 - `docs/implementation/evidence/issue169-answer-20260902d/answers.json`
@@ -65,10 +69,13 @@ Canary 证据仅保存了非敏感顶层形状和审计字段，没有保存具�
 - `docs/implementation/evidence/issue169-canary-policy-20260902c/phase.json`
 - `docs/implementation/evidence/issue169-canary-policy-20260902c/ledger-summary.json`
 - `docs/implementation/evidence/issue169-20260902-focus45/phase.json`
+- `docs/implementation/evidence/issue169-canary-body-policy-20260902d/canary.json`
+- `docs/implementation/evidence/issue169-canary-body-policy-20260902d/phase.json`
+- `docs/implementation/evidence/issue169-canary-body-policy-20260902d/ledger-summary.json`
 
 ## 未完成项
 
 - 48 条完整执行与逐条人工语义评审：`NOT_RUN`。
-- 回答层质量门槛：`FAIL`（结构失败，整集未完成）。
+- 回答层质量门槛：`FAIL`（供应商正文未满足冻结补偿措辞，整集未完成）。
 - 最终 `pwsh ./scripts/check.ps1 -Issue 169`：`NOT_RUN`。
 - 推送、PR Ready、合入、关票、`origin/main` 回读：`NOT_RUN`。
