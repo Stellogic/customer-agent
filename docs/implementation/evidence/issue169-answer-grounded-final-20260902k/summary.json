@@ -42,5 +42,6 @@
   "http_pg_status": "PASS",
   "compose_cleanup": "PASS",
   "test_gate_status_after_run": "FREE",
-  "quality_status": "FAIL"
+  "quality_status": "ACCEPTED_WITH_KNOWN_LIMITATIONS",
+  "acceptance_note": "学习项目按用户决定接受当前回答质量缺陷；保留原始分母和失败项，不将其表述为质量门槛通过。"
 }
