@@ -31,7 +31,9 @@ class CustomerAutoResolutionControllerTest {
     @Test
     void cancellationUsesAuthenticatedOwnerAndTheExactPresentedCandidate() throws Exception {
         mvc.perform(
-                        post("/api/customer/tickets/{ticketId}/auto-resolution/cancel", TICKET_ID)
+                        post(
+                                        "/api/customer/v2/tickets/{ticketId}/auto-resolution/cancel",
+                                        TICKET_ID)
                                 .principal(customer())
                                 .header("X-Synthetic-Customer-Id", "customer-other-demo")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -45,7 +47,9 @@ class CustomerAutoResolutionControllerTest {
     @Test
     void missingCandidateIdentityDoesNotReachTheService() throws Exception {
         mvc.perform(
-                        post("/api/customer/tickets/{ticketId}/auto-resolution/cancel", TICKET_ID)
+                        post(
+                                        "/api/customer/v2/tickets/{ticketId}/auto-resolution/cancel",
+                                        TICKET_ID)
                                 .principal(customer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{}"))
@@ -61,7 +65,9 @@ class CustomerAutoResolutionControllerTest {
                 .cancel("customer-demo", TICKET_ID, DUE_AT, 1);
 
         mvc.perform(
-                        post("/api/customer/tickets/{ticketId}/auto-resolution/cancel", TICKET_ID)
+                        post(
+                                        "/api/customer/v2/tickets/{ticketId}/auto-resolution/cancel",
+                                        TICKET_ID)
                                 .principal(customer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(

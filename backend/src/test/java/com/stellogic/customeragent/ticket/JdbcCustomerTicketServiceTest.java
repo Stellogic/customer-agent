@@ -37,7 +37,7 @@ class JdbcCustomerTicketServiceTest {
                         "AGENT",
                         Instant.parse("2026-08-11T00:00:00Z"),
                         Instant.parse("2026-08-11T00:00:00Z"),
-                        "customer-public-v1",
+                        "public-conversation-v2",
                         8,
                         1,
                         List.of(),
@@ -46,10 +46,13 @@ class JdbcCustomerTicketServiceTest {
                         null);
         doReturn(snapshot).when(service).snapshot("customer-demo", TICKET_ID);
         when(jdbc.queryForObject(
-                        anyString(), eq(Long.class), eq(TICKET_ID), eq("customer-public-v1")))
+                        anyString(), eq(Long.class), eq(TICKET_ID), eq("public-conversation-v2")))
                 .thenReturn(5L);
 
-        assertThatThrownBy(() -> service.events("customer-demo", TICKET_ID, "customer-public-v1:2"))
+        assertThatThrownBy(
+                        () ->
+                                service.events(
+                                        "customer-demo", TICKET_ID, "public-conversation-v2:2"))
                 .isInstanceOf(ProjectionCursorException.class);
     }
 }

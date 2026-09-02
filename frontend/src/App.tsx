@@ -68,18 +68,12 @@ type EventEnvelope = {
 };
 
 type IntakeSnapshot = {
-  schema:
-    | "customer-intake-v1"
-    | "customer-intake-v2"
-    | "customer-intake-v3"
-    | typeof CUSTOMER_INTAKE_SCHEMA;
+  schema: typeof CUSTOMER_INTAKE_SCHEMA;
   intakeId: string;
   status: "READY_TO_CONFIRM" | "NEEDS_CLARIFICATION" | "CONFIRMED";
   candidateOrder: { reference: string; summary: string } | null;
-  issue: IntakeIssue | null;
   issues: IntakeIssue[];
   assistantMessage: string;
-  ticketId: string | null;
   ticketIds: string[];
   sharedIntakeRecordId: string | null;
   duplicateMatches: DuplicateIntakeMatch[];
@@ -153,9 +147,6 @@ export function App() {
   const [submitting, setSubmitting] = useState(false);
   const [cancellingAutoResolution, setCancellingAutoResolution] = useState(false);
   const [clarificationAnswer, setClarificationAnswer] = useState("");
-  const [ticketReplyOrderReference, setTicketReplyOrderReference] = useState("");
-  const [ticketReplyIssueKind, setTicketReplyIssueKind] = useState("LOGISTICS_DELAY");
-  const [ticketReplyBody, setTicketReplyBody] = useState("");
   const [liveMessageBody, setLiveMessageBody] = useState("");
   const [liveMessageState, setLiveMessageState] = useState<
     "idle" | "sending" | "accepted" | "conflict" | "error"
@@ -177,7 +168,6 @@ export function App() {
   const replyMessageId = useRef(globalThis.crypto.randomUUID());
   const resumeRequestId = useRef(globalThis.crypto.randomUUID());
   const handoffRequestId = useRef(globalThis.crypto.randomUUID());
-  const ticketReplyRequestId = useRef(globalThis.crypto.randomUUID());
   const liveMessageRequestId = useRef(globalThis.crypto.randomUUID());
   const streamController = useRef<AbortController | null>(null);
   const reconnectTimer = useRef<number | null>(null);
@@ -446,7 +436,7 @@ export function App() {
     try {
       const csrf = await loadCsrfToken();
       const response = await humanSessionFetch(
-        `/api/customer/tickets/${ticketId}/auto-resolution/cancel`,
+        `/api/customer/v2/tickets/${ticketId}/auto-resolution/cancel`,
         {
           method: "POST",
           credentials: "same-origin",
@@ -514,7 +504,7 @@ export function App() {
         "X-Resume-Request-Id": resumeRequestId.current,
       };
       const response = await humanSessionFetch(
-        `/api/customer/tickets/${ticketId}/clarifications/${clarificationId}/replies`,
+        `/api/customer/v2/tickets/${ticketId}/clarifications/${clarificationId}/replies`,
         {
           method: "POST",
           credentials: "same-origin",
@@ -558,7 +548,7 @@ export function App() {
       }
     } catch {
       const status = await humanSessionFetch(
-        `/api/customer/tickets/${ticketId}/clarification-resumes/${resumeRequestId.current}`,
+        `/api/customer/v2/tickets/${ticketId}/clarification-resumes/${resumeRequestId.current}`,
         {
           credentials: "same-origin",
         },
@@ -594,16 +584,19 @@ export function App() {
     const requestId = handoffRequestId.current;
     try {
       const csrf = await loadCsrfToken();
-      const response = await humanSessionFetch(`/api/customer/tickets/${ticketId}/human-handoff`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          [csrf.headerName]: csrf.token,
-          "Content-Type": "application/json",
-          "Idempotency-Key": requestId,
+      const response = await humanSessionFetch(
+        `/api/customer/v2/tickets/${ticketId}/human-handoff`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            [csrf.headerName]: csrf.token,
+            "Content-Type": "application/json",
+            "Idempotency-Key": requestId,
+          },
+          body: JSON.stringify({ reasonCode: "CUSTOMER_REQUESTED" }),
         },
-        body: JSON.stringify({ reasonCode: "CUSTOMER_REQUESTED" }),
-      });
+      );
       if (!response.ok) throw new Error("human handoff failed");
       await loadTicket(ticketId);
       handoffRequestId.current = globalThis.crypto.randomUUID();
@@ -628,7 +621,7 @@ export function App() {
 
   async function reconcileHumanHandoff(ticketId: string, stableRequestId: string) {
     const status = await humanSessionFetch(
-      `/api/customer/tickets/${ticketId}/human-handoff-requests/${stableRequestId}`,
+      `/api/customer/v2/tickets/${ticketId}/human-handoff-requests/${stableRequestId}`,
       { credentials: "same-origin" },
     ).catch(() => null);
     if (!status?.ok) {
@@ -654,42 +647,6 @@ export function App() {
   function forgetUnknownHandoff(ticketId: string) {
     globalThis.sessionStorage.removeItem(handoffRecoveryStorageKey(ticketId));
     setUnknownHandoffRequestId(null);
-  }
-
-  async function submitTicketReply(event: FormEvent) {
-    event.preventDefault();
-    if (!snapshot || !["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState)) return;
-    setSubmitting(true);
-    setError("");
-    try {
-      const csrf = await loadCsrfToken();
-      const response = await humanSessionFetch(
-        `/api/customer/tickets/${snapshot.ticket.id}/replies`,
-        {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            [csrf.headerName]: csrf.token,
-            "Content-Type": "application/json",
-            "Idempotency-Key": ticketReplyRequestId.current,
-          },
-          body: JSON.stringify({
-            orderReference: ticketReplyOrderReference,
-            issueKind: ticketReplyIssueKind,
-            message: ticketReplyBody,
-          }),
-        },
-      );
-      if (!response.ok) throw new Error("ticket reply failed");
-      const result = (await response.json()) as { ticketId: string };
-      await loadTicket(result.ticketId);
-      ticketReplyRequestId.current = globalThis.crypto.randomUUID();
-      setTicketReplyBody("");
-    } catch {
-      setError("回复状态暂时未知；请保留本页重试，相同消息身份不会重开或创建第二张工单。");
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   async function submitLiveMessage(event: FormEvent) {
@@ -1225,7 +1182,7 @@ export function App() {
                   <span>疑似重复 · {intakeIssueLabel(match.issueKind)}</span>
                   <strong>{match.issueSummary}</strong>
                   <small>
-                    仅使用同一订单下未关闭工单的编号、问题类型与状态匹配；不会读取或合并既有对话。
+                    仅使用同一订单下既有工单的编号、问题类型与状态匹配；不会读取或合并既有对话。
                   </small>
                   <div className="intake-duplicate-actions">
                     <button
@@ -1351,7 +1308,7 @@ export function App() {
             />
           </label>
           <button className="primary-action" disabled={submitting}>
-            {submitting ? "正在理解你的问题…" : "提交物流延迟问题"}
+            {submitting ? "正在理解你的问题…" : "开始智能受理"}
           </button>
           <button
             type="button"
@@ -1595,42 +1552,9 @@ export function App() {
               </form>
             )}
           {["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState) && (
-            <form className="clarification-form" onSubmit={submitTicketReply}>
-              <label>
-                回复涉及的订单编号
-                <input
-                  aria-label="回复订单编号"
-                  value={ticketReplyOrderReference}
-                  onChange={(event) => setTicketReplyOrderReference(event.target.value)}
-                  required
-                />
-              </label>
-              <label>
-                这是哪类问题
-                <select
-                  aria-label="回复问题类型"
-                  value={ticketReplyIssueKind}
-                  onChange={(event) => setTicketReplyIssueKind(event.target.value)}
-                >
-                  <option value="LOGISTICS_DELAY">原物流延迟问题</option>
-                  <option value="PACKAGE_NOT_RECEIVED">包裹未收到</option>
-                  <option value="DUPLICATE_CHARGE">重复扣款</option>
-                  <option value="ORDER_OPERATION_OR_RULE">地址或取消规则</option>
-                  <option value="OTHER">其他问题</option>
-                </select>
-              </label>
-              <label>
-                你的回复
-                <textarea
-                  aria-label="工单回复"
-                  value={ticketReplyBody}
-                  onChange={(event) => setTicketReplyBody(event.target.value)}
-                  required
-                  rows={3}
-                />
-              </label>
-              <button disabled={submitting}>{submitting ? "正在提交…" : "发送回复"}</button>
-            </form>
+            <StatusNotice role="status" tone="neutral">
+              如仍需帮助，请在上方用自然语言发起新的智能受理。系统会先识别并请你确认问题；同一问题可继续既有工单，独立新问题会创建新工单。
+            </StatusNotice>
           )}
           {snapshot.ticket.handlingMode === "AGENT" &&
             !["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState) &&
@@ -1922,113 +1846,49 @@ function isIntakeConversationMessage(value: unknown) {
 
 function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
   if (!isRecord(value)) return null;
-  const legacy = value.schema === "customer-intake-v1";
-  const v2 = value.schema === "customer-intake-v2";
-  const v3 = value.schema === "customer-intake-v3";
-  const expectedKeys = legacy
-    ? [
-        "schema",
-        "intakeId",
-        "status",
-        "candidateOrder",
-        "issue",
-        "assistantMessage",
-        "ticketId",
-        "confirmed",
-        "replayed",
-      ]
-    : v2
-      ? [
-          "schema",
-          "intakeId",
-          "status",
-          "candidateOrder",
-          "issue",
-          "issues",
-          "assistantMessage",
-          "ticketId",
-          "ticketIds",
-          "sharedIntakeRecordId",
-          "expectedTicketCount",
-          "confirmed",
-          "replayed",
-        ]
-      : v3
-        ? [
-            "schema",
-            "intakeId",
-            "status",
-            "candidateOrder",
-            "issue",
-            "issues",
-            "assistantMessage",
-            "ticketId",
-            "ticketIds",
-            "sharedIntakeRecordId",
-            "duplicateMatches",
-            "routedTicketIds",
-            "remainingOrderCount",
-            "completedOrderCount",
-            "expectedTicketCount",
-            "confirmed",
-            "replayed",
-          ]
-        : [
-            "schema",
-            "intakeId",
-            "status",
-            "candidateOrder",
-            "issue",
-            "issues",
-            "assistantMessage",
-            "ticketId",
-            "ticketIds",
-            "sharedIntakeRecordId",
-            "duplicateMatches",
-            "routedTicketIds",
-            "remainingOrderCount",
-            "completedOrderCount",
-            "expectedTicketCount",
-            "confirmed",
-            "version",
-            "replayed",
-          ];
+  const expectedKeys = [
+    "schema",
+    "intakeId",
+    "status",
+    "candidateOrder",
+    "issues",
+    "assistantMessage",
+    "ticketIds",
+    "sharedIntakeRecordId",
+    "duplicateMatches",
+    "routedTicketIds",
+    "remainingOrderCount",
+    "completedOrderCount",
+    "expectedTicketCount",
+    "confirmed",
+    "version",
+    "replayed",
+  ];
   if (
     !hasOnlyKeys(value, expectedKeys) ||
-    (!legacy && !v2 && !v3 && value.schema !== CUSTOMER_INTAKE_SCHEMA) ||
+    value.schema !== CUSTOMER_INTAKE_SCHEMA ||
     typeof value.intakeId !== "string" ||
     !["READY_TO_CONFIRM", "NEEDS_CLARIFICATION", "CONFIRMED"].includes(String(value.status)) ||
     typeof value.assistantMessage !== "string" ||
-    !(value.ticketId === null || typeof value.ticketId === "string") ||
     typeof value.confirmed !== "boolean" ||
-    (!legacy &&
-      !v2 &&
-      !v3 &&
-      (!Number.isSafeInteger(value.version) || Number(value.version) < 1)) ||
+    !Number.isSafeInteger(value.version) ||
+    Number(value.version) < 1 ||
     typeof value.replayed !== "boolean"
   )
     return null;
   const candidate = value.candidateOrder;
-  const issue = value.issue;
-  if (
-    !(
-      candidate === null ||
-      (isRecord(candidate) &&
-        hasOnlyKeys(candidate, ["reference", "summary"]) &&
-        typeof candidate.reference === "string" &&
-        typeof candidate.summary === "string")
-    ) ||
-    !(issue === null || isIntakeIssue(issue))
-  )
+  if (!(
+    candidate === null ||
+    (isRecord(candidate) &&
+      hasOnlyKeys(candidate, ["reference", "summary"]) &&
+      typeof candidate.reference === "string" &&
+      typeof candidate.summary === "string")
+  ))
     return null;
-  const issues = legacy ? (issue ? [issue] : []) : value.issues;
-  const ticketIds = legacy
-    ? typeof value.ticketId === "string"
-      ? [value.ticketId]
-      : []
-    : value.ticketIds;
-  const duplicateMatches = legacy || v2 ? [] : value.duplicateMatches;
-  const routedTicketIds = legacy || v2 ? [] : value.routedTicketIds;
+  const issues = value.issues;
+  const ticketIds = value.ticketIds;
+  const duplicateMatches = value.duplicateMatches;
+  const routedTicketIds = value.routedTicketIds;
   if (
     !Array.isArray(issues) ||
     !issues.every(isIntakeIssue) ||
@@ -2038,42 +1898,31 @@ function parseIntakeSnapshot(value: unknown): IntakeSnapshot | null {
     !duplicateMatches.every(isDuplicateIntakeMatch) ||
     !Array.isArray(routedTicketIds) ||
     !routedTicketIds.every((ticketId) => typeof ticketId === "string") ||
-    (!legacy &&
-      !v2 &&
-      (!Number.isSafeInteger(value.remainingOrderCount) ||
-        Number(value.remainingOrderCount) < 0 ||
-        !Number.isSafeInteger(value.completedOrderCount) ||
-        Number(value.completedOrderCount) < 0)) ||
-    (!legacy &&
-      (!(value.sharedIntakeRecordId === null || typeof value.sharedIntakeRecordId === "string") ||
-        !Number.isSafeInteger(value.expectedTicketCount) ||
-        Number(value.expectedTicketCount) !== issues.length))
+    !Number.isSafeInteger(value.remainingOrderCount) ||
+    Number(value.remainingOrderCount) < 0 ||
+    !Number.isSafeInteger(value.completedOrderCount) ||
+    Number(value.completedOrderCount) < 0 ||
+    !(value.sharedIntakeRecordId === null || typeof value.sharedIntakeRecordId === "string") ||
+    !Number.isSafeInteger(value.expectedTicketCount) ||
+    Number(value.expectedTicketCount) !== issues.length
   )
     return null;
   return {
-    schema: legacy
-      ? "customer-intake-v1"
-      : v2
-        ? "customer-intake-v2"
-        : v3
-          ? "customer-intake-v3"
-          : CUSTOMER_INTAKE_SCHEMA,
+    schema: CUSTOMER_INTAKE_SCHEMA,
     intakeId: value.intakeId,
     status: value.status as IntakeSnapshot["status"],
     candidateOrder: candidate as IntakeSnapshot["candidateOrder"],
-    issue,
     issues,
     assistantMessage: value.assistantMessage,
-    ticketId: value.ticketId,
     ticketIds,
-    sharedIntakeRecordId: legacy ? null : (value.sharedIntakeRecordId as string | null),
+    sharedIntakeRecordId: value.sharedIntakeRecordId,
     duplicateMatches,
     routedTicketIds,
-    remainingOrderCount: legacy || v2 ? 0 : Number(value.remainingOrderCount),
-    completedOrderCount: legacy || v2 ? 0 : Number(value.completedOrderCount),
-    expectedTicketCount: legacy ? issues.length : Number(value.expectedTicketCount),
+    remainingOrderCount: Number(value.remainingOrderCount),
+    completedOrderCount: Number(value.completedOrderCount),
+    expectedTicketCount: Number(value.expectedTicketCount),
     confirmed: value.confirmed,
-    version: legacy || v2 || v3 ? 0 : Number(value.version),
+    version: Number(value.version),
     replayed: value.replayed,
   };
 }

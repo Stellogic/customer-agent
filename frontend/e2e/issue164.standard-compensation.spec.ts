@@ -19,7 +19,7 @@ test("Issue #164 选择标准补偿并提交审批", async ({ browser }) => {
       /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(new URL(response.url()).pathname) &&
       response.status() === 201,
   );
-  await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await customer.getByRole("button", { name: "开始智能受理" }).click();
   await continueAsNewIfDuplicate(customer);
   await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };

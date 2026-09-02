@@ -11,7 +11,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 public final class CustomerPublicProjectionAppender {
-    private static final String EPOCH = "customer-public-v1";
+    private static final String EPOCH = "public-conversation-v2";
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
 

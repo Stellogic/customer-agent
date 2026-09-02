@@ -31,7 +31,7 @@ test("Issue #98 客户真实创建、交互状态与断线权威恢复视觉", a
         new URL(response.url()).pathname,
       ) && response.status() === 201,
   );
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await page.getByRole("button", { name: "开始智能受理" }).click();
   await continueAsNewIfDuplicate(page);
   await page.getByRole("button", { name: "确认，就是这个问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };
@@ -57,7 +57,7 @@ test("Issue #98 客户真实创建、交互状态与断线权威恢复视觉", a
   await expect(page.getByRole("heading", { name: "正在重新同步工单" })).toBeVisible();
   await expect(page.getByText(`工单 ${shortTicketId}`)).toBeVisible();
   await expect(page.getByText(description)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "提交物流延迟问题" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "开始智能受理" })).toHaveCount(0);
   await page.screenshot({ path: "/artifacts/issue98-connection-recovery.png", fullPage: true });
 
   await context.close();

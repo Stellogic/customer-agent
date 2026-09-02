@@ -115,10 +115,10 @@ public class AutoResolutionService {
         changeStatus(ticketId, "RESOLVED", now);
         jdbc.update(
                 "insert into customer_public_event (ticket_id, epoch, sequence, event_type,"
-                        + " payload, occurred_at) select ?, 'customer-public-v1',"
+                        + " payload, occurred_at) select ?, 'public-conversation-v2',"
                         + " coalesce(max(sequence), 0) + 1, 'TICKET_RESOLVED',"
                         + " jsonb_build_object('lifecycleState', 'RESOLVED'), ? from"
-                        + " customer_public_event where ticket_id = ? and epoch = 'customer-public-v1'",
+                        + " customer_public_event where ticket_id = ? and epoch = 'public-conversation-v2'",
                 ticketId,
                 Timestamp.from(now),
                 ticketId);

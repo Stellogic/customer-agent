@@ -115,6 +115,25 @@ public class JdbcClosureService implements ClosureService {
         return result;
     }
 
+    @Override
+    public UUID continueFromConfirmedIntake(
+            String customerId,
+            UUID originalTicketId,
+            String messageId,
+            String orderReference,
+            String issueKind,
+            String message) {
+        return reply(
+                        new CustomerReplyCommand(
+                                customerId,
+                                originalTicketId,
+                                messageId,
+                                orderReference,
+                                issueKind,
+                                message))
+                .ticketId();
+    }
+
     private void reopen(CustomerReplyCommand command, TicketRecord ticket, Instant now) {
         Timestamp at = Timestamp.from(now);
         jdbc.update(

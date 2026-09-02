@@ -10,7 +10,7 @@ test("Issue #154 桌面端由客户确认继续既有工单且不重复建单", 
   await page
     .getByLabel("问题描述")
     .fill("ORDER-DELAY-001 的物流仍然延迟，请继续处理同一个问题");
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await page.getByRole("button", { name: "开始智能受理" }).click();
 
   await expect(page.getByRole("heading", { name: "请确认是否继续既有工单" })).toBeVisible();
   await expect(page.getByRole("region", { name: "疑似重复问题" })).toContainText(
@@ -44,7 +44,7 @@ test("Issue #154 窄屏逐订单确认并保留原始描述续办", async ({ bro
   await page
     .getByLabel("问题描述")
     .fill("ORDER-DELAY-001 物流延迟，ORDER-DELAY-UNDER-24 的物流也延迟");
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await page.getByRole("button", { name: "开始智能受理" }).click();
 
   await expect(page.getByRole("article", { name: "订单候选" })).toContainText("ORDER-DELAY-001");
   await expect(page.getByRole("heading", { name: "请确认是否继续既有工单" })).toBeVisible();

@@ -23,7 +23,7 @@ test("Issue #156 受理协助保持独立责任并由客户最终确认", async 
     );
     await customer.getByLabel("订单编号").fill(orderReference);
     await customer.getByLabel("问题描述").fill("物流一直没有更新，请转人工客服");
-    await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+    await customer.getByRole("button", { name: "开始智能受理" }).click();
     const intake = (await (await intakeResponse).json()) as { intakeId: string };
     await expect(customer.getByText(/已建立受理协助请求/)).toBeVisible();
     expect(ticketCount(orderReference)).toBe("0");

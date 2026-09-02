@@ -28,7 +28,7 @@ describe("人工 Session 跨标签生命周期", () => {
     subscribeToHumanSessionInvalidation(invalidated);
 
     const { humanSessionFetch } = await import("./humanSessionLifecycle");
-    const response = await humanSessionFetch("/api/customer/tickets");
+    const response = await humanSessionFetch("/api/customer/v2/tickets");
 
     expect(response.status).toBe(401);
     expect(invalidated).toHaveBeenCalledExactlyOnceWith("server-rejected");
@@ -56,7 +56,7 @@ describe("人工 Session 跨标签生命周期", () => {
     subscribeToHumanSessionInvalidation(invalidated);
 
     const { humanSessionFetch } = await import("./humanSessionLifecycle");
-    const response = await humanSessionFetch("/api/customer/tickets/old-resource");
+    const response = await humanSessionFetch("/api/customer/v2/tickets/old-resource");
 
     expect(response.status).toBe(status);
     expect(globalThis.fetch).toHaveBeenNthCalledWith(2, "/api/auth/session", {

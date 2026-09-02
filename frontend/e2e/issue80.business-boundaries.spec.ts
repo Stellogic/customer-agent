@@ -17,7 +17,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
       /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(new URL(response.url()).pathname) &&
       response.status() === 201,
   );
-  await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await customer.getByRole("button", { name: "开始智能受理" }).click();
   await continueAsNewIfDuplicate(customer);
   await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };
@@ -29,7 +29,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   ).toBeVisible();
 
   const customerProjection = await customer.evaluate(async (ticketId) => {
-    const response = await fetch(`/api/customer/tickets/${ticketId}`, {
+    const response = await fetch(`/api/customer/v2/tickets/${ticketId}`, {
       credentials: "same-origin",
       cache: "no-store",
       headers: {
@@ -51,7 +51,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
 
   const otherCustomerStatus = await customer.evaluate(async (ticketId) => {
     return (
-      await fetch(`/api/customer/tickets/${ticketId}`, {
+      await fetch(`/api/customer/v2/tickets/${ticketId}`, {
         credentials: "same-origin",
         cache: "no-store",
       })
@@ -78,7 +78,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   await anonymous.goto("/help/login");
   const forgedAnonymousStatus = await anonymous.evaluate(async (ticketId) => {
     return (
-      await fetch(`/api/customer/tickets/${ticketId}`, {
+      await fetch(`/api/customer/v2/tickets/${ticketId}`, {
         headers: { "X-Synthetic-Customer-Id": "customer-demo" },
       })
     ).status;

@@ -19,7 +19,7 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
         new URL(response.url()).pathname,
       ) && response.status() === 201,
   );
-  await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await customer.getByRole("button", { name: "开始智能受理" }).click();
   await continueAsNewIfDuplicate(customer);
   await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };

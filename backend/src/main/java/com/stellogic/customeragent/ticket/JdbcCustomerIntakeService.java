@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.ticket;
 
+import com.stellogic.customeragent.closure.ClosureService;
 import com.stellogic.customeragent.reliability.StableParameterDigest;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -18,6 +19,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
     private final JdbcTemplate jdbc;
     private final IntakeUnderstandingGateway agent;
     private final CustomerTicketService tickets;
+    private final ClosureService closure;
     private final IntakeAssistanceService assistance;
     private final Clock clock;
 
@@ -25,11 +27,13 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
             JdbcTemplate jdbc,
             IntakeUnderstandingGateway agent,
             CustomerTicketService tickets,
+            ClosureService closure,
             IntakeAssistanceService assistance,
             Clock clock) {
         this.jdbc = jdbc;
         this.agent = agent;
         this.tickets = tickets;
+        this.closure = closure;
         this.assistance = assistance;
         this.clock = clock;
     }
@@ -283,6 +287,18 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                 command.intakeId(),
                 selected.issueKind());
         if ("CONTINUE_EXISTING".equals(command.action())) {
+            UUID routedTicketId = selected.ticketId();
+            if ("RESOLVED".equals(selected.lifecycleState())
+                    || "CLOSED".equals(selected.lifecycleState())) {
+                routedTicketId =
+                        closure.continueFromConfirmedIntake(
+                                command.customerId(),
+                                selected.ticketId(),
+                                "intake:" + command.intakeId() + ":" + selected.issueKind(),
+                                current.orderReference(),
+                                selected.issueKind(),
+                                current.originalMessage());
+            }
             jdbc.update(
                     "insert into customer_intake_routed_ticket "
                             + "(intake_id, order_reference, issue_kind, ticket_id, routed_at) "
@@ -290,7 +306,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                     command.intakeId(),
                     current.orderReference(),
                     selected.issueKind(),
-                    selected.ticketId());
+                    routedTicketId);
             jdbc.update(
                     "delete from customer_intake_issue where intake_id = ? and issue_kind = ?",
                     command.intakeId(),
@@ -936,7 +952,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                             + "(intake_id, issue_kind, existing_ticket_id, issue_summary, lifecycle_state) "
                             + "select ?, ?, id, ?, lifecycle_state from support_ticket "
                             + "where customer_id = ? and order_reference = ? and issue_kind = ? "
-                            + "and lifecycle_state <> 'CLOSED' on conflict do nothing",
+                            + "on conflict do nothing",
                     intakeId,
                     issue.kind(),
                     issue.summary(),

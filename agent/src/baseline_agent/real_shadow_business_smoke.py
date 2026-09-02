@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 import psycopg
 
+from baseline_agent.customer_intake_smoke import create_customer_ticket
 from baseline_agent.deepseek_real_evaluation import (
     DEEPSEEK_PRICING_VERSION,
     deepseek_flash_pricing_at,
@@ -193,13 +194,12 @@ def _run_scenario(scenario_id: str, template: str, phase: str, run_id: str) -> d
         _clone_order(connection, template, order_reference)
     with httpx.Client(timeout=20) as client:
         _login(client, spring_url)
-        response = client.post(
-            f"{spring_url}/api/customer/tickets",
-            headers={"Idempotency-Key": str(uuid.uuid4())},
-            json={
-                "orderReference": order_reference,
-                "description": "合成客服工单真实 shadow 验证",
-            },
+        response = create_customer_ticket(
+            client,
+            spring_url,
+            str(uuid.uuid4()),
+            order_reference,
+            "合成客服工单真实 shadow 验证",
         )
         _expect(response, 201)
         ticket_id = response.json()["ticketId"]

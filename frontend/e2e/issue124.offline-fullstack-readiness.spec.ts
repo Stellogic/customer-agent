@@ -2,6 +2,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import sensitivePatterns from "../src/sensitive-content-patterns.json" with { type: "json" };
 import { continueAsNewIfDuplicate, login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
+import { executeFixtureSql } from "./support/database";
 
 const forbiddenBrowserEvidence = sensitivePatterns.modelBoundaryLiterals;
 
@@ -107,7 +108,7 @@ async function createTicket(page: Page, orderReference: string, description: str
     (response) =>
       new URL(response.url()).pathname === "/api/customer/v2/intakes" && response.status() === 201,
   );
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await page.getByRole("button", { name: "开始智能受理" }).click();
   await intakeResponse;
   await continueAsNewIfDuplicate(page);
   const createdResponse = page.waitForResponse(
@@ -116,7 +117,9 @@ async function createTicket(page: Page, orderReference: string, description: str
       response.status() === 201,
   );
   await page.getByRole("button", { name: "确认，就是这个问题" }).click();
-  return (await (await createdResponse).json()) as { ticketId: string };
+  const snapshot = (await (await createdResponse).json()) as { ticketIds: string[] };
+  expect(snapshot.ticketIds).toHaveLength(1);
+  return { ticketId: snapshot.ticketIds[0] };
 }
 
 async function openPreexistingClarificationTicket(
@@ -124,32 +127,47 @@ async function openPreexistingClarificationTicket(
   orderReference: string,
   description: string,
 ) {
-  // 本用例验证 #124 已存在工单的调查澄清，而不是 #152 的建单流程；该特殊
-  // 别名不是 customer_intake 可确认的真实订单，因此显式构造旧领域夹具。
-  const created = await page.evaluate(
-    async ({ reference, issue }) => {
-      const csrf = (await (
-        await fetch("/api/auth/csrf", { credentials: "same-origin", cache: "no-store" })
-      ).json()) as { token: string; headerName: string };
-      const response = await fetch("/api/customer/v2/tickets", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          [csrf.headerName]: csrf.token,
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
-          schema: "public-conversation-v2",
-          orderReference: reference,
-          description: issue,
-        }),
-      });
-      if (!response.ok) throw new Error(`ticket fixture failed: ${response.status}`);
-      return (await response.json()) as { ticketId: string };
-    },
-    { reference: orderReference, issue: description },
-  );
+  // v4 受理不会创建含歧义订单别名的新工单；这里直接落一条历史工单夹具，
+  // 继续验证已经存在的旧工单仍可完成澄清。
+  const created = {
+    ticketId: crypto.randomUUID(),
+    generationId: crypto.randomUUID(),
+    threadId: crypto.randomUUID(),
+    submissionId: crypto.randomUUID(),
+  };
+  executeFixtureSql(`
+    INSERT INTO support_ticket (
+      id, customer_id, order_reference, description, issue_kind, lifecycle_state,
+      handling_mode, created_at, first_responded_at, resolution_running_since
+    ) VALUES (
+      '${created.ticketId}', 'customer-demo', '${orderReference}', '${description}',
+      'LOGISTICS_DELAY', 'INVESTIGATING', 'AGENT', now(), now(), now()
+    );
+    INSERT INTO agent_processing_generation (
+      id, ticket_id, generation_number, thread_id, status, created_at
+    ) VALUES (
+      '${created.generationId}', '${created.ticketId}', 1, '${created.threadId}', 'ACTIVE', now()
+    );
+    INSERT INTO agent_submission (
+      submission_request_id, generation_id, thread_id, parameter_digest,
+      status, next_attempt_at, created_at
+    ) VALUES (
+      '${created.submissionId}', '${created.generationId}', '${created.threadId}',
+      encode(sha256('${created.ticketId}${created.generationId}${created.threadId}${created.submissionId}'::bytea), 'hex'),
+      'PENDING', now(), now()
+    );
+    INSERT INTO public_message (id, ticket_id, message_sequence, author, body, sent_at) VALUES
+      ('${crypto.randomUUID()}', '${created.ticketId}', 1, 'CUSTOMER', '${description}', now()),
+      ('${crypto.randomUUID()}', '${created.ticketId}', 2, 'SUPPORT',
+       '您的问题已受理，我们会在此公开沟通中更新进展。', now());
+    INSERT INTO customer_public_event (
+      ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at
+    ) VALUES
+      ('${created.ticketId}', 'public-conversation-v2', 1, 1, 'TICKET_ACCEPTED',
+       jsonb_build_object('ticketId', '${created.ticketId}', 'lifecycleState', 'INVESTIGATING', 'handlingMode', 'AGENT'), now()),
+      ('${created.ticketId}', 'public-conversation-v2', 2, 1, 'PUBLIC_MESSAGE_APPENDED',
+       jsonb_build_object('author', 'SUPPORT', 'body', '您的问题已受理，我们会在此公开沟通中更新进展。', 'sentAt', now()), now());
+  `);
   await page.goto(`/help?ticket=${created.ticketId}`);
   return created;
 }

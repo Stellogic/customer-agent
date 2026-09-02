@@ -33,30 +33,6 @@ class CustomerTicketV2ApiTest {
                     .build();
 
     @Test
-    void createsTheCurrentLogisticsConversationThroughTheExplicitV2Contract() throws Exception {
-        when(service.create(any())).thenReturn(new TicketCreationResult(TICKET_ID, false));
-
-        mvc.perform(
-                        post("/api/customer/v2/tickets")
-                                .principal(customer("customer-demo"))
-                                .header("Idempotency-Key", "issue-151-create")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                        {
-                                          "schema":"public-conversation-v2",
-                                          "orderReference":"ORDER-DELAY-001",
-                                          "description":"物流已经延迟多日"
-                                        }
-                                        """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.schema").value("public-conversation-v2"))
-                .andExpect(jsonPath("$.ticketId").value(TICKET_ID.toString()))
-                .andExpect(jsonPath("$.accepted").value(true))
-                .andExpect(jsonPath("$.replayed").value(false));
-    }
-
-    @Test
     void acceptsAnAdditionalCustomerMessageWithStableIdentityWhileAgentIsProcessing()
             throws Exception {
         when(service.appendMessage(any()))
@@ -85,42 +61,6 @@ class CustomerTicketV2ApiTest {
                 .appendMessage(
                         new AppendCustomerMessage(
                                 "customer-demo", TICKET_ID, "message-158-1", "补充一下，今天仍然没有更新物流轨迹"));
-    }
-
-    @Test
-    void rejectsUnknownFieldsAndIncompatibleRequestVersions() throws Exception {
-        mvc.perform(
-                        post("/api/customer/v2/tickets")
-                                .principal(customer("customer-demo"))
-                                .header("Idempotency-Key", "issue-151-unknown")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                        {
-                                          "schema":"public-conversation-v2",
-                                          "orderReference":"ORDER-DELAY-001",
-                                          "description":"物流延迟",
-                                          "checkpoint":"must-not-enter-product-contract"
-                                        }
-                                        """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
-
-        mvc.perform(
-                        post("/api/customer/v2/tickets")
-                                .principal(customer("customer-demo"))
-                                .header("Idempotency-Key", "issue-151-version")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                        {
-                                          "schema":"ticket-conversation-v3",
-                                          "orderReference":"ORDER-DELAY-001",
-                                          "description":"物流延迟"
-                                        }
-                                        """))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("INCOMPATIBLE_SCHEMA"));
     }
 
     @Test
@@ -166,7 +106,7 @@ class CustomerTicketV2ApiTest {
         var event =
                 CustomerTicketV2Controller.V2Event.from(
                         new CustomerPublicEvent(
-                                "customer-public-v1",
+                                "public-conversation-v2",
                                 3,
                                 1,
                                 "AUTO_RESOLUTION_CHANGED",
@@ -186,7 +126,7 @@ class CustomerTicketV2ApiTest {
                                 "HUMAN",
                                 Instant.parse("2026-08-28T00:00:00Z"),
                                 Instant.parse("2026-08-28T00:00:00Z"),
-                                "customer-public-v1",
+                                "public-conversation-v2",
                                 3,
                                 1,
                                 List.of(),
@@ -211,25 +151,25 @@ class CustomerTicketV2ApiTest {
     @Test
     void replaysV2SseWithAnIndependentCursorAndEnvelope() throws Exception {
         when(service.snapshot("customer-demo", TICKET_ID)).thenReturn(snapshot());
-        when(service.events("customer-demo", TICKET_ID, "customer-public-v1:0"))
+        when(service.events("customer-demo", TICKET_ID, "public-conversation-v2:0"))
                 .thenReturn(
                         List.of(
                                 new CustomerPublicEvent(
-                                        "customer-public-v1",
+                                        "public-conversation-v2",
                                         1,
                                         1,
                                         "TICKET_ACCEPTED",
                                         "{\"ticketId\":\"" + TICKET_ID + "\"}")));
-        when(service.events("customer-demo", TICKET_ID, "customer-public-v1:1"))
+        when(service.events("customer-demo", TICKET_ID, "public-conversation-v2:1"))
                 .thenReturn(
                         List.of(
                                 new CustomerPublicEvent(
-                                        "customer-public-v1",
+                                        "public-conversation-v2",
                                         2,
                                         1,
                                         "PUBLIC_MESSAGE_APPENDED",
                                         "{\"author\":\"SUPPORT\",\"body\":\"已受理\",\"sentAt\":\"2026-08-28T00:00:00Z\"}")));
-        when(service.events("customer-demo", TICKET_ID, "customer-public-v1:2"))
+        when(service.events("customer-demo", TICKET_ID, "public-conversation-v2:2"))
                 .thenReturn(List.of());
 
         mvc.perform(
@@ -240,30 +180,32 @@ class CustomerTicketV2ApiTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(request().asyncStarted());
 
-        verify(service, timeout(2_000)).events("customer-demo", TICKET_ID, "customer-public-v1:1");
-        verify(service, timeout(2_000)).events("customer-demo", TICKET_ID, "customer-public-v1:2");
+        verify(service, timeout(2_000))
+                .events("customer-demo", TICKET_ID, "public-conversation-v2:1");
+        verify(service, timeout(2_000))
+                .events("customer-demo", TICKET_ID, "public-conversation-v2:2");
     }
 
     @Test
     void rejectsUnknownEventsAndV1OrFutureCursors() throws Exception {
         when(service.snapshot("customer-demo", TICKET_ID)).thenReturn(snapshot());
-        when(service.events("customer-demo", TICKET_ID, "customer-public-v1:2"))
+        when(service.events("customer-demo", TICKET_ID, "public-conversation-v2:2"))
                 .thenReturn(
                         List.of(
                                 new CustomerPublicEvent(
-                                        "customer-public-v1", 3, 1, "RAW_AGENT_EVENT", "{}")));
+                                        "public-conversation-v2", 3, 1, "RAW_AGENT_EVENT", "{}")));
 
         mvc.perform(
                         get("/api/customer/v2/tickets/{ticketId}/events", TICKET_ID)
                                 .principal(customer("customer-demo"))
-                                .header("Last-Event-ID", "public-conversation-v2:2"))
+                                .header("Last-Event-ID", "customer-public-v1:2"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("SNAPSHOT_REQUIRED"));
 
         mvc.perform(
                         get("/api/customer/v2/tickets/{ticketId}/events", TICKET_ID)
                                 .principal(customer("customer-demo"))
-                                .header("Last-Event-ID", "customer-public-v1:2"))
+                                .header("Last-Event-ID", "public-conversation-v2:2"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("SNAPSHOT_REQUIRED"));
     }
@@ -279,7 +221,7 @@ class CustomerTicketV2ApiTest {
                 "AGENT",
                 Instant.parse("2026-08-28T00:00:00Z"),
                 Instant.parse("2026-08-28T00:00:00Z"),
-                "customer-public-v1",
+                "public-conversation-v2",
                 2,
                 1,
                 List.of(

@@ -46,7 +46,7 @@ test("Issue #157 同订单工单独立启动、分组导航与领取隔离", asy
   await customer
     .getByLabel("问题描述")
     .fill(`${orderReference} 的包裹至今没收到，而且确实重复扣款`);
-  await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await customer.getByRole("button", { name: "开始智能受理" }).click();
   await expect(customer.getByRole("heading", { name: "请确认 2 个问题" })).toBeVisible();
   const createdResponse = customer.waitForResponse(
     (response) =>
@@ -99,7 +99,7 @@ test("Issue #157 同订单工单独立启动、分组导航与领取隔离", asy
     const csrf = (await (
       await fetch("/api/auth/csrf", { credentials: "same-origin", cache: "no-store" })
     ).json()) as { token: string; headerName: string };
-    const response = await fetch(`/api/customer/tickets/${ticketId}/human-handoff`, {
+    const response = await fetch(`/api/customer/v2/tickets/${ticketId}/human-handoff`, {
       method: "POST",
       credentials: "same-origin",
       headers: {

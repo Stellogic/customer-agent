@@ -138,7 +138,7 @@ test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
         /\/api\/customer\/v2\/tickets\/[^/]+$/.test(new URL(response.url()).pathname) &&
         response.status() === 200,
     );
-    await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+    await customer.getByRole("button", { name: "开始智能受理" }).click();
     await continueAsNewIfDuplicate(customer);
     await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
     const created = (await (await createdResponse).json()) as {

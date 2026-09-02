@@ -21,7 +21,7 @@ test("Issue #163 持久化领取、人工公开回复与刷新恢复", async ({ 
         new URL(response.url()).pathname,
       ) && response.status() === 201,
   );
-  await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await customer.getByRole("button", { name: "开始智能受理" }).click();
   await continueAsNewIfDuplicate(customer);
   await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
   const created = (await (await createdResponse).json()) as { ticketId: string };

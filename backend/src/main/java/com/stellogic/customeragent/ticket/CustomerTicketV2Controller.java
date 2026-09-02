@@ -23,9 +23,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RequestMapping("/api/customer/v2/tickets")
 public final class CustomerTicketV2Controller {
     static final String SCHEMA = "public-conversation-v2";
-    private static final String V1_SCHEMA = "customer-public-v1";
-    private static final Set<String> CREATE_FIELDS =
-            Set.of("schema", "orderReference", "description");
     private static final Set<String> MESSAGE_FIELDS = Set.of("schema", "message");
     private static final Set<String> EVENT_TYPES =
             Set.of(
@@ -55,29 +52,6 @@ public final class CustomerTicketV2Controller {
 
     public CustomerTicketV2Controller(CustomerTicketService service) {
         this.service = service;
-    }
-
-    @PostMapping
-    ResponseEntity<CreateResponse> create(
-            Authentication authentication,
-            @RequestHeader(value = "Idempotency-Key", required = false) String requestId,
-            @RequestBody Map<String, Object> request) {
-        requireExactFields(request);
-        String schema = text(request, "schema");
-        if (!SCHEMA.equals(schema)) throw new IncompatibleCustomerSchemaException();
-        requireText(requestId, "缺少稳定请求身份");
-        String orderReference = text(request, "orderReference");
-        String description = text(request, "description");
-        var result =
-                service.create(
-                        new CreateCustomerTicket(
-                                authentication.getName().trim(),
-                                requestId.trim(),
-                                orderReference,
-                                description,
-                                "LOGISTICS_DELAY"));
-        return ResponseEntity.status(result.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
-                .body(new CreateResponse(SCHEMA, result.ticketId(), true, result.replayed()));
     }
 
     @PostMapping("/{ticketId}/messages")
@@ -130,7 +104,7 @@ public final class CustomerTicketV2Controller {
                             public List<V2Event> events(String afterCursor) {
                                 long sequence = parseV2Sequence(afterCursor);
                                 return service
-                                        .events(owner, ticketId, V1_SCHEMA + ":" + sequence)
+                                        .events(owner, ticketId, SCHEMA + ":" + sequence)
                                         .stream()
                                         .map(V2Event::from)
                                         .toList();
@@ -154,12 +128,6 @@ public final class CustomerTicketV2Controller {
                                         .data(event.publicData());
                             }
                         }));
-    }
-
-    private static void requireExactFields(Map<String, Object> request) {
-        if (!request.keySet().equals(CREATE_FIELDS)) {
-            throw new InvalidCustomerRequestException("请求字段与 v2 契约不一致");
-        }
     }
 
     private static String text(Map<String, Object> request, String field) {
@@ -196,8 +164,6 @@ public final class CustomerTicketV2Controller {
         }
     }
 
-    record CreateResponse(String schema, UUID ticketId, boolean accepted, boolean replayed) {}
-
     record MessageResponse(String schema, UUID ticketId, boolean accepted, boolean replayed) {}
 
     record SnapshotResponse(
@@ -232,7 +198,7 @@ public final class CustomerTicketV2Controller {
 
     record V2Event(long sequence, long generation, String type, String jsonPayload) {
         static V2Event from(CustomerPublicEvent event) {
-            if (!V1_SCHEMA.equals(event.epoch()) || !EVENT_TYPES.contains(event.type())) {
+            if (!SCHEMA.equals(event.epoch()) || !EVENT_TYPES.contains(event.type())) {
                 throw new ProjectionCursorException();
             }
             return new V2Event(

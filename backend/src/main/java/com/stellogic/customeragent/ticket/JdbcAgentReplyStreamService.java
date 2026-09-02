@@ -16,7 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 class JdbcAgentReplyStreamService implements AgentReplyStreamService {
-    private static final String EPOCH = "customer-public-v1";
+    private static final String EPOCH = "public-conversation-v2";
     private final JdbcTemplate jdbc;
     private final TicketAuthorityLock authorityLock;
     private final Clock clock;

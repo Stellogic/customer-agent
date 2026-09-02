@@ -147,33 +147,31 @@ describe("客户帮助中心", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({
-            schema: "customer-intake-v1",
-            intakeId: "intake-152",
-            status: "READY_TO_CONFIRM",
-            candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
-            issue: { kind: "LOGISTICS_DELAY", summary: "物流已经延迟多日" },
-            assistantMessage: "请确认我的理解。",
-            ticketId: null,
-            confirmed: false,
-            replayed: false,
-          }),
+          JSON.stringify(
+            intakeV4({
+              intakeId: "intake-152",
+              candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
+              issues: [{ kind: "LOGISTICS_DELAY", summary: "物流已经延迟多日" }],
+              assistantMessage: "请确认我的理解。",
+            }),
+          ),
           { status: 201 },
         ),
       )
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({
-            schema: "customer-intake-v1",
-            intakeId: "intake-152",
-            status: "CONFIRMED",
-            candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
-            issue: { kind: "LOGISTICS_DELAY", summary: "物流已经延迟多日" },
-            assistantMessage: "已确认，客服工单正在独立处理。",
-            ticketId: "ticket-13",
-            confirmed: true,
-            replayed: false,
-          }),
+          JSON.stringify(
+            intakeV4({
+              intakeId: "intake-152",
+              status: "CONFIRMED",
+              candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
+              issues: [{ kind: "LOGISTICS_DELAY", summary: "物流已经延迟多日" }],
+              assistantMessage: "已确认，客服工单正在独立处理。",
+              ticketIds: ["ticket-13"],
+              confirmed: true,
+              version: 2,
+            }),
+          ),
           { status: 201 },
         ),
       )
@@ -219,7 +217,7 @@ describe("客户帮助中心", () => {
     render(<App />);
     fireEvent.change(screen.getByLabelText("订单编号"), { target: { value: "ORDER-DELAY-001" } });
     fireEvent.change(screen.getByLabelText("问题描述"), { target: { value: "物流已经延迟多日" } });
-    fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始智能受理" }));
 
     expect(await screen.findByRole("heading", { name: "请确认我的理解" })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -246,17 +244,14 @@ describe("客户帮助中心", () => {
   it("不选择订单或问题类型即可看到候选、问题理解与确认边界", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(
-        JSON.stringify({
-          schema: "customer-intake-v1",
-          intakeId: "intake-natural-language",
-          status: "READY_TO_CONFIRM",
-          candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
-          issue: { kind: "LOGISTICS_DELAY", summary: "包裹好几天没有动了" },
-          assistantMessage: "我理解为这笔订单的物流延迟问题，请确认是否正确。",
-          ticketId: null,
-          confirmed: false,
-          replayed: false,
-        }),
+        JSON.stringify(
+          intakeV4({
+            intakeId: "intake-natural-language",
+            candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
+            issues: [{ kind: "LOGISTICS_DELAY", summary: "包裹好几天没有动了" }],
+            assistantMessage: "我理解为这笔订单的物流延迟问题，请确认是否正确。",
+          }),
+        ),
         { status: 201 },
       ),
     );
@@ -265,7 +260,7 @@ describe("客户帮助中心", () => {
     fireEvent.change(screen.getByLabelText("问题描述"), {
       target: { value: "包裹好几天没有动了" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始智能受理" }));
 
     expect(await screen.findByRole("heading", { name: "请确认我的理解" })).toBeInTheDocument();
     expect(screen.getByRole("article", { name: "订单候选" })).toHaveTextContent("ORDER-DELAY-001");
@@ -284,50 +279,43 @@ describe("客户帮助中心", () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({
-            schema: "customer-intake-v2",
-            intakeId: "intake-multi-153",
-            status: "READY_TO_CONFIRM",
-            candidateOrder: { reference: "ORDER-MULTI-001", summary: "配送中的合成订单" },
-            issue: null,
-            issues: [
-              { kind: "PACKAGE_NOT_RECEIVED", summary: "包裹未收到" },
-              { kind: "DUPLICATE_CHARGE", summary: "疑似重复扣款" },
-            ],
-            assistantMessage: "请确认；确认后将创建 2 张工单。",
-            ticketId: null,
-            ticketIds: [],
-            sharedIntakeRecordId: null,
-            expectedTicketCount: 2,
-            confirmed: false,
-            replayed: false,
-          }),
+          JSON.stringify(
+            intakeV4({
+              intakeId: "intake-multi-153",
+              candidateOrder: { reference: "ORDER-MULTI-001", summary: "配送中的合成订单" },
+              issues: [
+                { kind: "PACKAGE_NOT_RECEIVED", summary: "包裹未收到" },
+                { kind: "DUPLICATE_CHARGE", summary: "疑似重复扣款" },
+              ],
+              assistantMessage: "请确认；确认后将创建 2 张工单。",
+              expectedTicketCount: 2,
+            }),
+          ),
           { status: 201 },
         ),
       )
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({
-            schema: "customer-intake-v2",
-            intakeId: "intake-multi-153",
-            status: "CONFIRMED",
-            candidateOrder: { reference: "ORDER-MULTI-001", summary: "配送中的合成订单" },
-            issue: null,
-            issues: [
-              { kind: "PACKAGE_NOT_RECEIVED", summary: "包裹未收到" },
-              { kind: "DUPLICATE_CHARGE", summary: "疑似重复扣款" },
-            ],
-            assistantMessage: "已确认，2 张客服工单已原子创建并开始独立处理。",
-            ticketId: null,
-            ticketIds: [
-              "15300000-0000-0000-0000-000000000001",
-              "15300000-0000-0000-0000-000000000002",
-            ],
-            sharedIntakeRecordId: "shared-153",
-            expectedTicketCount: 2,
-            confirmed: true,
-            replayed: false,
-          }),
+          JSON.stringify(
+            intakeV4({
+              intakeId: "intake-multi-153",
+              status: "CONFIRMED",
+              candidateOrder: { reference: "ORDER-MULTI-001", summary: "配送中的合成订单" },
+              issues: [
+                { kind: "PACKAGE_NOT_RECEIVED", summary: "包裹未收到" },
+                { kind: "DUPLICATE_CHARGE", summary: "疑似重复扣款" },
+              ],
+              assistantMessage: "已确认，2 张客服工单已原子创建并开始独立处理。",
+              ticketIds: [
+                "15300000-0000-0000-0000-000000000001",
+                "15300000-0000-0000-0000-000000000002",
+              ],
+              sharedIntakeRecordId: "shared-153",
+              expectedTicketCount: 2,
+              confirmed: true,
+              version: 2,
+            }),
+          ),
           { status: 201 },
         ),
       )
@@ -368,7 +356,7 @@ describe("客户帮助中心", () => {
     fireEvent.change(screen.getByLabelText("问题描述"), {
       target: { value: "包裹未收到而且重复扣款" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始智能受理" }));
 
     expect(await screen.findByRole("heading", { name: "请确认 2 个问题" })).toBeInTheDocument();
     expect(screen.getAllByRole("article", { name: /拟建工单/ })).toHaveLength(2);
@@ -394,10 +382,8 @@ describe("客户帮助中心", () => {
             intakeId: "15400000-0000-0000-0000-000000000002",
             status: "READY_TO_CONFIRM",
             candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
-            issue: { kind: "LOGISTICS_DELAY", summary: "物流延迟" },
             issues: [{ kind: "LOGISTICS_DELAY", summary: "物流延迟" }],
             assistantMessage: "发现同一订单下可能相同的未关闭问题，请确认如何继续。",
-            ticketId: null,
             ticketIds: [],
             sharedIntakeRecordId: null,
             duplicateMatches: [
@@ -426,10 +412,8 @@ describe("客户帮助中心", () => {
             intakeId: "15400000-0000-0000-0000-000000000002",
             status: "CONFIRMED",
             candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
-            issue: null,
             issues: [],
             assistantMessage: "已按你的确认继续既有工单，没有创建重复工单。",
-            ticketId: null,
             ticketIds: [],
             sharedIntakeRecordId: null,
             duplicateMatches: [],
@@ -449,7 +433,7 @@ describe("客户帮助中心", () => {
     fireEvent.change(screen.getByLabelText("问题描述"), {
       target: { value: "ORDER-DELAY-001 的物流还是没动" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始智能受理" }));
 
     const continueButton = await screen.findByRole("button", { name: /继续旧工单/ });
     expect(screen.getByText(/不会读取或合并既有对话/)).toBeInTheDocument();
@@ -488,7 +472,7 @@ describe("客户帮助中心", () => {
     fireEvent.change(screen.getByLabelText("问题描述"), {
       target: { value: "ORDER-DELAY-001 延迟，ORDER-DELAY-002 也延迟" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始智能受理" }));
     fireEvent.click(await screen.findByRole("button", { name: "确认，就是这个问题" }));
 
     expect(await screen.findByRole("heading", { name: "继续下一订单" })).toBeInTheDocument();
@@ -1302,12 +1286,10 @@ describe("客户帮助中心", () => {
     expect(screen.queryByRole("region", { name: "自动解决状态" })).not.toBeInTheDocument();
   });
 
-  it("已解决工单可从客户界面重开或进入关联新工单", async () => {
+  it("已解决工单引导客户通过自然语言受理确认后续问题", async () => {
     const originalId = "28000000-0000-0000-0000-000000000003";
-    const linkedId = "28000000-0000-0000-0000-000000000004";
     globalThis.history.replaceState(null, "", `/?ticket=${originalId}`);
-    let submittedBody = "";
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (url.endsWith(`/api/customer/v2/tickets/${originalId}`)) {
         return new Response(
@@ -1327,31 +1309,6 @@ describe("客户帮助中心", () => {
           { status: 200 },
         );
       }
-      if (url.endsWith(`/api/customer/tickets/${originalId}/replies`) && init?.method === "POST") {
-        submittedBody = String(init.body);
-        return new Response(
-          JSON.stringify({ ticketId: linkedId, outcome: "LINKED_TICKET_CREATED" }),
-          { status: 201 },
-        );
-      }
-      if (url.endsWith(`/api/customer/v2/tickets/${linkedId}`)) {
-        return new Response(
-          JSON.stringify({
-            view: "PUBLIC_CONVERSATION",
-            schema: "public-conversation-v2",
-            cursor: "public-conversation-v2:2",
-            ticket: {
-              id: linkedId,
-              lifecycleState: "INVESTIGATING",
-              handlingMode: "HUMAN",
-              agentGeneration: 0,
-            },
-            messages: [],
-            clarification: null,
-          }),
-          { status: 200 },
-        );
-      }
       if (url.endsWith("/events")) {
         return openEventResponse();
       }
@@ -1359,23 +1316,11 @@ describe("客户帮助中心", () => {
     });
 
     render(<App />);
-    expect(await screen.findByRole("button", { name: "发送回复" })).toBeInTheDocument();
+    expect(
+      await screen.findByText(/同一问题可继续既有工单，独立新问题会创建新工单/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "发送回复" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "转人工处理" })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("回复订单编号"), {
-      target: { value: "ORDER-INTAKE-ONLY" },
-    });
-    fireEvent.change(screen.getByLabelText("回复问题类型"), { target: { value: "OTHER" } });
-    fireEvent.change(screen.getByLabelText("工单回复"), {
-      target: { value: "同一订单的另一个问题" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "发送回复" }));
-
-    expect(await screen.findByText("28000000…0004")).toBeInTheDocument();
-    expect(JSON.parse(submittedBody)).toEqual({
-      orderReference: "ORDER-INTAKE-ONLY",
-      issueKind: "OTHER",
-      message: "同一订单的另一个问题",
-    });
   });
 
   it("序号缺口时关闭旧流并整体替换为新的权威快照", async () => {
@@ -2067,7 +2012,7 @@ describe("客户帮助中心", () => {
 
     expect(await screen.findByText("正在重新同步工单")).toBeInTheDocument();
     expect(screen.queryByText("即将过期的公开投影")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "提交物流延迟问题" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "开始智能受理" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "立即重试同步" }));
     expect(await screen.findByText("恢复后的权威公开投影")).toBeInTheDocument();
   });
@@ -2120,10 +2065,8 @@ function intakeV4(overrides: Record<string, unknown> = {}) {
     intakeId: "15400000-0000-0000-0000-000000000010",
     status: "READY_TO_CONFIRM",
     candidateOrder: { reference: "ORDER-DELAY-001", summary: "配送中的合成订单" },
-    issue: { kind: "LOGISTICS_DELAY", summary: "物流延迟" },
     issues: [{ kind: "LOGISTICS_DELAY", summary: "物流延迟" }],
     assistantMessage: "请确认当前订单的问题。",
-    ticketId: null,
     ticketIds: [],
     sharedIntakeRecordId: null,
     duplicateMatches: [],

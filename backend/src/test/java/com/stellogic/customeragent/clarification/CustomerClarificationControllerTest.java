@@ -34,7 +34,7 @@ class CustomerClarificationControllerTest {
 
         mvc.perform(
                         post(
-                                        "/api/customer/tickets/{ticketId}/clarifications/{requestId}/replies",
+                                        "/api/customer/v2/tickets/{ticketId}/clarifications/{requestId}/replies",
                                         TICKET_ID,
                                         REQUEST_ID)
                                 .principal(customer())
@@ -58,7 +58,7 @@ class CustomerClarificationControllerTest {
 
         mvc.perform(
                         get(
-                                        "/api/customer/tickets/{ticketId}/clarification-resumes/{resumeId}",
+                                        "/api/customer/v2/tickets/{ticketId}/clarification-resumes/{resumeId}",
                                         TICKET_ID,
                                         RESUME_ID)
                                 .principal(customer()))
