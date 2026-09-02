@@ -158,6 +158,7 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
     assert request["model"] == "deepseek-v4-flash"
     assert request["stream"] is True
     assert request["reasoning"] == {"effort": "none"}
+    assert "frame them as 您反馈" in request["instructions"]
     assert set(request["text"]["format"]) == {"type", "name", "schema"}
     assert request["text"]["format"]["type"] == "json_schema"
     body_schema = request["text"]["format"]["schema"]["properties"]["body"]
