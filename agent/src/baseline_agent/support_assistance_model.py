@@ -1,4 +1,4 @@
-"""#170 专用同次充分性判断与草稿生成；无检索实现、业务工具或自动重试。"""
+"""#170 专用同次充分性判断与草稿生成; 无检索实现、业务工具或自动重试。"""
 
 import json
 from collections.abc import Mapping
@@ -31,11 +31,19 @@ SCHEMA = {
         "decision": {"type": "string", "enum": ["SUPPORTED", "INSUFFICIENT_INFORMATION"]},
         "text": {"type": "string", "minLength": 1, "maxLength": 2000},
         "followUp": {"type": ["string", "null"], "maxLength": 500},
-        "citations": {"type": "array", "maxItems": 5, "items": {
-            "type": "object", "properties": {
-                "chunkId": {"type": "string"}, "quote": {"type": "string", "minLength": 1},
-            }, "required": ["chunkId", "quote"], "additionalProperties": False,
-        }},
+        "citations": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "chunkId": {"type": "string"},
+                    "quote": {"type": "string", "minLength": 1},
+                },
+                "required": ["chunkId", "quote"],
+                "additionalProperties": False,
+            },
+        },
     },
     "required": ["decision", "text", "followUp", "citations"],
     "additionalProperties": False,
@@ -43,8 +51,10 @@ SCHEMA = {
 
 
 def validate_answer(value: object, knowledge: object) -> dict[str, Any]:
-    """只校验结构和本次引用归属；语义是否充分仍须独立评估及人工审阅。"""
-    sources = {source.chunk_id: source for source in parse_knowledge_response(200, knowledge).sources}
+    """只校验结构和本次引用归属; 语义是否充分仍须独立评估及人工审阅。"""
+    sources = {
+        source.chunk_id: source for source in parse_knowledge_response(200, knowledge).sources
+    }
     if not isinstance(value, dict) or set(value) != set(SCHEMA["required"]):
         raise ValueError("invalid answer structure")
     if value["decision"] not in {"SUPPORTED", "INSUFFICIENT_INFORMATION"}:
@@ -63,7 +73,11 @@ def validate_answer(value: object, knowledge: object) -> dict[str, Any]:
         chunk_id, quote = citation["chunkId"], citation["quote"]
         if not isinstance(chunk_id, str) or chunk_id not in sources:
             raise ValueError("citation is not in this request")
-        if not isinstance(quote, str) or not quote.strip() or quote not in sources[chunk_id].snippet:
+        if (
+            not isinstance(quote, str)
+            or not quote.strip()
+            or quote not in sources[chunk_id].snippet
+        ):
             raise ValueError("citation quote is not canonical")
         total_quote_length += len(quote)
     if total_quote_length > 4000:
@@ -72,32 +86,56 @@ def validate_answer(value: object, knowledge: object) -> dict[str, Any]:
 
 
 async def generate_support_answer(
-    request: dict[str, Any], environment: Mapping[str, str],
-    *, transport: httpx.AsyncBaseTransport | None = None,
+    request: dict[str, Any],
+    environment: Mapping[str, str],
+    *,
+    transport: httpx.AsyncBaseTransport | None = None,
 ) -> dict[str, Any]:
     mode = environment.get("INVESTIGATION_MODEL_MODE", "fixed-fake")
     api_key = environment.get("DEEPSEEK_API_KEY", "")
     if mode not in {"deepseek-formal", "real-shadow"} or not api_key.strip():
         return {"status": "failed", "code": "MODEL_UNAVAILABLE", "audit": {"attempts": 0}}
-    # 复用169唯一解析；结构不合法的检索输入不能消耗生成调用。
+    # 复用169唯一解析; 结构不合法的检索输入不能消耗生成调用。
     knowledge = parse_knowledge_response(200, request["knowledge"])
     model = environment.get("DEEPSEEK_MODEL", DEEPSEEK_FLASH_MODEL)
     if model != DEEPSEEK_FLASH_MODEL:
         raise ValueError("support assistance protocol requires the frozen flash model")
-    audit: dict[str, Any] = {"attempts": 1, "model": model, "protocol": VERSION,
-                             "maxOutputTokens": MAX_OUTPUT_TOKENS}
+    audit: dict[str, Any] = {
+        "attempts": 1,
+        "model": model,
+        "protocol": VERSION,
+        "maxOutputTokens": MAX_OUTPUT_TOKENS,
+    }
     body = {
-        "model": model, "instructions": PROMPT,
-        "input": json.dumps({"kind": request["kind"], "query": request["query"],
-                             "context": request["context"],
-                             "sources": [asdict(source) for source in knowledge.sources]}, ensure_ascii=False),
-        "max_output_tokens": MAX_OUTPUT_TOKENS, "reasoning": {"effort": "none"}, "stream": False,
-        "text": {"format": {"type": "json_schema", "name": "support_assistance_answer",
-                            "strict": True, "schema": SCHEMA}},
+        "model": model,
+        "instructions": PROMPT,
+        "input": json.dumps(
+            {
+                "kind": request["kind"],
+                "query": request["query"],
+                "context": request["context"],
+                "sources": [asdict(source) for source in knowledge.sources],
+            },
+            ensure_ascii=False,
+        ),
+        "max_output_tokens": MAX_OUTPUT_TOKENS,
+        "reasoning": {"effort": "none"},
+        "stream": False,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "support_assistance_answer",
+                "strict": True,
+                "schema": SCHEMA,
+            }
+        },
     }
     try:
-        async with httpx.AsyncClient(transport=transport, timeout=httpx.Timeout(20, connect=3),
-                                     headers={"Authorization": f"Bearer {api_key}"}) as client:
+        async with httpx.AsyncClient(
+            transport=transport,
+            timeout=httpx.Timeout(20, connect=3),
+            headers={"Authorization": f"Bearer {api_key}"},
+        ) as client:
             response = await client.post("https://api.deepseek.com/responses", json=body)
             audit["httpStatus"] = response.status_code
             response.raise_for_status()
@@ -107,12 +145,21 @@ async def generate_support_answer(
         usage = payload.get("usage", {})
         for key in ("input_tokens", "output_tokens", "total_tokens"):
             audit[key] = usage.get(key)
-        if isinstance(usage.get("input_tokens"), int) and isinstance(usage.get("output_tokens"), int):
-            audit["estimatedUsdMicros"] = estimate_flash_cost_micros(usage["input_tokens"], usage["output_tokens"])
+        if isinstance(usage.get("input_tokens"), int) and isinstance(
+            usage.get("output_tokens"), int
+        ):
+            audit["estimatedUsdMicros"] = estimate_flash_cost_micros(
+                usage["input_tokens"], usage["output_tokens"]
+            )
         if payload.get("status") != "completed":
             return {"status": "failed", "code": "MODEL_UNAVAILABLE", "audit": audit}
-        texts = [part["text"] for item in payload.get("output", []) if item.get("type") == "message"
-                 for part in item.get("content", []) if part.get("type") == "output_text"]
+        texts = [
+            part["text"]
+            for item in payload.get("output", [])
+            if item.get("type") == "message"
+            for part in item.get("content", [])
+            if part.get("type") == "output_text"
+        ]
         if len(texts) != 1:
             return {"status": "failed", "code": "MODEL_UNAVAILABLE", "audit": audit}
         answer = validate_answer(json.loads(texts[0]), request["knowledge"])

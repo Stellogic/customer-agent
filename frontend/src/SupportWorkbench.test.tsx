@@ -185,33 +185,52 @@ describe("客服共享队列工作台", () => {
     let detailReads = 0;
     let endAuthority: (() => void) | undefined;
     let resolveDetail: ((response: Response) => void) | undefined;
-    const pendingDetail = new Promise<Response>((resolve) => { resolveDetail = resolve; });
-    const authority = new Response(new ReadableStream<Uint8Array>({
-      start(controller) { endAuthority = () => controller.close(); },
-    }), { headers: { "Content-Type": "text/event-stream" } });
+    const pendingDetail = new Promise<Response>((resolve) => {
+      resolveDetail = resolve;
+    });
+    const authority = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          endAuthority = () => controller.close();
+        },
+      }),
+      { headers: { "Content-Type": "text/event-stream" } },
+    );
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
-      if (path === SNAPSHOT_URL) return snapshotResponse("support-workbench-v2:4", [], [], [HANDOFF_TICKET]);
+      if (path === SNAPSHOT_URL)
+        return snapshotResponse("support-workbench-v2:4", [], [], [HANDOFF_TICKET]);
       if (path === "/api/support/workbench/events") return openStream();
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}`) {
         detailReads += 1;
         return detailReads === 1 ? Response.json(humanDetails()) : pendingDetail;
       }
       if (path === `/api/support/workbench/tickets/${HANDOFF_TICKET}/events`) return authority;
-      if (path.endsWith("/assistance/context")) return Response.json({ schema: "support-assistance-v1",
-        ticketId: HANDOFF_TICKET, assignmentId: "27000000-0000-0000-0000-000000000001" });
+      if (path.endsWith("/assistance/context"))
+        return Response.json({
+          schema: "support-assistance-v1",
+          ticketId: HANDOFF_TICKET,
+          assignmentId: "27000000-0000-0000-0000-000000000001",
+        });
       if (path.endsWith("/compensation-options")) return couponOptions();
       throw new Error(`unexpected request: ${path}`);
     });
     render(<SupportWorkbench />);
-    fireEvent.change(await screen.findByRole("textbox", { name: "内部编辑区（尚未发送）" }),
-      { target: { value: "需要在重同步时清除的草稿" } });
+    fireEvent.change(await screen.findByRole("textbox", { name: "内部编辑区（尚未发送）" }), {
+      target: { value: "需要在重同步时清除的草稿" },
+    });
     endAuthority?.();
-    await waitFor(() => expect(screen.queryByRole("textbox", { name: "内部编辑区（尚未发送）" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("textbox", { name: "内部编辑区（尚未发送）" }),
+      ).not.toBeInTheDocument(),
+    );
     expect(detailReads).toBe(2);
     expect(screen.queryByText("需要在重同步时清除的草稿")).not.toBeInTheDocument();
     resolveDetail?.(new Response(null, { status: 404 }));
-    await waitFor(() => expect(screen.queryByRole("heading", { name: "授权工单详情" })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "授权工单详情" })).not.toBeInTheDocument(),
+    );
   });
 
   it("assignment 失效后移除旧详情并重读权威详情", async () => {

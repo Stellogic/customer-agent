@@ -1,4 +1,4 @@
-"""独立HUMAN辅助图；仅服务身份可调用，不复活Agent generation。"""
+"""独立HUMAN辅助图; 仅服务身份可调用, 不复活Agent generation。"""
 
 import os
 from typing import Any, TypedDict
@@ -18,10 +18,22 @@ class SupportAssistanceState(TypedDict, total=False):
 
 
 async def assist(state: SupportAssistanceState) -> SupportAssistanceState:
-    if state.get("requested_by") != "spring" or state.get("kind") not in {"summary", "knowledge", "policy", "draft"}:
+    if state.get("requested_by") != "spring" or state.get("kind") not in {
+        "summary",
+        "knowledge",
+        "policy",
+        "draft",
+    }:
         raise ValueError("invalid Spring assistance request")
-    result = await generate_support_answer({"kind": state["kind"], "query": state["query"],
-        "context": state["context"], "knowledge": state["knowledge"]}, os.environ)
+    result = await generate_support_answer(
+        {
+            "kind": state["kind"],
+            "query": state["query"],
+            "context": state["context"],
+            "knowledge": state["knowledge"],
+        },
+        os.environ,
+    )
     return {"support_assistance": result}
 
 

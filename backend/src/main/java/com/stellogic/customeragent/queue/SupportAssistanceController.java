@@ -27,56 +27,74 @@ final class SupportAssistanceController {
     private final SupportAssistanceContext context;
     private final SupportAssistanceService service;
 
-    SupportAssistanceController(SupportAssistanceContext context, SupportAssistanceService service) {
+    SupportAssistanceController(
+            SupportAssistanceContext context, SupportAssistanceService service) {
         this.context = context;
         this.service = service;
     }
 
     @GetMapping("/context")
-    ResponseEntity<?> context(Authentication principal, @PathVariable UUID ticketId, HttpServletRequest http) {
+    ResponseEntity<?> context(
+            Authentication principal, @PathVariable UUID ticketId, HttpServletRequest http) {
         var session = SessionBinding.capture(http, principal.getName());
         var authorized = context.load(principal.getName(), ticketId);
         session.verify();
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of(
-                "schema", "support-assistance-v1", "ticketId", ticketId,
-                "assignmentId", authorized.assignmentId()));
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(
+                        Map.of(
+                                "schema",
+                                "support-assistance-v1",
+                                "ticketId",
+                                ticketId,
+                                "assignmentId",
+                                authorized.assignmentId()));
     }
 
     @PostMapping("/requests")
-    ResponseEntity<JsonNode> request(Authentication principal, @PathVariable UUID ticketId,
-            @RequestBody Map<String, Object> body, HttpServletRequest http) {
+    ResponseEntity<JsonNode> request(
+            Authentication principal,
+            @PathVariable UUID ticketId,
+            @RequestBody Map<String, Object> body,
+            HttpServletRequest http) {
         var session = SessionBinding.capture(http, principal.getName());
         JsonNode response = service.request(principal.getName(), ticketId, parse(body));
         session.verify();
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(response);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(response);
     }
 
     @GetMapping("/requests/{requestId}")
-    ResponseEntity<JsonNode> result(Authentication principal, @PathVariable UUID ticketId,
-            @PathVariable UUID requestId, HttpServletRequest http) {
+    ResponseEntity<JsonNode> result(
+            Authentication principal,
+            @PathVariable UUID ticketId,
+            @PathVariable UUID requestId,
+            HttpServletRequest http) {
         var session = SessionBinding.capture(http, principal.getName());
         JsonNode response = service.result(principal.getName(), ticketId, requestId);
         session.verify();
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(response);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(response);
     }
 
     @ExceptionHandler(SupportAssistanceConflictException.class)
     ResponseEntity<?> conflict() {
-        return ResponseEntity.status(HttpStatus.CONFLICT).cacheControl(CacheControl.noStore())
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .cacheControl(CacheControl.noStore())
                 .body(Map.of("code", "REQUEST_CONFLICT", "message", "请求标识已绑定其他辅助输入"));
     }
 
     private static SupportAssistanceRequest parse(Map<String, Object> body) {
         try {
-            if (!body.keySet().equals(Set.of("schema", "assignmentId", "requestId", "kind", "query"))
+            if (!body.keySet()
+                            .equals(Set.of("schema", "assignmentId", "requestId", "kind", "query"))
                     || !"support-assistance-v1".equals(body.get("schema"))
                     || !(body.get("query") instanceof String query)
-                    || query.isBlank() || query.length() > 200) throw new IllegalArgumentException();
-            return new SupportAssistanceRequest(UUID.fromString((String) body.get("assignmentId")),
+                    || query.isBlank()
+                    || query.length() > 200) throw new IllegalArgumentException();
+            return new SupportAssistanceRequest(
+                    UUID.fromString((String) body.get("assignmentId")),
                     UUID.fromString((String) body.get("requestId")),
-                    SupportAssistanceKind.valueOf((String) body.get("kind")), query.trim());
+                    SupportAssistanceKind.valueOf((String) body.get("kind")),
+                    query.trim());
         } catch (IllegalArgumentException | ClassCastException | NullPointerException invalid) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "辅助请求格式无效");
         }
@@ -93,8 +111,11 @@ final class SupportAssistanceController {
 
         void verify() {
             try {
-                Object stored = session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
-                if (!id.equals(session.getId()) || !(stored instanceof SecurityContext security)
+                Object stored =
+                        session.getAttribute(
+                                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+                if (!id.equals(session.getId())
+                        || !(stored instanceof SecurityContext security)
                         || security.getAuthentication() == null
                         || !subject.equals(security.getAuthentication().getName())) throw expired();
             } catch (IllegalStateException invalidated) {

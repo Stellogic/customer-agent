@@ -1,4 +1,4 @@
-"""仅验证 #170 计数语义的合成 fixture；不是 DeepSeek 质量运行。"""
+"""仅验证 #170 计数语义的合成 fixture; 不是 DeepSeek 质量运行。"""
 
 from dataclasses import replace
 
@@ -12,7 +12,13 @@ from baseline_agent.support_assistance_evaluation import (
 
 def refusal(sample_id: str) -> SupportAnswerObservation:
     return SupportAnswerObservation(
-        sample_id, "completed", "INSUFFICIENT_INFORMATION", True, True, True, True,
+        sample_id,
+        "completed",
+        "INSUFFICIENT_INFORMATION",
+        True,
+        True,
+        True,
+        True,
     )
 
 
@@ -30,7 +36,8 @@ def test_wrong_refusal_stays_in_precision_denominator():
 @pytest.mark.parametrize("semantic_valid", [False, None])
 def test_unanswerable_label_does_not_make_invalid_or_unreviewed_refusal_correct(semantic_valid):
     report = summarize_support_answers(
-        {"q": True}, [replace(refusal("q"), semantic_valid=semantic_valid)],
+        {"q": True},
+        [replace(refusal("q"), semantic_valid=semantic_valid)],
     )
     assert report["normalRefusals"] == 1
     assert report["correctRefusals"] == 0
@@ -65,10 +72,15 @@ def test_metrics_alone_do_not_hide_failure_on_an_answerable_sample():
     assert "PASS" not in report.values()
 
 
-@pytest.mark.parametrize("change", [
-    {"decision": "SUPPORTED"}, {"insufficiency_explained": False},
-    {"structure_valid": False}, {"citation_valid": False},
-])
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"decision": "SUPPORTED"},
+        {"insufficiency_explained": False},
+        {"structure_valid": False},
+        {"citation_valid": False},
+    ],
+)
 def test_only_explicit_and_valid_insufficiency_counts(change):
     report = summarize_support_answers({"q": True}, [replace(refusal("q"), **change)])
     assert report["normalRefusals"] == 0
@@ -77,7 +89,7 @@ def test_only_explicit_and_valid_insufficiency_counts(change):
 
 
 def test_empty_retrieval_itself_cannot_be_counted_as_a_refusal():
-    # 检索空结果尚未有回答观察记录；不得生成一条假 INSUFFICIENT_INFORMATION。
+    # 检索空结果尚未有回答观察记录; 不得生成一条假 INSUFFICIENT_INFORMATION。
     report = summarize_support_answers({"q": True}, [])
     assert report["normalRefusals"] == 0
     assert report["missingSampleIds"] == ["q"]

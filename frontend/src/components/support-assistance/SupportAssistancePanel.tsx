@@ -83,13 +83,21 @@ function AuthorizedAssistance({
             key={kind}
             type="button"
             disabled={onRequest !== null && (view.status === "loading" || view.status === "empty")}
-            onClick={() => onRequest ? onRequest(kind as AssistanceKind) : setNotice(`${label}接入开发中，未发起 Agent 请求。`)}
+            onClick={() =>
+              onRequest
+                ? onRequest(kind as AssistanceKind)
+                : setNotice(`${label}接入开发中，未发起 Agent 请求。`)
+            }
           >
             {label}
           </button>
         ))}
       </nav>
-      <p className="support-assistance__hint">{onRequest ? "辅助仅供人工审阅；不会执行建议、修改工单或提交补偿。" : "辅助接入开发中；不会执行建议、修改工单或提交补偿。"}</p>
+      <p className="support-assistance__hint">
+        {onRequest
+          ? "辅助仅供人工审阅；不会执行建议、修改工单或提交补偿。"
+          : "辅助接入开发中；不会执行建议、修改工单或提交补偿。"}
+      </p>
 
       <div className="support-assistance__result" aria-busy={view.status === "loading"}>
         {view.status === "idle" && <p>暂无辅助结果，可继续人工编辑回复。</p>}
@@ -103,7 +111,9 @@ function AuthorizedAssistance({
             <small>请求标识：{view.requestId}</small>
             <p className="support-assistance__text">{view.explanation}</p>
             {view.followUp && <p>可补充确认：{view.followUp}</p>}
-            <p className="support-assistance__hint">这是本次辅助生成给出的不足说明，不会自动发送或改变人工处理模式。</p>
+            <p className="support-assistance__hint">
+              这是本次辅助生成给出的不足说明，不会自动发送或改变人工处理模式。
+            </p>
           </section>
         )}
         {view.status === "error" && (

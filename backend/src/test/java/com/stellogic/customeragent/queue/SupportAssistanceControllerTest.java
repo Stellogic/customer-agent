@@ -23,7 +23,8 @@ import tools.jackson.databind.ObjectMapper;
 class SupportAssistanceControllerTest {
     private final SupportAssistanceContext context = mock(SupportAssistanceContext.class);
     private final SupportAssistanceService service = mock(SupportAssistanceService.class);
-    private final SupportAssistanceController controller = new SupportAssistanceController(context, service);
+    private final SupportAssistanceController controller =
+            new SupportAssistanceController(context, service);
     private final UUID ticket = UUID.randomUUID();
     private final UUID requestId = UUID.randomUUID();
 
@@ -32,13 +33,33 @@ class SupportAssistanceControllerTest {
         var http = new MockHttpServletRequest();
         var session = session("support-demo");
         http.setSession(session);
-        when(service.request(eq("support-demo"), eq(ticket), any())).thenAnswer(invocation -> {
-            session.invalidate();
-            return new ObjectMapper().readTree("{\"view\":{\"status\":\"ready\",\"text\":\"内部结果\"}}");
-        });
-        var failure = assertThrows(ResponseStatusException.class, () -> controller.request(support(), ticket,
-                Map.of("schema", "support-assistance-v1", "assignmentId", UUID.randomUUID().toString(),
-                        "requestId", requestId.toString(), "kind", "draft", "query", "合成查询"), http));
+        when(service.request(eq("support-demo"), eq(ticket), any()))
+                .thenAnswer(
+                        invocation -> {
+                            session.invalidate();
+                            return new ObjectMapper()
+                                    .readTree(
+                                            "{\"view\":{\"status\":\"ready\",\"text\":\"内部结果\"}}");
+                        });
+        var failure =
+                assertThrows(
+                        ResponseStatusException.class,
+                        () ->
+                                controller.request(
+                                        support(),
+                                        ticket,
+                                        Map.of(
+                                                "schema",
+                                                "support-assistance-v1",
+                                                "assignmentId",
+                                                UUID.randomUUID().toString(),
+                                                "requestId",
+                                                requestId.toString(),
+                                                "kind",
+                                                "draft",
+                                                "query",
+                                                "合成查询"),
+                                        http));
         assertEquals(HttpStatus.UNAUTHORIZED, failure.getStatusCode());
     }
 
@@ -47,13 +68,23 @@ class SupportAssistanceControllerTest {
         var http = new MockHttpServletRequest();
         var session = session("support-demo");
         http.setSession(session);
-        when(service.result("support-demo", ticket, requestId)).thenAnswer(invocation -> {
-            var security = (SecurityContext) session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
-            security.setAuthentication(UsernamePasswordAuthenticationToken.authenticated("support-other", "n/a", java.util.List.of()));
-            return new ObjectMapper().createObjectNode();
-        });
-        var failure = assertThrows(ResponseStatusException.class,
-                () -> controller.result(support(), ticket, requestId, http));
+        when(service.result("support-demo", ticket, requestId))
+                .thenAnswer(
+                        invocation -> {
+                            var security =
+                                    (SecurityContext)
+                                            session.getAttribute(
+                                                    HttpSessionSecurityContextRepository
+                                                            .SPRING_SECURITY_CONTEXT_KEY);
+                            security.setAuthentication(
+                                    UsernamePasswordAuthenticationToken.authenticated(
+                                            "support-other", "n/a", java.util.List.of()));
+                            return new ObjectMapper().createObjectNode();
+                        });
+        var failure =
+                assertThrows(
+                        ResponseStatusException.class,
+                        () -> controller.result(support(), ticket, requestId, http));
         assertEquals(HttpStatus.UNAUTHORIZED, failure.getStatusCode());
     }
 }

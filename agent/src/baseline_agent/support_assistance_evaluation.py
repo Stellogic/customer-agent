@@ -1,7 +1,7 @@
-"""#170 rag-layered-v2 回答质量的纯计数，不调用模型或读取验收题目。
+"""#170 rag-layered-v2 回答质量的纯计数, 不调用模型或读取验收题目。
 
-输入由未来冻结执行协议的逐题结果和独立标注提供；不能用模型自称的校验状态。
-不返回整体验收 PASS：实际模型、数据哈希、prompt/schema、费用和运行证据须另行核验。
+输入由未来冻结执行协议的逐题结果和独立标注提供; 不能用模型自称的校验状态。
+不返回整体验收 PASS: 实际模型、数据哈希、prompt/schema、费用和运行证据须另行核验。
 """
 
 from collections import Counter
@@ -25,10 +25,10 @@ def summarize_support_answers(
     expected_unanswerable: Mapping[str, bool],
     observations: Sequence[SupportAnswerObservation],
 ) -> dict[str, object]:
-    """完整冻结分母由 expected_unanswerable 提供；缺失样本保留为未评估。
+    """完整冻结分母由 expected_unanswerable 提供; 缺失样本保留为未评估。
 
-    正确拒答须标签为无答案且独立语义校验通过；recall 保留全部无答案题分母。
-    模型宣称不足但实际可回答仍是错误拒答，不能用 semantic_valid=False 把它从分母删掉。
+    正确拒答须标签为无答案且独立语义校验通过; recall 保留全部无答案题分母。
+    模型宣称不足但实际可回答仍是错误拒答, 不能用 semantic_valid=False 把它从分母删掉。
     """
     if not expected_unanswerable:
         raise ValueError("冻结样本集不能为空")
@@ -39,7 +39,8 @@ def summarize_support_answers(
         by_id[row.sample_id] = row
 
     refusals = [
-        row for row in observations
+        row
+        for row in observations
         if row.outcome == "completed"
         and row.structure_valid is True
         and row.citation_valid is True
@@ -65,7 +66,11 @@ def summarize_support_answers(
         for key in expected_unanswerable:
             row = by_id.get(key)
             if row is None or row.outcome != "completed":
-                values.append(False if row is not None and row.outcome == "format_failure" and label == "structure" else None)
+                values.append(
+                    False
+                    if row is not None and row.outcome == "format_failure" and label == "structure"
+                    else None
+                )
             else:
                 values.append(getattr(row, attribute))
         checks[label] = {
@@ -87,9 +92,12 @@ def summarize_support_answers(
         "unanswerableSamples": unanswerable_count,
         "refusalPrecision": precision,
         "refusalRecall": recall,
-        "refusalTargetsMet": precision is not None and recall is not None and precision >= 0.90 and recall >= 0.85,
+        "refusalTargetsMet": precision is not None
+        and recall is not None
+        and precision >= 0.90
+        and recall >= 0.85,
         "checks": checks,
-        "allSamplesValidated": not missing and not failures and all(
-            counts["passed"] == len(expected_unanswerable) for counts in checks.values()
-        ),
+        "allSamplesValidated": not missing
+        and not failures
+        and all(counts["passed"] == len(expected_unanswerable) for counts in checks.values()),
     }

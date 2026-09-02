@@ -118,7 +118,6 @@ export function reduceSupportAssistance(
     return { ...state, view: { status: "empty", kind: event.request.kind } };
   }
   if ("kind" in event.view && event.view.kind !== event.request.kind) return state;
-  if ("requestId" in event.view && event.view.requestId !== event.request.requestId)
-    return state;
+  if ("requestId" in event.view && event.view.requestId !== event.request.requestId) return state;
   return { ...state, view: event.view };
 }

@@ -24,12 +24,18 @@ class SupportAssistanceContext {
         if (details.handlingMode() != SupportHandlingMode.HUMAN) {
             throw new SupportTicketNotFoundException();
         }
-        UUID assignmentId = jdbc.queryForObject(
-                "select id from support_assignment where ticket_id = ? and support_id = ? and status = 'ACTIVE'",
-                UUID.class, ticketId, supportId);
+        UUID assignmentId =
+                jdbc.queryForObject(
+                        "select id from support_assignment where ticket_id = ? and support_id = ? and status = 'ACTIVE'",
+                        UUID.class,
+                        ticketId,
+                        supportId);
         var messages = details.publicConversation();
         // 只提供近期公开沟通，不传 audit、主体身份或完整历史载荷。
-        return new Snapshot(ticketId, assignmentId, details.description(),
+        return new Snapshot(
+                ticketId,
+                assignmentId,
+                details.description(),
                 List.copyOf(messages.subList(Math.max(0, messages.size() - 20), messages.size())),
                 details.investigationFacts());
     }
@@ -37,9 +43,14 @@ class SupportAssistanceContext {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     void requireAssignment(String supportId, UUID ticketId, UUID assignmentId) {
         Snapshot current = load(supportId, ticketId);
-        if (!current.assignmentId().equals(assignmentId)) throw new SupportTicketNotFoundException();
+        if (!current.assignmentId().equals(assignmentId))
+            throw new SupportTicketNotFoundException();
     }
 
-    record Snapshot(UUID ticketId, UUID assignmentId, String description,
-            List<SupportConversationMessage> messages, List<SupportInvestigationFact> facts) {}
+    record Snapshot(
+            UUID ticketId,
+            UUID assignmentId,
+            String description,
+            List<SupportConversationMessage> messages,
+            List<SupportInvestigationFact> facts) {}
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Modal } from "antd";
 import {
   consumeSseEvents,
@@ -780,9 +780,7 @@ function TicketDetail({
   );
   const replyBusy = replyState === "sending" || replyState === "querying";
   const [reviewedAssistance, setReviewedAssistance] = useState<string | null>(null);
-  useEffect(() => {
-    if (!assistanceAvailable) setReviewedAssistance(null);
-  }, [assistanceAvailable]);
+  const clearReviewedAssistance = useCallback(() => setReviewedAssistance(null), []);
 
   function reviewAssistance(text: string) {
     if (!assistanceAvailable || replyBusy || replyState === "unknown") return;
@@ -903,7 +901,10 @@ function TicketDetail({
             aria-label="公开回复"
             value={draft}
             maxLength={2000}
-            onChange={(event) => { setDraft(event.target.value); setReviewedAssistance(null); }}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setReviewedAssistance(null);
+            }}
             placeholder="写下客户可以看到的回复…"
             disabled={replyBusy || replyState === "unknown"}
             rows={4}
@@ -911,8 +912,18 @@ function TicketDetail({
           {reviewedAssistance !== null && !replyBusy && replyState !== "unknown" && (
             <div role="group" aria-label="确认替换人工发送区草稿">
               <p>发送区已有编辑内容，是否替换为已审阅辅助草稿？不会自动发送。</p>
-              <button type="button" onClick={() => { setDraft(reviewedAssistance); setReviewedAssistance(null); }}>替换发送区草稿</button>
-              <button type="button" onClick={() => setReviewedAssistance(null)}>保留发送区编辑</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(reviewedAssistance);
+                  setReviewedAssistance(null);
+                }}
+              >
+                替换发送区草稿
+              </button>
+              <button type="button" onClick={() => setReviewedAssistance(null)}>
+                保留发送区编辑
+              </button>
             </div>
           )}
           <div className="support-reply-actions">
@@ -947,8 +958,12 @@ function TicketDetail({
       )}
 
       {details.handlingMode === "HUMAN" && assistanceAvailable && (
-        <SupportAssistance ticketId={details.ticketId} defaultQuery={details.description}
-          onReviewDraft={replyBusy || replyState === "unknown" ? null : reviewAssistance} />
+        <SupportAssistance
+          ticketId={details.ticketId}
+          defaultQuery={details.description}
+          onReviewDraft={replyBusy || replyState === "unknown" ? null : reviewAssistance}
+          onClearDraft={clearReviewedAssistance}
+        />
       )}
 
       {details.handlingMode === "HUMAN" && (

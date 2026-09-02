@@ -44,7 +44,8 @@ function props(content: AssistanceView = fixture): SupportAssistancePanelProps {
       kind: "kind" in content ? content.kind : ("draft" as const),
     };
     state = reduceSupportAssistance(state, { type: "start", request });
-    if (content.status === "empty") state = reduceSupportAssistance(state, { type: "noMatch", request });
+    if (content.status === "empty")
+      state = reduceSupportAssistance(state, { type: "noMatch", request });
     else if (content.status !== "loading")
       state = reduceSupportAssistance(state, { type: "complete", request, view: content });
   }
@@ -222,16 +223,30 @@ describe("独立客服辅助展示与草稿", () => {
 
   it("检索无匹配不冒称正常拒答，模型资料不足说明保留人工编辑", () => {
     const onReviewDraft = vi.fn();
-    const { rerender } = render(<SupportAssistancePanel {...props()} onReviewDraft={onReviewDraft} />);
+    const { rerender } = render(
+      <SupportAssistancePanel {...props()} onReviewDraft={onReviewDraft} />,
+    );
     fireEvent.change(editor(), { target: { value: "已有人工草稿" } });
-    rerender(<SupportAssistancePanel {...props({ status: "empty", kind: "draft" })} onReviewDraft={onReviewDraft} />);
+    rerender(
+      <SupportAssistancePanel
+        {...props({ status: "empty", kind: "draft" })}
+        onReviewDraft={onReviewDraft}
+      />,
+    );
     expect(screen.getByRole("status")).toHaveTextContent("尚未形成回答充分性判断");
     expect(screen.queryByRole("heading", { name: "资料不足" })).not.toBeInTheDocument();
-    rerender(<SupportAssistancePanel {...props({
-      status: "insufficient", kind: "draft", requestId: "fixture-request-1",
-      explanation: "现有资料未说明该情形的处理规则，不能据此给出结论。",
-      followUp: "请确认您希望了解的是哪项规则。",
-    })} onReviewDraft={onReviewDraft} />);
+    rerender(
+      <SupportAssistancePanel
+        {...props({
+          status: "insufficient",
+          kind: "draft",
+          requestId: "fixture-request-1",
+          explanation: "现有资料未说明该情形的处理规则，不能据此给出结论。",
+          followUp: "请确认您希望了解的是哪项规则。",
+        })}
+        onReviewDraft={onReviewDraft}
+      />,
+    );
     expect(screen.getByRole("heading", { name: "资料不足" })).toBeInTheDocument();
     expect(screen.getByText(/可补充确认/)).toBeInTheDocument();
     expect(editor()).toHaveValue("已有人工草稿");
@@ -240,8 +255,13 @@ describe("独立客服辅助展示与草稿", () => {
   });
 
   it("引用超过24字符仍完整展示，不实施单条截断", () => {
-    const snippet = "这是一段超过二十四个字符的合成政策引用，用于核实片段完整展示而非产品知识质量。";
-    render(<SupportAssistancePanel {...props({ ...fixture, citations: [{ ...fixture.citations[0], snippet }] })} />);
+    const snippet =
+      "这是一段超过二十四个字符的合成政策引用，用于核实片段完整展示而非产品知识质量。";
+    render(
+      <SupportAssistancePanel
+        {...props({ ...fixture, citations: [{ ...fixture.citations[0], snippet }] })}
+      />,
+    );
     expect(screen.getByText(snippet)).toBeInTheDocument();
   });
 

@@ -1,25 +1,25 @@
 # #170 HUMAN 辅助接线源码（2026-09-01）
 
-状态：**CODE_READY_NO_TESTS**；最终静态 Standards / Spec 均 PASS，当前不具备独立运行条件（待 #169 正式合入共享实现）。
+状态：**INTEGRATED_FOCUSED_PASS**；#169 正式共享契约已接入，backend / agent / frontend 聚焦门禁通过，等待集中风险审查、最终双轴确认与完整门禁。
 
-当前仅源码/测试源码与静态双 CR，**NOT_RUN**。已同步最新 `origin/main` `9995156252e416ac59bfaba24d05ad58319ca572`；分支保留既有 `e61152199c985f2d46b1a1cf1575b14ac8cb3a03` 与 V44，未重写历史。#150/#160/#163/#190 原生前置均已关闭，但 #169 共享适配仍为 Draft，真实接线继续等待其正式合入。本票没有测试、检查、构建、Docker、模型或完整门禁权限。
+已同步 #169 正式合入后的 `origin/main` `6d5ab983ce6b685974f00751fd06afcdb1549064`；分支保留既有 `e61152199c985f2d46b1a1cf1575b14ac8cb3a03` 与 V44，未重写历史。#150/#160/#163/#169/#190 前置均已关闭。共享 Java DTO/适配器、Python 解析器与 V43 已来自 main，本票不再依赖未合入源码。
 
 ## 固定共享契约与归属
 
-只读核对 #169 Draft PR #208 当前头 `73926b5e6f9a1ed65a809fdcc8d5bbd0ef7ca10e` 的契约文档、实际 Java/Python 源码与 V43。#169 的 `AgentKnowledgeRetrievalAdapter.searchSupport(principalId, query)` 固定 INTERNAL/SUPPORT 并验证知识 capability；`revalidateSupport(principalId, receipt)` 只校验索引代次、当前已发布版本、范围和 canonical 内容，不再次编码或排名。`AgentKnowledgeResult.Source` 的九字段（含 `updatedAt`）来自 Spring，Python `knowledge_retrieval.py` 为唯一解析。新增的 `revalidateCustomerForPublication` 只服务客户最终发布事务，#170 不调用。
+从 #169 正式 main 回读其契约、实际 Java/Python 源码与 V43。`AgentKnowledgeRetrievalAdapter.searchSupport(principalId, query)` 固定 INTERNAL/SUPPORT 并验证知识 capability；`revalidateSupport(principalId, receipt)` 只校验索引代次、当前已发布版本、范围和 canonical 内容，不再次编码或排名。`AgentKnowledgeResult.Source` 的九字段（含 `updatedAt`）来自 Spring，Python `knowledge_retrieval.py` 为唯一解析。`revalidateCustomerForPublication` 只服务客户最终发布事务，#170 不调用。
 
-本分支只引用这些公开类/纯解析，未复制未合入实现，也没有把 #190 内部检索 API 当作 Agent 或工单授权。共享类目前仍不在 main 中，**运行前须同步 #169 已交付源码并核对契约**；当前静态审查不能证明本分支已可编译。旧 #190 scope 交集200语义不使用，显式越权由403处理。
+本分支只引用这些正式公开类/纯解析，未复制实现，也没有把 #190 内部检索 API 当作 Agent 或工单授权。聚焦门禁已经证明三端可编译、格式/静态检查和自动化测试通过；旧 #190 scope 交集200语义不使用，显式越权由403处理。
 
 协调统一交付顺序：#169 共享实现先交付并使用 V43，#170 后交付，请求表使用 `V44__support_assistance_request.sql`；本票已将未发布的 V43 仅改名为 V44，SQL内容不变。#170仍拥有 queue 下自有文件、SupportWorkbench 中辅助挂载/草稿衔接和 `langgraph.json` 的 support_assistance 注册。运行前须同步 #169 正式 main 并再次核对序号，不修改已发布迁移、不用 outOfOrder 绕过。#169拥有知识适配及客户路径，本票未修改其文件，也未改 App、InternalShell、共享回复/补偿存储、编码器或 #189 资产。
 
-## #169 合入后的串行交接清单
+## #169 合入后的串行交接结果
 
-1. 先 fetch 并从 `origin/main` 回读 #169 的正式合入提交，确认公开 Java DTO/适配器、Python 解析器和 `V43__customer_knowledge_reply.sql` 均来自该提交；Draft PR 头只作本轮只读参考。
-2. 逐项复核 `searchSupport`、`revalidateSupport`、九字段 Source 与 Python `updatedAt` 解析是否仍兼容；若契约变化，只在 #170 自有消费文件中做最小调整，不复制适配器或修改 #169 文件。
-3. 回读 main 的迁移序号；仅在 V44 发生真实占用时协调新序号并改名未发布的 #170 迁移，不改已发布迁移，不启用 outOfOrder。
-4. 保留 #168 已合入的 Agent 依赖和资源策略，并确认 `langgraph.json` 同时包含既有图与 `support_assistance`；不改 encoder、pyproject 或 uv.lock。
-5. 对同步后的自有增量完成 Standards / Spec 双轴静态复核。只有协调分配运行窗口且测试锁为 FREE 时，才运行本票聚焦验证；BUSY 立即停止。真实 PostgreSQL、浏览器、模型质量与最终完整门禁仍按串行交付另行执行。
-6. 验证与正式交付完成前保持 Draft、`CODE_READY_NO_TESTS`，不转 Ready、不合入、不关票；所有未运行项继续明确记为 `NOT_RUN`。
+1. 已从 `origin/main@6d5ab983` 回读 #169 的公开 Java DTO/适配器、Python 解析器和 `V43__customer_knowledge_reply.sql`。
+2. 已核对 `searchSupport`、`revalidateSupport`、九字段 Source 与 Python `updatedAt` 解析，#170 消费签名兼容，未复制适配器或修改 #169 文件。
+3. main 最高迁移为 V43，#170 的 `V44__support_assistance_request.sql` 顺序有效；未改已发布迁移，未启用 outOfOrder。
+4. `langgraph.json` 同时保留既有图与 `support_assistance`；未改 encoder、pyproject 或 uv.lock。
+5. 聚焦门禁在共享锁下完成；初次格式/lint失败均按工具输出最小修复并复验通过。最终完整门禁尚未运行。
+6. #169 已记录的答案质量以及 #170 真实回答质量均保持 **KNOWN_LIMITATIONS**；结构、引用和合成计数测试不能替代真实语义质量 PASS。
 
 ## 最小运行链路
 
@@ -50,11 +50,17 @@
 
 真实质量运行前仍需同一累计账本核实剩余额度、冻结完整样本及 prompt/schema/源码记录，**所有相关运行累计不超过人民币6元，不重置旧消费**。本轮真实模型调用0；未知历史余额不表示可用6元。出现未知调用费用应先核对，不开始下一次付费运行。继续使用既有 #170 完整分母计数及三项独立检查，结构/引文通过不等于语义充分；不读验收错题调参。
 
-## 测试与未验证
+## 聚焦验证与未验证
 
-新增源码覆盖：同次调用和usage、非正式模式不伪造回答、失败不自动重试、引用归属/长引文、请求重放不再次检索/生成、检索后撤权禁止调用、回执重读复核且不泄露audit、宿主人工移交与未知结果GET恢复。全部未运行，测试transport/Mockito/HTTP响应仅为合成测试。
+新增源码覆盖：同次调用和usage、非正式模式不伪造回答、失败不自动重试、引用归属/长引文、请求重放不再次检索/生成、检索后撤权禁止调用、回执重读复核且不泄露audit、宿主人工移交与未知结果GET恢复。
 
-后续串行窗口需要聚焦 Python/Java/React、必要检查，真实 PostgreSQL 请求并发/异参/撤权与回执证据、工作台现有回复回归、窄屏视觉、真实回答质量和最终完整门禁。旧494dbff的25项PASS及7823fc3静态CR均不能覆盖本次源码。CI仍关闭，外部审查不阻塞；本轮不转Ready、不合入、不关票。
+- backend 聚焦门禁：PASS；编译、Spotless、Checkstyle 与测试全部通过。
+- agent 聚焦门禁：PASS；Ruff、Pyright（0 errors）与 pytest（445 passed、3 skipped）通过。
+- frontend 聚焦门禁：PASS；Prettier、ESLint、TypeScript、Vitest（206 passed、3 skipped）与 bundle evidence 通过。
+
+测试 transport、Mockito 与合成 HTTP 响应只证明工程边界；真实 DeepSeek 回答质量仍为 **KNOWN_LIMITATIONS**，不得写成 PASS。最终完整 `pwsh ./scripts/check.ps1 -Issue 170` 尚未运行。
+
+最终交付仍需集中风险审查、Standards / Spec 双轴确认和一次完整 `pwsh ./scripts/check.ps1 -Issue 170`。完整门禁包含真实 PostgreSQL/Compose、smoke 与浏览器回归；回答质量限制继续单列，不用 #169 检索门禁或本票合成测试替代。CI 关闭，外部审查不阻塞。
 
 ## 静态双 CR 记录
 
