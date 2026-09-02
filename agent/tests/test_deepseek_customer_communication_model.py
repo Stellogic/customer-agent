@@ -160,6 +160,7 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
     assert request["reasoning"] == {"effort": "none"}
     assert "Never return a JSON Schema" in request["instructions"]
     assert "frame them as 您反馈" in request["instructions"]
+    assert "Do not infer any of them from delaySeconds" in request["instructions"]
     assert set(request["text"]["format"]) == {"type", "name", "schema"}
     assert request["text"]["format"]["type"] == "json_schema"
     body_schema = request["text"]["format"]["schema"]["properties"]["body"]
@@ -576,6 +577,8 @@ async def test_knowledge_sufficiency_and_answer_share_one_call_and_never_stream_
     assert len(requests) == 1
     assert published == []
     assert requests[0]["max_output_tokens"] == 1536
+    assert "body must not answer the general knowledge question" in requests[0]["instructions"]
+    assert "do not infer service availability" in requests[0]["instructions"]
     assert "knowledge" in requests[0]["text"]["format"]["schema"]["required"]
     supplied = json.loads(requests[0]["input"])
     assert supplied["untrustedKnowledge"][0]["snippet"] == snippet
