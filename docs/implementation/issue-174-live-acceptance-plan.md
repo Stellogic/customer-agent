@@ -1,18 +1,27 @@
-# #174 真实 DeepSeek 发布验收：隔离静态准备
+# #174 真实 DeepSeek 发布验收
 
-状态：**CODE_READY_NO_TESTS / NOT_RUN**。日期：2026-09-01。基线：`origin/main@e34b601`。
+状态：**FROZEN_AUTHORIZED_NOT_RUN**。日期：2026-09-03。基线：`origin/main@c28971e`。
 
-本文件及 [独立合成场景清单](issue-174-live-scenarios.json) 是验收设计，不是 runner、运行配置、执行许可或验收报告。当前授权的模型逻辑调用、供应商尝试及费用均为 **0**，`executionAuthorized=false`；项目累计付费共享上限为 **6 元人民币**，不是本票新增额度。未来 live 可分配余额及调用上限待核对冻结，不能把空值解释为无限制。本阶段没有运行任何验证。
+[独立合成场景清单](issue-174-live-scenarios.json) 已在任何本轮供应商调用前冻结；下方保留 2026-09-01 静态设计作为历史，不再代表当前前置和预算状态。协调任务已明确授权本轮真实 DeepSeek 运行与正式交付。
 
 规格依据：[GitHub #174](https://github.com/Stellogic/customer-agent/issues/174)、[父规格 #149](../specs/issue-149.md)、[票据镜像](../tickets/spec-149/issue-174.md)。2026-09-01 只读回读时，#174 仍为 OPEN，尚无对应 PR；本次以协调任务的明确派发为所有权依据。
 
-## 范围与前置
+## 本轮冻结配置
 
-- 仅准备这两份文件，不修改公共 runner、预算设施、产品代码、#173 文件或 #190 实验账本，不创建运行产物或修改 Issue/PR。
-- **#173 前置仍有效**：#173 为 OPEN，PR #210 仍是 Draft/NOT_RUN。其隔离静态场景不等于确定性全栈验收完成；#150 及原生依赖状态也须在未来运行前重新核对。本阶段不解除任何前置。
-- 当前规则允许开发期间提交；禁止未过最终门禁合并或关票。旧规格的“普通 CI”在本项目按本地确定性检查理解，GitHub Actions 保持关闭。
-- 禁止测试、格式化/格式检查、lint、类型检查、构建、Docker/Compose、浏览器、产品 API、模型、锁查询/获取及合入。Git/Issue 只读核对、文档编辑、静态双 CR 和范围内提交不构成运行许可。
-- #174 正式目标包括预算门禁及真实证据，本阶段只完成静态设计，不能表述为 #174 已实现或交付。
+- 前置：#173 已正式完成，PR #210 已合入，Issue #173 已关闭；`issue173-final-20260903b` 的 RAG 64/64、浏览器 59/59 与六阶段检查均 PASS。
+- 分层证据：#190 检索 64/64 已交付；#169 客户回答为用户接受的 `KNOWN_LIMITATIONS`，语义 35/48，不改阈值也不重跑；#170 已交付，但客服回答质量仍为 `NOT_EVALUATED`，不得外推。
+- 模型与回退：全部生成接缝固定 `deepseek-v4-flash`，formal 模式开启，shadow 关闭，不允许 fixed fake 回退、换模型或随机重跑。
+- 场景：固定运行 #173 A、D、B 与本票 L174-04、L174-05，共五项。它们覆盖自然语言多问题、不同调查终态、追加消息围栏、客户/客服知识引用和签收未收到的安全转人工。
+- 上限：逻辑调用 100、供应商尝试 100、已持久化 token 200000；行动循环每代费用上限 10000 micro-USD、单次生成 16000 token、120 秒和 6 次 provider 尝试；整轮只执行一次。五段场景预留依次为 220000、120000、260000、280000、120000 micro-CNY，总和精确为 1 CNY；每段开始前回读累计费用，上一段 usage 未确认或已侵占下一段额度即停止。
+- 预算：共享人民币账本调用前累计 `3.810222 CNY`、`0 PENDING`，用户总上限 `5 CNY`；本轮最多预留 `1 CNY`，最多剩余 `1.189778 CNY`。formal 指标按 micro-USD × 7 保守折算，客服按输入/输出 token 的 3/9 micro-CNY 计，受理未持久化 usage，因此每次按 `20000 micro-CNY` 上界结算。
+- 输入和路径：只使用合成订单和仓库公开知识；真实 Chromium 可见操作经 Spring、PostgreSQL 和 LangGraph 到 DeepSeek。浏览器不直连 provider、Agent 私有接口或数据库。
+- 结果边界：五项发布场景必须 5/5；L174-02 绑定现行 #173 D 的 23 小时低风险回复、五分钟候选与取消，不再沿用早期 12 小时候选描述；L174-04 固定绑定 `customer-delivery-help-v1` 与 `logistics-delay-v2` 并检查语义和 canonical 引用；L174-05 精确核对 `PACKAGE_SIGNED_NOT_RECEIVED` 原因。任何供应商、schema、安全或公开投影失败均诚实记 FAIL 并停止。发布场景不构成生产准确率、可用性或客服回答质量证明。
+
+执行入口为 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-20260903a`。脚本先核对共享账本和工作树，登记唯一预算预留，再按正式锁协议运行；无调用的启动失败撤销预留，发生调用后无论 PASS/FAIL 都结算已知费用并保存脱敏报告。最终证据写入 `docs/delivery/issue-174-live-report.json`，浏览器工件写入忽略目录 `.local/gate-evidence/<runId>/browser`。
+
+## 2026-09-01 历史静态设计
+
+以下内容保留当时的设计依据和未知项。涉及 `CODE_READY_NO_TESTS`、6 元上限、未授权、#169/#170/#173 未完成或 `NOT_RUN` 的陈述只描述当时快照，由上面的 2026-09-03 冻结配置取代。
 
 ## 已有真实接缝及不能借用的证据
 

@@ -3,16 +3,20 @@ import { continueAsNewIfDuplicate } from "./auth";
 import { executeFixtureSql } from "./database";
 
 // #173 只准备独有订单；工单、回复、代次和结果均由真实 UI → Spring/LangGraph 产生。
-export function prepareOrder({ delayHours = 80, allowance = 268 } = {}) {
+export function prepareOrder({
+  delayHours = 80,
+  allowance = 268,
+  logisticsStatus = "IN_TRANSIT",
+} = {}) {
   const reference = `ORDER-ISSUE-173-${crypto.randomUUID()}`;
   executeFixtureSql(`
     INSERT INTO synthetic_order (
       order_reference, customer_id, paid_amount, currency, delay_hours, delay_seconds,
       paid, cancelled, fully_refunded, existing_compensation, policy_version,
-      available_compensation_amount
+      available_compensation_amount, logistics_status
     ) VALUES (
       '${reference}', 'customer-demo', 268.00, 'CNY', ${delayHours}, ${delayHours * 3600},
-      true, false, false, false, 'delay-policy-v1', ${allowance}
+      true, false, false, false, 'delay-policy-v1', ${allowance}, '${logisticsStatus}'
     );
   `);
   return reference;

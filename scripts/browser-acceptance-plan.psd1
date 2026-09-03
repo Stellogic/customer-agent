@@ -35,5 +35,6 @@
     )
     Excluded = @{
         'e2e/issue129.flash-customer-communication.spec.ts' = '仅由显式授权的真实模型验收脚本运行，不属于离线完整门禁。'
+        'e2e/issue174.live-deepseek.spec.ts' = '仅由显式授权且受共享预算约束的真实模型验收脚本运行，不属于确定性完整门禁。'
     }
 }
