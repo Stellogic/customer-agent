@@ -5011,13 +5011,21 @@ def main() -> None:
     ]
 
     with customer_browser_client(spring_url) as client:
-        notifications = client.get(
-            f"{spring_url}/api/support/sla/notifications",
-        )
-        expect_status(notifications, 200)
-        assert {
-            item["objective"] for item in notifications.json() if item["ticketId"] == ticket_id
-        } == {"FIRST_RESPONSE", "RESOLUTION"}
+        notification_objectives = set()
+        for _ in range(40):
+            notifications = client.get(
+                f"{spring_url}/api/support/sla/notifications",
+            )
+            expect_status(notifications, 200)
+            notification_objectives = {
+                item["objective"]
+                for item in notifications.json()
+                if item["ticketId"] == ticket_id
+            }
+            if notification_objectives == {"FIRST_RESPONSE", "RESOLUTION"}:
+                break
+            time.sleep(0.25)
+        assert notification_objectives == {"FIRST_RESPONSE", "RESOLUTION"}
         escalations = client.get(
             f"{spring_url}/api/support/escalations",
         )
