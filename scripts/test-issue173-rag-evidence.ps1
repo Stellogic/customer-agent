@@ -56,4 +56,4 @@ if (
     throw 'Issue #173 缺少 #170 HUMAN 辅助接线、聚焦门禁或已知限制证据。'
 }
 
-Write-Host 'Issue #173 RAG 分层证据契约通过：#190 retrieval PASS；#169 browser PASS；#170 HUMAN 接线与聚焦门禁在案；回答质量保留已知限制。'
+Write-Host 'Issue #173 RAG 分层证据契约通过：#190 retrieval PASS；#169 browser PASS/回答质量已知限制；#170 HUMAN 接线与聚焦门禁在案、真实回答质量 NOT_EVALUATED。'
