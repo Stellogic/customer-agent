@@ -85,7 +85,7 @@ async function expectResolved(page: Page, ticket: ClockTicket) {
   await expect(
     page.getByRole("region", { name: "自动解决状态" }).getByText("工单已自动解决", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "发送回复", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "发起新的智能受理", exact: true })).toBeVisible();
   const stored = storedTicket(ticket.ticketId);
   expect(stored).toMatchObject({
     candidate: "RESOLVED",
@@ -99,24 +99,30 @@ async function expectResolved(page: Page, ticket: ClockTicket) {
   expect(Date.parse(stored.closeDueAt!)).toBe(Date.parse(closeDue));
 }
 
-async function replyThroughUi(
-  page: Page,
-  ticket: ClockTicket,
-  message: string,
-  expectedStatus: number,
-) {
-  await page.getByLabel("回复订单编号").fill(ticket.reference);
-  await page.getByLabel("回复问题类型").selectOption("LOGISTICS_DELAY");
-  await page.getByLabel("工单回复", { exact: true }).fill(message);
-  const replied = page.waitForResponse(
+async function continueThroughIntake(page: Page, ticket: ClockTicket, message: string) {
+  await page.getByRole("button", { name: "发起新的智能受理", exact: true }).click();
+  await page.getByLabel("订单编号").fill(ticket.reference);
+  await page.getByLabel("问题描述").fill(message);
+  await page.getByRole("button", { name: "开始智能受理", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "请确认是否继续既有工单" })).toBeVisible();
+  const continued = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
-      new URL(response.url()).pathname === `/api/customer/tickets/${ticket.ticketId}/replies`,
+      /\/api\/customer\/v2\/intakes\/[^/]+\/duplicate-resolution$/.test(
+        new URL(response.url()).pathname,
+      ),
   );
-  await page.getByRole("button", { name: "发送回复", exact: true }).click();
-  const response = await replied;
-  expect(response.status()).toBe(expectedStatus);
-  return (await response.json()) as { ticketId: string; outcome: string; replayed: boolean };
+  await page.getByRole("button", { name: /继续旧工单/ }).first().click();
+  const response = await continued;
+  expect(response.status()).toBe(201);
+  const result = (await response.json()) as { routedTicketIds: string[]; confirmed: boolean };
+  expect(result.confirmed).toBe(true);
+  expect(result.routedTicketIds).toHaveLength(1);
+  await page
+    .getByRole("region", { name: "继续处理的既有工单" })
+    .getByRole("button", { name: /继续旧工单/ })
+    .click();
+  return result.routedTicketIds[0];
 }
 
 test(`Issue #173 F：真实自动解决与72小时回复边界 / ${phase}`, async ({ browser }) => {
@@ -174,19 +180,14 @@ test(`Issue #173 F：真实自动解决与72小时回复边界 / ${phase}`, asyn
           const ticket = state.tickets[0];
           await openTicket(page, ticket.ticketId);
           const message = `仍需帮助，请人工继续核实本物流问题。${ticket.reference}`;
-          const result = await replyThroughUi(page, ticket, message, 200);
-          expect(result).toMatchObject({
-            ticketId: ticket.ticketId,
-            outcome: "REOPENED",
-            replayed: false,
-          });
-          await expect(page.getByText(message, { exact: true })).toBeVisible();
+          const routedTicketId = await continueThroughIntake(page, ticket, message);
+          expect(routedTicketId).toBe(ticket.ticketId);
           await expect(page.getByRole("region", { name: "自动解决状态" })).toHaveCount(0);
           const reopened = await openTicket(page, ticket.ticketId);
           expect(reopened.ticket.lifecycleState).toBe("INVESTIGATING");
           expect(reopened.ticket.agentGeneration).toBeGreaterThan(ticket.generation);
           expect(reopened.autoResolution).toBeNull();
-          await expect(page.getByText(message, { exact: true })).toBeVisible();
+          await expect(page.getByText(message)).toBeVisible();
           await expect(page.getByRole("region", { name: "自动解决状态" })).toHaveCount(0);
           expect(storedTicket(ticket.ticketId)).toMatchObject({
             lifecycle: "INVESTIGATING",
@@ -216,24 +217,22 @@ test(`Issue #173 F：真实自动解决与72小时回复边界 / ${phase}`, asyn
           closures: 1,
         });
         expect(Date.parse(stored.closedAt!)).toBe(Date.parse(closeDue));
-        const result = await replyThroughUi(
+        const linkedTicketId = await continueThroughIntake(
           page,
           closing,
           "仍需帮助，请人工继续处理原物流问题。",
-          201,
         );
-        expect(result).toMatchObject({ outcome: "LINKED_TICKET_CREATED", replayed: false });
-        expect(result.ticketId).toMatch(/^[0-9a-f-]{36}$/i);
-        expect(result.ticketId).not.toBe(closing.ticketId);
+        expect(linkedTicketId).toMatch(/^[0-9a-f-]{36}$/i);
+        expect(linkedTicketId).not.toBe(closing.ticketId);
         await expect(
           page.getByRole("heading", {
-            name: `${result.ticketId.slice(0, 8)}…${result.ticketId.slice(-4)}`,
+            name: `${linkedTicketId.slice(0, 8)}…${linkedTicketId.slice(-4)}`,
             exact: true,
           }),
         ).toBeVisible();
         expect(
           queryFixtureSql(`
-          SELECT follow_up_of::text FROM support_ticket WHERE id = '${result.ticketId}';
+          SELECT follow_up_of::text FROM support_ticket WHERE id = '${linkedTicketId}';
         `),
         ).toBe(closing.ticketId);
         const original = await openTicket(page, reopened.ticketId);

@@ -29,14 +29,15 @@ export function intakeReply(page: Page) {
 export async function createSingleTicket(page: Page, reference: string, description: string) {
   await page.getByLabel("订单编号").fill(reference);
   await page.getByLabel("问题描述").fill(description);
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await page.getByRole("button", { name: "开始智能受理" }).click();
   await continueAsNewIfDuplicate(page);
   const confirmed = intakeReply(page);
   await page.getByRole("button", { name: "确认，就是这个问题" }).click();
   const response = await confirmed;
   expect(response.status()).toBe(201);
-  const result = (await response.json()) as { ticketId: string; confirmed: boolean };
+  const result = (await response.json()) as { ticketIds: string[]; confirmed: boolean };
   expect(result.confirmed).toBe(true);
-  expect(result.ticketId).toMatch(/^[0-9a-f-]{36}$/i);
-  return result.ticketId;
+  expect(result.ticketIds).toHaveLength(1);
+  expect(result.ticketIds[0]).toMatch(/^[0-9a-f-]{36}$/i);
+  return result.ticketIds[0];
 }

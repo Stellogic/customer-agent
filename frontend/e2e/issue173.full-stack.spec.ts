@@ -14,7 +14,7 @@ test("Issue #173 A：自然语言多问题澄清、一次建单与订单分组�
     const page = await context.newPage();
     await login(page, "customer", "customer-demo");
     await page.getByLabel("问题描述").fill(`${reference} 的包裹没收到，而且疑似重复扣款`);
-    await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+    await page.getByRole("button", { name: "开始智能受理" }).click();
     await expect(page.getByRole("heading", { name: "再帮我确认一点" })).toBeVisible();
     await expect(page.getByRole("button", { name: /原子创建/ })).toHaveCount(0);
     await page.getByLabel("补充受理信息").fill("是的，确实重复扣款");
@@ -94,7 +94,7 @@ test("Issue #173 D：真实低风险回复产生五分钟候选，刷新后仍�
       (result) =>
         result.request().method() === "POST" &&
         new URL(result.url()).pathname ===
-          `/api/customer/tickets/${ticketId}/auto-resolution/cancel`,
+          `/api/customer/v2/tickets/${ticketId}/auto-resolution/cancel`,
     );
     await cancel.click();
     const cancelResponse = await cancelled;
