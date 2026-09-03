@@ -570,7 +570,7 @@ def main() -> None:
             client,
             spring_url,
             message_fence_create_id,
-            "ORDER-ISSUE-158-FENCE",
+            "ORDER-DELAY-UNDER-24",
             "请先调查这笔合成订单的物流状态",
         )
         expect_status(created, 201)
@@ -699,12 +699,12 @@ def main() -> None:
     concurrent_message_id = f"issue-158-cross-ticket-{uuid.uuid4()}"
     concurrent_ticket_ids: list[str] = []
     with customer_browser_client(spring_url) as client:
-        for index in range(2):
+        for _ in range(2):
             created = create_customer_ticket(
                 client,
                 spring_url,
                 f"issue-158-concurrent-create-{uuid.uuid4()}",
-                f"ORDER-ISSUE-158-CONCURRENT-{index}",
+                "ORDER-DELAY-UNDER-24",
                 "并发消息身份隔离测试",
             )
             expect_status(created, 201)
