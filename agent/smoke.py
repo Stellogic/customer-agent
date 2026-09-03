@@ -4949,7 +4949,7 @@ def main() -> None:
         )
         connection.execute(
             "update support_ticket set created_at = %s::timestamptz - interval '15 minutes', "
-            "first_responded_at = %s, lifecycle_state = 'WAITING_FOR_CUSTOMER', "
+            "first_responded_at = %s, lifecycle_state = 'WAITING_FOR_CUSTOMER', handling_mode = 'AGENT', "
             "resolution_elapsed_seconds = 86399, resolution_running_since = null where id = %s",
             (fixed_now, fixed_now, ticket_uuid),
         )
