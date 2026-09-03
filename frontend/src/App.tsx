@@ -426,6 +426,44 @@ export function App() {
     void consumeEvents(ticketId, authoritative.cursor);
   }
 
+  function startNewIntake() {
+    streamController.current?.abort();
+    if (snapshot) {
+      globalThis.sessionStorage.removeItem(handoffRecoveryStorageKey(snapshot.ticket.id));
+    }
+    if (reconnectTimer.current !== null) {
+      globalThis.clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+    }
+    snapshotRef.current = null;
+    setSnapshot(null);
+    setRecoveringTicketId(null);
+    setIntake(null);
+    setOrderReference("");
+    setDescription("");
+    setIntakeReply("");
+    setIntakeRecoveryState("idle");
+    setArchivedIntakes([]);
+    setIntakeFactsChanged(false);
+    setIntakeMessages([]);
+    setCancellingAutoResolution(false);
+    setClarificationAnswer("");
+    setLiveMessageBody("");
+    setLiveMessageState("idle");
+    setCopiedTicketId(false);
+    setConfirmingHumanHandoff(false);
+    setUnknownHandoffRequestId(null);
+    setError("");
+    requestId.current = globalThis.crypto.randomUUID();
+    intakeReplyRequestId.current = globalThis.crypto.randomUUID();
+    duplicateResolutionRequestId.current = globalThis.crypto.randomUUID();
+    replyMessageId.current = globalThis.crypto.randomUUID();
+    resumeRequestId.current = globalThis.crypto.randomUUID();
+    handoffRequestId.current = globalThis.crypto.randomUUID();
+    liveMessageRequestId.current = globalThis.crypto.randomUUID();
+    globalThis.history.replaceState(null, "", globalThis.location.pathname);
+  }
+
   async function cancelAutoResolution() {
     if (snapshot?.autoResolution?.status !== "PENDING" || cancellingAutoResolution) return;
     const ticketId = snapshot.ticket.id;
@@ -1552,9 +1590,14 @@ export function App() {
               </form>
             )}
           {["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState) && (
-            <StatusNotice role="status" tone="neutral">
-              如仍需帮助，请在上方用自然语言发起新的智能受理。系统会先识别并请你确认问题；同一问题可继续既有工单，独立新问题会创建新工单。
-            </StatusNotice>
+            <>
+              <StatusNotice role="status" tone="neutral">
+                如仍需帮助，请发起新的智能受理。系统会先识别并请你确认问题；同一问题可继续既有工单，独立新问题会创建新工单。
+              </StatusNotice>
+              <button type="button" className="primary-action" onClick={startNewIntake}>
+                发起新的智能受理
+              </button>
+            </>
           )}
           {snapshot.ticket.handlingMode === "AGENT" &&
             !["RESOLVED", "CLOSED"].includes(snapshot.ticket.lifecycleState) &&
@@ -2138,13 +2181,13 @@ const LIFECYCLE_PRESENTATIONS: Record<
   RESOLVED: {
     label: "已解决",
     title: "本次处理已有结果",
-    description: "请查看公开回复；如仍需说明，可使用下方现有回复入口。",
+    description: "请查看公开回复；如仍需说明，请发起新的智能受理。",
     className: "status-resolved",
   },
   CLOSED: {
     label: "已关闭",
     title: "本次工单已经结束",
-    description: "历史公开回复仍可查看；如需继续反馈，可使用下方现有回复入口。",
+    description: "历史公开回复仍可查看；如需继续反馈，请发起新的智能受理。",
     className: "status-closed",
   },
 };

@@ -96,8 +96,13 @@ test("Issue #153 桌面确认失败不展示部分创建结果", async ({ browse
         assistantMessage: "请确认；确认后将创建 2 张工单。",
         ticketIds: [],
         sharedIntakeRecordId: null,
+        duplicateMatches: [],
+        routedTicketIds: [],
+        remainingOrderCount: 0,
+        completedOrderCount: 0,
         expectedTicketCount: 2,
         confirmed: false,
+        version: 1,
         replayed: false,
       }),
     });
