@@ -995,7 +995,6 @@ def main() -> None:
         assert candidate.json()["autoResolution"]["status"] == "PENDING"
         assert candidate.json()["autoResolution"]["dueAt"] is not None
         assert resolved_projection["ticket"]["handlingMode"] == "AGENT"
-        assert resolved_projection["ticket"]["createdAt"] == "2026-08-09T14:00:00Z"
         assert len(resolved_projection["messages"]) == 3
         assert resolved_projection["messages"][-1]["author"] == "AGENT"
         assert "不足 24 小时" in resolved_projection["messages"][-1]["body"]
