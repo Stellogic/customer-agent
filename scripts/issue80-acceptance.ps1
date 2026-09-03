@@ -34,6 +34,21 @@ $env:CUSTOMER_AGENT_IMAGE_TAG = $imageTag
 $env:CUSTOMER_AGENT_FRONTEND_PORT = [string]$frontendPort
 $env:SESSION_COOKIE_SECURE = 'true'
 $ownsImages = -not $SkipBuild
+$artifactsAvailable = $false
+
+function Export-BrowserAcceptanceArtifacts {
+    param([string]$ProjectName, [string]$Image, [string]$Destination)
+    $volume = "${ProjectName}_browser-artifacts"
+    $container = "${ProjectName}-artifact-export"
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+    docker create --name $container --volume "${volume}:/artifacts" $Image sh -c true | Out-Null
+    try {
+        docker cp "${container}:/artifacts/." $Destination
+    } finally {
+        docker rm --force $container | Out-Null
+    }
+    Write-Host "Issue #80 浏览器证据已保留：$Destination"
+}
 
 $plan = Import-PowerShellDataFile "$PSScriptRoot/browser-acceptance-plan.psd1"
 $discovered = @(
@@ -85,6 +100,7 @@ try {
     docker compose --project-name $projectName exec -T postgres `
         psql -U postgres -d customer_agent -f /acceptance/issue80-browser.sql
     docker compose --project-name $projectName --profile smoke up --detach --no-build --no-deps --wait browser-frontend
+    $artifactsAvailable = $true
 
     Invoke-PlaywrightGroup -Files $plan.ParallelSafe -Workers 2 -RepeatCount 3 -Runner $playwrightRunner
 
@@ -109,7 +125,16 @@ try {
     $env:ISSUE80_SESSION_PHASE = 'expiry'
     Invoke-PlaywrightGroup -Files $sessionFile -Workers 1 -Runner $playwrightRunner
 } finally {
-    docker compose --project-name $projectName --profile smoke down --volumes --remove-orphans
+    try {
+        if ($artifactsAvailable) {
+            Export-BrowserAcceptanceArtifacts `
+                -ProjectName $projectName `
+                -Image "customer-agent/frontend-browser-test:$imageTag" `
+                -Destination (Join-Path $repoRoot ".local/gate-evidence/$RunId/browser")
+        }
+    } finally {
+        docker compose --project-name $projectName --profile smoke down --volumes --remove-orphans
+    }
     Assert-ComposeProjectResourcesEmpty -ProjectName $projectName -Phase '在清理后'
     if ($ownsImages) {
         Remove-GateImages -RunId $RunId

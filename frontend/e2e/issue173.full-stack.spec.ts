@@ -259,7 +259,7 @@ test("Issue #173 E：同订单两提案竞争30元额度，只允许一笔26.80�
   }
 });
 
-test("Issue #173 B：真实调查后连续追加消息并从断线恢复同一工单", async ({ browser }) => {
+test("Issue #173 B：真实调查流、并发追加消息、旧代次隔离与断线恢复", async ({ browser }) => {
   test.setTimeout(120_000);
   const reference = prepareOrder();
   const context = await newAcceptanceContext(browser, { viewport: { width: 1440, height: 960 } });
@@ -288,19 +288,48 @@ test("Issue #173 B：真实调查后连续追加消息并从断线恢复同一�
       ORDER BY message_sequence DESC LIMIT 1;
     `);
     expect(agentReply).not.toBe("");
+    const initialStream = JSON.parse(
+      queryFixtureSql(`
+      SELECT json_build_object(
+        'started', count(*) FILTER (WHERE e.event_type = 'AGENT_REPLY_STREAM_STARTED'),
+        'delta', string_agg(e.payload->>'delta', '' ORDER BY e.sequence)
+          FILTER (WHERE e.event_type = 'AGENT_REPLY_CONTENT_DELTA')
+      )
+      FROM agent_processing_generation g
+      JOIN customer_public_event e
+        ON e.ticket_id = g.ticket_id AND e.agent_generation = g.generation_number
+      WHERE g.ticket_id = '${ticketId}' AND g.generation_number = 1
+      GROUP BY g.id;
+    `),
+    ) as { started: number; delta: string };
+    expect(initialStream.started).toBeGreaterThan(0);
+    expect(initialStream.delta).toBe(agentReply);
     const agentBubble = page.locator(".ant-bubble").filter({ hasText: agentReply });
     await expect(agentBubble).toBeVisible();
     await expect(agentBubble.locator(".ant-bubble-header")).toHaveText("智能客服");
     const messages = ["补充：物流页面今天仍未更新。", "再次补充：请在此工单继续说明物流进展。"];
-    for (const message of messages) {
-      await page.getByPlaceholder("继续补充消息", { exact: true }).fill(message);
-      const accepted = page.waitForResponse(
+    const secondPage = await context.newPage();
+    await secondPage.goto(`/help?ticket=${ticketId}`);
+    const messagePages = [page, secondPage];
+    await Promise.all(
+      messagePages.map((messagePage, index) =>
+        messagePage.getByPlaceholder("继续补充消息", { exact: true }).fill(messages[index]),
+      ),
+    );
+    const accepted = messagePages.map((messagePage) =>
+      messagePage.waitForResponse(
         (response) =>
           response.request().method() === "POST" &&
           new URL(response.url()).pathname === `/api/customer/v2/tickets/${ticketId}/messages`,
-      );
-      await page.getByRole("button", { name: "发送新消息" }).click();
-      const response = await accepted;
+      ),
+    );
+    await Promise.all(
+      messagePages.map((messagePage) =>
+        messagePage.getByRole("button", { name: "发送新消息" }).click(),
+      ),
+    );
+    const responses = await Promise.all(accepted);
+    for (const response of responses) {
       expect(response.ok()).toBe(true);
       expect(await response.json()).toMatchObject({
         schema: "public-conversation-v2",
@@ -308,9 +337,52 @@ test("Issue #173 B：真实调查后连续追加消息并从断线恢复同一�
         accepted: true,
         replayed: false,
       });
-      await expect(page.getByText(message, { exact: true })).toHaveCount(1);
-      await expect(page.getByRole("button", { name: "发送新消息" })).toBeEnabled();
     }
+    for (const message of messages) await expect(page.getByText(message, { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "发送新消息" })).toBeEnabled();
+
+    await expect
+      .poll(
+        () =>
+          queryFixtureSql(`
+          SELECT count(*) FROM agent_processing_generation
+          WHERE ticket_id = '${ticketId}' AND status = 'SUPERSEDED';
+        `),
+        { timeout: 30_000 },
+      )
+      .not.toBe("0");
+    const staleGeneration = JSON.parse(
+      queryFixtureSql(`
+      SELECT json_build_object('number', generation_number)
+      FROM agent_processing_generation
+      WHERE ticket_id = '${ticketId}' AND status = 'SUPERSEDED'
+      ORDER BY generation_number DESC LIMIT 1;
+    `),
+    ) as { number: number };
+    expect(
+      queryFixtureSql(`
+      SELECT count(*) FROM customer_public_event
+      WHERE ticket_id = '${ticketId}' AND agent_generation = ${staleGeneration.number}
+        AND event_type = 'AGENT_PROCESSING_TERMINATED';
+    `),
+    ).toBe("1");
+    await expect
+      .poll(
+        () =>
+          queryFixtureSql(`
+          SELECT status FROM agent_processing_generation
+          WHERE ticket_id = '${ticketId}' ORDER BY generation_number DESC LIMIT 1;
+        `),
+        { timeout: 30_000 },
+      )
+      .toBe("COMPLETED");
+    expect(
+      queryFixtureSql(`
+      SELECT count(*) FROM customer_public_event
+      WHERE ticket_id = '${ticketId}' AND agent_generation = ${staleGeneration.number}
+        AND event_type = 'PUBLIC_MESSAGE_APPENDED' AND payload->>'author' = 'AGENT';
+    `),
+    ).toBe("0");
 
     // 只中断传输，不伪造 Spring 响应。恢复仍由真实快照与 SSE 完成。
     let disconnected = true;
@@ -371,6 +443,28 @@ test("Issue #173 C：人工领取与公开回复、标准补偿提交和独立�
       .click();
     await support.getByRole("button", { name: "确认领取", exact: true }).click();
     await expect(support.getByRole("heading", { name: "人工公开回复" })).toBeVisible();
+    const publicMessageCount = queryFixtureSql(
+      `SELECT count(*) FROM public_message WHERE ticket_id = '${ticketId}';`,
+    );
+    const assistance = support.getByRole("region", { name: "客服辅助入口" });
+    await assistance.getByLabel("辅助查询（最多200字）").fill("请检索物流延迟政策并给出依据");
+    const assisted = support.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname ===
+          `/api/support/workbench/tickets/${ticketId}/assistance/requests`,
+    );
+    await assistance.getByRole("button", { name: "知识检索", exact: true }).click();
+    const assistanceResponse = await assisted;
+    const assistanceBody = await assistanceResponse.text();
+    expect(assistanceResponse.status(), assistanceBody).toBe(500);
+    await expect(assistance.getByRole("alert")).toHaveText(
+      "知识检索暂不可用。人工处理不受影响。",
+    );
+    expect(
+      queryFixtureSql(`SELECT count(*) FROM public_message WHERE ticket_id = '${ticketId}';`),
+    ).toBe(publicMessageCount);
+    await expect(support.getByRole("textbox", { name: "公开回复", exact: true })).toBeEnabled();
     const reply = `已收到您的补充，正在核实物流。${crypto.randomUUID()}`;
     await support.getByRole("textbox", { name: "公开回复", exact: true }).fill(reply);
     await support.getByRole("button", { name: "发送公开回复" }).click();
