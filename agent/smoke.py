@@ -454,7 +454,10 @@ def main() -> None:
             "同一请求身份下的不同参数",
         )
         expect_status(conflict, 409)
-        assert conflict.json()["code"] == "REQUEST_ID_CONFLICT"
+        conflict_snapshot = conflict.json()
+        assert conflict_snapshot["schema"] == "customer-intake-v4"
+        assert conflict_snapshot["replayed"] is True
+        assert conflict_snapshot["ticketIds"] == [str(ticket_id)]
 
         snapshot = client.get(
             f"{spring_url}/api/customer/v2/tickets/{ticket_id}",
@@ -5463,7 +5466,11 @@ def main() -> None:
             "复用身份但改变内容",
         )
         expect_status(conflict, 409)
-        assert conflict.json()["code"] == "REQUEST_ID_CONFLICT"
+        conflict_snapshot = conflict.json()
+        assert conflict_snapshot["schema"] == "customer-intake-v4"
+        assert conflict_snapshot["replayed"] is True
+        assert conflict_snapshot["ticketIds"] == []
+        assert conflict_snapshot["routedTicketIds"] == [str(different_linked_id)]
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert (
             connection.execute(
