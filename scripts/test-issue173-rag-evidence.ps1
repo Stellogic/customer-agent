@@ -5,6 +5,7 @@ $retrieval = Get-Content -Raw -LiteralPath (Join-Path $root 'docs/implementation
 $customerRuntime = Get-Content -Raw -LiteralPath (Join-Path $root 'docs/implementation/evidence/issue169-runtime-20260902g/phase.json') | ConvertFrom-Json
 $customerBrowser = Get-Content -Raw -LiteralPath (Join-Path $root 'docs/implementation/evidence/issue169-runtime-20260902g/browser.json') | ConvertFrom-Json
 $customerAnswer = Get-Content -Raw -LiteralPath (Join-Path $root 'docs/implementation/evidence/issue169-answer-grounded-final-20260902k/summary.json') | ConvertFrom-Json
+$humanEvidence = Get-Content -Raw -LiteralPath (Join-Path $root 'docs/implementation/issue-170-human-wiring.md')
 
 if (
     $retrieval.evaluation_protocol -ne 'rag-layered-v2-retrieval' -or
@@ -36,4 +37,23 @@ if (
     throw 'Issue #173 的 #169 回答证据边界或原始分母已漂移。'
 }
 
-Write-Host 'Issue #173 RAG 分层证据契约通过：#190 retrieval PASS；#169 browser PASS；回答质量保留已知限制。'
+$humanMarkers = @(
+    'support-assistance-answer-v2',
+    'issue170-riskfix-backend-20260902b',
+    'issue170-riskfix-agent-20260902a',
+    'issue170-riskfix-frontend-20260902b',
+    'KNOWN_LIMITATIONS'
+)
+$humanFiles = @(
+    'backend/src/main/java/com/stellogic/customeragent/queue/SupportAssistanceService.java',
+    'agent/src/baseline_agent/support_assistance_model.py',
+    'frontend/src/components/support-assistance/SupportAssistance.tsx'
+)
+if (
+    @($humanMarkers | Where-Object { -not $humanEvidence.Contains($_) }).Count -ne 0 -or
+    @($humanFiles | Where-Object { -not (Test-Path -LiteralPath (Join-Path $root $_)) }).Count -ne 0
+) {
+    throw 'Issue #173 缺少 #170 HUMAN 辅助接线、聚焦门禁或已知限制证据。'
+}
+
+Write-Host 'Issue #173 RAG 分层证据契约通过：#190 retrieval PASS；#169 browser PASS；#170 HUMAN 接线与聚焦门禁在案；回答质量保留已知限制。'

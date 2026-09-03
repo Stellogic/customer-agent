@@ -125,26 +125,57 @@ try {
     $env:ISSUE80_SESSION_PHASE = 'expiry'
     Invoke-PlaywrightGroup -Files $sessionFile -Workers 1 -Runner $playwrightRunner
 } finally {
-    try {
-        if ($artifactsAvailable) {
+    $artifactFailure = $null
+    $cleanupFailure = $null
+    if ($artifactsAvailable) {
+        try {
             Export-BrowserAcceptanceArtifacts `
                 -ProjectName $projectName `
                 -Image "customer-agent/frontend-browser-test:$imageTag" `
                 -Destination (Join-Path $repoRoot ".local/gate-evidence/$RunId/browser")
+        } catch {
+            $artifactFailure = $_
         }
-    } finally {
-        docker compose --project-name $projectName --profile smoke down --volumes --remove-orphans
     }
-    Assert-ComposeProjectResourcesEmpty -ProjectName $projectName -Phase '在清理后'
+    try {
+        docker compose --project-name $projectName --profile smoke down --volumes --remove-orphans
+    } catch {
+        $cleanupFailure = $_
+    }
+    try {
+        Assert-ComposeProjectResourcesEmpty -ProjectName $projectName -Phase '在清理后'
+    } catch {
+        if ($null -eq $cleanupFailure) {
+            $cleanupFailure = $_
+        }
+    }
     if ($ownsImages) {
-        Remove-GateImages -RunId $RunId
-        Assert-GateImagesAbsent -RunId $RunId
+        try {
+            Remove-GateImages -RunId $RunId
+        } catch {
+            if ($null -eq $cleanupFailure) {
+                $cleanupFailure = $_
+            }
+        }
+        try {
+            Assert-GateImagesAbsent -RunId $RunId
+        } catch {
+            if ($null -eq $cleanupFailure) {
+                $cleanupFailure = $_
+            }
+        }
     }
     Remove-Item Env:CUSTOMER_AGENT_IMAGE_TAG -ErrorAction SilentlyContinue
     Remove-Item Env:CUSTOMER_AGENT_FRONTEND_PORT -ErrorAction SilentlyContinue
     Remove-Item Env:SESSION_COOKIE_SECURE -ErrorAction SilentlyContinue
     Remove-Item Env:CUSTOMER_AGENT_SESSION_TIMEOUT -ErrorAction SilentlyContinue
     Remove-Item Env:ISSUE80_SESSION_PHASE -ErrorAction SilentlyContinue
+    if ($null -ne $cleanupFailure) {
+        throw $cleanupFailure
+    }
+    if ($null -ne $artifactFailure) {
+        throw $artifactFailure
+    }
 }
 
 Write-Host "Issue #80 真实浏览器验收通过：parallel-safe=$($plan.ParallelSafe.Count) files x3 workers=2，serial=$($plan.Serial.Count) files workers=1；隔离容器、网络与卷已回读为空。"
