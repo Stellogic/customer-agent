@@ -1545,7 +1545,12 @@ def main() -> None:
         assert "等待人工审批" in projection["messages"][-1]["body"]
         serialized = json.dumps(projection)
         assert not any(field in serialized for field in forbidden_fields)
-        assert "26.80" not in serialized and "SIMULATED_PARTIAL_REFUND" not in serialized
+        assert projection["pendingCompensation"] == {
+            "compensationMethod": "SIMULATED_PARTIAL_REFUND",
+            "amount": "26.80",
+            "currency": "CNY",
+            "status": "PENDING_REVIEW",
+        }
 
     try:
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
