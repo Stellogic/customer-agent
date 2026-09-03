@@ -399,18 +399,9 @@ def main() -> None:
             "select convalidated from pg_constraint "
             "where conname = 'synthetic_order_paid_amount_check'"
         ).fetchone() == (True,)
-        connection.execute(
-            "insert into synthetic_order "
-            "(order_reference, customer_id, paid_amount, currency, delay_hours, delay_seconds, "
-            "paid, cancelled, fully_refunded, existing_compensation, policy_version, "
-            "available_compensation_amount) values "
-            "('ORDER-INTAKE-ONLY', 'customer-demo', 120.00, 'CNY', 1, 3600, "
-            "true, false, false, false, 'delay-policy-v1', 120.00)"
-        )
-
     request_id = f"smoke-{uuid.uuid4()}"
     ticket_payload = {
-        "orderReference": "ORDER-INTAKE-ONLY",
+        "orderReference": "ORDER-DELAY-UNDER-24",
         "description": "合成订单物流已经延迟多日",
     }
     ticket_headers = {
@@ -443,7 +434,7 @@ def main() -> None:
             "insert into support_ticket "
             "(id, customer_id, order_reference, description, lifecycle_state, handling_mode, "
             "created_at, first_responded_at) values (%s, 'customer-other-demo', "
-            "'ORDER-INTAKE-ONLY', 'other customer boundary', 'INVESTIGATING', 'HUMAN', "
+            "'ORDER-DELAY-UNDER-24', 'other customer boundary', 'INVESTIGATING', 'HUMAN', "
             "current_timestamp, current_timestamp)",
             (other_customer_ticket_id,),
         )
@@ -4936,7 +4927,7 @@ def main() -> None:
             client,
             spring_url,
             first_warning_headers["Idempotency-Key"],
-            "ORDER-INTAKE-ONLY",
+            "ORDER-DELAY-UNDER-24",
             "首次响应边界验收",
         )
         expect_status(first_warning_response, 201)
@@ -5300,7 +5291,7 @@ def main() -> None:
             client,
             spring_url,
             f"sla-concurrent-state-{uuid.uuid4()}",
-            "ORDER-INTAKE-ONLY",
+            "ORDER-DELAY-UNDER-24",
             "并发状态变化验收",
         )
         expect_status(concurrent_state_response, 201)
@@ -5369,7 +5360,7 @@ def main() -> None:
                 client,
                 spring_url,
                 f"issue-28-{suffix}-{uuid.uuid4()}",
-                "ORDER-INTAKE-ONLY",
+                "ORDER-DELAY-UNDER-24",
                 f"关闭等待期验收 {suffix}",
             )
             expect_status(response, 201)
@@ -5402,7 +5393,7 @@ def main() -> None:
             client,
             spring_url,
             "issue-28-before-boundary-message",
-            "ORDER-INTAKE-ONLY",
+            "ORDER-DELAY-UNDER-24",
             "原问题仍未解决",
             duplicate_action="CONTINUE_EXISTING",
             existing_ticket_id=str(before_boundary_id),
@@ -5413,7 +5404,7 @@ def main() -> None:
             client,
             spring_url,
             "issue-28-before-boundary-message",
-            "ORDER-INTAKE-ONLY",
+            "ORDER-DELAY-UNDER-24",
             "原问题仍未解决",
             duplicate_action="CONTINUE_EXISTING",
             existing_ticket_id=str(before_boundary_id),
@@ -5457,7 +5448,7 @@ def main() -> None:
             client,
             spring_url,
             "issue-28-different-message",
-            "ORDER-INTAKE-ONLY",
+            "ORDER-DELAY-UNDER-24",
             "关闭期外仍需帮助",
             duplicate_action="CONTINUE_EXISTING",
             existing_ticket_id=str(expired_reply_id),
@@ -5468,7 +5459,7 @@ def main() -> None:
             client,
             spring_url,
             "issue-28-different-message",
-            "ORDER-INTAKE-ONLY",
+            "ORDER-DELAY-UNDER-24",
             "复用身份但改变内容",
         )
         expect_status(conflict, 409)
@@ -5575,7 +5566,7 @@ def main() -> None:
                 concurrent_client,
                 spring_url,
                 boundary_headers["Idempotency-Key"],
-                "ORDER-INTAKE-ONLY",
+                "ORDER-DELAY-UNDER-24",
                 boundary_payload["message"],
                 duplicate_action="CONTINUE_EXISTING",
                 existing_ticket_id=str(exact_boundary_id),
@@ -5674,7 +5665,7 @@ def main() -> None:
             client,
             spring_url,
             "issue-28-closed-message",
-            "ORDER-INTAKE-ONLY",
+            "ORDER-DELAY-UNDER-24",
             "关闭后的后续回复",
             duplicate_action="CONTINUE_EXISTING",
             existing_ticket_id=str(exact_boundary_id),
