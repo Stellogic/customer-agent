@@ -5157,6 +5157,10 @@ def main() -> None:
             assert list(sequences) == list(range(1, len(sequences) + 1)), (
                 f"{epoch} cursor sequence is not contiguous: {sequences}"
             )
+        assigned_claim = client.post(
+            f"{spring_url}/api/support/workbench/tickets/{ticket_id}/claims",
+        )
+        expect_status(assigned_claim, 201)
         assigned_detail = client.get(
             f"{spring_url}/api/support/workbench/tickets/{ticket_id}",
         )
