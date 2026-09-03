@@ -11,6 +11,8 @@ from typing import Any
 import httpx
 import psycopg
 
+from baseline_agent.customer_intake_smoke import create_customer_ticket
+
 _SUCCESS_TEMPLATE = "ORDER-DELAY-001"
 _WAIT_SECONDS = 90
 
@@ -275,18 +277,17 @@ def _run(
         _clone_order(connection, order_reference)
     with httpx.Client(timeout=20) as client:
         _login(client, spring_url)
-        response = client.post(
-            f"{spring_url}/api/customer/tickets",
-            headers={"Idempotency-Key": str(uuid.uuid4())},
-            json={
-                "orderReference": order_reference,
-                "description": "合成客服工单正式 Flash 调查验收",
-            },
+        response = create_customer_ticket(
+            client,
+            spring_url,
+            str(uuid.uuid4()),
+            order_reference,
+            "合成客服工单正式 Flash 调查验收",
         )
         _expect(response, 201)
         ticket_id = response.json()["ticketId"]
         state = _wait_for_terminal(connection_uri, ticket_id)
-        projection_response = client.get(f"{spring_url}/api/customer/tickets/{ticket_id}")
+        projection_response = client.get(f"{spring_url}/api/customer/v2/tickets/{ticket_id}")
         _expect(projection_response, 200)
         projection = projection_response.json()
 

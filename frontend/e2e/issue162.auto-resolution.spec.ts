@@ -31,7 +31,7 @@ for (const width of [1440, 390]) {
     );
     // Keep the stream request pending so the fixture does not simulate an EOF/disconnection.
     await page.route(`**/api/customer/v2/tickets/${ticketId}/events`, () => {});
-    await page.route(`**/api/customer/tickets/${ticketId}/auto-resolution/cancel`, (route) => {
+    await page.route(`**/api/customer/v2/tickets/${ticketId}/auto-resolution/cancel`, (route) => {
       expect(route.request().postDataJSON()).toEqual({
         candidateDueAt: dueAt,
         candidateGeneration: 1,
@@ -71,7 +71,13 @@ for (const width of [1440, 390]) {
     status = "RESOLVED";
     await page.reload();
     await expect(notice.getByText("工单已自动解决", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "发送回复", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "发送回复", exact: true })).toHaveCount(0);
+    await expect(page.getByText(/如仍需帮助，请发起新的智能受理/)).toBeVisible();
+    await page.getByRole("button", { name: "发起新的智能受理" }).click();
+    await expect(page).toHaveURL(/\/help$/);
+    await expect(page.getByRole("button", { name: "开始智能受理" })).toBeVisible();
+    await expect(page.getByLabel("订单编号")).toHaveValue("");
+    await expect(page.getByLabel("问题描述")).toHaveValue("");
     await page.screenshot({ path: `/artifacts/issue162-resolved-${width}.png`, fullPage: true });
     await context.close();
   });

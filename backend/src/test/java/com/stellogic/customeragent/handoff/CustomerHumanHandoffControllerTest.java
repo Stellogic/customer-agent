@@ -29,7 +29,7 @@ class CustomerHumanHandoffControllerTest {
                 .thenReturn(new HumanHandoffResult("handoff-18", "HUMAN", false));
 
         mvc.perform(
-                        post("/api/customer/tickets/{ticketId}/human-handoff", TICKET_ID)
+                        post("/api/customer/v2/tickets/{ticketId}/human-handoff", TICKET_ID)
                                 .principal(customer())
                                 .header("Idempotency-Key", "handoff-18")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -50,7 +50,7 @@ class CustomerHumanHandoffControllerTest {
 
         mvc.perform(
                         get(
-                                        "/api/customer/tickets/{ticketId}/human-handoff-requests/{requestId}",
+                                        "/api/customer/v2/tickets/{ticketId}/human-handoff-requests/{requestId}",
                                         TICKET_ID,
                                         "handoff-18")
                                 .principal(customer()))

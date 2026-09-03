@@ -56,7 +56,7 @@ class CustomerIntakeV2ApiTest {
                                 .content(
                                         """
                                         {
-                                          "schema":"customer-intake-v1",
+                                          "schema":"customer-intake-v4",
                                           "message":"我的包裹好几天没动了，帮我看看"
                                         }
                                         """))
@@ -66,7 +66,6 @@ class CustomerIntakeV2ApiTest {
                 .andExpect(jsonPath("$.status").value("READY_TO_CONFIRM"))
                 .andExpect(jsonPath("$.candidateOrder.reference").value("ORDER-DELAY-001"))
                 .andExpect(jsonPath("$.candidateOrder.summary").value("配送中的合成订单"))
-                .andExpect(jsonPath("$.issue.kind").value("LOGISTICS_DELAY"))
                 .andExpect(jsonPath("$.issues.length()").value(1))
                 .andExpect(jsonPath("$.ticketIds.length()").value(0))
                 .andExpect(jsonPath("$.ticketId").doesNotExist())
@@ -105,7 +104,7 @@ class CustomerIntakeV2ApiTest {
                                         """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
-                .andExpect(jsonPath("$.ticketId").value(TICKET_ID.toString()))
+                .andExpect(jsonPath("$.ticketId").doesNotExist())
                 .andExpect(jsonPath("$.ticketIds[0]").value(TICKET_ID.toString()))
                 .andExpect(
                         jsonPath("$.sharedIntakeRecordId")
@@ -142,7 +141,7 @@ class CustomerIntakeV2ApiTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
-                                        {"schema":"customer-intake-v2","message":"包裹未收到且重复扣款"}
+                                        {"schema":"customer-intake-v4","message":"包裹未收到且重复扣款"}
                                         """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.schema").value("customer-intake-v4"))

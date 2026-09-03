@@ -13,10 +13,10 @@ test("Issue #152 自然语言受理先确认后建单并保持窄屏可用", asy
     (response) =>
       new URL(response.url()).pathname === "/api/customer/v2/intakes" && response.status() === 201,
   );
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
-  const initial = (await (await started).json()) as { ticketId: string | null };
+  await page.getByRole("button", { name: "开始智能受理" }).click();
+  const initial = (await (await started).json()) as { ticketIds: string[] };
 
-  expect(initial.ticketId).toBeNull();
+  expect(initial.ticketIds).toEqual([]);
   await continueAsNewIfDuplicate(page);
   await expect(page.getByRole("article", { name: "订单候选" })).toContainText(
     "ORDER-DELAY-UNDER-24",
@@ -38,9 +38,13 @@ test("Issue #152 自然语言受理先确认后建单并保持窄屏可用", asy
       ) && response.status() === 201,
   );
   await page.getByRole("button", { name: "确认，就是这个问题" }).click();
-  const result = (await (await confirmed).json()) as { ticketId: string; confirmed: boolean };
+  const result = (await (await confirmed).json()) as {
+    ticketIds: string[];
+    confirmed: boolean;
+  };
   expect(result.confirmed).toBe(true);
-  expect(result.ticketId).toMatch(/^[0-9a-f-]{36}$/i);
+  expect(result.ticketIds).toHaveLength(1);
+  expect(result.ticketIds[0]).toMatch(/^[0-9a-f-]{36}$/i);
   await expect(page.getByRole("heading", { name: /…/ })).toBeVisible();
   await context.close();
 });
@@ -54,7 +58,7 @@ test("Issue #152 受理加载和错误状态不会伪造成功", async ({ browse
     await route.fulfill({ status: 503, body: "temporarily unavailable" });
   });
   await page.getByLabel("问题描述").fill("我的包裹物流延迟了");
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await page.getByRole("button", { name: "开始智能受理" }).click();
   await expect(page.getByRole("button", { name: "正在理解你的问题…" })).toBeDisabled();
   await expect(page.getByRole("alert")).toContainText("受理未完成");
   await expect(page.getByRole("heading", { name: "请确认我的理解" })).toHaveCount(0);

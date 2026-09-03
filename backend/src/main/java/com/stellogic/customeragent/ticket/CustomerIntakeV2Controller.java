@@ -21,8 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 @ConditionalOnProperty(name = "baseline.migrate-only", havingValue = "false", matchIfMissing = true)
 public final class CustomerIntakeV2Controller {
     static final String SCHEMA = "customer-intake-v4";
-    private static final Set<String> ACCEPTED_SCHEMAS =
-            Set.of(SCHEMA, "customer-intake-v3", "customer-intake-v2", "customer-intake-v1");
     private static final Set<String> START_FIELDS = Set.of("schema", "message");
     private static final Set<String> REPLY_FIELDS = Set.of("schema", "message", "expectedVersion");
     private static final Set<String> DUPLICATE_FIELDS =
@@ -145,7 +143,7 @@ public final class CustomerIntakeV2Controller {
         if (!request.keySet().equals(START_FIELDS)) {
             throw new InvalidCustomerRequestException("请求字段与受理契约不一致");
         }
-        if (!ACCEPTED_SCHEMAS.contains(request.get("schema"))) {
+        if (!SCHEMA.equals(request.get("schema"))) {
             throw new IncompatibleCustomerSchemaException();
         }
         return new MessageRequest(
@@ -200,10 +198,8 @@ public final class CustomerIntakeV2Controller {
             UUID intakeId,
             String status,
             CandidateOrder candidateOrder,
-            ProposedIssue issue,
             java.util.List<ProposedIssue> issues,
             String assistantMessage,
-            UUID ticketId,
             java.util.List<UUID> ticketIds,
             UUID sharedIntakeRecordId,
             java.util.List<DuplicateMatch> duplicateMatches,
@@ -225,18 +221,13 @@ public final class CustomerIntakeV2Controller {
                     snapshot.issues().stream()
                             .map(value -> new ProposedIssue(value.kind(), value.summary()))
                             .toList();
-            ProposedIssue issue = issues.size() == 1 ? issues.getFirst() : null;
-            UUID ticketId =
-                    snapshot.ticketIds().size() == 1 ? snapshot.ticketIds().getFirst() : null;
             return new IntakeResponse(
                     SCHEMA,
                     snapshot.intakeId(),
                     snapshot.status(),
                     candidate,
-                    issue,
                     issues,
                     snapshot.assistantMessage(),
-                    ticketId,
                     snapshot.ticketIds(),
                     snapshot.sharedIntakeRecordId(),
                     snapshot.duplicateMatches().stream().map(DuplicateMatch::from).toList(),

@@ -34,17 +34,13 @@ public final class SupportWorkbenchController {
     @GetMapping("/snapshot")
     ResponseEntity<?> snapshot(
             Authentication authentication,
-            @RequestParam(
-                            value = "schema",
-                            defaultValue = SupportWorkbenchProjectionService.LEGACY_EPOCH)
+            @RequestParam(value = "schema", defaultValue = SupportWorkbenchProjectionService.EPOCH)
                     String schema) {
         String supportId = authentication.getName();
         SupportWorkbenchSnapshot snapshot = service.snapshot(supportId, schema);
-        Object response =
-                SupportWorkbenchProjectionService.LEGACY_EPOCH.equals(snapshot.epoch())
-                        ? LegacySnapshotResponse.from(snapshot)
-                        : SnapshotResponse.from(snapshot);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(response);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(SnapshotResponse.from(snapshot));
     }
 
     @GetMapping("/tickets/{ticketId}")
@@ -211,33 +207,6 @@ public final class SupportWorkbenchController {
         }
     }
 
-    record LegacySnapshotResponse(
-            String view,
-            String schema,
-            String cursor,
-            List<LegacyQueueItem> sharedQueue,
-            List<LegacyQueueItem> escalationQueue) {
-        static LegacySnapshotResponse from(SupportWorkbenchSnapshot snapshot) {
-            return new LegacySnapshotResponse(
-                    "SUPPORT_WORKBENCH",
-                    snapshot.epoch(),
-                    snapshot.epoch() + ":" + snapshot.sequence(),
-                    legacyItems(snapshot.sharedQueue()),
-                    legacyItems(snapshot.escalationQueue()));
-        }
-    }
-
-    record LegacyQueueItem(
-            UUID ticketId,
-            SupportTicketLifecycleState lifecycleState,
-            SupportHandlingMode handlingMode,
-            java.time.Instant enteredAt) {
-        static LegacyQueueItem from(SupportQueueItem item) {
-            return new LegacyQueueItem(
-                    item.ticketId(), item.lifecycleState(), item.handlingMode(), item.enteredAt());
-        }
-    }
-
     record PublicReplyResponse(
             String schema,
             UUID ticketId,
@@ -288,9 +257,5 @@ public final class SupportWorkbenchController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "重分配请求格式无效");
         }
         return target.trim();
-    }
-
-    private static List<LegacyQueueItem> legacyItems(List<SupportQueueItem> items) {
-        return items.stream().map(LegacyQueueItem::from).toList();
     }
 }

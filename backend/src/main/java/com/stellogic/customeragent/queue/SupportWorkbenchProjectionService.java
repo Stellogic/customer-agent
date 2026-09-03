@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 class SupportWorkbenchProjectionService {
-    static final String LEGACY_EPOCH = "support-workbench-v1";
     static final String EPOCH = "support-workbench-v2";
     private static final Set<SupportTicketLifecycleState> PUBLIC_REPLY_LIFECYCLE_STATES =
             Set.of(
@@ -476,7 +475,7 @@ class SupportWorkbenchProjectionService {
     }
 
     private static void requireSupportedEpoch(String epoch) {
-        if (!EPOCH.equals(epoch) && !LEGACY_EPOCH.equals(epoch)) {
+        if (!EPOCH.equals(epoch)) {
             throw new SupportWorkbenchCursorException();
         }
     }

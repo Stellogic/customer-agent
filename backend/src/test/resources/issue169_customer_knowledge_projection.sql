@@ -21,15 +21,15 @@ begin
     order by t.created_at desc limit 1;
     if ticket is null then raise exception 'prepare a synthetic AGENT ticket before this focused test'; end if;
 
-    select coalesce(max(sequence),0)+1 into next_sequence from customer_public_event where ticket_id=ticket and epoch='customer-public-v1';
+    select coalesce(max(sequence),0)+1 into next_sequence from customer_public_event where ticket_id=ticket and epoch='public-conversation-v2';
     insert into customer_public_event(ticket_id,epoch,sequence,agent_generation,event_type,payload,occurred_at)
-    values (ticket,'customer-public-v1',next_sequence,generation_number,'PUBLIC_MESSAGE_APPENDED',
+    values (ticket,'public-conversation-v2',next_sequence,generation_number,'PUBLIC_MESSAGE_APPENDED',
         jsonb_build_object('author','AGENT','body','测试回复','sentAt','2026-09-01T00:00:00Z','knowledge',projection),now()),
-        (ticket,'customer-public-v1',next_sequence+1,generation_number,'PUBLIC_MESSAGE_APPENDED',
+        (ticket,'public-conversation-v2',next_sequence+1,generation_number,'PUBLIC_MESSAGE_APPENDED',
         jsonb_build_object('author','SUPPORT','body','旧格式回复','sentAt','2026-09-01T00:00:00Z'),now());
     begin
         insert into customer_public_event(ticket_id,epoch,sequence,agent_generation,event_type,payload,occurred_at)
-        values (ticket,'customer-public-v1',next_sequence+2,generation_number,'PUBLIC_MESSAGE_APPENDED',
+        values (ticket,'public-conversation-v2',next_sequence+2,generation_number,'PUBLIC_MESSAGE_APPENDED',
             jsonb_build_object('author','CUSTOMER','body','不能自造来源','sentAt','2026-09-01T00:00:00Z','knowledge',projection),now());
         raise exception using errcode='ZX169', message='customer supplied knowledge was accepted';
     exception when raise_exception then null;

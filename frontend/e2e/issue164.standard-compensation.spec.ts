@@ -19,12 +19,14 @@ test("Issue #164 选择标准补偿并提交审批", async ({ browser }) => {
       /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(new URL(response.url()).pathname) &&
       response.status() === 201,
   );
-  await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await customer.getByRole("button", { name: "开始智能受理" }).click();
   await continueAsNewIfDuplicate(customer);
   await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
-  const created = (await (await createdResponse).json()) as { ticketId: string };
-  if (!/^[0-9a-f-]{36}$/i.test(created.ticketId)) {
-    throw new Error(`invalid ticket id: ${created.ticketId}`);
+  const created = (await (await createdResponse).json()) as { ticketIds: string[] };
+  expect(created.ticketIds).toHaveLength(1);
+  const ticketId = created.ticketIds[0];
+  if (!/^[0-9a-f-]{36}$/i.test(ticketId)) {
+    throw new Error(`invalid ticket id: ${ticketId}`);
   }
   await customer.getByRole("button", { name: "转人工处理" }).click();
   await customer.getByRole("button", { name: "确认转人工" }).click();
@@ -35,7 +37,7 @@ test("Issue #164 选择标准补偿并提交审批", async ({ browser }) => {
       SET status = 'SUPERSEDED'
       WHERE order_reference = 'ORDER-DELAY-E2E-NORMAL'
         AND status = 'PENDING_APPROVAL'
-        AND ticket_id <> '${created.ticketId}';
+        AND ticket_id <> '${ticketId}';
     UPDATE compensation_reservation
       SET status = 'RELEASED'
       WHERE order_reference = 'ORDER-DELAY-E2E-NORMAL'
@@ -51,7 +53,7 @@ test("Issue #164 选择标准补偿并提交审批", async ({ browser }) => {
   await expect(support.getByRole("heading", { name: "客服共享队列" })).toBeVisible();
 
   await support
-    .getByRole("button", { name: `领取工单 ${created.ticketId}` })
+    .getByRole("button", { name: `领取工单 ${ticketId}` })
     .first()
     .click();
   await expect(support.getByRole("dialog", { name: "确认领取工单" })).toBeVisible();
@@ -127,7 +129,7 @@ test("Issue #164 选择标准补偿并提交审批", async ({ browser }) => {
   await other.goto("/internal/support");
   await expect(other.getByRole("heading", { name: "客服共享队列" })).toBeVisible();
   await expect(other.getByRole("heading", { name: "标准补偿" })).toHaveCount(0);
-  await expect(other.getByRole("button", { name: `领取工单 ${created.ticketId}` })).toHaveCount(0);
+  await expect(other.getByRole("button", { name: `领取工单 ${ticketId}` })).toHaveCount(0);
 
   await otherContext.close();
   await supportContext.close();

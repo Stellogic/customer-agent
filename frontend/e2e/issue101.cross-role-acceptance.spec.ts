@@ -158,14 +158,14 @@ test("Issue #101 客户、客服与审批页面共享视觉语言并保持投影
   );
   await customer.getByLabel("订单编号").fill("ORDER-DELAY-UNDER-24");
   await customer.getByLabel("问题描述").fill("跨页面交互反馈验收");
-  await customer.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await customer.getByRole("button", { name: "开始智能受理" }).click();
   const customerStatus = customer.getByRole("alert");
   await assertTextAndIconStatus(customerStatus);
   await assertKeyboardAndReducedMotion(
     customer,
-    customer.getByRole("button", { name: "提交物流延迟问题" }),
+    customer.getByRole("button", { name: "开始智能受理" }),
   );
-  const customerAction = customer.getByRole("button", { name: "提交物流延迟问题" });
+  const customerAction = customer.getByRole("button", { name: "开始智能受理" });
   const customerStyle = await visualLanguage(
     customer,
     customer.locator(".help-center"),

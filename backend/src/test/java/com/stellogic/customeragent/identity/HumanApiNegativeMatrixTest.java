@@ -25,17 +25,24 @@ class HumanApiNegativeMatrixTest {
     private static final String ID = "79000000-0000-0000-0000-000000000001";
     private static final List<ApiRequest> CUSTOMER_APIS =
             List.of(
-                    getApi("/api/customer/tickets"),
-                    getApi("/api/customer/tickets/" + ID),
-                    getApi("/api/customer/tickets/" + ID + "/events"),
+                    getApi("/api/customer/v2/tickets"),
+                    getApi("/api/customer/v2/tickets/" + ID),
+                    getApi("/api/customer/v2/tickets/" + ID + "/events"),
                     postApi("/api/customer/v2/intakes"),
                     postApi("/api/customer/v2/intakes/" + ID + "/messages"),
-                    postApi("/api/customer/tickets"),
-                    postApi("/api/customer/tickets/" + ID + "/clarifications/" + ID + "/replies"),
-                    getApi("/api/customer/tickets/" + ID + "/clarification-resumes/" + ID),
-                    postApi("/api/customer/tickets/" + ID + "/human-handoff"),
-                    getApi("/api/customer/tickets/" + ID + "/human-handoff-requests/request-79"),
-                    postApi("/api/customer/tickets/" + ID + "/replies"));
+                    postApi("/api/customer/v2/tickets"),
+                    postApi(
+                            "/api/customer/v2/tickets/"
+                                    + ID
+                                    + "/clarifications/"
+                                    + ID
+                                    + "/replies"),
+                    getApi("/api/customer/v2/tickets/" + ID + "/clarification-resumes/" + ID),
+                    postApi("/api/customer/v2/tickets/" + ID + "/human-handoff"),
+                    getApi(
+                            "/api/customer/v2/tickets/"
+                                    + ID
+                                    + "/human-handoff-requests/request-79"));
     private static final List<ApiRequest> SUPPORT_APIS =
             List.of(
                     getApi("/api/support/queue"),

@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/customer/tickets/{ticketId}")
+@RequestMapping("/api/customer/v2/tickets/{ticketId}")
 public final class CustomerHumanHandoffController {
     private final HumanHandoffService service;
 

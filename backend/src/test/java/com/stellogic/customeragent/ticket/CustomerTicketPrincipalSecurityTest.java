@@ -32,7 +32,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @WebMvcTest(
         controllers = {
-            CustomerTicketController.class,
             CustomerTicketV2Controller.class,
             CustomerAutoResolutionController.class,
             CustomerIntakeV2Controller.class,
@@ -56,7 +55,7 @@ class CustomerTicketPrincipalSecurityTest {
 
     @Test
     void autoResolutionCancellationRequiresCustomerSessionAndCurrentCsrfToken() throws Exception {
-        String endpoint = "/api/customer/tickets/{ticketId}/auto-resolution/cancel";
+        String endpoint = "/api/customer/v2/tickets/{ticketId}/auto-resolution/cancel";
         String body = "{\"candidateDueAt\":\"2026-08-30T04:00:00Z\",\"candidateGeneration\":1}";
         MockHttpSession customer = login("customer-demo");
 
@@ -103,7 +102,7 @@ class CustomerTicketPrincipalSecurityTest {
         MockHttpSession customer = login("customer-demo");
 
         mvc.perform(
-                        get("/api/customer/tickets/{ticketId}", TICKET_ID)
+                        get("/api/customer/v2/tickets/{ticketId}", TICKET_ID)
                                 .session(customer)
                                 .header("X-Synthetic-Customer-Id", "customer-other-demo"))
                 .andExpect(status().isOk());
@@ -112,7 +111,7 @@ class CustomerTicketPrincipalSecurityTest {
     }
 
     @Test
-    void v2UsesTheSameCustomerPrincipalAndCsrfBoundaryAsV1() throws Exception {
+    void publicConversationUsesTheAuthenticatedCustomerAndCsrfBoundary() throws Exception {
         when(service.snapshot("customer-demo", TICKET_ID)).thenReturn(snapshot());
         MockHttpSession customer = login("customer-demo");
 
@@ -121,28 +120,13 @@ class CustomerTicketPrincipalSecurityTest {
                                 .session(customer)
                                 .header("X-Synthetic-Customer-Id", "customer-other-demo"))
                 .andExpect(status().isOk());
-        mvc.perform(
-                        post("/api/customer/v2/tickets")
-                                .session(customer)
-                                .header("Idempotency-Key", "issue-151-create")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        """
-                                        {
-                                          "schema":"public-conversation-v2",
-                                          "orderReference":"ORDER-DELAY-001",
-                                          "description":"物流延迟"
-                                        }
-                                        """))
-                .andExpect(status().isForbidden());
-
         verify(service, atLeastOnce()).snapshot("customer-demo", TICKET_ID);
     }
 
     @Test
     void naturalLanguageIntakeUsesTheAuthenticatedCustomerAndCsrfBoundary() throws Exception {
         MockHttpSession customer = login("customer-demo");
-        String body = "{\"schema\":\"customer-intake-v1\",\"message\":\"我的包裹好几天没动了\"}";
+        String body = "{\"schema\":\"customer-intake-v4\",\"message\":\"我的包裹好几天没动了\"}";
 
         mvc.perform(
                         post("/api/customer/v2/intakes")
@@ -156,12 +140,12 @@ class CustomerTicketPrincipalSecurityTest {
     @Test
     void anonymousAndInternalSessionsCannotUseForgedCustomerHeaders() throws Exception {
         mvc.perform(
-                        get("/api/customer/tickets/{ticketId}", TICKET_ID)
+                        get("/api/customer/v2/tickets/{ticketId}", TICKET_ID)
                                 .header("X-Synthetic-Customer-Id", "customer-demo"))
                 .andExpect(status().isUnauthorized());
 
         mvc.perform(
-                        get("/api/customer/tickets/{ticketId}", TICKET_ID)
+                        get("/api/customer/v2/tickets/{ticketId}", TICKET_ID)
                                 .session(login("support-demo"))
                                 .header("X-Synthetic-Customer-Id", "customer-demo"))
                 .andExpect(status().isForbidden());
@@ -169,12 +153,13 @@ class CustomerTicketPrincipalSecurityTest {
 
     @Test
     void customerWritesRequireTheCurrentSessionCsrfToken() throws Exception {
-        when(service.create(any())).thenReturn(new TicketCreationResult(TICKET_ID, false));
+        when(service.appendMessage(any()))
+                .thenReturn(new CustomerMessageResult(TICKET_ID, "ACCEPTED", false));
         MockHttpSession customer = login("customer-demo");
-        String body = "{\"orderReference\":\"ORDER-DELAY-001\",\"description\":\"物流延迟\"}";
+        String body = "{\"schema\":\"public-conversation-v2\",\"message\":\"补充物流信息\"}";
 
         mvc.perform(
-                        post("/api/customer/tickets")
+                        post("/api/customer/v2/tickets/{ticketId}/messages", TICKET_ID)
                                 .session(customer)
                                 .header("Idempotency-Key", "issue-74-create")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -186,14 +171,14 @@ class CustomerTicketPrincipalSecurityTest {
                         .andExpect(status().isOk())
                         .andReturn();
         mvc.perform(
-                        post("/api/customer/tickets")
+                        post("/api/customer/v2/tickets/{ticketId}/messages", TICKET_ID)
                                 .session(customer)
                                 .header("X-CSRF-TOKEN", token(csrf))
                                 .header("X-Synthetic-Customer-Id", "customer-other-demo")
                                 .header("Idempotency-Key", "issue-74-create")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
     }
 
     private MockHttpSession login(String username) throws Exception {
@@ -222,7 +207,7 @@ class CustomerTicketPrincipalSecurityTest {
                 "AGENT",
                 Instant.parse("2026-08-22T00:00:00Z"),
                 Instant.parse("2026-08-22T00:00:01Z"),
-                "customer-public-v1",
+                "public-conversation-v2",
                 1,
                 1,
                 List.of(),

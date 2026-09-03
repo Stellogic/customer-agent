@@ -11,6 +11,7 @@ from pathlib import Path
 import httpx
 import psycopg
 
+from baseline_agent.customer_intake_smoke import create_customer_ticket
 from smoke import collect_investigation_facts, evidence_sufficiency, expect_status, login_human
 
 START = datetime.datetime(2026, 8, 9, 14, tzinfo=datetime.UTC)
@@ -270,7 +271,7 @@ class Acceptance:
             )
             expect_status(
                 client.post(
-                    f"{self.spring}/api/customer/tickets/{self.ticket('cancel')}/auto-resolution/cancel",
+                    f"{self.spring}/api/customer/v2/tickets/{self.ticket('cancel')}/auto-resolution/cancel",
                     json={"candidateDueAt": DUE.isoformat(), "candidateGeneration": 2},
                 ),
                 409,
@@ -279,7 +280,7 @@ class Acceptance:
             for _ in range(2):
                 expect_status(
                     client.post(
-                        f"{self.spring}/api/customer/tickets/{self.ticket('cancel')}/auto-resolution/cancel",
+                        f"{self.spring}/api/customer/v2/tickets/{self.ticket('cancel')}/auto-resolution/cancel",
                         json={"candidateDueAt": DUE.isoformat(), "candidateGeneration": 1},
                     ),
                     204,
@@ -400,17 +401,17 @@ class Acceptance:
         case = "completed-check"
         with httpx.Client(timeout=20) as client:
             login_human(client, self.spring, "customer-demo", ["CUSTOMER_HELP_ACCESS"])
-            response = client.post(
-                f"{self.spring}/api/customer/tickets/{self.ticket(case)}/replies",
-                headers={"Idempotency-Key": f"auto162:{self.namespace}:reopen"},
-                json={
-                    "orderReference": self.order(case),
-                    "issueKind": "LOGISTICS_DELAY",
-                    "message": "仍需帮助，请人工继续处理",
-                },
+            response = create_customer_ticket(
+                client,
+                self.spring,
+                f"auto162:{self.namespace}:reopen",
+                self.order(case),
+                "仍需帮助，请人工继续处理",
+                duplicate_action="CONTINUE_EXISTING",
+                existing_ticket_id=str(self.ticket(case)),
             )
-            expect_status(response, 200)
-            assert response.json()["outcome"] == "REOPENED"
+            expect_status(response, 201)
+            assert response.json()["ticketId"] == str(self.ticket(case))
             snapshot = client.get(f"{self.spring}/api/customer/v2/tickets/{self.ticket(case)}")
             expect_status(snapshot, 200)
             assert snapshot.json()["ticket"]["lifecycleState"] == "INVESTIGATING"

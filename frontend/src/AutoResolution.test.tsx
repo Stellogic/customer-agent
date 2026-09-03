@@ -80,7 +80,7 @@ describe("Issue #162 客户自动解决", () => {
       screen.queryByRole("button", { name: "仍需帮助，取消自动解决" }),
     ).not.toBeInTheDocument();
     const request = fetchMock.mock.calls[2];
-    expect(request[0]).toBe(`/api/customer/tickets/${ticketId}/auto-resolution/cancel`);
+    expect(request[0]).toBe(`/api/customer/v2/tickets/${ticketId}/auto-resolution/cancel`);
     expect(request[1]?.method).toBe("POST");
     expect(new Headers(request[1]?.headers).get("X-CSRF-TOKEN")).toBe("customer-csrf");
     expect(JSON.parse(String(request[1]?.body))).toEqual({

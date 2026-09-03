@@ -170,7 +170,7 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
     fireEvent.change(screen.getByLabelText("问题描述"), {
       target: { value: `Issue #29 ${scenario} 合成物流延迟验收` },
     });
-    fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始智能受理" }));
     expect(
       await screen.findByRole("heading", { name: "请确认我的理解" }, { timeout: 10_000 }),
     ).toBeInTheDocument();

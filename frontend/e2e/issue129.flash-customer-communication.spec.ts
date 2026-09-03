@@ -19,7 +19,7 @@ test("Issue #129 客户人工偏好围栏真实 Flash 迟到自动回复", async
         new URL(response.url()).pathname,
       ) && response.status() === 201,
   );
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await page.getByRole("button", { name: "开始智能受理" }).click();
   await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
   await page.getByRole("button", { name: "确认，就是这个问题" }).click();
   await createdResponse;

@@ -35,7 +35,7 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
     const description = `React 全栈验收 ${globalThis.crypto.randomUUID()}`;
     fireEvent.change(screen.getByLabelText("订单编号"), { target: { value: "ORDER-DELAY-001" } });
     fireEvent.change(screen.getByLabelText("问题描述"), { target: { value: description } });
-    fireEvent.click(screen.getByRole("button", { name: "提交物流延迟问题" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始智能受理" }));
     const intakeHeading = await screen.findByRole("heading", {
       name: /请确认我的理解|请确认是否继续既有工单/,
     });

@@ -19,7 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class JdbcCustomerTicketService implements CustomerTicketService {
-    private static final String EPOCH = "customer-public-v1";
+    private static final String EPOCH = "public-conversation-v2";
     private static final Set<String> AGENT_ISSUE_KINDS =
             Set.of("LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE");
     private static final String ACKNOWLEDGEMENT = "您的问题已受理，我们会在此公开沟通中更新进展。";

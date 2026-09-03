@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/customer/tickets")
+@RequestMapping("/api/customer/v2/tickets")
 public final class CustomerAutoResolutionController {
     private final AutoResolutionService service;
 

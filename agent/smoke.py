@@ -15,6 +15,8 @@ from functools import cache
 import httpx
 import psycopg
 
+from baseline_agent.customer_intake_smoke import create_customer_ticket
+
 
 def expect_status(response: httpx.Response, expected: int) -> None:
     if response.status_code != expected:
@@ -291,13 +293,12 @@ def run_evidence_sufficiency_path(
     order_reference: str,
 ) -> tuple[list[str], dict]:
     with customer_browser_client(spring_url) as client:
-        accepted = client.post(
-            f"{spring_url}/api/customer/tickets",
-            headers={"Idempotency-Key": f"issue-160-{uuid.uuid4()}"},
-            json={
-                "orderReference": order_reference,
-                "description": "请解释物流状态",
-            },
+        accepted = create_customer_ticket(
+            client,
+            spring_url,
+            f"issue-160-{uuid.uuid4()}",
+            order_reference,
+            "请解释物流状态",
         )
         expect_status(accepted, 201)
         ticket_id = accepted.json()["ticketId"]
@@ -398,10 +399,9 @@ def main() -> None:
             "select convalidated from pg_constraint "
             "where conname = 'synthetic_order_paid_amount_check'"
         ).fetchone() == (True,)
-
     request_id = f"smoke-{uuid.uuid4()}"
     ticket_payload = {
-        "orderReference": "ORDER-INTAKE-ONLY",
+        "orderReference": "ORDER-DELAY-UNDER-24",
         "description": "合成订单物流已经延迟多日",
     }
     ticket_headers = {
@@ -410,8 +410,12 @@ def main() -> None:
 
     def create_ticket(_: int) -> httpx.Response:
         with customer_browser_client(spring_url) as concurrent_client:
-            return concurrent_client.post(
-                f"{spring_url}/api/customer/tickets", headers=ticket_headers, json=ticket_payload
+            return create_customer_ticket(
+                concurrent_client,
+                spring_url,
+                ticket_headers["Idempotency-Key"],
+                ticket_payload["orderReference"],
+                ticket_payload["description"],
             )
 
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -430,36 +434,40 @@ def main() -> None:
             "insert into support_ticket "
             "(id, customer_id, order_reference, description, lifecycle_state, handling_mode, "
             "created_at, first_responded_at) values (%s, 'customer-other-demo', "
-            "'ORDER-INTAKE-ONLY', 'other customer boundary', 'INVESTIGATING', 'HUMAN', "
+            "'ORDER-DELAY-UNDER-24', 'other customer boundary', 'INVESTIGATING', 'HUMAN', "
             "current_timestamp, current_timestamp)",
             (other_customer_ticket_id,),
         )
 
     with httpx.Client(timeout=20.0) as anonymous_client:
         forged_anonymous = anonymous_client.get(
-            f"{spring_url}/api/customer/tickets/{ticket_id}",
+            f"{spring_url}/api/customer/v2/tickets/{ticket_id}",
         )
         expect_status(forged_anonymous, 401)
 
     with isolated_customer_browser_client(spring_url) as client:
-        conflict = client.post(
-            f"{spring_url}/api/customer/tickets",
-            headers=ticket_headers,
-            json={**ticket_payload, "description": "同一请求身份下的不同参数"},
+        conflict = create_customer_ticket(
+            client,
+            spring_url,
+            ticket_headers["Idempotency-Key"],
+            ticket_payload["orderReference"],
+            "同一请求身份下的不同参数",
         )
         expect_status(conflict, 409)
-        assert conflict.json()["code"] == "REQUEST_ID_CONFLICT"
+        conflict_snapshot = conflict.json()
+        assert conflict_snapshot["schema"] == "customer-intake-v4"
+        assert conflict_snapshot["replayed"] is True
+        assert conflict_snapshot["ticketIds"] == [str(ticket_id)]
 
         snapshot = client.get(
-            f"{spring_url}/api/customer/tickets/{ticket_id}",
+            f"{spring_url}/api/customer/v2/tickets/{ticket_id}",
         )
         expect_status(snapshot, 200)
         public_projection = snapshot.json()
-        assert public_projection["view"] == "CUSTOMER_PUBLIC"
-        assert public_projection["cursor"] == "customer-public-v1:2"
+        assert public_projection["view"] == "PUBLIC_CONVERSATION"
+        assert public_projection["cursor"] == "public-conversation-v2:2"
         assert public_projection["ticket"]["lifecycleState"] == "INVESTIGATING"
         assert public_projection["ticket"]["handlingMode"] == "AGENT"
-        assert public_projection["ticket"]["firstRespondedAt"]
         assert len(public_projection["messages"]) == 2
         assert [message["author"] for message in public_projection["messages"]] == [
             "CUSTOMER",
@@ -479,11 +487,11 @@ def main() -> None:
         assert not any(field in serialized_projection for field in forbidden_fields)
 
         denied_snapshot = client.get(
-            f"{spring_url}/api/customer/tickets/{other_customer_ticket_id}",
+            f"{spring_url}/api/customer/v2/tickets/{other_customer_ticket_id}",
         )
         expect_status(denied_snapshot, 404)
         denied_handoff = client.post(
-            f"{spring_url}/api/customer/tickets/{other_customer_ticket_id}/human-handoff",
+            f"{spring_url}/api/customer/v2/tickets/{other_customer_ticket_id}/human-handoff",
             headers={
                 "Idempotency-Key": f"other-customer-handoff-{uuid.uuid4()}",
             },
@@ -493,9 +501,9 @@ def main() -> None:
 
         with client.stream(
             "GET",
-            f"{spring_url}/api/customer/tickets/{ticket_id}/events",
+            f"{spring_url}/api/customer/v2/tickets/{ticket_id}/events",
             headers={
-                "Last-Event-ID": "customer-public-v1:0",
+                "Last-Event-ID": "public-conversation-v2:0",
             },
         ) as events:
             expect_status(events, 200)
@@ -506,12 +514,12 @@ def main() -> None:
                 if line == ":connected":
                     break
             event_stream = "\n".join(event_lines)
-            assert "id:customer-public-v1:1" in event_stream
-            assert "id:customer-public-v1:2" in event_stream
+            assert "id:public-conversation-v2:1" in event_stream
+            assert "id:public-conversation-v2:2" in event_stream
             assert not any(field in event_stream for field in forbidden_fields)
 
         restored = client.get(
-            f"{spring_url}/api/customer/tickets/{ticket_id}",
+            f"{spring_url}/api/customer/v2/tickets/{ticket_id}",
         )
         expect_status(restored, 200)
         assert restored.json() == public_projection
@@ -519,7 +527,7 @@ def main() -> None:
         logout = client.post(f"{spring_url}/api/auth/logout")
         expect_status(logout, 204)
         rejected_reconnect = client.get(
-            f"{spring_url}/api/customer/tickets/{ticket_id}/events",
+            f"{spring_url}/api/customer/v2/tickets/{ticket_id}/events",
             headers={
                 "Last-Event-ID": public_projection["cursor"],
             },
@@ -558,14 +566,12 @@ def main() -> None:
     message_fence_create_id = f"issue-158-create-{uuid.uuid4()}"
     message_fence_id = f"issue-158-message-{uuid.uuid4()}"
     with customer_browser_client(spring_url) as client:
-        created = client.post(
-            f"{spring_url}/api/customer/v2/tickets",
-            headers={"Idempotency-Key": message_fence_create_id},
-            json={
-                "schema": "public-conversation-v2",
-                "orderReference": "ORDER-ISSUE-158-FENCE",
-                "description": "请先调查这笔合成订单的物流状态",
-            },
+        created = create_customer_ticket(
+            client,
+            spring_url,
+            message_fence_create_id,
+            "ORDER-DELAY-001",
+            "请先调查这笔合成订单的物流状态",
         )
         expect_status(created, 201)
         message_fence_ticket_id = uuid.UUID(created.json()["ticketId"])
@@ -693,15 +699,13 @@ def main() -> None:
     concurrent_message_id = f"issue-158-cross-ticket-{uuid.uuid4()}"
     concurrent_ticket_ids: list[str] = []
     with customer_browser_client(spring_url) as client:
-        for index in range(2):
-            created = client.post(
-                f"{spring_url}/api/customer/v2/tickets",
-                headers={"Idempotency-Key": f"issue-158-concurrent-create-{uuid.uuid4()}"},
-                json={
-                    "schema": "public-conversation-v2",
-                    "orderReference": f"ORDER-ISSUE-158-CONCURRENT-{index}",
-                    "description": "并发消息身份隔离测试",
-                },
+        for _ in range(2):
+            created = create_customer_ticket(
+                client,
+                spring_url,
+                f"issue-158-concurrent-create-{uuid.uuid4()}",
+                "ORDER-DELAY-001",
+                "并发消息身份隔离测试",
             )
             expect_status(created, 201)
             concurrent_ticket_ids.append(created.json()["ticketId"])
@@ -959,10 +963,12 @@ def main() -> None:
         "Idempotency-Key": no_compensation_request,
     }
     with customer_browser_client(spring_url) as client:
-        accepted = client.post(
-            f"{spring_url}/api/customer/tickets",
-            headers=no_compensation_headers,
-            json=no_compensation_payload,
+        accepted = create_customer_ticket(
+            client,
+            spring_url,
+            no_compensation_headers["Idempotency-Key"],
+            no_compensation_payload["orderReference"],
+            no_compensation_payload["description"],
         )
         expect_status(accepted, 201)
         assert accepted.json()["accepted"] is True
@@ -970,7 +976,7 @@ def main() -> None:
         resolved_projection = None
         for _ in range(60):
             snapshot = client.get(
-                f"{spring_url}/api/customer/tickets/{resolved_ticket_id}",
+                f"{spring_url}/api/customer/v2/tickets/{resolved_ticket_id}",
             )
             expect_status(snapshot, 200)
             resolved_projection = snapshot.json()
@@ -989,7 +995,6 @@ def main() -> None:
         assert candidate.json()["autoResolution"]["status"] == "PENDING"
         assert candidate.json()["autoResolution"]["dueAt"] is not None
         assert resolved_projection["ticket"]["handlingMode"] == "AGENT"
-        assert resolved_projection["ticket"]["createdAt"] == "2026-08-09T14:00:00Z"
         assert len(resolved_projection["messages"]) == 3
         assert resolved_projection["messages"][-1]["author"] == "AGENT"
         assert "不足 24 小时" in resolved_projection["messages"][-1]["body"]
@@ -1428,15 +1433,12 @@ def main() -> None:
     proposal_request = f"issue-15-{uuid.uuid4()}"
     proposal_order_reference = "ORDER-DELAY-001"
     with customer_browser_client(spring_url) as client:
-        accepted = client.post(
-            f"{spring_url}/api/customer/tickets",
-            headers={
-                "Idempotency-Key": proposal_request,
-            },
-            json={
-                "orderReference": proposal_order_reference,
-                "description": "合成订单物流延迟八十小时",
-            },
+        accepted = create_customer_ticket(
+            client,
+            spring_url,
+            proposal_request,
+            proposal_order_reference,
+            "合成订单物流延迟八十小时",
         )
         expect_status(accepted, 201)
         proposal_ticket_id = accepted.json()["ticketId"]
@@ -1534,7 +1536,7 @@ def main() -> None:
 
     with customer_browser_client(spring_url) as client:
         customer_view = client.get(
-            f"{spring_url}/api/customer/tickets/{proposal_ticket_id}",
+            f"{spring_url}/api/customer/v2/tickets/{proposal_ticket_id}",
         )
         expect_status(customer_view, 200)
         projection = customer_view.json()
@@ -1543,7 +1545,12 @@ def main() -> None:
         assert "等待人工审批" in projection["messages"][-1]["body"]
         serialized = json.dumps(projection)
         assert not any(field in serialized for field in forbidden_fields)
-        assert "26.80" not in serialized and "SIMULATED_PARTIAL_REFUND" not in serialized
+        assert projection["pendingCompensation"] == {
+            "compensationMethod": "SIMULATED_PARTIAL_REFUND",
+            "amount": "26.80",
+            "currency": "CNY",
+            "status": "PENDING_REVIEW",
+        }
 
     try:
         with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -1585,7 +1592,8 @@ def main() -> None:
             expect_status(denied, 401)
         with httpx.Client(timeout=20.0) as anonymous_client:
             approver_customer_detail = anonymous_client.get(
-                f"{spring_url}/api/customer/tickets/{proposal_ticket_id}", headers=approver_headers
+                f"{spring_url}/api/customer/v2/tickets/{proposal_ticket_id}",
+                headers=approver_headers,
             )
             expect_status(approver_customer_detail, 403)
         approver_support_detail = client.get(
@@ -1721,7 +1729,7 @@ def main() -> None:
         expect_status(invisible_proposal, 404)
         incompatible_cursor = client.get(
             f"{spring_url}/api/approver/compensation-proposals/{first_revision_id}/approval-view/events",
-            headers={**lease_headers, "Last-Event-ID": "support-workbench-v1:1"},
+            headers={**lease_headers, "Last-Event-ID": "support-workbench-v2:1"},
         )
         expect_status(incompatible_cursor, 409)
 
@@ -2688,15 +2696,12 @@ def main() -> None:
 
     reserved_request = f"issue-55-{uuid.uuid4()}"
     with customer_browser_client(spring_url) as client:
-        reserved_ticket = client.post(
-            f"{spring_url}/api/customer/tickets",
-            headers={
-                "Idempotency-Key": reserved_request,
-            },
-            json={
-                "orderReference": "ORDER-DELAY-APPROVAL-RESERVED",
-                "description": "已有额度预占时仍可审批的合成场景",
-            },
+        reserved_ticket = create_customer_ticket(
+            client,
+            spring_url,
+            reserved_request,
+            "ORDER-DELAY-APPROVAL-RESERVED",
+            "已有额度预占时仍可审批的合成场景",
         )
         expect_status(reserved_ticket, 201)
         reserved_ticket_id = uuid.UUID(reserved_ticket.json()["ticketId"])
@@ -2855,7 +2860,7 @@ def main() -> None:
         )
         expect_status(reject_after_approval, 409)
         approval_customer = client.get(
-            f"{spring_url}/api/customer/tickets/{approval_ticket_id}",
+            f"{spring_url}/api/customer/v2/tickets/{approval_ticket_id}",
         )
         expect_status(approval_customer, 200)
         approval_customer_payload = approval_customer.json()
@@ -2990,7 +2995,7 @@ def main() -> None:
         assert unknown.json()["status"] == "UNKNOWN"
         assert unknown.json()["customerMessage"] == "补偿结果正在自动确认中，请勿重复提交。"
         unknown_customer = client.get(
-            f"{spring_url}/api/customer/tickets/{approval_ticket_id}",
+            f"{spring_url}/api/customer/v2/tickets/{approval_ticket_id}",
         )
         expect_status(unknown_customer, 200)
         assert (
@@ -3080,7 +3085,7 @@ def main() -> None:
         )
         expect_status(terminal_claim_identity_conflict, 409)
         execution_customer = client.get(
-            f"{spring_url}/api/customer/tickets/{approval_ticket_id}",
+            f"{spring_url}/api/customer/v2/tickets/{approval_ticket_id}",
         )
         expect_status(execution_customer, 200)
         execution_customer_payload = execution_customer.json()
@@ -3459,7 +3464,7 @@ def main() -> None:
             assert terminal_success_replay.json() == {**coupon_success.json(), "replayed": True}
             assert_success_sla_projection(ticket)
             customer = client.get(
-                f"{spring_url}/api/customer/tickets/{ticket}",
+                f"{spring_url}/api/customer/v2/tickets/{ticket}",
             )
             expect_status(customer, 200)
             assert customer.json()["ticket"]["lifecycleState"] == "RESOLVED"
@@ -3819,7 +3824,7 @@ def main() -> None:
         )
         expect_status(rejected_view, 409)
         rejection_customer = client.get(
-            f"{spring_url}/api/customer/tickets/{rejection_ticket_id}",
+            f"{spring_url}/api/customer/v2/tickets/{rejection_ticket_id}",
         )
         expect_status(rejection_customer, 200)
         rejection_projection = rejection_customer.json()
@@ -3963,12 +3968,12 @@ def main() -> None:
     rejected_ticket_ids = []
     with customer_browser_client(spring_url) as client:
         for order_reference, expected_reason in rejection_cases.items():
-            response = client.post(
-                f"{spring_url}/api/customer/tickets",
-                headers={
-                    "Idempotency-Key": f"reject-{uuid.uuid4()}",
-                },
-                json={"orderReference": order_reference, "description": "不合法补偿提案验收"},
+            response = create_customer_ticket(
+                client,
+                spring_url,
+                f"reject-{uuid.uuid4()}",
+                order_reference,
+                "不合法补偿提案验收",
             )
             expect_status(response, 201)
             rejected_id = uuid.UUID(response.json()["ticketId"])
@@ -3992,22 +3997,70 @@ def main() -> None:
             assert observed and proposal_count == 0, (order_reference, expected_reason)
 
     def create_ambiguous_ticket(label: str) -> tuple[str, dict]:
-        with customer_browser_client(spring_url) as client:
-            response = client.post(
-                f"{spring_url}/api/customer/tickets",
-                headers={
-                    "Idempotency-Key": f"clarification-{label}-{uuid.uuid4()}",
-                },
-                json={
-                    "orderReference": "ORDER-DELAY-AMBIGUOUS",
-                    "description": "请解释物流状态",
-                },
+        created_id = uuid.uuid4()
+        generation_id = uuid.uuid4()
+        thread_id = uuid.uuid4()
+        submission_id = uuid.uuid4()
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            now = datetime.datetime.now(datetime.UTC)
+            connection.execute(
+                "insert into support_ticket "
+                "(id, customer_id, order_reference, description, issue_kind, lifecycle_state, "
+                "handling_mode, created_at, first_responded_at, resolution_running_since) "
+                "values (%s, 'customer-demo', 'ORDER-DELAY-AMBIGUOUS', %s, "
+                "'LOGISTICS_DELAY', 'INVESTIGATING', 'AGENT', %s, %s, %s)",
+                (created_id, "请解释物流状态", now, now, now),
             )
-            expect_status(response, 201)
-            created_id = response.json()["ticketId"]
+            connection.execute(
+                "insert into agent_processing_generation "
+                "(id, ticket_id, generation_number, thread_id, status, created_at) "
+                "values (%s, %s, 1, %s, 'ACTIVE', %s)",
+                (generation_id, created_id, thread_id, now),
+            )
+            connection.execute(
+                "insert into agent_submission "
+                "(submission_request_id, generation_id, thread_id, parameter_digest, status, "
+                "next_attempt_at, created_at) values (%s, %s, %s, %s, 'PENDING', %s, %s)",
+                (submission_id, generation_id, thread_id, label, now, now),
+            )
+            connection.execute(
+                "insert into public_message "
+                "(id, ticket_id, message_sequence, author, body, sent_at) values "
+                "(%s, %s, 1, 'CUSTOMER', %s, %s), "
+                "(%s, %s, 2, 'SUPPORT', %s, %s)",
+                (
+                    uuid.uuid4(),
+                    created_id,
+                    "请解释物流状态",
+                    now,
+                    uuid.uuid4(),
+                    created_id,
+                    "您的问题已受理，我们会在此公开沟通中更新进展。",
+                    now,
+                ),
+            )
+            connection.execute(
+                "insert into customer_public_event "
+                "(ticket_id, epoch, sequence, agent_generation, event_type, payload, occurred_at) "
+                "values (%s, 'public-conversation-v2', 1, 1, 'TICKET_ACCEPTED', "
+                "jsonb_build_object('ticketId', %s::text, 'lifecycleState', 'INVESTIGATING', "
+                "'handlingMode', 'AGENT'), %s), "
+                "(%s, 'public-conversation-v2', 2, 1, 'PUBLIC_MESSAGE_APPENDED', "
+                "jsonb_build_object('author', 'SUPPORT', 'body', %s::text, 'sentAt', %s), %s)",
+                (
+                    created_id,
+                    created_id,
+                    now,
+                    created_id,
+                    "您的问题已受理，我们会在此公开沟通中更新进展。",
+                    now,
+                    now,
+                ),
+            )
+        with customer_browser_client(spring_url) as client:
             for _ in range(80):
                 projection_response = client.get(
-                    f"{spring_url}/api/customer/tickets/{created_id}",
+                    f"{spring_url}/api/customer/v2/tickets/{created_id}",
                 )
                 expect_status(projection_response, 200)
                 projection = projection_response.json()
@@ -4015,7 +4068,7 @@ def main() -> None:
                     projection["ticket"]["lifecycleState"] == "WAITING_FOR_CUSTOMER"
                     and projection["clarification"]
                 ):
-                    return created_id, projection
+                    return str(created_id), projection
                 time.sleep(0.25)
         raise AssertionError("clarification request was not published")
 
@@ -4041,7 +4094,7 @@ def main() -> None:
     resume_request_id = str(uuid.uuid4())
     reply_message_id = f"message-{uuid.uuid4()}"
     reply_url = (
-        f"{spring_url}/api/customer/tickets/{clarification_ticket_id}/clarifications/"
+        f"{spring_url}/api/customer/v2/tickets/{clarification_ticket_id}/clarifications/"
         f"{clarification_request_id}/replies"
     )
     with customer_browser_client(spring_url) as client:
@@ -4095,7 +4148,7 @@ def main() -> None:
         resume_status = None
         for _ in range(80):
             queried = client.get(
-                f"{spring_url}/api/customer/tickets/{clarification_ticket_id}/clarification-resumes/{resume_request_id}",
+                f"{spring_url}/api/customer/v2/tickets/{clarification_ticket_id}/clarification-resumes/{resume_request_id}",
             )
             expect_status(queried, 200)
             resume_status = queried.json()["status"]
@@ -4107,7 +4160,7 @@ def main() -> None:
         resumed_projection = None
         for _ in range(80):
             projection_response = client.get(
-                f"{spring_url}/api/customer/tickets/{clarification_ticket_id}",
+                f"{spring_url}/api/customer/v2/tickets/{clarification_ticket_id}",
             )
             expect_status(projection_response, 200)
             resumed_projection = projection_response.json()
@@ -4208,7 +4261,7 @@ def main() -> None:
         reply_barrier.wait()
         with customer_browser_client(spring_url) as client:
             response = client.post(
-                f"{spring_url}/api/customer/tickets/{concurrent_ticket_id}/clarifications/{concurrent_request_id}/replies",
+                f"{spring_url}/api/customer/v2/tickets/{concurrent_ticket_id}/clarifications/{concurrent_request_id}/replies",
                 headers={
                     "Idempotency-Key": f"concurrent-message-{uuid.uuid4()}",
                     "X-Resume-Request-Id": str(uuid.uuid4()),
@@ -4246,7 +4299,7 @@ def main() -> None:
         ).fetchone()[0]
 
     handoff_request_id = f"handoff-{uuid.uuid4()}"
-    handoff_url = f"{spring_url}/api/customer/tickets/{handoff_ticket_id}/human-handoff"
+    handoff_url = f"{spring_url}/api/customer/v2/tickets/{handoff_ticket_id}/human-handoff"
     handoff_headers = {
         "Idempotency-Key": handoff_request_id,
     }
@@ -4276,11 +4329,11 @@ def main() -> None:
         )
         expect_status(conflicting_handoff, 409)
         handoff_status = client.get(
-            f"{spring_url}/api/customer/tickets/{handoff_ticket_id}/human-handoff-requests/{handoff_request_id}",
+            f"{spring_url}/api/customer/v2/tickets/{handoff_ticket_id}/human-handoff-requests/{handoff_request_id}",
         )
         expect_status(handoff_status, 200)
         restored_handoff = client.get(
-            f"{spring_url}/api/customer/tickets/{handoff_ticket_id}",
+            f"{spring_url}/api/customer/v2/tickets/{handoff_ticket_id}",
         )
         expect_status(restored_handoff, 200)
         handoff_public = restored_handoff.json()
@@ -4293,7 +4346,7 @@ def main() -> None:
         assert "CUSTOMER_REQUESTED" not in json.dumps(handoff_public)
 
         stale_reply_after_handoff = client.post(
-            f"{spring_url}/api/customer/tickets/{handoff_ticket_id}/clarifications/"
+            f"{spring_url}/api/customer/v2/tickets/{handoff_ticket_id}/clarifications/"
             f"{handoff_clarification_id}/replies",
             headers={
                 "Idempotency-Key": f"late-reply-{uuid.uuid4()}",
@@ -4548,7 +4601,7 @@ def main() -> None:
         )
         expect_status(stale_new_handoff, 403)
         agent_handoff_public_response = client.get(
-            f"{spring_url}/api/customer/tickets/{agent_handoff_ticket_id}",
+            f"{spring_url}/api/customer/v2/tickets/{agent_handoff_ticket_id}",
         )
         expect_status(agent_handoff_public_response, 200)
         agent_handoff_public = agent_handoff_public_response.json()
@@ -4670,7 +4723,7 @@ def main() -> None:
     resolved_handoff_request_id = f"resolved-handoff-{uuid.uuid4()}"
     with customer_browser_client(spring_url) as client:
         resolved_handoff = client.post(
-            f"{spring_url}/api/customer/tickets/{resolved_ticket_id}/human-handoff",
+            f"{spring_url}/api/customer/v2/tickets/{resolved_ticket_id}/human-handoff",
             headers={
                 "Idempotency-Key": resolved_handoff_request_id,
             },
@@ -4717,7 +4770,7 @@ def main() -> None:
         race_barrier.wait()
         with customer_browser_client(spring_url) as client:
             response = client.post(
-                f"{spring_url}/api/customer/tickets/{race_ticket_id}/human-handoff",
+                f"{spring_url}/api/customer/v2/tickets/{race_ticket_id}/human-handoff",
                 headers={
                     "Idempotency-Key": race_handoff_id,
                 },
@@ -4729,7 +4782,7 @@ def main() -> None:
         race_barrier.wait()
         with customer_browser_client(spring_url) as client:
             response = client.post(
-                f"{spring_url}/api/customer/tickets/{race_ticket_id}/clarifications/"
+                f"{spring_url}/api/customer/v2/tickets/{race_ticket_id}/clarifications/"
                 f"{race_clarification_id}/replies",
                 headers={
                     "Idempotency-Key": f"race-reply-{uuid.uuid4()}",
@@ -4773,7 +4826,7 @@ def main() -> None:
         )
     with customer_browser_client(spring_url) as client:
         superseded = client.post(
-            f"{spring_url}/api/customer/tickets/{superseded_ticket_id}/clarifications/"
+            f"{spring_url}/api/customer/v2/tickets/{superseded_ticket_id}/clarifications/"
             f"{superseded_projection['clarification']['id']}/replies",
             headers={
                 "Idempotency-Key": f"superseded-{uuid.uuid4()}",
@@ -4845,7 +4898,7 @@ def main() -> None:
         )
     with customer_browser_client(spring_url) as client:
         human_preference = client.post(
-            f"{spring_url}/api/customer/tickets/{human_ticket_id}/clarifications/"
+            f"{spring_url}/api/customer/v2/tickets/{human_ticket_id}/clarifications/"
             f"{human_projection['clarification']['id']}/replies",
             headers={
                 "Idempotency-Key": f"human-pref-{uuid.uuid4()}",
@@ -4862,7 +4915,7 @@ def main() -> None:
         )
     with customer_browser_client(spring_url) as client:
         handed_off = client.post(
-            f"{spring_url}/api/customer/tickets/{human_ticket_id}/clarifications/"
+            f"{spring_url}/api/customer/v2/tickets/{human_ticket_id}/clarifications/"
             f"{human_projection['clarification']['id']}/replies",
             headers={
                 "Idempotency-Key": f"human-mode-{uuid.uuid4()}",
@@ -4877,10 +4930,12 @@ def main() -> None:
         "Idempotency-Key": f"sla-first-warning-{uuid.uuid4()}",
     }
     with customer_browser_client(spring_url) as client:
-        first_warning_response = client.post(
-            f"{spring_url}/api/customer/tickets",
-            headers=first_warning_headers,
-            json={"orderReference": "ORDER-INTAKE-ONLY", "description": "首次响应边界验收"},
+        first_warning_response = create_customer_ticket(
+            client,
+            spring_url,
+            first_warning_headers["Idempotency-Key"],
+            "ORDER-DELAY-UNDER-24",
+            "首次响应边界验收",
         )
         expect_status(first_warning_response, 201)
         first_warning_ticket_id = uuid.UUID(first_warning_response.json()["ticketId"])
@@ -4888,15 +4943,15 @@ def main() -> None:
     ticket_uuid = uuid.UUID(ticket_id)
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         connection.execute(
+            "update support_ticket set created_at = %s::timestamptz - interval '15 minutes', "
+            "first_responded_at = %s, lifecycle_state = 'WAITING_FOR_CUSTOMER', handling_mode = 'HUMAN', "
+            "resolution_elapsed_seconds = 86399, resolution_running_since = null where id = %s",
+            (fixed_now, fixed_now, ticket_uuid),
+        )
+        connection.execute(
             "insert into support_assignment (id, ticket_id, support_id, status, assigned_at) "
             "values (%s, %s, 'support-demo', 'ACTIVE', %s)",
             (uuid.uuid4(), ticket_uuid, fixed_now),
-        )
-        connection.execute(
-            "update support_ticket set created_at = %s::timestamptz - interval '15 minutes', "
-            "first_responded_at = %s, lifecycle_state = 'WAITING_FOR_CUSTOMER', "
-            "resolution_elapsed_seconds = 86399, resolution_running_since = null where id = %s",
-            (fixed_now, fixed_now, ticket_uuid),
         )
         connection.execute(
             "update support_ticket set created_at = %s::timestamptz - interval '12 minutes', "
@@ -4930,9 +4985,26 @@ def main() -> None:
     assert resolution_warning_facts == [("WARNING",)]
     assert paused_resolution_breach == 0
 
+    assigned_notification_objectives = set()
+    for _ in range(40):
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            assigned_notification_objectives = {
+                row[0]
+                for row in connection.execute(
+                    "select objective from support_sla_notification "
+                    "where ticket_id = %s and support_id = 'support-demo'",
+                    (ticket_uuid,),
+                ).fetchall()
+            }
+        if assigned_notification_objectives == {"FIRST_RESPONSE", "RESOLUTION"}:
+            break
+        time.sleep(0.25)
+    assert assigned_notification_objectives == {"FIRST_RESPONSE", "RESOLUTION"}
+
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         connection.execute(
             "update support_ticket set lifecycle_state = 'WAITING_FOR_EXTERNAL', "
+            "handling_mode = 'AGENT', "
             "resolution_running_since = %s::timestamptz - interval '1 second' where id = %s",
             (fixed_now, ticket_uuid),
         )
@@ -4956,13 +5028,19 @@ def main() -> None:
     ]
 
     with customer_browser_client(spring_url) as client:
-        notifications = client.get(
-            f"{spring_url}/api/support/sla/notifications",
-        )
-        expect_status(notifications, 200)
-        assert {
-            item["objective"] for item in notifications.json() if item["ticketId"] == ticket_id
-        } == {"FIRST_RESPONSE", "RESOLUTION"}
+        notification_objectives = set()
+        for _ in range(40):
+            notifications = client.get(
+                f"{spring_url}/api/support/sla/notifications",
+            )
+            expect_status(notifications, 200)
+            notification_objectives = {
+                item["objective"] for item in notifications.json() if item["ticketId"] == ticket_id
+            }
+            if notification_objectives == {"FIRST_RESPONSE", "RESOLUTION"}:
+                break
+            time.sleep(0.25)
+        assert notification_objectives == {"FIRST_RESPONSE", "RESOLUTION"}
         escalations = client.get(
             f"{spring_url}/api/support/escalations",
         )
@@ -4992,7 +5070,7 @@ def main() -> None:
         workbench_cursor = workbench_before_handoff["cursor"]
         sla_handoff_request_id = f"sla-handoff-{uuid.uuid4()}"
         sla_handoff = client.post(
-            f"{spring_url}/api/customer/tickets/{ticket_id}/human-handoff",
+            f"{spring_url}/api/customer/v2/tickets/{ticket_id}/human-handoff",
             headers={
                 "Idempotency-Key": sla_handoff_request_id,
             },
@@ -5073,13 +5151,16 @@ def main() -> None:
                 "from support_workbench_event group by epoch order by epoch"
             ).fetchall()
         assert {epoch for epoch, _ in epoch_sequences} == {
-            "support-workbench-v1",
             "support-workbench-v2",
         }
         for epoch, sequences in epoch_sequences:
             assert list(sequences) == list(range(1, len(sequences) + 1)), (
                 f"{epoch} cursor sequence is not contiguous: {sequences}"
             )
+        assigned_claim = client.post(
+            f"{spring_url}/api/support/workbench/tickets/{ticket_id}/claims",
+        )
+        expect_status(assigned_claim, 201)
         assigned_detail = client.get(
             f"{spring_url}/api/support/workbench/tickets/{ticket_id}",
         )
@@ -5200,7 +5281,7 @@ def main() -> None:
         )
     with customer_browser_client(spring_url) as client:
         immediate_reply = client.post(
-            f"{spring_url}/api/customer/tickets/{immediate_ticket_id}/clarifications/"
+            f"{spring_url}/api/customer/v2/tickets/{immediate_ticket_id}/clarifications/"
             f"{immediate_request_id}/replies",
             headers={
                 "Idempotency-Key": f"sla-resume-message-{uuid.uuid4()}",
@@ -5240,12 +5321,12 @@ def main() -> None:
         ).fetchone() == ("WAITING_FOR_EXTERNAL", "HUMAN", 86399)
 
     with customer_browser_client(spring_url) as client:
-        concurrent_state_response = client.post(
-            f"{spring_url}/api/customer/tickets",
-            headers={
-                "Idempotency-Key": f"sla-concurrent-state-{uuid.uuid4()}",
-            },
-            json={"orderReference": "ORDER-INTAKE-ONLY", "description": "并发状态变化验收"},
+        concurrent_state_response = create_customer_ticket(
+            client,
+            spring_url,
+            f"sla-concurrent-state-{uuid.uuid4()}",
+            "ORDER-DELAY-UNDER-24",
+            "并发状态变化验收",
         )
         expect_status(concurrent_state_response, 201)
         concurrent_state_ticket_id = uuid.UUID(concurrent_state_response.json()["ticketId"])
@@ -5309,15 +5390,12 @@ def main() -> None:
 
     def create_closure_fixture(suffix: str, resolved_at, handling_mode: str = "HUMAN"):
         with customer_browser_client(spring_url) as client:
-            response = client.post(
-                f"{spring_url}/api/customer/tickets",
-                headers={
-                    "Idempotency-Key": f"issue-28-{suffix}-{uuid.uuid4()}",
-                },
-                json={
-                    "orderReference": "ORDER-INTAKE-ONLY",
-                    "description": f"关闭等待期验收 {suffix}",
-                },
+            response = create_customer_ticket(
+                client,
+                spring_url,
+                f"issue-28-{suffix}-{uuid.uuid4()}",
+                "ORDER-DELAY-UNDER-24",
+                f"关闭等待期验收 {suffix}",
             )
             expect_status(response, 201)
             fixture_id = uuid.UUID(response.json()["ticketId"])
@@ -5345,33 +5423,25 @@ def main() -> None:
             (before_boundary_id,),
         ).fetchone()
     with customer_browser_client(spring_url) as client:
-        reopened = client.post(
-            f"{spring_url}/api/customer/tickets/{before_boundary_id}/replies",
-            headers={
-                "Idempotency-Key": "issue-28-before-boundary-message",
-            },
-            json={
-                "orderReference": "ORDER-INTAKE-ONLY",
-                "issueKind": "LOGISTICS_DELAY",
-                "message": "原问题仍未解决",
-            },
+        reopened = create_customer_ticket(
+            client,
+            spring_url,
+            "issue-28-before-boundary-message",
+            "ORDER-DELAY-UNDER-24",
+            "原问题仍未解决",
+            duplicate_action="CONTINUE_EXISTING",
+            existing_ticket_id=str(before_boundary_id),
         )
-        expect_status(reopened, 200)
-        assert reopened.json() == {
-            "ticketId": str(before_boundary_id),
-            "outcome": "REOPENED",
-            "replayed": False,
-        }
-        reopened_replay = client.post(
-            f"{spring_url}/api/customer/tickets/{before_boundary_id}/replies",
-            headers={
-                "Idempotency-Key": "issue-28-before-boundary-message",
-            },
-            json={
-                "orderReference": "ORDER-INTAKE-ONLY",
-                "issueKind": "LOGISTICS_DELAY",
-                "message": "原问题仍未解决",
-            },
+        expect_status(reopened, 201)
+        assert reopened.json()["ticketId"] == str(before_boundary_id)
+        reopened_replay = create_customer_ticket(
+            client,
+            spring_url,
+            "issue-28-before-boundary-message",
+            "ORDER-DELAY-UNDER-24",
+            "原问题仍未解决",
+            duplicate_action="CONTINUE_EXISTING",
+            existing_ticket_id=str(before_boundary_id),
         )
         expect_status(reopened_replay, 200)
         assert reopened_replay.json()["replayed"] is True
@@ -5394,68 +5464,67 @@ def main() -> None:
         assert (
             connection.execute(
                 "select count(*) from customer_reply_request where customer_id = 'customer-demo' "
-                "and message_id = 'issue-28-before-boundary-message'",
+                "and original_ticket_id = %s",
+                (before_boundary_id,),
             ).fetchone()[0]
             == 1
         )
 
-    different_issue_id = create_closure_fixture(
-        "different-issue", closure_now - datetime.timedelta(hours=1)
+    expired_reply_id = create_closure_fixture(
+        "expired-natural-reply", closure_now - datetime.timedelta(hours=73)
     )
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         original_message_count = connection.execute(
-            "select count(*) from public_message where ticket_id = %s", (different_issue_id,)
+            "select count(*) from public_message where ticket_id = %s", (expired_reply_id,)
         ).fetchone()[0]
     with customer_browser_client(spring_url) as client:
-        different = client.post(
-            f"{spring_url}/api/customer/tickets/{different_issue_id}/replies",
-            headers={
-                "Idempotency-Key": "issue-28-different-message",
-            },
-            json={
-                "orderReference": "ORDER-INTAKE-ONLY",
-                "issueKind": "OTHER",
-                "message": "同一订单的另一个问题",
-            },
+        different = create_customer_ticket(
+            client,
+            spring_url,
+            "issue-28-different-message",
+            "ORDER-DELAY-UNDER-24",
+            "关闭期外仍需帮助",
+            duplicate_action="CONTINUE_EXISTING",
+            existing_ticket_id=str(expired_reply_id),
         )
         expect_status(different, 201)
         different_linked_id = uuid.UUID(different.json()["ticketId"])
-        conflict = client.post(
-            f"{spring_url}/api/customer/tickets/{different_issue_id}/replies",
-            headers={
-                "Idempotency-Key": "issue-28-different-message",
-            },
-            json={
-                "orderReference": "ORDER-INTAKE-ONLY",
-                "issueKind": "OTHER",
-                "message": "复用身份但改变内容",
-            },
+        conflict = create_customer_ticket(
+            client,
+            spring_url,
+            "issue-28-different-message",
+            "ORDER-DELAY-UNDER-24",
+            "复用身份但改变内容",
         )
         expect_status(conflict, 409)
-        assert conflict.json()["code"] == "MESSAGE_ID_CONFLICT"
+        conflict_snapshot = conflict.json()
+        assert conflict_snapshot["schema"] == "customer-intake-v4"
+        assert conflict_snapshot["replayed"] is True
+        assert conflict_snapshot["ticketIds"] == []
+        assert conflict_snapshot["routedTicketIds"] == [str(different_linked_id)]
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         assert (
             connection.execute(
-                "select lifecycle_state from support_ticket where id = %s", (different_issue_id,)
+                "select lifecycle_state from support_ticket where id = %s", (expired_reply_id,)
             ).fetchone()[0]
-            == "RESOLVED"
+            == "CLOSED"
         )
         assert (
             connection.execute(
-                "select count(*) from public_message where ticket_id = %s", (different_issue_id,)
+                "select count(*) from public_message where ticket_id = %s", (expired_reply_id,)
             ).fetchone()[0]
             == original_message_count
         )
         assert connection.execute(
             "select follow_up_of, issue_kind, handling_mode from support_ticket where id = %s",
             (different_linked_id,),
-        ).fetchone() == (different_issue_id, "OTHER", "HUMAN")
+        ).fetchone() == (expired_reply_id, "LOGISTICS_DELAY", "AGENT")
         assert (
             connection.execute(
                 "select count(*) from agent_processing_generation where ticket_id = %s",
                 (different_linked_id,),
             ).fetchone()[0]
-            == 0
+            == 1
         )
         assert (
             connection.execute(
@@ -5463,7 +5532,7 @@ def main() -> None:
                 "and reason_code = 'UNSUPPORTED_ISSUE'",
                 (different_linked_id,),
             ).fetchone()[0]
-            == 1
+            == 0
         )
 
     exact_boundary_id = create_closure_fixture(
@@ -5527,18 +5596,18 @@ def main() -> None:
     boundary_headers = {
         "Idempotency-Key": "issue-28-exact-boundary-message",
     }
-    boundary_payload = {
-        "orderReference": "ORDER-INTAKE-ONLY",
-        "issueKind": "LOGISTICS_DELAY",
-        "message": "边界时刻回复",
-    }
+    boundary_payload = {"message": "边界时刻回复"}
 
     def reply_at_boundary(_: int):
         with customer_browser_client(spring_url) as concurrent_client:
-            return concurrent_client.post(
-                f"{spring_url}/api/customer/tickets/{exact_boundary_id}/replies",
-                headers=boundary_headers,
-                json=boundary_payload,
+            return create_customer_ticket(
+                concurrent_client,
+                spring_url,
+                boundary_headers["Idempotency-Key"],
+                "ORDER-DELAY-UNDER-24",
+                boundary_payload["message"],
+                duplicate_action="CONTINUE_EXISTING",
+                existing_ticket_id=str(exact_boundary_id),
             )
 
     authority_key = f"{exact_boundary_id}\nBUSINESS_AUTHORITY"
@@ -5603,8 +5672,7 @@ def main() -> None:
         )
         assert (
             connection.execute(
-                "select count(*) from customer_reply_request where original_ticket_id = %s "
-                "and message_id = 'issue-28-exact-boundary-message'",
+                "select count(*) from customer_reply_request where original_ticket_id = %s",
                 (exact_boundary_id,),
             ).fetchone()[0]
             == 1
@@ -5631,16 +5699,14 @@ def main() -> None:
     assert str(exact_boundary_id) in queue_event_stream
 
     with customer_browser_client(spring_url) as client:
-        closed_follow_up = client.post(
-            f"{spring_url}/api/customer/tickets/{exact_boundary_id}/replies",
-            headers={
-                "Idempotency-Key": "issue-28-closed-message",
-            },
-            json={
-                "orderReference": "ORDER-INTAKE-ONLY",
-                "issueKind": "LOGISTICS_DELAY",
-                "message": "关闭后的后续回复",
-            },
+        closed_follow_up = create_customer_ticket(
+            client,
+            spring_url,
+            "issue-28-closed-message",
+            "ORDER-DELAY-UNDER-24",
+            "关闭后的后续回复",
+            duplicate_action="CONTINUE_EXISTING",
+            existing_ticket_id=str(exact_boundary_id),
         )
         expect_status(closed_follow_up, 201)
         closed_follow_up_id = uuid.UUID(closed_follow_up.json()["ticketId"])

@@ -8,7 +8,7 @@ test("Issue #153 低置信问题澄清后原子创建同订单多工单", async 
   await login(page, "customer", "customer-demo");
 
   await page.getByLabel("问题描述").fill("ORDER-DELAY-UNDER-24 的包裹没收到，而且疑似重复扣款");
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await page.getByRole("button", { name: "开始智能受理" }).click();
 
   await expect(page.getByRole("heading", { name: "再帮我确认一点" })).toBeVisible();
   await expect(page.getByText("请确认是否确实发生了两次扣款")).toBeVisible();
@@ -85,21 +85,24 @@ test("Issue #153 桌面确认失败不展示部分创建结果", async ({ browse
       status: 201,
       contentType: "application/json",
       body: JSON.stringify({
-        schema: "customer-intake-v2",
+        schema: "customer-intake-v4",
         intakeId: "15300000-0000-0000-0000-000000000001",
         status: "READY_TO_CONFIRM",
         candidateOrder: { reference: "ORDER-MULTI-001", summary: "配送中的合成订单" },
-        issue: null,
         issues: [
           { kind: "PACKAGE_NOT_RECEIVED", summary: "包裹未收到" },
           { kind: "DUPLICATE_CHARGE", summary: "重复扣款" },
         ],
         assistantMessage: "请确认；确认后将创建 2 张工单。",
-        ticketId: null,
         ticketIds: [],
         sharedIntakeRecordId: null,
+        duplicateMatches: [],
+        routedTicketIds: [],
+        remainingOrderCount: 0,
+        completedOrderCount: 0,
         expectedTicketCount: 2,
         confirmed: false,
+        version: 1,
         replayed: false,
       }),
     });
@@ -109,7 +112,7 @@ test("Issue #153 桌面确认失败不展示部分创建结果", async ({ browse
   });
 
   await page.getByLabel("问题描述").fill("包裹没收到并且重复扣款");
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await page.getByRole("button", { name: "开始智能受理" }).click();
   await page.getByRole("button", { name: "确认并原子创建 2 张工单" }).click();
 
   await expect(page.getByRole("alert")).toContainText("不会创建部分工单或重复工单");

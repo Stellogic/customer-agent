@@ -199,7 +199,7 @@ async function startIntake(page: Page, orderReference: string) {
   );
   await page.getByLabel("订单编号").fill(orderReference);
   await page.getByLabel("问题描述").fill("物流已经延迟，请帮我核对");
-  await page.getByRole("button", { name: "提交物流延迟问题" }).click();
+  await page.getByRole("button", { name: "开始智能受理" }).click();
   const body = (await (await response).json()) as { intakeId: string };
   await expect(page.getByRole("heading", { name: "请确认我的理解" })).toBeVisible();
   return body.intakeId;

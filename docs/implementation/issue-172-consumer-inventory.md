@@ -1,8 +1,22 @@
-# #172：旧契约消费者与历史读取盘点
+# #172：旧契约消费者盘点与收缩记录
+
+## 2026-09-03 实施更新
+
+本轮在最新 `origin/main` 上完成盘点后的最小收缩，下面的 2026-09-01 内容保留为迁移前证据。当前产品接缝为：客户受理 `customer-intake-v4`、公开对话 `public-conversation-v2`、客服工作台 `support-workbench-v2`。
+
+- 删除旧 `/api/customer/tickets` 控制器以及 `/api/customer/v2/tickets` 直接建单桥；客户创建统一经过 v4 自然语言受理、重复问题选择和确认。
+- 客户公开事件存量 epoch 原地迁移到 v2，新增约束禁止继续写 v1；客户事件写入和 SSE 游标只使用 v2。业务消息、工单、审计、幂等映射及序号不删除。
+- 客服工作台停止 v1 默认响应、兼容 DTO 和双 epoch 新写入，历史事件行保留，活动读取只接受 v2。
+- v4 受理响应和前端解析删除单值 `issue`、`ticketId` 及 v1/v2/v3 兼容；已结案页面不再暴露固定问题选择或直接回复接口，后续诉求重新进入自然语言受理。客户确认继续既有已解决工单时复用原有重开规则，独立问题则确认后创建新工单。
+- smoke、模型业务 smoke 和 Playwright 正向建单均迁到受理确认流。含歧义别名的既有工单续办场景使用直接数据库历史夹具，不恢复公开直建接口。
+
+活动源码静态扫描仅保留 `CustomerTicketV2ApiTest` 中故意提交 `customer-public-v1` 游标并断言 `SNAPSHOT_REQUIRED` 的负向用例。历史文档和已执行迁移仍保留原版本文字，避免篡改历史证据。
+
+聚焦验证：backend PASS；frontend PASS（226 passed，3 skipped）；agent PASS（448 passed，3 skipped）。最终完整 `pwsh ./scripts/check.ps1 -Issue 172` 的 run id、提交和合并回读在完成正式门禁后补录。
 
 ## 范围与证据基准
 
-- 状态：**仅静态准备，#172 未完成，不可据此删除或交付**。本次唯一产物是本文件；未修改业务、接口、共享脚本、测试源码或其他任务文件。
+- 以下小节是 **2026-09-01 迁移前盘点快照**，其中的 `NOT_RUN` 和“待处理”描述只说明当时状态，已由上方实施更新取代。
 - 日期：2026-09-01。当前起点为远端 `main` `e34b60113a3bbcfe28a4fcd247900127ffbd234a`，已把原盘点提交重放到该基准并通过 `git ls-remote origin refs/heads/main` 核对一致。下文源码路径、符号与行号均指此基准，后续集成需重新核对。
 - 事实源：[#172 当前票面](https://github.com/Stellogic/customer-agent/issues/172)、[父规格](../specs/issue-149.md)、[自然语言受理 ADR](../adr/0007-natural-language-intake-creates-confirmed-ticket-sets.md)。本地 `docs/tickets/spec-149/issue-172.md` 是旧镜像；本次已读取 GitHub 当前正文与原生依赖，不修改镜像。
 - 当前原生前置中 #150/#155/#156/#157/#158/#159/#161/#163/#164 已关闭；#169/#170/#171 仍 OPEN。#193 是 #171 的在途接触点，不把它写成 #172 的新增原生依赖。关闭前置不等于本次已验证所有消费者。
