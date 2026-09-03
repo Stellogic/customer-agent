@@ -4943,15 +4943,15 @@ def main() -> None:
     ticket_uuid = uuid.UUID(ticket_id)
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         connection.execute(
+            "update support_ticket set created_at = %s::timestamptz - interval '15 minutes', "
+            "first_responded_at = %s, lifecycle_state = 'WAITING_FOR_CUSTOMER', handling_mode = 'HUMAN', "
+            "resolution_elapsed_seconds = 86399, resolution_running_since = null where id = %s",
+            (fixed_now, fixed_now, ticket_uuid),
+        )
+        connection.execute(
             "insert into support_assignment (id, ticket_id, support_id, status, assigned_at) "
             "values (%s, %s, 'support-demo', 'ACTIVE', %s)",
             (uuid.uuid4(), ticket_uuid, fixed_now),
-        )
-        connection.execute(
-            "update support_ticket set created_at = %s::timestamptz - interval '15 minutes', "
-            "first_responded_at = %s, lifecycle_state = 'WAITING_FOR_CUSTOMER', handling_mode = 'AGENT', "
-            "resolution_elapsed_seconds = 86399, resolution_running_since = null where id = %s",
-            (fixed_now, fixed_now, ticket_uuid),
         )
         connection.execute(
             "update support_ticket set created_at = %s::timestamptz - interval '12 minutes', "
@@ -4985,9 +4985,26 @@ def main() -> None:
     assert resolution_warning_facts == [("WARNING",)]
     assert paused_resolution_breach == 0
 
+    assigned_notification_objectives = set()
+    for _ in range(40):
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            assigned_notification_objectives = {
+                row[0]
+                for row in connection.execute(
+                    "select objective from support_sla_notification "
+                    "where ticket_id = %s and support_id = 'support-demo'",
+                    (ticket_uuid,),
+                ).fetchall()
+            }
+        if assigned_notification_objectives == {"FIRST_RESPONSE", "RESOLUTION"}:
+            break
+        time.sleep(0.25)
+    assert assigned_notification_objectives == {"FIRST_RESPONSE", "RESOLUTION"}
+
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
         connection.execute(
             "update support_ticket set lifecycle_state = 'WAITING_FOR_EXTERNAL', "
+            "handling_mode = 'AGENT', "
             "resolution_running_since = %s::timestamptz - interval '1 second' where id = %s",
             (fixed_now, ticket_uuid),
         )
