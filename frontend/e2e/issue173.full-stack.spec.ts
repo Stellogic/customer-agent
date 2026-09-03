@@ -4,7 +4,7 @@ import { newAcceptanceContext } from "./support/browser-context";
 import { queryFixtureSql } from "./support/database";
 import { createSingleTicket, intakeReply, prepareOrder } from "./support/issue173-intake";
 
-// 已登记串行门禁，仍未运行；完整 AC 与待接线项见 issue-173-acceptance-plan.md。
+// 已登记串行门禁；完整 AC、运行证据与复用边界见 issue-173-acceptance-plan.md。
 
 test("Issue #173 A：自然语言多问题澄清、一次建单与订单分组恢复", async ({ browser }) => {
   test.setTimeout(90_000);
