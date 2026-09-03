@@ -107,6 +107,9 @@ try {
     & "$PSScriptRoot/test-gate-image-reuse.ps1"
     & "$PSScriptRoot/test-gate-resources.ps1"
     & "$PSScriptRoot/test-browser-acceptance-plan.ps1"
+    if ($Issue -eq '173') {
+        & "$PSScriptRoot/test-issue173-rag-evidence.ps1"
+    }
     & "$PSScriptRoot/assert-deprecated-human-auth-contract.ps1"
 
     if (-not $runsFullAcceptance) {

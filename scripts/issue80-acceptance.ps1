@@ -34,6 +34,21 @@ $env:CUSTOMER_AGENT_IMAGE_TAG = $imageTag
 $env:CUSTOMER_AGENT_FRONTEND_PORT = [string]$frontendPort
 $env:SESSION_COOKIE_SECURE = 'true'
 $ownsImages = -not $SkipBuild
+$artifactsAvailable = $false
+
+function Export-BrowserAcceptanceArtifacts {
+    param([string]$ProjectName, [string]$Image, [string]$Destination)
+    $volume = "${ProjectName}_browser-artifacts"
+    $container = "${ProjectName}-artifact-export"
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+    docker create --name $container --volume "${volume}:/artifacts" $Image sh -c true | Out-Null
+    try {
+        docker cp "${container}:/artifacts/." $Destination
+    } finally {
+        docker rm --force $container | Out-Null
+    }
+    Write-Host "Issue #80 浏览器证据已保留：$Destination"
+}
 
 $plan = Import-PowerShellDataFile "$PSScriptRoot/browser-acceptance-plan.psd1"
 $discovered = @(
@@ -85,11 +100,17 @@ try {
     docker compose --project-name $projectName exec -T postgres `
         psql -U postgres -d customer_agent -f /acceptance/issue80-browser.sql
     docker compose --project-name $projectName --profile smoke up --detach --no-build --no-deps --wait browser-frontend
+    $artifactsAvailable = $true
 
     Invoke-PlaywrightGroup -Files $plan.ParallelSafe -Workers 2 -RepeatCount 3 -Runner $playwrightRunner
 
-    $regularSerial = @($plan.Serial | Where-Object { $_ -ne 'e2e/issue80.session-restart-expiry.spec.ts' })
+    $regularSerial = @($plan.Serial | Where-Object {
+        $_ -notin @('e2e/issue80.session-restart-expiry.spec.ts', 'e2e/issue173.auto-resolution-clock.spec.ts')
+    })
     Invoke-PlaywrightGroup -Files $regularSerial -Workers 1 -Runner $playwrightRunner
+
+    # #173 复用本次隔离栈推进业务时钟；恢复后继续原 #80 Session 阶段。
+    & "$PSScriptRoot/issue173-clock-acceptance.ps1" -ProjectName $projectName
 
     $sessionFile = @('e2e/issue80.session-restart-expiry.spec.ts')
     $env:ISSUE80_SESSION_PHASE = 'restart-prepare'
@@ -104,17 +125,57 @@ try {
     $env:ISSUE80_SESSION_PHASE = 'expiry'
     Invoke-PlaywrightGroup -Files $sessionFile -Workers 1 -Runner $playwrightRunner
 } finally {
-    docker compose --project-name $projectName --profile smoke down --volumes --remove-orphans
-    Assert-ComposeProjectResourcesEmpty -ProjectName $projectName -Phase '在清理后'
+    $artifactFailure = $null
+    $cleanupFailure = $null
+    if ($artifactsAvailable) {
+        try {
+            Export-BrowserAcceptanceArtifacts `
+                -ProjectName $projectName `
+                -Image "customer-agent/frontend-browser-test:$imageTag" `
+                -Destination (Join-Path $repoRoot ".local/gate-evidence/$RunId/browser")
+        } catch {
+            $artifactFailure = $_
+        }
+    }
+    try {
+        docker compose --project-name $projectName --profile smoke down --volumes --remove-orphans
+    } catch {
+        $cleanupFailure = $_
+    }
+    try {
+        Assert-ComposeProjectResourcesEmpty -ProjectName $projectName -Phase '在清理后'
+    } catch {
+        if ($null -eq $cleanupFailure) {
+            $cleanupFailure = $_
+        }
+    }
     if ($ownsImages) {
-        Remove-GateImages -RunId $RunId
-        Assert-GateImagesAbsent -RunId $RunId
+        try {
+            Remove-GateImages -RunId $RunId
+        } catch {
+            if ($null -eq $cleanupFailure) {
+                $cleanupFailure = $_
+            }
+        }
+        try {
+            Assert-GateImagesAbsent -RunId $RunId
+        } catch {
+            if ($null -eq $cleanupFailure) {
+                $cleanupFailure = $_
+            }
+        }
     }
     Remove-Item Env:CUSTOMER_AGENT_IMAGE_TAG -ErrorAction SilentlyContinue
     Remove-Item Env:CUSTOMER_AGENT_FRONTEND_PORT -ErrorAction SilentlyContinue
     Remove-Item Env:SESSION_COOKIE_SECURE -ErrorAction SilentlyContinue
     Remove-Item Env:CUSTOMER_AGENT_SESSION_TIMEOUT -ErrorAction SilentlyContinue
     Remove-Item Env:ISSUE80_SESSION_PHASE -ErrorAction SilentlyContinue
+    if ($null -ne $cleanupFailure) {
+        throw $cleanupFailure
+    }
+    if ($null -ne $artifactFailure) {
+        throw $artifactFailure
+    }
 }
 
 Write-Host "Issue #80 真实浏览器验收通过：parallel-safe=$($plan.ParallelSafe.Count) files x3 workers=2，serial=$($plan.Serial.Count) files workers=1；隔离容器、网络与卷已回读为空。"

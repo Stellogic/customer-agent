@@ -256,6 +256,7 @@ services:
     environment:
       PLAYWRIGHT_BASE_URL: https://browser-frontend:8443
       ISSUE80_SESSION_PHASE: ${ISSUE80_SESSION_PHASE:-}
+      ISSUE173_CLOCK_PHASE: ${ISSUE173_CLOCK_PHASE:-}
       ISSUE80_DATABASE_HOST: postgres
       ISSUE80_DATABASE_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-local-postgres-superuser}
     volumes:
