@@ -570,7 +570,7 @@ def main() -> None:
             client,
             spring_url,
             message_fence_create_id,
-            "ORDER-DELAY-UNDER-24",
+            "ORDER-DELAY-001",
             "请先调查这笔合成订单的物流状态",
         )
         expect_status(created, 201)
@@ -704,7 +704,7 @@ def main() -> None:
                 client,
                 spring_url,
                 f"issue-158-concurrent-create-{uuid.uuid4()}",
-                "ORDER-DELAY-UNDER-24",
+                "ORDER-DELAY-001",
                 "并发消息身份隔离测试",
             )
             expect_status(created, 201)
