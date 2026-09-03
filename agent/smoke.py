@@ -4046,7 +4046,7 @@ def main() -> None:
                 "jsonb_build_object('ticketId', %s::text, 'lifecycleState', 'INVESTIGATING', "
                 "'handlingMode', 'AGENT'), %s), "
                 "(%s, 'public-conversation-v2', 2, 1, 'PUBLIC_MESSAGE_APPENDED', "
-                "jsonb_build_object('author', 'SUPPORT', 'body', %s, 'sentAt', %s), %s)",
+                "jsonb_build_object('author', 'SUPPORT', 'body', %s::text, 'sentAt', %s), %s)",
                 (
                     created_id,
                     created_id,
