@@ -399,6 +399,14 @@ def main() -> None:
             "select convalidated from pg_constraint "
             "where conname = 'synthetic_order_paid_amount_check'"
         ).fetchone() == (True,)
+        connection.execute(
+            "insert into synthetic_order "
+            "(order_reference, customer_id, paid_amount, currency, delay_hours, delay_seconds, "
+            "paid, cancelled, fully_refunded, existing_compensation, policy_version, "
+            "available_compensation_amount) values "
+            "('ORDER-INTAKE-ONLY', 'customer-demo', 120.00, 'CNY', 1, 3600, "
+            "true, false, false, false, 'delay-policy-v1', 120.00)"
+        )
 
     request_id = f"smoke-{uuid.uuid4()}"
     ticket_payload = {
