@@ -5018,9 +5018,7 @@ def main() -> None:
             )
             expect_status(notifications, 200)
             notification_objectives = {
-                item["objective"]
-                for item in notifications.json()
-                if item["ticketId"] == ticket_id
+                item["objective"] for item in notifications.json() if item["ticketId"] == ticket_id
             }
             if notification_objectives == {"FIRST_RESPONSE", "RESOLUTION"}:
                 break
