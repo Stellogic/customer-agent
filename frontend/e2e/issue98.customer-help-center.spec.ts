@@ -34,8 +34,10 @@ test("Issue #98 客户真实创建、交互状态与断线权威恢复视觉", a
   await page.getByRole("button", { name: "开始智能受理" }).click();
   await continueAsNewIfDuplicate(page);
   await page.getByRole("button", { name: "确认，就是这个问题" }).click();
-  const created = (await (await createdResponse).json()) as { ticketId: string };
-  const shortTicketId = `${created.ticketId.slice(0, 8)}…${created.ticketId.slice(-4)}`;
+  const created = (await (await createdResponse).json()) as { ticketIds: string[] };
+  expect(created.ticketIds).toHaveLength(1);
+  const ticketId = created.ticketIds[0];
+  const shortTicketId = `${ticketId.slice(0, 8)}…${ticketId.slice(-4)}`;
 
   await expect(page.getByRole("heading", { name: shortTicketId })).toBeVisible();
   const handoffButton = page.getByRole("button", { name: "转人工处理" });
@@ -48,7 +50,7 @@ test("Issue #98 客户真实创建、交互状态与断线权威恢复视觉", a
 
   await expect(page.getByText("调查中", { exact: true })).toBeVisible();
   await expect(page.getByText(description)).toBeVisible();
-  await expect(page.getByText(created.ticketId, { exact: true })).toHaveCount(0);
+  await expect(page.getByText(ticketId, { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "复制完整工单编号" })).toBeVisible();
   await page.screenshot({ path: "/artifacts/issue98-customer-ticket.png", fullPage: true });
 

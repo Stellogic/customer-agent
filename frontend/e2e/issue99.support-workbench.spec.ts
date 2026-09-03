@@ -22,7 +22,9 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
   await customer.getByRole("button", { name: "开始智能受理" }).click();
   await continueAsNewIfDuplicate(customer);
   await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
-  const created = (await (await createdResponse).json()) as { ticketId: string };
+  const created = (await (await createdResponse).json()) as { ticketIds: string[] };
+  expect(created.ticketIds).toHaveLength(1);
+  const ticketId = created.ticketIds[0];
   await customer.getByRole("button", { name: "转人工处理" }).click();
   await customer.getByRole("button", { name: "确认转人工" }).click();
   await expect(customer.getByText("人工客服处理中")).toBeVisible();
@@ -36,16 +38,16 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
   support.on("request", (request) => {
     if (
       request.method() === "GET" &&
-      new URL(request.url()).pathname === `/api/support/workbench/tickets/${created.ticketId}`
+      new URL(request.url()).pathname === `/api/support/workbench/tickets/${ticketId}`
     ) {
       detailReads += 1;
     }
   });
   await login(support, "internal", "support-demo");
 
-  const shortTicketId = `${created.ticketId.slice(0, 8)}…${created.ticketId.slice(-4)}`;
+  const shortTicketId = `${ticketId.slice(0, 8)}…${ticketId.slice(-4)}`;
   await expect(support.getByText(shortTicketId).first()).toBeVisible();
-  await expect(support.getByText(created.ticketId, { exact: true })).toHaveCount(0);
+  await expect(support.getByText(ticketId, { exact: true })).toHaveCount(0);
   await expect(support.getByText(description)).toHaveCount(0);
   expect(detailReads).toBe(0);
   await support.screenshot({
@@ -62,7 +64,7 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
   await expect(support.getByLabel("授权详情等待区")).toHaveCSS("position", "static");
 
   await support
-    .getByRole("button", { name: `领取工单 ${created.ticketId}` })
+    .getByRole("button", { name: `领取工单 ${ticketId}` })
     .first()
     .click();
   await expect(support.getByRole("dialog", { name: "确认领取工单" })).toBeVisible();
@@ -89,7 +91,7 @@ test("Issue #99 客服真实登录、最小队列、确认领取与撤权清屏"
   executeFixtureSql(`
     UPDATE support_assignment
       SET status = 'REVOKED', revoked_at = clock_timestamp()
-      WHERE ticket_id = '${created.ticketId}' AND status = 'ACTIVE';
+      WHERE ticket_id = '${ticketId}' AND status = 'ACTIVE';
   `);
   await expect(support.getByRole("alert")).toContainText("客服分配已失效", { timeout: 60_000 });
   await expect(support.getByRole("heading", { name: "授权工单详情" })).toHaveCount(0);

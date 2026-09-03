@@ -20,11 +20,13 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   await customer.getByRole("button", { name: "开始智能受理" }).click();
   await continueAsNewIfDuplicate(customer);
   await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
-  const created = (await (await createdResponse).json()) as { ticketId: string };
-  expect(created.ticketId).toMatch(/^[0-9a-f-]{36}$/i);
+  const created = (await (await createdResponse).json()) as { ticketIds: string[] };
+  expect(created.ticketIds).toHaveLength(1);
+  const ticketId = created.ticketIds[0];
+  expect(ticketId).toMatch(/^[0-9a-f-]{36}$/i);
   await expect(
     customer.getByRole("heading", {
-      name: `${created.ticketId.slice(0, 8)}…${created.ticketId.slice(-4)}`,
+      name: `${ticketId.slice(0, 8)}…${ticketId.slice(-4)}`,
     }),
   ).toBeVisible();
 
@@ -39,11 +41,12 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
       },
     });
     return { status: response.status, body: await response.text() };
-  }, created.ticketId);
+  }, ticketId);
   expect(customerProjection.status).toBe(200);
   expect(JSON.parse(customerProjection.body)).toMatchObject({
-    view: "CUSTOMER_PUBLIC",
-    ticket: { id: created.ticketId },
+    view: "PUBLIC_CONVERSATION",
+    schema: "public-conversation-v2",
+    ticket: { id: ticketId },
   });
   expect(customerProjection.body).not.toMatch(
     /internalNote|investigationFacts|businessTimeline|leaseToken|evidenceSnapshot/i,
@@ -82,7 +85,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
         headers: { "X-Synthetic-Customer-Id": "customer-demo" },
       })
     ).status;
-  }, created.ticketId);
+  }, ticketId);
   expect(forgedAnonymousStatus).toBe(401);
   await anonymousContext.close();
 
@@ -90,7 +93,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   const support = await supportContext.newPage();
   await login(support, "internal", "support-demo");
   await expect(
-    support.getByText(`${created.ticketId.slice(0, 8)}…${created.ticketId.slice(-4)}`).first(),
+    support.getByText(`${ticketId.slice(0, 8)}…${ticketId.slice(-4)}`).first(),
   ).toBeVisible();
 
   const minimumQueueItem = await support.evaluate(async (ticketId) => {
@@ -101,7 +104,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
       })
     ).json()) as { sharedQueue: Array<Record<string, unknown>> };
     return snapshot.sharedQueue.find((item) => item.ticketId === ticketId);
-  }, created.ticketId);
+  }, ticketId);
   expect(Object.keys(minimumQueueItem ?? {}).sort()).toEqual(
     [
       "enteredAt",
@@ -135,7 +138,7 @@ test("客户公开投影、客服最小队列与领取详情保持资源授权�
   });
   expect(hiddenResourceStatus).toBe(404);
 
-  await support.getByRole("button", { name: `领取工单 ${created.ticketId}` }).click();
+  await support.getByRole("button", { name: `领取工单 ${ticketId}` }).click();
   await support.getByRole("button", { name: "确认领取" }).click();
   await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
   await expect(

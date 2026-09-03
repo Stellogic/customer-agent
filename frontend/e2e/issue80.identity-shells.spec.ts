@@ -143,7 +143,7 @@ test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
     await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
     const created = (await (await createdResponse).json()) as {
       schema: string;
-      ticketId: string;
+      ticketIds: string[];
     };
     const snapshot = (await (await snapshotResponse).json()) as {
       view: string;
@@ -151,10 +151,11 @@ test.describe("Issue #80 五类身份的 Shell 与静态路由", () => {
       ticket: { id: string };
     };
     expect(created.schema).toBe("customer-intake-v4");
+    expect(created.ticketIds).toHaveLength(1);
     expect(snapshot).toMatchObject({
       view: "PUBLIC_CONVERSATION",
       schema: "public-conversation-v2",
-      ticket: { id: created.ticketId },
+      ticket: { id: created.ticketIds[0] },
     });
     await expect(customer.getByText("Issue #151 窄屏真实 v2 公开沟通验收")).toBeVisible();
     await expect(customer.getByRole("button", { name: "转人工处理" })).toBeVisible();

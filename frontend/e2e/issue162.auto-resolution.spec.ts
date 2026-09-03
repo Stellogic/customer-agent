@@ -71,7 +71,9 @@ for (const width of [1440, 390]) {
     status = "RESOLVED";
     await page.reload();
     await expect(notice.getByText("工单已自动解决", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "发送回复", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "发送回复", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "开始智能受理" })).toBeVisible();
+    await expect(page.getByText(/如仍需帮助，请在上方用自然语言发起新的智能受理/)).toBeVisible();
     await page.screenshot({ path: `/artifacts/issue162-resolved-${width}.png`, fullPage: true });
     await context.close();
   });

@@ -89,13 +89,11 @@ test("Issue #153 桌面确认失败不展示部分创建结果", async ({ browse
         intakeId: "15300000-0000-0000-0000-000000000001",
         status: "READY_TO_CONFIRM",
         candidateOrder: { reference: "ORDER-MULTI-001", summary: "配送中的合成订单" },
-        issue: null,
         issues: [
           { kind: "PACKAGE_NOT_RECEIVED", summary: "包裹未收到" },
           { kind: "DUPLICATE_CHARGE", summary: "重复扣款" },
         ],
         assistantMessage: "请确认；确认后将创建 2 张工单。",
-        ticketId: null,
         ticketIds: [],
         sharedIntakeRecordId: null,
         expectedTicketCount: 2,

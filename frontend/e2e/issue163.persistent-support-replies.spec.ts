@@ -24,7 +24,9 @@ test("Issue #163 持久化领取、人工公开回复与刷新恢复", async ({ 
   await customer.getByRole("button", { name: "开始智能受理" }).click();
   await continueAsNewIfDuplicate(customer);
   await customer.getByRole("button", { name: "确认，就是这个问题" }).click();
-  const created = (await (await createdResponse).json()) as { ticketId: string };
+  const created = (await (await createdResponse).json()) as { ticketIds: string[] };
+  expect(created.ticketIds).toHaveLength(1);
+  const ticketId = created.ticketIds[0];
   await customer.getByRole("button", { name: "转人工处理" }).click();
   await customer.getByRole("button", { name: "确认转人工" }).click();
   await expect(customer.getByText("人工客服处理中")).toBeVisible();
@@ -46,7 +48,7 @@ test("Issue #163 持久化领取、人工公开回复与刷新恢复", async ({ 
     .toBe(true);
   await expect(support.getByLabel("授权详情等待区")).toHaveCSS("position", "static");
 
-  await support.getByRole("button", { name: `领取工单 ${created.ticketId}` }).first().click();
+  await support.getByRole("button", { name: `领取工单 ${ticketId}` }).first().click();
   await expect(support.getByRole("dialog", { name: "确认领取工单" })).toBeVisible();
   await support.getByRole("button", { name: "确认领取" }).click();
   await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
@@ -83,12 +85,12 @@ test("Issue #163 持久化领取、人工公开回复与刷新恢复", async ({ 
   await expect(other.getByRole("heading", { name: "客服共享队列" })).toBeVisible();
   await expect(other.getByText(description, { exact: true })).toHaveCount(0);
   await expect(other.getByRole("heading", { name: "授权工单详情" })).toHaveCount(0);
-  await expect(other.getByRole("button", { name: `领取工单 ${created.ticketId}` })).toHaveCount(0);
+  await expect(other.getByRole("button", { name: `领取工单 ${ticketId}` })).toHaveCount(0);
 
   executeFixtureSql(`
     UPDATE support_assignment
       SET status = 'REVOKED', revoked_at = clock_timestamp()
-      WHERE ticket_id = '${created.ticketId}' AND status = 'ACTIVE';
+      WHERE ticket_id = '${ticketId}' AND status = 'ACTIVE';
   `);
   await expect(support.getByRole("alert")).toContainText("客服分配已失效", { timeout: 60_000 });
   await expect(support.getByRole("heading", { name: "授权工单详情" })).toHaveCount(0);
