@@ -1,5 +1,6 @@
 param(
     [switch]$ConfirmProviderSpend,
+    [switch]$IntakeDiagnostic,
     [string]$EnvFile = 'D:\customer-agent\.env',
     [string]$LedgerPath = 'D:\customer-agent\.local\issue190-sufficiency\cost-ledger.json',
     [string]$KnowledgeModelPath = 'C:\Users\lizhuo\.codex\worktrees\745a\customer-agent\.local\models\bge-small-zh-v1.5',
@@ -12,9 +13,9 @@ $PSNativeCommandUseErrorActionPreference = $true
 . "$PSScriptRoot/gate-images.ps1"
 . "$PSScriptRoot/gate-resources.ps1"
 
-$projectLimitMicroCny = 5000000
+$projectLimitMicroCny = if ($IntakeDiagnostic) { 8000000 } else { 5000000 }
 $expectedPriorMicroCny = 3810222
-$runReservationMicroCny = 1000000
+$runReservationMicroCny = if ($IntakeDiagnostic) { 100000 } else { 1000000 }
 $logicalCallLimit = 100
 $providerAttemptLimit = 100
 $knownTokenLimit = 200000
@@ -47,10 +48,14 @@ function Get-SettledMicroCny($Ledger) {
 $ledger = Read-SharedLedger
 $settledBefore = Get-SettledMicroCny $ledger
 $pending = @($ledger.attempts | Where-Object status -eq 'PENDING')
-if ($settledBefore -ne $expectedPriorMicroCny -or $pending.Count -ne 0) {
+$expectedPendingCount = if ($IntakeDiagnostic) { 1 } else { 0 }
+if ($IntakeDiagnostic -and ($pending.Count -ne 1 -or $pending[0].phase -ne 'issue174-live-20260903a' -or
+    [long]$pending[0].reserved_micro_cny -ne 1000000)) { throw '诊断必须保留上一轮唯一的 1 元 PENDING。' }
+if ($settledBefore -ne $expectedPriorMicroCny -or $pending.Count -ne $expectedPendingCount) {
     throw "共享账本未处于冻结起点: settled=$settledBefore pending=$($pending.Count)"
 }
-if ($settledBefore + $runReservationMicroCny -gt $projectLimitMicroCny) {
+$pendingBeforeMicroCny = [long](($pending | Measure-Object reserved_micro_cny -Sum).Sum)
+if ($settledBefore + $pendingBeforeMicroCny + $runReservationMicroCny -gt $projectLimitMicroCny) {
     throw '共享预算不足以预留本次运行上限。'
 }
 if ($ledger.phases.PSObject.Properties.Name -contains $RunId) { throw 'RunId 已存在，禁止覆盖。' }
@@ -218,16 +223,19 @@ function Settle-SharedLedger($Usage, [string]$Status) {
 }
 
 try {
-    Assert-FrozenCatalog
+    if (-not $IntakeDiagnostic) { Assert-FrozenCatalog }
     $gate = Enter-TestGateLock -Issue 174 -RunId $RunId -CommandType 'deepseek-live' `
         -BaseSha $base -HeadSha $head -ComposeProject $projectName -ImageTag $imageTag
     $ledger = Read-SharedLedger
-    if ((Get-SettledMicroCny $ledger) -ne $settledBefore -or @($ledger.attempts | Where-Object status -eq 'PENDING').Count -ne 0) {
+    $pendingNow = @($ledger.attempts | Where-Object status -eq 'PENDING')
+    if ((Get-SettledMicroCny $ledger) -ne $settledBefore -or $pendingNow.Count -ne $expectedPendingCount -or
+        [long](($pendingNow | Measure-Object reserved_micro_cny -Sum).Sum) -ne $pendingBeforeMicroCny -or
+        ($IntakeDiagnostic -and $pendingNow[0].phase -ne 'issue174-live-20260903a')) {
         throw '获得门禁锁后共享账本起点发生变化。'
     }
     $ledger.phases | Add-Member -NotePropertyName $RunId -NotePropertyValue ([pscustomobject]@{
         status = 'RUNNING'
-        dataset = 'issue-174-live-scenarios-v1'
+        dataset = $(if ($IntakeDiagnostic) { 'issue174-intake-diagnostic-v1' } else { 'issue-174-live-scenarios-v1' })
     })
     $ledger.attempts += [pscustomobject]@{
         phase = $RunId
@@ -268,13 +276,25 @@ services:
     $env:AGENT_INVESTIGATION_MAX_REPEATED_ACTIONS = '0'
 
     $sourceFingerprint = Get-GateSourceFingerprint -RepoRoot $repoRoot
-    Invoke-GateImageBuilds -RepoRoot $repoRoot -RunId $RunId -SourceFingerprint $sourceFingerprint | Out-Null
     $imagesBuilt = $true
+    Invoke-GateImageBuilds -RepoRoot $repoRoot -RunId $RunId -SourceFingerprint $sourceFingerprint | Out-Null
     Invoke-Compose @('up', '--detach', '--no-build', '--force-recreate', '--wait')
     Invoke-Compose @('--profile', 'smoke', 'up', '--detach', '--no-build', '--no-deps', '--wait', 'browser-frontend')
     $artifactsAvailable = $true
 
+    if ($IntakeDiagnostic) {
+        Invoke-Compose @('--profile', 'smoke', 'run', '--rm', '--no-deps', 'browser-acceptance',
+            '--list', 'e2e/issue174.intake-diagnostic.spec.ts')
+    }
     $providerMayHaveRun = $true
+    if ($IntakeDiagnostic) {
+        Invoke-Compose @('--profile', 'smoke', 'run', '--rm', '--no-deps',
+            '--volume', "${evidenceDir}:/diagnostics", 'browser-acceptance',
+            '--workers=1', '--max-failures=1', '--trace', 'off', 'e2e/issue174.intake-diagnostic.spec.ts')
+        $current = Read-SharedLedger
+        $current.phases.$RunId.status = 'DIAGNOSTIC_COMPLETED_PENDING_USAGE'
+        $current | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $LedgerPath -Encoding utf8
+    } else {
     $cumulativeScenarioBudget = 0
     foreach ($scenario in @(
         [pscustomobject]@{ Id = 'L174-01'; File = 'e2e/issue173.full-stack.spec.ts'; Title = 'Issue #173 A：'; Budget = 220000 },
@@ -381,9 +401,10 @@ services:
 
     Settle-SharedLedger $usage 'PASS'
     $completed = $true
+    }
 } catch {
     $runFailure = $_
-    if ($reservationWritten -and $providerMayHaveRun -and $artifactsAvailable) {
+    if (-not $IntakeDiagnostic -and $reservationWritten -and $providerMayHaveRun -and $artifactsAvailable) {
         try {
             $usage = Get-LiveUsage
             $failureReport = [ordered]@{
@@ -414,7 +435,7 @@ services:
             $failureReport | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding utf8
             $runFailure = "运行失败且费用无法完整结算，保留 PENDING 并停止: $($runFailure.Exception.Message); metrics=$metricsFailure"
         }
-    } elseif ($reservationWritten) {
+    } elseif ($reservationWritten -and -not $providerMayHaveRun) {
         $current = Read-SharedLedger
         $current.attempts = @($current.attempts | Where-Object phase -ne $RunId)
         $current.phases.PSObject.Properties.Remove($RunId)
@@ -452,4 +473,8 @@ if ($runFailure) {
 }
 if ($cleanupFailures.Count -ne 0) { throw "Issue #174 运行通过但资源清理失败: $($cleanupFailures -join ' | ')" }
 
-Write-Host "Issue #174 真实 DeepSeek/Chromium 发布验收通过：run=$RunId report=$reportPath"
+if ($IntakeDiagnostic) {
+    Write-Host "受理诊断已结束（最多两次请求），非发布验收；预留保留 PENDING。证据：$evidenceDir/intake-diagnostic.json"
+} else {
+    Write-Host "Issue #174 真实 DeepSeek/Chromium 发布验收通过：run=$RunId report=$reportPath"
+}
