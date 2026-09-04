@@ -4,6 +4,8 @@
 
 ## 第 3 版复验冻结
 
+后续准备：已将运行器的单代次动作/尝试上限从错误的6修正为产品默认8；这是新版草案，不修改第3版失败结果。第3版调用前清单归档为 [run03 freeze](../delivery/issue-174-live-03-freeze.json)。当前场景清单 revision=4、DRAFT_NOT_AUTHORIZED，入口在读取密钥或写账本之前拒绝执行。新 RunId、账本准入和报告路径尚未冻结，不能用旧运行标识重跑。总费用上限、全局调用上限和五项结果标准没有提高。现有未预留0.389778元不足1元发布预留，schema失败仍需定位；此处准备不代表修复全部阻塞。
+
 用户在确认修复票已完成后要求继续发布验收。固定模型仍为 deepseek-v4-flash；受理提示改为实施票已交付的 intake-v3，模型 schema 按首次识别、澄清、其他受理路径分别为 customer_intake_issue_assessments、customer_intake_clarification、customer_intake_understanding。其他接缝版本及五场景的输入、阈值、分段预算和调用上限不变。原第2版浏览器交互已经逐项回答当前问题，可兼容首次一项拟建、另一项待澄清的合法状态，不更改产品实现。
 
 RunId 冻结为 `issue174-live-03`，入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-03`，新报告写入 `docs/delivery/issue-174-live-report-03.json`。调用前已结算 3.810222 元，十笔 PENDING 共 2.80 元完整保留，剩余未预留 1.389778 元；本轮最多预留1元，累计占用上界7.610222元，不超过授权8元。脚本在锁内再次核对旧预留身份与金额。失败立即停止并保留整轮预留，不自动重跑。

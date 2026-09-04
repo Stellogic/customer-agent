@@ -22,6 +22,12 @@ $knownTokenLimit = 200000
 $intakeCallUpperMicroCny = 20000
 
 if (-not $ConfirmProviderSpend) { throw '必须显式传入 -ConfirmProviderSpend。' }
+if (-not $IntakeDiagnostic) {
+    $executionCatalog = Get-Content (Join-Path $PSScriptRoot '../docs/implementation/issue-174-live-scenarios.json') -Raw | ConvertFrom-Json
+    if ($executionCatalog.executionAuthorized -ne $true -or $executionCatalog.status -ne 'FROZEN_AUTHORIZED_NOT_RUN') {
+        throw '发布配置尚未冻结授权；禁止读取密钥、预留费用或调用供应商。'
+    }
+}
 if ($RunId -notmatch '^[a-z0-9][a-z0-9-]{7,}$') { throw 'RunId 格式无效。' }
 foreach ($path in @($EnvFile, $LedgerPath, $KnowledgeModelPath)) {
     if (-not (Test-Path -LiteralPath $path)) { throw "所需输入不存在: $path" }
@@ -290,11 +296,11 @@ services:
     $env:AGENT_INVESTIGATION_ACTION_MODEL_MODE = 'deepseek-formal'
     $env:AGENT_CUSTOMER_COMMUNICATION_MODEL_MODE = 'deepseek-formal'
     $env:AGENT_INVESTIGATION_SHADOW_MODE = 'disabled'
-    $env:AGENT_INVESTIGATION_MAX_ACTIONS = '6'
+    $env:AGENT_INVESTIGATION_MAX_ACTIONS = '8'
     $env:AGENT_INVESTIGATION_MAX_WALL_CLOCK_MS = '120000'
     $env:AGENT_INVESTIGATION_MAX_TOKENS = '16000'
     $env:AGENT_INVESTIGATION_MAX_COST_MICROS = '10000'
-    $env:AGENT_INVESTIGATION_MAX_PROVIDER_ATTEMPTS = '6'
+    $env:AGENT_INVESTIGATION_MAX_PROVIDER_ATTEMPTS = '8'
     $env:AGENT_INVESTIGATION_MAX_REPEATED_ACTIONS = '0'
 
     $sourceFingerprint = Get-GateSourceFingerprint -RepoRoot $repoRoot
