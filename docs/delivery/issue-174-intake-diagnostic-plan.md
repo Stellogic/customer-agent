@@ -16,3 +16,13 @@
 入口：`pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -IntakeDiagnostic -RunId issue174-intake-diagnostic-01`。
 
 诊断完成后先评估证据再决定下一步；不能由诊断自动转入整套发布验收、合入或关票。
+
+## 本次结果
+
+测试提交 `a761826`，运行标识 `issue174-intake-diagnostic-01`。用例加载检查通过，诊断观察完成（Playwright 1 passed，12.0 秒）；这里的 passed 仅表示诊断程序执行完成，不是 L174-01 通过。
+
+初次请求 HTTP 201，3989 ms，NEEDS_CLARIFICATION，issues 数量 0；追加确认请求 HTTP 201，2803 ms，仍为 NEEDS_CLARIFICATION，issues 数量 0。原 5 秒标题观察为 false。证据见 `issue-174-intake-diagnostic-result.json`。
+
+这次观察排除了“只因第二次响应超过 5 秒”的解释，但不能反推旧轮的确切原因。状态未进入确认，也未形成任何拟建问题。Spring 的 `JdbcCustomerIntakeService` 在 Agent 不可用时也可创建人工协助受理并返回类似状态，因此 HTTP 201 不等于模型理解成功；两次 HTTP 操作也不等于两次供应商调用。当前诊断没有记录人工协助原因或供应商失败分类，不能进一步断言模型分类、契约校验或传输哪一环失败。
+
+本次无后续调用。累计已结算仍为 3.810222 元，旧轮 1 元及本次 0.10 元均保留 PENDING，预算占用上界 4.910222 元，剩余未预留额度 3.089778 元。专属资源清理完成，锁回读 FREE。产品接缝的安全错误分类证据仍是下一步所需；本票不通过修改提示、阈值或业务逻辑来掩盖失败。
