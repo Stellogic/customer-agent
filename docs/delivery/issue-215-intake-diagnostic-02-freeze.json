@@ -1,0 +1,23 @@
+{
+  "schema": "issue215-diagnostic-freeze-v1",
+  "runId": "issue215-intake-diagnostic-02",
+  "base": "c28971eed633ba1128f299e6f6f964efd024be15",
+  "head": "c28971eed633ba1128f299e6f6f964efd024be15",
+  "uncommittedChanges": true,
+  "sourceFingerprint": "fdf59cca47d0368b232a177590095966be4c68ede0b472988f1d25b3a159d3af",
+  "model": "deepseek-v4-flash",
+  "mode": "deepseek-formal-intake-v1",
+  "promptSource": "c28971e:agent/src/baseline_agent/deepseek_intake_model.py",
+  "schemaName": "customer_intake_understanding",
+  "schemaSource": "c28971e:agent/src/baseline_agent/deepseek_intake_model.py",
+  "logicalCallLimit": 2,
+  "providerAttemptLimit": 2,
+  "maxOutputTokensPerAttempt": 600,
+  "retries": 0,
+  "reservedMicroCny": 100000,
+  "priorSettledMicroCny": 3810222,
+  "priorPendingMicroCny": 2500000,
+  "projectLimitMicroCny": 8000000,
+  "finalConfirmation": false,
+  "releaseAcceptance": false
+}

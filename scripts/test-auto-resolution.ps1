@@ -64,7 +64,7 @@ FROM unnest(ARRAY['success', 'reply', 'cancel', 'pending', 'compensation', 'prop
         docker compose --profile smoke run --rm --no-deps --name $ContainerName `
             --volume $ScriptVolume --volume $MarkerVolume --entrypoint python `
             integration-smoke /smoke/auto_resolution_smoke.py exact_race `
-            --namespace $NamespaceValue --marker-directory /auto-resolution-markers
+            --namespace $NamespaceValue --marker-directory /auto-resolution-markers 2>&1
         if ($LASTEXITCODE -ne 0) {
             throw "Issue #162 精确截止验收失败，退出码 $LASTEXITCODE"
         }

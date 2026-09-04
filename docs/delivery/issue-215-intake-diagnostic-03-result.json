@@ -1,0 +1,19 @@
+{
+  "schema": "issue215-intake-diagnostic-v2",
+  "releaseAcceptance": false,
+  "verdict": "INITIAL_PRECONDITION_FAILED",
+  "observations": [
+    {
+      "httpStatus": 201,
+      "status": "NEEDS_CLARIFICATION",
+      "candidateMatches": true,
+      "responseIssueKinds": [],
+      "issueKinds": [],
+      "pendingKinds": [
+        "PACKAGE_NOT_RECEIVED"
+      ],
+      "assistanceCount": 0,
+      "ticketCount": 0
+    }
+  ]
+}

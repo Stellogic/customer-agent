@@ -1,8 +1,14 @@
 package com.stellogic.customeragent.ticket;
 
+import static com.stellogic.customeragent.ticket.IntakeAgentUnavailableException.Reason.RESPONSE_PARSE;
+import static com.stellogic.customeragent.ticket.IntakeAgentUnavailableException.Reason.STATE_CONSISTENCY;
+import static com.stellogic.customeragent.ticket.IntakeAgentUnavailableException.Reason.TRANSPORT;
+
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
@@ -15,6 +21,8 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 @ConditionalOnProperty(name = "baseline.migrate-only", havingValue = "false", matchIfMissing = true)
 final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstandingGateway {
+    private static final Logger LOG =
+            LoggerFactory.getLogger(AgentServerIntakeUnderstandingGateway.class);
     private final RestClient agent;
     private final ObjectMapper json;
 
@@ -88,7 +96,7 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
         } catch (IntakeAgentUnavailableException exception) {
             throw exception;
         } catch (RuntimeException exception) {
-            throw new IntakeAgentUnavailableException();
+            throw new IntakeAgentUnavailableException(TRANSPORT);
         }
     }
 
@@ -106,8 +114,10 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
             String assistantMessage = requiredText(value, "assistant_message");
             if (!List.of("UNDERSTANDING", "CONFIRM").contains(intent)
                     || !List.of("READY_TO_CONFIRM", "NEEDS_CLARIFICATION", "CONFIRMED")
-                            .contains(status)
-                    || (orderReference != null
+                            .contains(status)) {
+                throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
+            }
+            if ((orderReference != null
                             && request.visibleOrders().stream()
                                     .noneMatch(order -> order.reference().equals(orderReference)))
                     || !hasConsistentShape(
@@ -121,7 +131,15 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
                             request.currentPendingIssueKinds(),
                             remainingOrderReferences,
                             request.currentRemainingOrderReferences())) {
-                throw new IntakeAgentUnavailableException();
+                LOG.warn(
+                        "INTAKE_STATE_REJECTED intent={} status={} issues={} pending={} currentIssues={} currentPending={}",
+                        intent,
+                        status,
+                        issues.size(),
+                        pendingIssueKinds.size(),
+                        request.currentIssues().size(),
+                        request.currentPendingIssueKinds().size());
+                throw new IntakeAgentUnavailableException(STATE_CONSISTENCY);
             }
             return new IntakeUnderstanding(
                     intent,
@@ -131,8 +149,10 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
                     pendingIssueKinds,
                     remainingOrderReferences,
                     assistantMessage);
+        } catch (IntakeAgentUnavailableException exception) {
+            throw exception;
         } catch (RuntimeException exception) {
-            throw new IntakeAgentUnavailableException();
+            throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
         }
     }
 
@@ -213,7 +233,8 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
     }
 
     private static List<ProposedIntakeIssue> parseIssues(JsonNode value) {
-        if (!value.isArray() || value.size() > 8) throw new IntakeAgentUnavailableException();
+        if (!value.isArray() || value.size() > 8)
+            throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
         java.util.ArrayList<ProposedIntakeIssue> issues = new java.util.ArrayList<>();
         java.util.HashSet<String> kinds = new java.util.HashSet<>();
         for (JsonNode issue : value) {
@@ -227,7 +248,7 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
                                     "OTHER")
                             .contains(kind)
                     || !kinds.add(kind)) {
-                throw new IntakeAgentUnavailableException();
+                throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
             }
             issues.add(new ProposedIntakeIssue(kind, summary));
         }
@@ -235,7 +256,8 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
     }
 
     private static List<String> parsePendingIssueKinds(JsonNode value) {
-        if (!value.isArray() || value.size() > 3) throw new IntakeAgentUnavailableException();
+        if (!value.isArray() || value.size() > 3)
+            throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
         java.util.ArrayList<String> kinds = new java.util.ArrayList<>();
         for (JsonNode item : value) {
             String kind = item.asText().trim();
@@ -247,7 +269,7 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
                                     "OTHER")
                             .contains(kind)
                     || kinds.contains(kind)) {
-                throw new IntakeAgentUnavailableException();
+                throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
             }
             kinds.add(kind);
         }
@@ -257,7 +279,7 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
     private static List<String> parseOrderReferences(
             JsonNode value, IntakeUnderstandingRequest request) {
         if (!value.isArray() || value.size() > request.visibleOrders().size()) {
-            throw new IntakeAgentUnavailableException();
+            throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
         }
         java.util.ArrayList<String> references = new java.util.ArrayList<>();
         for (JsonNode item : value) {
@@ -265,7 +287,7 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
             if (references.contains(reference)
                     || request.visibleOrders().stream()
                             .noneMatch(order -> order.reference().equals(reference))) {
-                throw new IntakeAgentUnavailableException();
+                throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
             }
             references.add(reference);
         }
@@ -274,7 +296,7 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
 
     private static String requiredText(JsonNode value, String field) {
         String text = optionalText(value, field);
-        if (text == null) throw new IntakeAgentUnavailableException();
+        if (text == null) throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
         return text;
     }
 
@@ -282,7 +304,8 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
         JsonNode fieldValue = value.path(field);
         if (fieldValue.isMissingNode() || fieldValue.isNull()) return null;
         String text = fieldValue.asText().trim();
-        if (text.isEmpty() || text.length() > 2000) throw new IntakeAgentUnavailableException();
+        if (text.isEmpty() || text.length() > 2000)
+            throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
         return text;
     }
 

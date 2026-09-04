@@ -34,6 +34,7 @@
         'e2e/issue193.internal-shell.spec.ts'
     )
     Excluded = @{
+        'e2e/issue215.intake-diagnostic.spec.ts' = '仅由持锁、冻结预算的诊断入口显式启用，不属于离线完整门禁。'
         'e2e/issue129.flash-customer-communication.spec.ts' = '仅由显式授权的真实模型验收脚本运行，不属于离线完整门禁。'
     }
 }

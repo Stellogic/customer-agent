@@ -1,0 +1,55 @@
+{
+  "schema": "issue215-intake-diagnostic-v3",
+  "releaseAcceptance": false,
+  "verdict": "PASS",
+  "observations": [
+    {
+      "httpStatus": 201,
+      "status": "NEEDS_CLARIFICATION",
+      "candidateMatches": true,
+      "responseIssueKinds": [
+        "PACKAGE_NOT_RECEIVED"
+      ],
+      "issueKinds": [
+        "PACKAGE_NOT_RECEIVED"
+      ],
+      "pendingKinds": [
+        "DUPLICATE_CHARGE"
+      ],
+      "assistanceCount": 0,
+      "ticketCount": 0
+    },
+    {
+      "httpStatus": 201,
+      "status": "READY_TO_CONFIRM",
+      "candidateMatches": true,
+      "responseIssueKinds": [
+        "PACKAGE_NOT_RECEIVED",
+        "DUPLICATE_CHARGE"
+      ],
+      "issueKinds": [
+        "PACKAGE_NOT_RECEIVED",
+        "DUPLICATE_CHARGE"
+      ],
+      "pendingKinds": [],
+      "assistanceCount": 0,
+      "ticketCount": 0
+    },
+    {
+      "httpStatus": 201,
+      "status": "CONFIRMED",
+      "candidateMatches": true,
+      "responseIssueKinds": [
+        "PACKAGE_NOT_RECEIVED",
+        "DUPLICATE_CHARGE"
+      ],
+      "issueKinds": [
+        "PACKAGE_NOT_RECEIVED",
+        "DUPLICATE_CHARGE"
+      ],
+      "pendingKinds": [],
+      "assistanceCount": 0,
+      "ticketCount": 2
+    }
+  ]
+}
