@@ -48,9 +48,12 @@ function Get-SettledMicroCny($Ledger) {
 $ledger = Read-SharedLedger
 $settledBefore = Get-SettledMicroCny $ledger
 $pending = @($ledger.attempts | Where-Object status -eq 'PENDING')
-$expectedPendingCount = if ($IntakeDiagnostic) { 1 } else { 0 }
-if ($IntakeDiagnostic -and ($pending.Count -ne 1 -or $pending[0].phase -ne 'issue174-live-20260903a' -or
-    [long]$pending[0].reserved_micro_cny -ne 1000000)) { throw '诊断必须保留上一轮唯一的 1 元 PENDING。' }
+$expectedPendingCount = if ($IntakeDiagnostic) { 2 } else { 0 }
+if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-02' -or $pending.Count -ne 2 -or
+    @($pending | Where-Object { $_.phase -eq 'issue174-live-20260903a' -and $_.reserved_micro_cny -eq 1000000 }).Count -ne 1 -or
+    @($pending | Where-Object { $_.phase -eq 'issue174-intake-diagnostic-01' -and $_.reserved_micro_cny -eq 100000 }).Count -ne 1)) {
+    throw '第二阶段诊断须保留已知的两笔 PENDING，且只能使用冻结的新运行标识。'
+}
 if ($settledBefore -ne $expectedPriorMicroCny -or $pending.Count -ne $expectedPendingCount) {
     throw "共享账本未处于冻结起点: settled=$settledBefore pending=$($pending.Count)"
 }
@@ -230,7 +233,8 @@ try {
     $pendingNow = @($ledger.attempts | Where-Object status -eq 'PENDING')
     if ((Get-SettledMicroCny $ledger) -ne $settledBefore -or $pendingNow.Count -ne $expectedPendingCount -or
         [long](($pendingNow | Measure-Object reserved_micro_cny -Sum).Sum) -ne $pendingBeforeMicroCny -or
-        ($IntakeDiagnostic -and $pendingNow[0].phase -ne 'issue174-live-20260903a')) {
+        ($IntakeDiagnostic -and (@($pendingNow | Where-Object phase -eq 'issue174-live-20260903a').Count -ne 1 -or
+            @($pendingNow | Where-Object phase -eq 'issue174-intake-diagnostic-01').Count -ne 1))) {
         throw '获得门禁锁后共享账本起点发生变化。'
     }
     $ledger.phases | Add-Member -NotePropertyName $RunId -NotePropertyValue ([pscustomobject]@{
@@ -288,9 +292,30 @@ services:
     }
     $providerMayHaveRun = $true
     if ($IntakeDiagnostic) {
+        try {
         Invoke-Compose @('--profile', 'smoke', 'run', '--rm', '--no-deps',
             '--volume', "${evidenceDir}:/diagnostics", 'browser-acceptance',
             '--workers=1', '--max-failures=1', '--trace', 'off', 'e2e/issue174.intake-diagnostic.spec.ts')
+        } finally {
+            # 不保存原始日志；仅在内存中匹配固定异常名和固定消息。
+            $rawLog = (Invoke-Compose @('logs', '--no-color', 'agent-server') 2>&1 | Out-String)
+            $classes = [ordered]@{}
+            foreach ($kind in @('HTTPStatusError', 'JSONDecodeError', 'KeyError', 'ValueError', 'ReadTimeout', 'ConnectError')) {
+                $classes[$kind] = [regex]::Matches($rawLog, "\b$kind\b").Count
+            }
+            $known = [ordered]@{}
+            foreach ($message in @('incomplete provider response', 'invalid provider response', 'invalid provider output', 'model selected a non-visible order')) {
+                $known[$message] = $rawLog.Contains($message)
+            }
+            $httpCodes = @([regex]::Matches($rawLog, "(?:Client|Server) error '([0-9]{3})") | ForEach-Object { [int]$_.Groups[1].Value } | Sort-Object -Unique)
+            $rawLog = $null
+            $dbSummary = Invoke-Compose @('exec', '--no-TTY', 'postgres', 'psql', '--username', 'postgres',
+                '--dbname', 'customer_agent', '--tuples-only', '--no-align', '--command',
+                "select json_build_object('agentUnavailableAssistance',(select count(*) from intake_assistance_request where reason_code='AGENT_UNAVAILABLE'),'intakes',(select count(*) from customer_intake),'messages',(select count(*) from customer_intake_message));")
+            [ordered]@{ exceptionNameOccurrences = $classes; knownFailureMessages = $known; providerHttpCodes = $httpCodes;
+                database = (($dbSummary | Where-Object { $_ -match '^\{' } | Select-Object -Last 1) | ConvertFrom-Json)
+            } | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $evidenceDir 'intake-error-classification.json') -Encoding utf8
+        }
         $current = Read-SharedLedger
         $current.phases.$RunId.status = 'DIAGNOSTIC_COMPLETED_PENDING_USAGE'
         $current | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $LedgerPath -Encoding utf8

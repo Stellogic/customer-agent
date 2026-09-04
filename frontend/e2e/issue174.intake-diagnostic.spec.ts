@@ -17,14 +17,15 @@ test("Issue #174 intake diagnostic", async ({ browser }) => {
     const states = ["READY_TO_CONFIRM", "NEEDS_CLARIFICATION", "CONFIRMED"];
     const kinds = ["LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE"];
     const status = states.includes(body?.status) ? body.status : "OTHER";
+    const assisted = body?.assistantMessage === "已建立受理协助请求；客服只能协助确认订单与拟建问题，仍需由你确认后才会创建正式工单。";
     observations.push({
-      httpStatus: response.status(), elapsedMs, status,
+      httpStatus: response.status(), elapsedMs, status, assisted,
       issueCount: Array.isArray(body?.issues) ? body.issues.length : null,
       issueKinds: Array.isArray(body?.issues)
         ? body.issues.map((issue: { kind?: string }) => kinds.includes(issue.kind ?? "") ? issue.kind : "OTHER")
         : [],
     });
-    return status;
+    return { status, assisted };
   }
   try {
     const page = await context.newPage();
@@ -36,8 +37,9 @@ test("Issue #174 intake diagnostic", async ({ browser }) => {
     const initial = page.waitForResponse(r => r.request().method() === "POST" &&
       new URL(r.url()).pathname === "/api/customer/v2/intakes", { timeout: 30_000 });
     await page.getByRole("button", { name: "开始智能受理" }).click();
-    const initialStatus = await summarize(await initial, started);
-    if (initialStatus !== "NEEDS_CLARIFICATION") { stage = "INITIAL_RESULT_DIFFERENT"; return; }
+    const initialResult = await summarize(await initial, started);
+    if (initialResult.assisted) { stage = "INITIAL_ASSISTED"; return; }
+    if (initialResult.status !== "NEEDS_CLARIFICATION") { stage = "INITIAL_RESULT_DIFFERENT"; return; }
     await page.getByLabel("补充受理信息").fill("是的，确实重复扣款");
     stage = "FOLLOWUP_REQUEST";
     started = Date.now();
