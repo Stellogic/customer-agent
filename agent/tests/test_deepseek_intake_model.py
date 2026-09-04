@@ -124,3 +124,58 @@ async def test_initial_understanding_retains_both_asserted_and_uncertain_issues(
     assert result.status == "NEEDS_CLARIFICATION"
     assert result.issues == (IntakeIssue("PACKAGE_NOT_RECEIVED", "包裹一直没收到"),)
     assert result.pending_issue_kinds == ("DUPLICATE_CHARGE",)
+
+
+@pytest.mark.asyncio
+async def test_order_only_intake_keeps_selected_order_when_customer_describes_issue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    value = {
+        "intent": "UNDERSTANDING",
+        "status": "READY_TO_CONFIRM",
+        "candidateOrderReference": "ORDER-215",
+        "remainingOrderReferences": [],
+        "issues": [{"kind": "PACKAGE_NOT_RECEIVED", "summary": "包裹未收到"}],
+        "pendingIssueKinds": [],
+        "assistantMessage": "请确认包裹未收到的问题。",
+    }
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert payload["text"]["format"]["name"] == "customer_intake_understanding"
+        assert json.loads(payload["input"])["currentOrderReference"] == "ORDER-215"
+        return httpx.Response(
+            200,
+            json={
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": json.dumps(value)}],
+                    }
+                ],
+            },
+        )
+
+    client_type = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda **kwargs: client_type(
+            **kwargs,
+            transport=httpx.MockTransport(respond),
+        ),
+    )
+    result = await DeepSeekIntakeModel("synthetic-test-key").understand(
+        IntakeModelInput(
+            customer_message="包裹没收到",
+            visible_orders=(
+                VisibleOrder("ORDER-215", "合成订单"),
+                VisibleOrder("ORDER-OTHER", "其他订单"),
+            ),
+            current_order_reference="ORDER-215",
+        )
+    )
+    assert result.candidate_order_reference == "ORDER-215"
+    assert result.status == "READY_TO_CONFIRM"
+    assert result.issues == (IntakeIssue("PACKAGE_NOT_RECEIVED", "包裹未收到"),)

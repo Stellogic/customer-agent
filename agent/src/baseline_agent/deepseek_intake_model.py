@@ -47,7 +47,11 @@ class DeepSeekIntakeModel:
         clarifying = bool(
             model_input.current_order_reference and model_input.current_pending_issue_kinds
         )
-        starting = not model_input.current_issues and not model_input.current_pending_issue_kinds
+        starting = (
+            model_input.current_order_reference is None
+            and not model_input.current_issues
+            and not model_input.current_pending_issue_kinds
+        )
         request = {
             "model": self._model,
             "instructions": (
