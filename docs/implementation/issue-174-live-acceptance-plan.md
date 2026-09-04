@@ -1,6 +1,6 @@
 # #174 真实 DeepSeek 发布验收
 
-状态：**第 3 版冻结待运行**。基线：`origin/main@23475db`，已合入 #215 / PR #216 的受理修复。第2版仍为 INCOMPLETE，L174-01 失败、后四项 NOT_RUN；全部旧失败与诊断结果保留，不回写。详见 [第二轮结果](../delivery/issue-174-live-02-result.md)。
+状态：**第 3 版 INCOMPLETE：L174-01 PASS，L174-02 FAIL，其余三项 NOT_RUN**。基线：`origin/main@23475db`，已合入 #215 / PR #216 的受理修复。详见 [第三轮结果](../delivery/issue-174-live-03-result.md)。第2版仍为 INCOMPLETE；全部旧失败与诊断结果保留，不回写。
 
 ## 第 3 版复验冻结
 
