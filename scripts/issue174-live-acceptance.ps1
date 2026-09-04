@@ -48,12 +48,14 @@ function Get-SettledMicroCny($Ledger) {
 $ledger = Read-SharedLedger
 $settledBefore = Get-SettledMicroCny $ledger
 $pending = @($ledger.attempts | Where-Object status -eq 'PENDING')
-$expectedPendingCount = if ($IntakeDiagnostic) { 3 } else { 4 }
-if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-03' -or $pending.Count -ne 3 -or
+$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 4 }
+if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pending.Count -ne 5 -or
     @($pending | Where-Object { $_.phase -eq 'issue174-live-20260903a' -and $_.reserved_micro_cny -eq 1000000 }).Count -ne 1 -or
     @($pending | Where-Object { $_.phase -eq 'issue174-intake-diagnostic-01' -and $_.reserved_micro_cny -eq 100000 }).Count -ne 1 -or
-    @($pending | Where-Object { $_.phase -eq 'issue174-intake-diagnostic-02' -and $_.reserved_micro_cny -eq 100000 }).Count -ne 1)) {
-    throw '第三阶段诊断须保留已知的三笔 PENDING，且只能使用冻结的新运行标识。'
+    @($pending | Where-Object { $_.phase -eq 'issue174-intake-diagnostic-02' -and $_.reserved_micro_cny -eq 100000 }).Count -ne 1 -or
+    @($pending | Where-Object { $_.phase -eq 'issue174-intake-diagnostic-03' -and $_.reserved_micro_cny -eq 100000 }).Count -ne 1 -or
+    @($pending | Where-Object { $_.phase -eq 'issue174-live-02' -and $_.reserved_micro_cny -eq 1000000 }).Count -ne 1)) {
+    throw '第四阶段诊断须保留已知的五笔 PENDING，且只能使用冻结的新运行标识。'
 }
 if (-not $IntakeDiagnostic) {
     if ($RunId -ne 'issue174-live-02' -or $pending.Count -ne 4) { throw '发布复验须使用冻结运行标识并保留四笔 PENDING。' }

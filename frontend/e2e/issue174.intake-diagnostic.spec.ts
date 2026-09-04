@@ -11,6 +11,7 @@ test("Issue #174 intake diagnostic", async ({ browser }) => {
   const observations: object[] = [];
   let headingWithinFiveSeconds: boolean | null = null;
   let stage = "START";
+  let responseMessageVisible: boolean | null = null;
   let reference = "";
   async function summarize(response: Response, started: number) {
     const elapsedMs = Date.now() - started;
@@ -25,17 +26,18 @@ test("Issue #174 intake diagnostic", async ({ browser }) => {
       ["LOGISTICS_DELAY", "请确认物流是否已经超过预期时间仍无进展。"],
       ["ORDER_REQUIRED", "你说的是不是某一笔订单的物流问题？请补充订单线索。"],
     ];
+    const clarificationKind = clarificationMessages.find(([, message]) => message === body?.assistantMessage)?.[0] ?? "OTHER";
     observations.push({
       httpStatus: response.status(), elapsedMs, status, assisted,
       candidatePresent: body?.candidateOrder != null,
       candidateMatchesFixture: body?.candidateOrder?.reference === reference,
-      clarificationKind: clarificationMessages.find(([, message]) => message === body?.assistantMessage)?.[0] ?? "OTHER",
+      clarificationKind,
       issueCount: Array.isArray(body?.issues) ? body.issues.length : null,
       issueKinds: Array.isArray(body?.issues)
         ? body.issues.map((issue: { kind?: string }) => kinds.includes(issue.kind ?? "") ? issue.kind : "OTHER")
         : [],
     });
-    return { status, assisted };
+    return { status, assisted, clarificationKind };
   }
   try {
     const page = await context.newPage();
@@ -50,7 +52,14 @@ test("Issue #174 intake diagnostic", async ({ browser }) => {
     const initialResult = await summarize(await initial, started);
     if (initialResult.assisted) { stage = "INITIAL_ASSISTED"; return; }
     if (initialResult.status !== "NEEDS_CLARIFICATION") { stage = "INITIAL_RESULT_DIFFERENT"; return; }
-    await page.getByLabel("补充受理信息").fill("是的，确实重复扣款");
+    const replies: Record<string, { question: string; answer: string }> = {
+      PACKAGE_NOT_RECEIVED: { question: "请确认包裹是否至今仍未收到。", answer: "是的，包裹至今仍未收到" },
+      DUPLICATE_CHARGE: { question: "你提到疑似重复扣款，请确认是否确实发生了两次扣款。", answer: "是的，确实重复扣款" },
+    };
+    const current = replies[initialResult.clarificationKind];
+    if (!current) { stage = "UNSUPPORTED_CLARIFICATION"; return; }
+    await expect(page.getByText(current.question, { exact: true })).toBeVisible();
+    await page.getByLabel("补充受理信息").fill(current.answer);
     stage = "FOLLOWUP_REQUEST";
     started = Date.now();
     const followup = page.waitForResponse(r => r.request().method() === "POST" &&
@@ -59,14 +68,20 @@ test("Issue #174 intake diagnostic", async ({ browser }) => {
     await page.getByRole("button", { name: "发送给智能受理" }).click();
     headingWithinFiveSeconds = await expect(page.getByRole("heading", { name: "请确认 2 个问题" }))
       .toBeVisible({ timeout: 5000 }).then(() => true, () => false);
-    await followup;
+    const result = await followup;
+    if (result) {
+      const message = result.assisted
+        ? "已建立受理协助请求；客服只能协助确认订单与拟建问题，仍需由你确认后才会创建正式工单。"
+        : replies[result.clarificationKind]?.question;
+      if (message) responseMessageVisible = await page.getByText(message, { exact: true }).isVisible();
+    }
     if (stage === "FOLLOWUP_REQUEST") stage = "OBSERVED";
   } finally {
     // 只写受控状态、数量和耗时；不写 URL/ID、正文、响应、凭据、trace 或页面快照。
     mkdirSync("/diagnostics", { recursive: true });
     writeFileSync("/diagnostics/intake-diagnostic.json", JSON.stringify({
       schema: "issue174-intake-diagnostic-v1", releaseAcceptance: false,
-      stage, headingWithinFiveSeconds, observations,
+      stage, headingWithinFiveSeconds, responseMessageVisible, observations,
     }, null, 2));
     await context.close();
   }
