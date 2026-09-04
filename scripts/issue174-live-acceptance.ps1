@@ -1,6 +1,7 @@
 param(
     [switch]$ConfirmProviderSpend,
     [switch]$IntakeDiagnostic,
+    [switch]$InvestigationDiagnostic,
     [string]$EnvFile = 'D:\customer-agent\.env',
     [string]$LedgerPath = 'D:\customer-agent\.local\issue190-sufficiency\cost-ledger.json',
     [string]$KnowledgeModelPath = 'C:\Users\lizhuo\.codex\worktrees\745a\customer-agent\.local\models\bge-small-zh-v1.5',
@@ -22,7 +23,8 @@ $knownTokenLimit = 200000
 $intakeCallUpperMicroCny = 20000
 
 if (-not $ConfirmProviderSpend) { throw '必须显式传入 -ConfirmProviderSpend。' }
-if (-not $IntakeDiagnostic) {
+if ($IntakeDiagnostic -and $InvestigationDiagnostic) { throw '只能选择一种诊断模式。' }
+if (-not $IntakeDiagnostic -and -not $InvestigationDiagnostic) {
     $executionCatalog = Get-Content (Join-Path $PSScriptRoot '../docs/implementation/issue-174-live-scenarios.json') -Raw | ConvertFrom-Json
     if ($executionCatalog.executionAuthorized -ne $true -or $executionCatalog.status -ne 'FROZEN_AUTHORIZED_NOT_RUN') {
         throw '发布配置尚未冻结授权；禁止读取密钥、预留费用或调用供应商。'
@@ -64,7 +66,8 @@ if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pend
     throw '第四阶段诊断须保留已知的五笔 PENDING，且只能使用冻结的新运行标识。'
 }
 if (-not $IntakeDiagnostic) {
-    if ($RunId -ne 'issue174-live-04' -or $pending.Count -ne 11) { throw '发布复验须使用冻结运行标识并保留十一笔 PENDING。' }
+    $expectedRunId = if ($InvestigationDiagnostic) { 'issue174-investigation-diagnostic-01' } else { 'issue174-live-04' }
+    if ($RunId -ne $expectedRunId -or $pending.Count -ne 11) { throw '须使用冻结运行标识并保留十一笔 PENDING。' }
     foreach ($prior in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03', 'issue174-intake-diagnostic-01', 'issue174-intake-diagnostic-02', 'issue174-intake-diagnostic-03', 'issue174-intake-diagnostic-04', 'issue215-intake-diagnostic-01', 'issue215-intake-diagnostic-02', 'issue215-intake-diagnostic-03', 'issue215-intake-diagnostic-04')) {
         $amount = if ($prior -in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03')) { 1000000 } else { 100000 }
         if (@($pending | Where-Object { $_.phase -eq $prior -and $_.reserved_micro_cny -eq $amount }).Count -ne 1) {
@@ -101,7 +104,7 @@ $base = (git rev-parse origin/main).Trim()
 $projectName = "customer-agent-$RunId"
 $imageTag = "gate-$RunId"
 $evidenceDir = Join-Path $repoRoot ".local/gate-evidence/$RunId"
-$reportPath = Join-Path $repoRoot 'docs/delivery/issue-174-live-report-04.json'
+$reportPath = Join-Path $repoRoot $(if ($InvestigationDiagnostic) { 'docs/delivery/issue-174-investigation-diagnostic-01-report.json' } else { 'docs/delivery/issue-174-live-report-04.json' })
 $formalPath = Join-Path $evidenceDir 'formal-metrics.json'
 $overridePath = Join-Path ([IO.Path]::GetTempPath()) "$RunId.override.yaml"
 $catalogPath = Join-Path $repoRoot 'docs/implementation/issue-174-live-scenarios.json'
@@ -260,7 +263,7 @@ function Settle-SharedLedger($Usage, [string]$Status) {
 }
 
 try {
-    if (-not $IntakeDiagnostic) { Assert-FrozenCatalog }
+    if (-not $IntakeDiagnostic -and -not $InvestigationDiagnostic) { Assert-FrozenCatalog }
     $gate = Enter-TestGateLock -Issue 174 -RunId $RunId -CommandType 'deepseek-live' `
         -BaseSha $base -HeadSha $head -ComposeProject $projectName -ImageTag $imageTag
     $ledger = Read-SharedLedger
@@ -277,11 +280,11 @@ try {
     }
     $ledger.phases | Add-Member -NotePropertyName $RunId -NotePropertyValue ([pscustomobject]@{
         status = 'RUNNING'
-        dataset = $(if ($IntakeDiagnostic) { 'issue174-intake-diagnostic-v1' } else { 'issue-174-live-scenarios-v1' })
+        dataset = $(if ($InvestigationDiagnostic) { 'issue174-investigation-diagnostic-v1' } elseif ($IntakeDiagnostic) { 'issue174-intake-diagnostic-v1' } else { 'issue-174-live-scenarios-v1' })
     })
     $ledger.attempts += [pscustomobject]@{
         phase = $RunId
-        query_id = 'issue174-browser-release'
+        query_id = $(if ($InvestigationDiagnostic) { 'issue174-browser-investigation-diagnostic' } else { 'issue174-browser-release' })
         status = 'PENDING'
         reserved_micro_cny = $runReservationMicroCny
     }
@@ -294,6 +297,29 @@ services:
     environment:
       INVESTIGATION_MODEL_MODE: deepseek-formal
 "@ | Set-Content -LiteralPath $overridePath -Encoding utf8
+    if ($InvestigationDiagnostic) {
+        # 仅运行时诊断副本：保留每条校验与异常，只打印受控分类及原文件行号。
+        $diagnosticSourcePath = Join-Path $evidenceDir 'deepseek_investigation_action_model.py'
+        $diagnosticSource = Get-Content (Join-Path $repoRoot 'agent/src/baseline_agent/deepseek_investigation_action_model.py') -Raw
+        if (-not $diagnosticSource.Contains('raise _DeepSeekActionResponseFailure(')) { throw '未找到冻结解析诊断位置。' }
+        $diagnosticSource = $diagnosticSource.Replace('raise _DeepSeekActionResponseFailure(', 'raise _diagnostic_response_failure(')
+        $diagnosticSource += @'
+
+
+def _diagnostic_response_failure(classification):
+    import sys
+    print("ISSUE174_PARSE_FAILURE line=" + str(sys._getframe(1).f_lineno) + " class=" + classification.value, flush=True)
+    return _DeepSeekActionResponseFailure(classification)
+'@
+        [IO.File]::WriteAllText($diagnosticSourcePath, $diagnosticSource)
+        @"
+    volumes:
+      - type: bind
+        source: $($diagnosticSourcePath.Replace('\', '/'))
+        target: /app/src/baseline_agent/deepseek_investigation_action_model.py
+        read_only: true
+"@ | Add-Content -LiteralPath $overridePath -Encoding utf8
+    }
 
     $env:COMPOSE_PROJECT_NAME = $projectName
     $env:COMPOSE_DISABLE_ENV_FILE = 'true'
@@ -353,6 +379,33 @@ services:
             [ordered]@{ exceptionNameOccurrences = $classes; knownFailureMessages = $known; providerHttpCodes = $httpCodes;
                 database = (($dbSummary | Where-Object { $_ -match '^\{' } | Select-Object -Last 1) | ConvertFrom-Json)
             } | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $evidenceDir 'intake-error-classification.json') -Encoding utf8
+        }
+        $current = Read-SharedLedger
+        $current.phases.$RunId.status = 'DIAGNOSTIC_COMPLETED_PENDING_USAGE'
+        $current | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $LedgerPath -Encoding utf8
+    } elseif ($InvestigationDiagnostic) {
+        try {
+            Invoke-LiveScenario 'e2e/issue173.full-stack.spec.ts' 'Issue #173 A：'
+        } finally {
+            $diagnosticWaitFailure = $null
+            try { Wait-NoActiveGenerations } catch { $diagnosticWaitFailure = 'GENERATION_WAIT_TIMEOUT_OR_QUERY_FAILURE' }
+            $diagnosticLog = (Invoke-Compose @('logs', '--no-color', 'agent-server') 2>&1 | Out-String)
+            $parseFailures = @([regex]::Matches($diagnosticLog, 'ISSUE174_PARSE_FAILURE line=(\d+) class=([A-Z_]+)') | ForEach-Object {
+                [ordered]@{ sourceLine = [int]$_.Groups[1].Value; classification = $_.Groups[2].Value }
+            })
+            $diagnosticLog = $null
+            $diagnosticUsage = Get-LiveUsage
+            [ordered]@{
+                status = 'DIAGNOSTIC_OBSERVATION'; releaseAcceptance = $false; runId = $RunId; testedHead = $head
+                parseFailures = $parseFailures; formalMetrics = $diagnosticUsage.Formal
+                generationWaitFailure = $diagnosticWaitFailure
+                reservationMicroCny = $runReservationMicroCny; pending = $true
+            } | ConvertTo-Json -Depth 12 | Set-Content (Join-Path $evidenceDir 'investigation-diagnostic.json') -Encoding utf8
+            if ($diagnosticWaitFailure) { throw $diagnosticWaitFailure }
+            Assert-LiveUsage $diagnosticUsage
+            if ($diagnosticUsage.ProviderAttempts -gt 30 -or $diagnosticUsage.ChargedMicroCny -gt $runReservationMicroCny) {
+                throw '调查诊断超出冻结尝试或估算费用上限。'
+            }
         }
         $current = Read-SharedLedger
         $current.phases.$RunId.status = 'DIAGNOSTIC_COMPLETED_PENDING_USAGE'
@@ -477,7 +530,8 @@ services:
         try {
             $usage = Get-LiveUsage
             $failureReport = [ordered]@{
-                schema = 'issue-174-live-release-v1'; status = 'INCOMPLETE'; runId = $RunId
+                schema = $(if ($InvestigationDiagnostic) { 'issue174-investigation-diagnostic-v1' } else { 'issue-174-live-release-v1' }); status = 'INCOMPLETE'; runId = $RunId
+                releaseAcceptance = -not $InvestigationDiagnostic
                 testedHead = $head; base = $base; model = 'deepseek-v4-flash'
                 completedScenarios = $scenarioCount; failure = $runFailure.Exception.Message
                 calls = [ordered]@{ logical = $usage.LogicalCalls; providerAttempts = $usage.ProviderAttempts }
@@ -494,7 +548,8 @@ services:
         } catch {
             $metricsFailure = $_.Exception.Message
             $failureReport = [ordered]@{
-                schema = 'issue-174-live-release-v1'; status = 'INCOMPLETE'; runId = $RunId
+                schema = $(if ($InvestigationDiagnostic) { 'issue174-investigation-diagnostic-v1' } else { 'issue-174-live-release-v1' }); status = 'INCOMPLETE'; runId = $RunId
+                releaseAcceptance = -not $InvestigationDiagnostic
                 testedHead = $head; base = $base; model = 'deepseek-v4-flash'
                 completedScenarios = $scenarioCount; failure = $runFailure.Exception.Message
                 metricsCollection = $metricsFailure
@@ -542,7 +597,9 @@ if ($runFailure) {
 }
 if ($cleanupFailures.Count -ne 0) { throw "Issue #174 运行通过但资源清理失败: $($cleanupFailures -join ' | ')" }
 
-if ($IntakeDiagnostic) {
+if ($InvestigationDiagnostic) {
+    Write-Host "调查诊断完成，非发布验收；预留保留。证据：$evidenceDir/investigation-diagnostic.json"
+} elseif ($IntakeDiagnostic) {
     Write-Host "受理诊断已结束（最多两次请求），非发布验收；预留保留 PENDING。证据：$evidenceDir/intake-diagnostic.json"
 } else {
     Write-Host "Issue #174 真实 DeepSeek/Chromium 发布验收通过：run=$RunId report=$reportPath"
