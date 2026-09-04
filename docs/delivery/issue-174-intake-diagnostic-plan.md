@@ -10,6 +10,12 @@
 
 入口：`pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -IntakeDiagnostic -RunId issue174-intake-diagnostic-04`。以下前三阶段为历史冻结与结果，不覆盖。
 
+第四阶段结果（提交 `3a65485`）：诊断观察完成，1 passed（11.3秒），并非发布通过。初次 201/3609 ms，候选订单匹配，PACKAGE_NOT_RECEIVED，issues=0；按当前问题确认后 201/2453 ms，NEEDS_CLARIFICATION，OTHER，issues=0。数据库唯一受理存在 AGENT_UNAVAILABLE 协助，两个待澄清类别原样保留，证明正确回复路径也进入了人工协助，不能只归因于旧测试回复顺序。证据为 `issue-174-intake-diagnostic-04-result.json` 与 `issue-174-intake-diagnostic-04-errors.json`。
+
+诊断局限：assisted 仅比较首次创建协助文案，未识别 `JdbcCustomerIntakeService.retainHumanAssistance` 的另一条固定文案，因此 false 不能证明未转人工，responseMessageVisible=null 也不是页面故障。保留原结果不回写。数据库证据优先；Agent 日志分类全零并不能排除 Spring 解析/契约校验失败，其异常被统一转为 IntakeAgentUnavailableException。具体底层原因尚未取得，不能宣称已定位模型或网络错误。
+
+累计已结算 3.810222 元，六笔 PENDING 合计 2.40 元，占用上界 6.210222 元，未预留 1.789778 元。资源清理后锁回读 FREE。本轮后不再自动付费复验；先在独立产品修复范围建立可区分传输、解析、形状校验的证据，再安排发布复验。#174 仍未完成，PR 保持 Draft。
+
 用户在原累计 5 元预算之外明确追加 3 元，当前项目累计上限为 8 元。本诊断不代表发布验收重跑或通过，不变更五场景的既有通过标准。
 
 - 运行标识：`issue174-intake-diagnostic-01`，只执行一次。
