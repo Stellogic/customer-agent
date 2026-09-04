@@ -1,6 +1,6 @@
 # #174 真实 DeepSeek 发布验收
 
-状态：**修正验收交互后的第 2 版待运行**。基线：`origin/main@c28971e`。旧轮 FAIL 和三次诊断结果保留，不回写为通过。
+状态：**第 2 版真实验收 INCOMPLETE，L174-01 失败，后四项 NOT_RUN**。基线：`origin/main@c28971e`。旧轮 FAIL 和三次诊断结果保留，不回写为通过。详见 [第二轮结果](../delivery/issue-174-live-02-result.md)。
 
 ## 第 2 版复验修正
 
