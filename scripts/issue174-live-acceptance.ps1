@@ -48,7 +48,7 @@ function Get-SettledMicroCny($Ledger) {
 $ledger = Read-SharedLedger
 $settledBefore = Get-SettledMicroCny $ledger
 $pending = @($ledger.attempts | Where-Object status -eq 'PENDING')
-$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 4 }
+$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 10 }
 if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pending.Count -ne 5 -or
     @($pending | Where-Object { $_.phase -eq 'issue174-live-20260903a' -and $_.reserved_micro_cny -eq 1000000 }).Count -ne 1 -or
     @($pending | Where-Object { $_.phase -eq 'issue174-intake-diagnostic-01' -and $_.reserved_micro_cny -eq 100000 }).Count -ne 1 -or
@@ -58,9 +58,9 @@ if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pend
     throw '第四阶段诊断须保留已知的五笔 PENDING，且只能使用冻结的新运行标识。'
 }
 if (-not $IntakeDiagnostic) {
-    if ($RunId -ne 'issue174-live-02' -or $pending.Count -ne 4) { throw '发布复验须使用冻结运行标识并保留四笔 PENDING。' }
-    foreach ($prior in @('issue174-live-20260903a', 'issue174-intake-diagnostic-01', 'issue174-intake-diagnostic-02', 'issue174-intake-diagnostic-03')) {
-        $amount = if ($prior -eq 'issue174-live-20260903a') { 1000000 } else { 100000 }
+    if ($RunId -ne 'issue174-live-03' -or $pending.Count -ne 10) { throw '发布复验须使用冻结运行标识并保留十笔 PENDING。' }
+    foreach ($prior in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-intake-diagnostic-01', 'issue174-intake-diagnostic-02', 'issue174-intake-diagnostic-03', 'issue174-intake-diagnostic-04', 'issue215-intake-diagnostic-01', 'issue215-intake-diagnostic-02', 'issue215-intake-diagnostic-03', 'issue215-intake-diagnostic-04')) {
+        $amount = if ($prior -in @('issue174-live-20260903a', 'issue174-live-02')) { 1000000 } else { 100000 }
         if (@($pending | Where-Object { $_.phase -eq $prior -and $_.reserved_micro_cny -eq $amount }).Count -ne 1) {
             throw '发布复验账本预留身份或金额不符。'
         }
@@ -81,7 +81,7 @@ $base = (git rev-parse origin/main).Trim()
 $projectName = "customer-agent-$RunId"
 $imageTag = "gate-$RunId"
 $evidenceDir = Join-Path $repoRoot ".local/gate-evidence/$RunId"
-$reportPath = Join-Path $repoRoot 'docs/delivery/issue-174-live-report-02.json'
+$reportPath = Join-Path $repoRoot 'docs/delivery/issue-174-live-report-03.json'
 $formalPath = Join-Path $evidenceDir 'formal-metrics.json'
 $overridePath = Join-Path ([IO.Path]::GetTempPath()) "$RunId.override.yaml"
 $catalogPath = Join-Path $repoRoot 'docs/implementation/issue-174-live-scenarios.json'
@@ -121,6 +121,8 @@ function Assert-FrozenCatalog {
     if (
         $catalog.status -ne 'FROZEN_AUTHORIZED_NOT_RUN' -or
         $catalog.executionAuthorized -ne $true -or
+        $catalog.revision -ne 3 -or
+        $catalog.liveFreeze.promptVersionsBySeam.intake -ne 'intake-v3' -or
         $catalog.liveFreeze.model -ne 'deepseek-v4-flash' -or
         [int]$catalog.liveFreeze.logicalCallLimit -ne $logicalCallLimit -or
         [int]$catalog.liveFreeze.providerAttemptLimit -ne $providerAttemptLimit -or

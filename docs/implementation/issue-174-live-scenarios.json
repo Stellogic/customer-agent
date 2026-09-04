@@ -2,7 +2,7 @@
   "issue": 174,
   "artifactKind": "frozen-live-scenario-catalog",
   "status": "FROZEN_AUTHORIZED_NOT_RUN",
-  "baselineCommit": "origin/main@c28971e",
+  "baselineCommit": "origin/main@23475db",
   "plan": "issue-174-live-acceptance-plan.md",
   "description": "调用前冻结的独立合成发布场景；真实结果仅由授权 runner 和发布报告给出。",
   "executionAuthorized": true,
@@ -39,13 +39,13 @@
     "currency": "CNY",
     "cumulativeLimit": 8,
     "archivedCumulativeUpperBound": 3.810222,
-    "archivedUnsettled": 1.3,
-    "arithmeticRemainingAtSnapshot": 2.889778,
+    "archivedUnsettled": 2.8,
+    "arithmeticRemainingAtSnapshot": 1.389778,
     "liveLedgerSpent": 3.810222,
-    "liveAvailable": 2.889778,
+    "liveAvailable": 1.389778,
     "issue174Reserved": 1,
     "ledgerReference": "D:\\customer-agent\\.local\\issue190-sufficiency\\cost-ledger.json（调用前 live 回读）",
-    "policy": "用户追加3元至累计8元；保留旧四笔PENDING共1.3元，本轮最多预留1元，禁止重复使用旧预留。"
+    "policy": "保留十笔旧PENDING共2.8元；本轮最多预留1元，累计占用上界7.610222元，禁止复用旧预留。"
   },
   "currentStage": {
     "logicalCalls": 0,
@@ -58,14 +58,14 @@
   "liveFreeze": {
     "model": "deepseek-v4-flash",
     "promptVersionsBySeam": {
-      "intake": "inline@c28971e",
+      "intake": "intake-v3",
       "action": "investigation-action-v3",
       "judgment": "investigation-judgment-v1",
       "customerCommunication": "customer-communication-v2/customer-knowledge-communication-v1",
       "supportAssistance": "support-assistance-answer-v2"
     },
     "schemaVersionsBySeam": {
-      "intake": "customer_intake_understanding",
+      "intake": "customer_intake_issue_assessments/customer_intake_clarification/customer_intake_understanding",
       "action": "investigation-action-v3",
       "judgment": "investigation-judgment-v1",
       "customerCommunication": "customer-reply-v1/customer-reply-v2",
@@ -109,7 +109,7 @@
   "prerequisites": [
     "#173 已完成：PR #210 merged，Issue #173 closed，issue173-final-20260903b PASS。",
     "#190 检索 64/64 已绑定；#169 35/48 由用户接受为 KNOWN_LIMITATIONS；#170 已交付但回答质量未单独评估。",
-    "共享账本已结算 3.810222 CNY，保留四笔 PENDING 共1.30 CNY；项目上限8 CNY，本轮最多预留1 CNY。",
+    "共享账本已结算 3.810222 CNY，保留十笔 PENDING 共2.80 CNY；项目上限8 CNY，本轮最多预留1 CNY。",
     "固定模型、prompt/schema、五个场景、调用/尝试/token/成本/时间上限。",
     "仅使用合成订单和公开知识；真实 Chromium 经 Spring，关闭 shadow 和 fake 回退。",
     "协调任务已明确授权本轮真实 DeepSeek 费用与正式交付。"
@@ -302,5 +302,5 @@
       ]
     }
   ],
-  "revision": 2
+  "revision": 3
 }

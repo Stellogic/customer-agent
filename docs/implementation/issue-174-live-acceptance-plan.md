@@ -1,6 +1,14 @@
 # #174 真实 DeepSeek 发布验收
 
-状态：**第 2 版真实验收 INCOMPLETE，L174-01 失败，后四项 NOT_RUN**。基线：`origin/main@c28971e`。旧轮 FAIL 和三次诊断结果保留，不回写为通过。详见 [第二轮结果](../delivery/issue-174-live-02-result.md)。
+状态：**第 3 版冻结待运行**。基线：`origin/main@23475db`，已合入 #215 / PR #216 的受理修复。第2版仍为 INCOMPLETE，L174-01 失败、后四项 NOT_RUN；全部旧失败与诊断结果保留，不回写。详见 [第二轮结果](../delivery/issue-174-live-02-result.md)。
+
+## 第 3 版复验冻结
+
+用户在确认修复票已完成后要求继续发布验收。固定模型仍为 deepseek-v4-flash；受理提示改为实施票已交付的 intake-v3，模型 schema 按首次识别、澄清、其他受理路径分别为 customer_intake_issue_assessments、customer_intake_clarification、customer_intake_understanding。其他接缝版本及五场景的输入、阈值、分段预算和调用上限不变。原第2版浏览器交互已经逐项回答当前问题，可兼容首次一项拟建、另一项待澄清的合法状态，不更改产品实现。
+
+RunId 冻结为 `issue174-live-03`，入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-03`，新报告写入 `docs/delivery/issue-174-live-report-03.json`。调用前已结算 3.810222 元，十笔 PENDING 共 2.80 元完整保留，剩余未预留 1.389778 元；本轮最多预留1元，累计占用上界7.610222元，不超过授权8元。脚本在锁内再次核对旧预留身份与金额。失败立即停止并保留整轮预留，不自动重跑。
+
+#215 的真实三请求建单成功和完整离线门禁仅作为修复前置证据，不能代替本票五场景真实发布验收。以下第2版和第1版段落保留为历史冻结，以本节及 revision=3 场景清单为当前运行依据。
 
 ## 第 2 版复验修正
 
