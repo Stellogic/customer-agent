@@ -1,11 +1,11 @@
 {
   "issue": 174,
   "artifactKind": "frozen-live-scenario-catalog",
-  "status": "DRAFT_NOT_AUTHORIZED",
+  "status": "DRAFT_NOT_READY",
   "baselineCommit": "origin/main@23475db",
   "plan": "issue-174-live-acceptance-plan.md",
   "description": "调用前冻结的独立合成发布场景；真实结果仅由授权 runner 和发布报告给出。",
-  "executionAuthorized": false,
+  "executionAuthorized": true,
   "qualityProtocol": "rag-layered-v2",
   "evidenceResponsibilities": {
     "retrieval": "#190：有答案 Recall@5 >= 0.90、MRR@5 >= 0.75；错误版本/范围/越权 Top-5 命中率各为0；无答案题完整执行，候选不决定拒答。",
@@ -42,10 +42,11 @@
     "archivedUnsettled": 3.8,
     "arithmeticRemainingAtSnapshot": 0.389778,
     "liveLedgerSpent": 3.810222,
-    "liveAvailable": 0.389778,
+    "liveAvailable": 3.8,
     "issue174Reserved": 1,
     "ledgerReference": "D:\\customer-agent\\.local\\issue190-sufficiency\\cost-ledger.json（调用前 live 回读）",
-    "policy": "保留十一笔PENDING共3.8元；未预留0.389778元不足以再次预留1元，草案不可执行。"
+    "policy": "用户确认历史平台实扣不足2元且当前至少还有3.8元预算；历史估算及3.8元预留保留但不重复加计，新调用另行预留，同时受总8元与当前可用额度限制。",
+    "billingReconciliation": "../delivery/issue-174-billing-reconciliation.json"
   },
   "currentStage": {
     "logicalCalls": 0,
@@ -54,7 +55,7 @@
     "costScope": "仅本静态阶段新增消耗，不代表全项目历史累计为0",
     "metricsStatus": "NOT_RUN"
   },
-  "freezeStatus": "DRAFT_NOT_AUTHORIZED",
+  "freezeStatus": "DRAFT_NOT_READY",
   "liveFreeze": {
     "model": "deepseek-v4-flash",
     "promptVersionsBySeam": {
@@ -111,10 +112,10 @@
   "prerequisites": [
     "#173 已完成：PR #210 merged，Issue #173 closed，issue173-final-20260903b PASS。",
     "#190 检索 64/64 已绑定；#169 35/48 由用户接受为 KNOWN_LIMITATIONS；#170 已交付但回答质量未单独评估。",
-    "已结算3.810222 CNY，十一笔PENDING共3.80 CNY；上限8 CNY，剩余0.389778 CNY不足下一轮1 CNY预留。",
+    "用户提供的历史平台累计实扣上界2 CNY，未经Agent独立核实；旧十一笔预留保留，新调用在总8 CNY内另行预留。",
     "固定模型、prompt/schema、五个场景、调用/尝试/token/成本/时间上限。",
     "仅使用合成订单和公开知识；真实 Chromium 经 Spring，关闭 shadow 和 fake 回退。",
-    "下一轮尚未授权及冻结，不得调用供应商。"
+    "用户已授权继续；草案尚未完成诊断安排及新运行冻结，不得执行。"
   ],
   "fixturePolicy": "仅描述合成输入事实；订单引用占位符待映射为本次隔离栈独有订单。只准备订单/支付/物流/知识输入，不预写工单、消息、代次、提案、审批、执行或 HUMAN 结果。",
   "observationPolicy": "真实 Chromium 可见 UI 发起业务，只观察同源 Spring 产品 API/SSE/页面；不直接请求 provider/Agent，不 mock 成功，不通过内部 publish 或 SQL 制造业务结果。",
