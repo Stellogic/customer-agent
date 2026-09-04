@@ -124,6 +124,7 @@ async def test_flash_selects_one_strict_action_from_minimal_normalized_facts() -
         "text",
     }
     assert body["model"] == "deepseek-v4-flash"
+    assert body["max_output_tokens"] == 128
     assert body["reasoning"] == {"effort": "none"}
     assert body["text"]["format"]["strict"] is True
     sent = json.loads(body["input"])
@@ -235,6 +236,7 @@ async def test_final_decision_can_choose_knowledge_without_promoting_customer_te
     assert decision.knowledge_query == query
     assert decision.action.parameter_map == {}
     assert len(captured) == 1
+    assert captured[0]["max_output_tokens"] == 1024
     model_input = json.loads(captured[0]["input"])
     assert "customerQuestion" not in model_input["syntheticInvestigationFacts"]
     assert model_input["customerQuestion"] == "包裹显示签收但没有收到，怎么办？"

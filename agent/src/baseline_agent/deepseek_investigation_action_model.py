@@ -46,6 +46,7 @@ class DeepSeekActionConfig:
     max_attempts: int = 2
     retry_base_delay_seconds: float = 0.2
     max_output_tokens: int = 128
+    conclusion_max_output_tokens: int = 1024
 
     def __post_init__(self) -> None:
         if (
@@ -57,6 +58,7 @@ class DeepSeekActionConfig:
             or not 1 <= self.max_attempts <= 2
             or self.retry_base_delay_seconds < 0
             or not 32 <= self.max_output_tokens <= 256
+            or not 512 <= self.conclusion_max_output_tokens <= 2048
         ):
             raise ActionLoopFailure(ActionLoopFailureCode.MODEL_CALL_FAILED)
 
@@ -494,7 +496,9 @@ def _build_request(
             separators=(",", ":"),
             sort_keys=True,
         ),
-        "max_output_tokens": config.max_output_tokens,
+        "max_output_tokens": config.conclusion_max_output_tokens
+        if is_submission
+        else config.max_output_tokens,
         "reasoning": {"effort": "none"},
         "stream": False,
         "text": {
