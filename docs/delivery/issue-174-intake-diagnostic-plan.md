@@ -36,3 +36,5 @@
 在容器清理前，将 Agent 日志仅在内存中匹配固定的异常类别、四条固定错误消息和三位 HTTP 状态码；仅保存这些计数/布尔值/数值。数据库只读取 AGENT_UNAVAILABLE 协助数量和受理/回复记录数。不得导出原始日志、异常详情、原始响应、提示或请求标识。浏览器只增加与代码中固定人工协助文案比较所得的 assisted 布尔值，不保存文案本身。
 
 入口沿用 -IntakeDiagnostic，但 RunId 改为 issue174-intake-diagnostic-02。旧运行标识不能重用，调用后保留新增 PENDING；本轮结果不作为原五场景通过证据。
+
+第二阶段执行结果（提交 87d5d6b）：诊断观察完成，首次/追加请求分别为 4333/3305 ms，HTTP 201，NEEDS_CLARIFICATION，issues=0，assisted=false；5秒目标标题仍不可见。数据库 AGENT_UNAVAILABLE 协助数为0，受理1条、回复1条；白名单异常和固定错误消息均未命中。结果支持排除本轮人工协助退化和超5秒响应，不证明所有可能错误都不存在。下一判别点为模型选择的订单候选及待澄清问题状态，不应放宽发布验收断言。两份安全结果见 issue-174-intake-diagnostic-02-result.json 和 issue-174-intake-diagnostic-02-errors.json。此前两轮与本轮预留均保留，PENDING总计1.20元，累计占用上界5.010222元。

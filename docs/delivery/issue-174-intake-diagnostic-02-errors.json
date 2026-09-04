@@ -1,0 +1,22 @@
+{
+  "exceptionNameOccurrences": {
+    "HTTPStatusError": 0,
+    "JSONDecodeError": 0,
+    "KeyError": 0,
+    "ValueError": 0,
+    "ReadTimeout": 0,
+    "ConnectError": 0
+  },
+  "knownFailureMessages": {
+    "incomplete provider response": false,
+    "invalid provider response": false,
+    "invalid provider output": false,
+    "model selected a non-visible order": false
+  },
+  "providerHttpCodes": [],
+  "database": {
+    "agentUnavailableAssistance": 0,
+    "intakes": 1,
+    "messages": 1
+  }
+}
