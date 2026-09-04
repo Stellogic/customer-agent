@@ -17,8 +17,37 @@ test("Issue #173 A：自然语言多问题澄清、一次建单与订单分组�
     await page.getByRole("button", { name: "开始智能受理" }).click();
     await expect(page.getByRole("heading", { name: "再帮我确认一点" })).toBeVisible();
     await expect(page.getByRole("button", { name: /原子创建/ })).toHaveCount(0);
-    await page.getByLabel("补充受理信息").fill("是的，确实重复扣款");
-    await page.getByRole("button", { name: "发送给智能受理" }).click();
+    // 回答当前真实澄清问题；两种问题各最多确认一次，不假定模型提问顺序。
+    const answered = new Set<string>();
+    let clarifiedKinds: string[] = [];
+    for (let step = 0; step < 2; step += 1) {
+      const packageQuestion = page.getByText("请确认包裹是否至今仍未收到。", { exact: true });
+      const duplicateQuestion = page.getByText("你提到疑似重复扣款，请确认是否确实发生了两次扣款。", { exact: true });
+      const packagePending = await packageQuestion.isVisible();
+      const kind = packagePending ? "PACKAGE_NOT_RECEIVED" : "DUPLICATE_CHARGE";
+      await expect(packagePending ? packageQuestion : duplicateQuestion).toBeVisible();
+      expect(answered.has(kind)).toBe(false);
+      answered.add(kind);
+      await expect(page.getByRole("button", { name: /原子创建/ })).toHaveCount(0);
+      await page.getByLabel("补充受理信息").fill(packagePending ? "是的，包裹至今仍未收到" : "是的，确实重复扣款");
+      const deadline = Date.now() + 5000;
+      const reply = page.waitForResponse(r => r.request().method() === "POST" &&
+        /\/api\/customer\/v2\/intakes\/[^/]+\/messages$/.test(new URL(r.url()).pathname), { timeout: 5000 });
+      await page.getByRole("button", { name: "发送给智能受理" }).click();
+      const clarified = await reply;
+      expect(clarified.status()).toBe(201);
+      const snapshot = await clarified.json() as { status: string; issues: { kind: string }[] };
+      clarifiedKinds = snapshot.issues.map(issue => issue.kind);
+      const remainingMs = deadline - Date.now();
+      expect(remainingMs).toBeGreaterThan(0);
+      if (snapshot.status === "READY_TO_CONFIRM") {
+        await expect(page.getByRole("heading", { name: "请确认 2 个问题" })).toBeVisible({ timeout: remainingMs });
+        break;
+      }
+      expect(snapshot.status).toBe("NEEDS_CLARIFICATION");
+      await expect(packagePending ? duplicateQuestion : packageQuestion).toBeVisible({ timeout: remainingMs });
+    }
+    expect(clarifiedKinds.sort()).toEqual(["DUPLICATE_CHARGE", "PACKAGE_NOT_RECEIVED"]);
     await expect(page.getByRole("heading", { name: "请确认 2 个问题" })).toBeVisible();
     await expect(page.getByRole("article", { name: /拟建工单/ })).toHaveCount(2);
 

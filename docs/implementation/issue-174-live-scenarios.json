@@ -37,15 +37,15 @@
   },
   "sharedProjectBudget": {
     "currency": "CNY",
-    "cumulativeLimit": 5,
+    "cumulativeLimit": 8,
     "archivedCumulativeUpperBound": 3.810222,
-    "archivedUnsettled": 0,
-    "arithmeticRemainingAtSnapshot": 1.189778,
+    "archivedUnsettled": 1.3,
+    "arithmeticRemainingAtSnapshot": 2.889778,
     "liveLedgerSpent": 3.810222,
-    "liveAvailable": 1.189778,
+    "liveAvailable": 2.889778,
     "issue174Reserved": 1,
     "ledgerReference": "D:\\customer-agent\\.local\\issue190-sufficiency\\cost-ledger.json（调用前 live 回读）",
-    "policy": "沿用同一人民币账本；本轮最多预留1 CNY，总累计不得超过5 CNY。无 fake 回退、降阈值、换模型或随机重跑。"
+    "policy": "用户追加3元至累计8元；保留旧四笔PENDING共1.3元，本轮最多预留1元，禁止重复使用旧预留。"
   },
   "currentStage": {
     "logicalCalls": 0,
@@ -109,7 +109,7 @@
   "prerequisites": [
     "#173 已完成：PR #210 merged，Issue #173 closed，issue173-final-20260903b PASS。",
     "#190 检索 64/64 已绑定；#169 35/48 由用户接受为 KNOWN_LIMITATIONS；#170 已交付但回答质量未单独评估。",
-    "共享账本调用前累计 3.810222 CNY、0 PENDING；项目上限 5 CNY，本轮最多 1 CNY。",
+    "共享账本已结算 3.810222 CNY，保留四笔 PENDING 共1.30 CNY；项目上限8 CNY，本轮最多预留1 CNY。",
     "固定模型、prompt/schema、五个场景、调用/尝试/token/成本/时间上限。",
     "仅使用合成订单和公开知识；真实 Chromium 经 Spring，关闭 shadow 和 fake 回退。",
     "协调任务已明确授权本轮真实 DeepSeek 费用与正式交付。"
@@ -133,17 +133,18 @@
         "bindingStatus": "BOUND_ISSUE173_A"
       },
       "customerInputs": [
-        "ORDER-L174-01-<run> 的包裹没收到，而且好像扣了两次钱。",
-        "是的，我确认这笔订单确实扣了两次款。"
+        "ORDER-L174-01-<run> 的包裹没收到，而且疑似重复扣款",
+        "若询问包裹未收到：是的，包裹至今仍未收到",
+        "若询问重复扣款：是的，确实重复扣款"
       ],
       "actions": [
         "从问题描述提交第一句，查看订单候选和待澄清问题",
-        "在补充受理信息控件提交第二句，确认两个问题后仅确认一次",
+        "按页面当前问题逐项回复，每类最多一次、总计最多两次；必须得到未收货及重复扣款两个问题后仅确认一次",
         "刷新订单分组并分别进入两个工单，只观察真实公开结果"
       ],
       "expectedObservations": [
         "确认前 ticketIds 为空，没有正式工单入口",
-        "不确定扣款先澄清，已确认的未收货问题保留",
+        "允许先澄清包裹未收到或重复扣款；未经确认的类别不得建单，已确认类别必须保留，最终类别精确为PACKAGE_NOT_RECEIVED和DUPLICATE_CHARGE",
         "确认响应返回两个不同 ticketIds 与共同 sharedIntakeRecordId",
         "刷新后仍存在两个独立工单入口；不把两个 ID 当并行运行或事务竞态证明"
       ],
@@ -300,5 +301,6 @@
         "backend/src/main/java/com/stellogic/customeragent/ticket/CustomerTicketV2Controller.java"
       ]
     }
-  ]
+  ],
+  "revision": 2
 }
