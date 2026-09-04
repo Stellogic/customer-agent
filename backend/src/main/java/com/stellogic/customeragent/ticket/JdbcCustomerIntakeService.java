@@ -8,6 +8,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnProperty(name = "baseline.migrate-only", havingValue = "false", matchIfMissing = true)
 class JdbcCustomerIntakeService implements CustomerIntakeService {
+    private static final Logger LOG = LoggerFactory.getLogger(JdbcCustomerIntakeService.class);
     private final JdbcTemplate jdbc;
     private final IntakeUnderstandingGateway agent;
     private final CustomerTicketService tickets;
@@ -81,6 +84,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                                     List.of()));
             requireUnderstanding(understanding, orders);
         } catch (IntakeAgentUnavailableException exception) {
+            LOG.warn("INTAKE_FAILURE phase=START reason={}", exception.reason());
             return createAssistedIntake(command, "AGENT_UNAVAILABLE");
         }
         String assistantMessage = CustomerIntakeSafetyPolicy.assistantMessage(understanding);
@@ -188,6 +192,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                                             .map(PendingOrder::reference)
                                             .toList()));
         } catch (IntakeAgentUnavailableException exception) {
+            LOG.warn("INTAKE_FAILURE phase=FOLLOWUP reason={}", exception.reason());
             assistance.createForIntake(command.intakeId(), "AGENT_UNAVAILABLE");
             return retainHumanAssistance(command.customerId(), command.intakeId(), now);
         }
@@ -201,6 +206,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
             }
             requireUnderstanding(understanding, orders);
         } catch (IntakeAgentUnavailableException exception) {
+            LOG.warn("INTAKE_FAILURE phase=FOLLOWUP reason={}", exception.reason());
             assistance.createForIntake(command.intakeId(), "AGENT_UNAVAILABLE");
             return retainHumanAssistance(command.customerId(), command.intakeId(), now);
         }

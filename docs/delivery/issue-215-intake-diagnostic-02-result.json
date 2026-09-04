@@ -1,0 +1,33 @@
+{
+  "schema": "issue215-intake-diagnostic-v2",
+  "releaseAcceptance": false,
+  "verdict": "PROGRESS_MISMATCH",
+  "observations": [
+    {
+      "httpStatus": 201,
+      "status": "NEEDS_CLARIFICATION",
+      "candidateMatches": true,
+      "responseIssueKinds": [],
+      "issueKinds": [],
+      "pendingKinds": [
+        "PACKAGE_NOT_RECEIVED",
+        "DUPLICATE_CHARGE"
+      ],
+      "assistanceCount": 0,
+      "ticketCount": 0
+    },
+    {
+      "httpStatus": 201,
+      "status": "NEEDS_CLARIFICATION",
+      "candidateMatches": true,
+      "responseIssueKinds": [],
+      "issueKinds": [],
+      "pendingKinds": [
+        "PACKAGE_NOT_RECEIVED",
+        "DUPLICATE_CHARGE"
+      ],
+      "assistanceCount": 0,
+      "ticketCount": 0
+    }
+  ]
+}

@@ -23,4 +23,4 @@ def test_formal_intake_requires_deepseek_credentials_and_never_falls_back() -> N
         }
     )
     assert isinstance(model, DeepSeekIntakeModel)
-    assert mode == "deepseek-formal-intake-v1"
+    assert mode == "deepseek-formal-intake-v3"
