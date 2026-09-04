@@ -1,0 +1,20 @@
+{
+  "outcome": "DIAGNOSTIC_FAILED",
+  "browserExit": 1,
+  "failureCounts": {
+    "START": {
+      "TRANSPORT": 0,
+      "RESPONSE_PARSE": 0,
+      "STATE_CONSISTENCY": 0,
+      "SERVICE_VALIDATION": 0
+    },
+    "FOLLOWUP": {
+      "TRANSPORT": 0,
+      "RESPONSE_PARSE": 0,
+      "STATE_CONSISTENCY": 0,
+      "SERVICE_VALIDATION": 0
+    }
+  },
+  "rejectedStates": [],
+  "providerUsage": null
+}

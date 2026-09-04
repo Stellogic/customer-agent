@@ -40,4 +40,25 @@ final class IntakeArchivedException extends RuntimeException {}
 
 final class IntakeVersionConflictException extends RuntimeException {}
 
-final class IntakeAgentUnavailableException extends RuntimeException {}
+final class IntakeAgentUnavailableException extends RuntimeException {
+    enum Reason {
+        TRANSPORT,
+        RESPONSE_PARSE,
+        STATE_CONSISTENCY,
+        SERVICE_VALIDATION
+    }
+
+    private final Reason reason;
+
+    IntakeAgentUnavailableException() {
+        this(Reason.SERVICE_VALIDATION);
+    }
+
+    IntakeAgentUnavailableException(Reason reason) {
+        this.reason = reason;
+    }
+
+    Reason reason() {
+        return reason;
+    }
+}
