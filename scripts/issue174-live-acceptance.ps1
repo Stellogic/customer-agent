@@ -48,11 +48,12 @@ function Get-SettledMicroCny($Ledger) {
 $ledger = Read-SharedLedger
 $settledBefore = Get-SettledMicroCny $ledger
 $pending = @($ledger.attempts | Where-Object status -eq 'PENDING')
-$expectedPendingCount = if ($IntakeDiagnostic) { 2 } else { 0 }
-if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-02' -or $pending.Count -ne 2 -or
+$expectedPendingCount = if ($IntakeDiagnostic) { 3 } else { 0 }
+if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-03' -or $pending.Count -ne 3 -or
     @($pending | Where-Object { $_.phase -eq 'issue174-live-20260903a' -and $_.reserved_micro_cny -eq 1000000 }).Count -ne 1 -or
-    @($pending | Where-Object { $_.phase -eq 'issue174-intake-diagnostic-01' -and $_.reserved_micro_cny -eq 100000 }).Count -ne 1)) {
-    throw '第二阶段诊断须保留已知的两笔 PENDING，且只能使用冻结的新运行标识。'
+    @($pending | Where-Object { $_.phase -eq 'issue174-intake-diagnostic-01' -and $_.reserved_micro_cny -eq 100000 }).Count -ne 1 -or
+    @($pending | Where-Object { $_.phase -eq 'issue174-intake-diagnostic-02' -and $_.reserved_micro_cny -eq 100000 }).Count -ne 1)) {
+    throw '第三阶段诊断须保留已知的三笔 PENDING，且只能使用冻结的新运行标识。'
 }
 if ($settledBefore -ne $expectedPriorMicroCny -or $pending.Count -ne $expectedPendingCount) {
     throw "共享账本未处于冻结起点: settled=$settledBefore pending=$($pending.Count)"
@@ -234,7 +235,8 @@ try {
     if ((Get-SettledMicroCny $ledger) -ne $settledBefore -or $pendingNow.Count -ne $expectedPendingCount -or
         [long](($pendingNow | Measure-Object reserved_micro_cny -Sum).Sum) -ne $pendingBeforeMicroCny -or
         ($IntakeDiagnostic -and (@($pendingNow | Where-Object phase -eq 'issue174-live-20260903a').Count -ne 1 -or
-            @($pendingNow | Where-Object phase -eq 'issue174-intake-diagnostic-01').Count -ne 1))) {
+            @($pendingNow | Where-Object phase -eq 'issue174-intake-diagnostic-01').Count -ne 1 -or
+            @($pendingNow | Where-Object phase -eq 'issue174-intake-diagnostic-02').Count -ne 1))) {
         throw '获得门禁锁后共享账本起点发生变化。'
     }
     $ledger.phases | Add-Member -NotePropertyName $RunId -NotePropertyValue ([pscustomobject]@{
@@ -311,7 +313,7 @@ services:
             $rawLog = $null
             $dbSummary = Invoke-Compose @('exec', '--no-TTY', 'postgres', 'psql', '--username', 'postgres',
                 '--dbname', 'customer_agent', '--tuples-only', '--no-align', '--command',
-                "select json_build_object('agentUnavailableAssistance',(select count(*) from intake_assistance_request where reason_code='AGENT_UNAVAILABLE'),'intakes',(select count(*) from customer_intake),'messages',(select count(*) from customer_intake_message));")
+                "select json_build_object('agentUnavailableAssistance',(select count(*) from intake_assistance_request where reason_code='AGENT_UNAVAILABLE'),'intakes',(select count(*) from customer_intake),'messages',(select count(*) from customer_intake_message),'visibleOrderCount',(select count(*) from synthetic_order where customer_id='customer-demo'),'candidatePresent',(select bool_or(candidate_order_reference is not null) from customer_intake),'pendingKinds',(select json_agg(case when issue_kind in ('DUPLICATE_CHARGE','PACKAGE_NOT_RECEIVED','LOGISTICS_DELAY') then issue_kind else 'OTHER' end order by ordinal) from customer_intake_pending_issue));")
             [ordered]@{ exceptionNameOccurrences = $classes; knownFailureMessages = $known; providerHttpCodes = $httpCodes;
                 database = (($dbSummary | Where-Object { $_ -match '^\{' } | Select-Object -Last 1) | ConvertFrom-Json)
             } | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $evidenceDir 'intake-error-classification.json') -Encoding utf8

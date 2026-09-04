@@ -11,6 +11,7 @@ test("Issue #174 intake diagnostic", async ({ browser }) => {
   const observations: object[] = [];
   let headingWithinFiveSeconds: boolean | null = null;
   let stage = "START";
+  let reference = "";
   async function summarize(response: Response, started: number) {
     const elapsedMs = Date.now() - started;
     const body = await response.json().catch(() => null);
@@ -18,8 +19,17 @@ test("Issue #174 intake diagnostic", async ({ browser }) => {
     const kinds = ["LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE"];
     const status = states.includes(body?.status) ? body.status : "OTHER";
     const assisted = body?.assistantMessage === "已建立受理协助请求；客服只能协助确认订单与拟建问题，仍需由你确认后才会创建正式工单。";
+    const clarificationMessages = [
+      ["DUPLICATE_CHARGE", "你提到疑似重复扣款，请确认是否确实发生了两次扣款。"],
+      ["PACKAGE_NOT_RECEIVED", "请确认包裹是否至今仍未收到。"],
+      ["LOGISTICS_DELAY", "请确认物流是否已经超过预期时间仍无进展。"],
+      ["ORDER_REQUIRED", "你说的是不是某一笔订单的物流问题？请补充订单线索。"],
+    ];
     observations.push({
       httpStatus: response.status(), elapsedMs, status, assisted,
+      candidatePresent: body?.candidateOrder != null,
+      candidateMatchesFixture: body?.candidateOrder?.reference === reference,
+      clarificationKind: clarificationMessages.find(([, message]) => message === body?.assistantMessage)?.[0] ?? "OTHER",
       issueCount: Array.isArray(body?.issues) ? body.issues.length : null,
       issueKinds: Array.isArray(body?.issues)
         ? body.issues.map((issue: { kind?: string }) => kinds.includes(issue.kind ?? "") ? issue.kind : "OTHER")
@@ -30,7 +40,7 @@ test("Issue #174 intake diagnostic", async ({ browser }) => {
   try {
     const page = await context.newPage();
     await login(page, "customer", "customer-demo");
-    const reference = prepareOrder();
+    reference = prepareOrder();
     await page.getByLabel("问题描述").fill(`${reference} 的包裹没收到，而且疑似重复扣款`);
     stage = "INITIAL_REQUEST";
     let started = Date.now();
