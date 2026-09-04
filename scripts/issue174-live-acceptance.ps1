@@ -116,7 +116,7 @@ function Assert-FrozenCatalog {
 
 function Invoke-LiveScenario([string]$File, [string]$Title) {
     Invoke-Compose @('--profile', 'smoke', 'run', '--rm', '--no-deps', 'browser-acceptance',
-        '--workers=1', '--max-failures=1', '--grep', $Title, $File)
+        '--workers=1', '--max-failures=1', '--trace', 'off', '--grep', $Title, $File)
 }
 
 function Wait-NoActiveGenerations {

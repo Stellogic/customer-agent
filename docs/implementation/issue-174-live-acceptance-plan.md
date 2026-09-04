@@ -17,7 +17,7 @@
 - 输入和路径：只使用合成订单和仓库公开知识；真实 Chromium 可见操作经 Spring、PostgreSQL 和 LangGraph 到 DeepSeek。浏览器不直连 provider、Agent 私有接口或数据库。
 - 结果边界：五项发布场景必须 5/5；L174-02 绑定现行 #173 D 的 23 小时低风险回复、五分钟候选与取消，不再沿用早期 12 小时候选描述；L174-04 固定绑定 `customer-delivery-help-v1` 与 `logistics-delay-v2` 并检查语义和 canonical 引用；L174-05 精确核对 `PACKAGE_SIGNED_NOT_RECEIVED` 原因。任何供应商、schema、安全或公开投影失败均诚实记 FAIL 并停止。发布场景不构成生产准确率、可用性或客服回答质量证明。
 
-执行入口为 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-20260903a`。脚本先核对共享账本和工作树，登记唯一预算预留，再按正式锁协议运行；无调用的启动失败撤销预留，发生调用后无论 PASS/FAIL 都结算已知费用并保存脱敏报告。最终证据写入 `docs/delivery/issue-174-live-report.json`，浏览器工件写入忽略目录 `.local/gate-evidence/<runId>/browser`。
+执行入口为 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-20260903a`。脚本先核对共享账本和工作树，登记唯一预算预留，再按正式锁协议运行；无调用的启动失败撤销预留，发生调用后仅在 PASS 且 usage 可信时结算；任一场景失败保留整轮 PENDING 预留并保存脱敏报告，避免未持久化尝试被漏计。最终证据写入 `docs/delivery/issue-174-live-report.json`，浏览器工件写入忽略目录 `.local/gate-evidence/<runId>/browser`。
 
 ## 2026-09-01 历史静态设计
 
