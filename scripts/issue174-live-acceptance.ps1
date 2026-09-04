@@ -149,7 +149,7 @@ function Export-BrowserAcceptanceArtifacts {
 function Get-LiveUsage {
     Invoke-Compose @('--profile', 'formal', 'run', '--rm', '--volume', "${evidenceDir}:/evidence",
         '--entrypoint', 'python', 'formal-mode-smoke', '-m', 'baseline_agent.formal_mode_metrics',
-        '--report-path', '/evidence/formal-metrics.json')
+        '--report-path', '/evidence/formal-metrics.json') | Out-Host
     $formal = Get-Content -LiteralPath $formalPath -Raw | ConvertFrom-Json
     $database = Invoke-Compose @('exec', '--no-TTY', 'postgres', 'psql', '--username', 'postgres',
         '--dbname', 'customer_agent', '--tuples-only', '--no-align', '--command',
