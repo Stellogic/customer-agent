@@ -274,10 +274,18 @@ def customer_reply_body_policy_violation(
             ):
                 continue
             return "ORDER_REFERENCE_SCOPE"
-    if complete and not _has_only_allowed_compensation_language(
-        body, _infer_intent_from_compensation_language(body)
-    ):
-        return "COMPENSATION_LANGUAGE"
+    if complete:
+        upper_body = body.upper()
+        upper_order = order_reference.upper()
+        for size in range(3, len(upper_order)):
+            if upper_body.endswith(upper_order[:size]):
+                start = len(upper_body) - size
+                if start == 0 or not upper_body[start - 1].isalnum():
+                    return "ORDER_REFERENCE_SCOPE"
+        if not _has_only_allowed_compensation_language(
+            body, _infer_intent_from_compensation_language(body)
+        ):
+            return "COMPENSATION_LANGUAGE"
     return None
 
 

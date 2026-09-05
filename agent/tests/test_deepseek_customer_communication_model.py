@@ -238,6 +238,23 @@ async def test_split_closing_quote_does_not_publish_partial_order() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("prefix", ["ORD", "ORDER", "ORDER-"])
+async def test_closed_short_order_prefix_is_not_published(prefix: str) -> None:
+    published: list[str] = []
+
+    async def publish(delta: str) -> None:
+        published.append(delta)
+
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(_completed(f"订单 {prefix}"))),
+    )
+    with pytest.raises(CustomerCommunicationFailure):
+        await model.compose(_input(), publish)
+    assert published == []
+
+
+@pytest.mark.asyncio
 async def test_closed_body_with_partial_order_is_rejected_before_publishing() -> None:
     published: list[str] = []
 

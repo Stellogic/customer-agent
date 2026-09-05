@@ -21,3 +21,5 @@ PR #220 由 Draft 转 Ready 触发一次集中 AI 风险审查。批量处理两
 新提交的自动审查提供了闭引号单独分片的进一步复现：旧代码在引号到达前已发布 `订单 ORDER-C1`。`issue219-quote-red` 为 1 failed（0.21秒）。因此未闭合正文现在只暂存末尾仍可能属于授权订单号的部分，其前面正文继续发布；完整订单或后续文字到达后正常续发，错误正文关闭时先拒绝。回归同时验证订单号首字母与中段切分、闭引号单独分片；没有把普通回复改成全量缓冲。
 
 `issue219-quote-green`：聚焦 64 passed（0.25秒）；Ruff format/lint PASS、Pyright 0 errors/0 warnings、Agent 全量 461 passed、3 skipped（33.44秒），Standards / Spec 本批增量确认均 PASS。最终完整门禁与合并读回集中记录于本票 PR。离线验证不等于真实模型语义或 #217/#174 验收；原 confirmed=false 和历史未知用量继续保留，后续按独立冻结运行处理。
+
+自动审查进一步发现 Python 缺少 Spring 既有的短订单前缀终态检查。`issue219-short-prefix-red` 使用 ORD、ORDER、ORDER- 三个闭合正文，旧适配器均未拒绝：3 failed（0.25秒）。补充与 Spring 等价的长度至少 3、单词边界、授权订单残缺尾部检查，统一返回固定 ORDER_REFERENCE_SCOPE 分类。`issue219-prefix-parity`：聚焦 67 passed（0.23秒），Ruff format/lint PASS、Pyright 0 errors/0 warnings、Agent 全量 464 passed、3 skipped（39.90秒）。Standards / Spec 集中对照中间前缀与完整订单规则后均 PASS。此批尚未启动最终完整门禁，没有新增供应商调用。
