@@ -129,3 +129,20 @@ def test_marks_provider_usage_untrusted_when_a_real_attempt_has_no_usage() -> No
 
     assert report["usageTrusted"] is False
     assert report["failureClassifications"] == {"TRANSPORT_UNCONFIRMED": 1}
+
+
+def test_reports_knowledge_failures_separately_from_provider_failures() -> None:
+    formal = {
+        "model_mode": "deepseek-v4-flash-customer-communication-formal-v1",
+        "knowledge_failure": "RETRIEVAL_UNAVAILABLE",
+        "ticket_id": "private-ticket-identifier",
+        "customer_text": "private-customer-text",
+    }
+    report = aggregate_checkpoint_metrics(
+        [formal, formal, {**formal, "model_mode": "fixed-fake-model-v1"}],
+        ["HANDED_OFF", "HANDED_OFF", "HANDED_OFF"],
+    )
+
+    assert report["knowledgeFailures"] == {"RETRIEVAL_UNAVAILABLE": 2}
+    assert report["failureClassifications"] == {}
+    assert "private-" not in str(report)

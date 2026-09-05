@@ -3,6 +3,7 @@ param(
     [switch]$IntakeDiagnostic,
     [switch]$InvestigationDiagnostic,
     [string]$EnvFile = 'D:\customer-agent\.env',
+    [string]$ProviderBalancePath = (Join-Path $PSScriptRoot '../.local/provider-balance.json'),
     [string]$LedgerPath = 'D:\customer-agent\.local\issue190-sufficiency\cost-ledger.json',
     [string]$KnowledgeModelPath = 'C:\Users\lizhuo\.codex\worktrees\745a\customer-agent\.local\models\bge-small-zh-v1.5',
     [string]$RunId = "issue174-live-$([DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))"
@@ -56,7 +57,7 @@ function Get-SettledMicroCny($Ledger) {
 $ledger = Read-SharedLedger
 $settledBefore = Get-SettledMicroCny $ledger
 $pending = @($ledger.attempts | Where-Object status -eq 'PENDING')
-$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 18 }
+$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 22 }
 $additionalPending = [ordered]@{
     'issue174-investigation-diagnostic-01' = 1000000
     'issue217-live-20260905a' = 1000000
@@ -65,6 +66,10 @@ $additionalPending = [ordered]@{
     'issue217-live-20260905c' = 200000
     'issue217-action-diagnostic-20260905a' = 50000
     'issue221-live-20260905a' = 200000
+    'issue174-live-04' = 1000000
+    'issue174-reply-diagnostic-05' = 50000
+    'issue174-product-diagnostic-06' = 220000
+    'issue174-remaining-diagnostic-07' = 780000
 }
 if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pending.Count -ne 5 -or
     @($pending | Where-Object { $_.phase -eq 'issue174-live-20260903a' -and $_.reserved_micro_cny -eq 1000000 }).Count -ne 1 -or
@@ -76,7 +81,7 @@ if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pend
 }
 if (-not $IntakeDiagnostic) {
     if ($InvestigationDiagnostic) { throw '旧诊断已结束；本次冻结仅允许五场景发布复验。' }
-    if ($RunId -ne 'issue174-live-04' -or $pending.Count -ne 18) { throw '须使用冻结运行标识并保留十八笔 PENDING。' }
+    if ($RunId -ne 'issue174-live-05' -or $pending.Count -ne 22) { throw '须使用冻结运行标识并保留二十二笔 PENDING。' }
     foreach ($prior in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03', 'issue174-intake-diagnostic-01', 'issue174-intake-diagnostic-02', 'issue174-intake-diagnostic-03', 'issue174-intake-diagnostic-04', 'issue215-intake-diagnostic-01', 'issue215-intake-diagnostic-02', 'issue215-intake-diagnostic-03', 'issue215-intake-diagnostic-04')) {
         $amount = if ($prior -in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03')) { 1000000 } else { 100000 }
         if (@($pending | Where-Object { $_.phase -eq $prior -and $_.reserved_micro_cny -eq $amount }).Count -ne 1) {
@@ -105,8 +110,12 @@ if (-not $IntakeDiagnostic) {
         throw '费用核对点与历史账本不符，禁止遗漏新消费。'
     }
     $budgetBasisBeforeMicroCny = [long]$billing.historicalPaidUpperMicroCny + $additionalReserved
-    if ($runReservationMicroCny -gt ([long]$billing.userReportedAvailableMicroCny - $additionalReserved)) {
-        throw '本轮预留超过用户确认的当前可用额度。'
+    # 历史余额已过期；当前支付能力单独由官方只读快照确认，不释放旧预留。
+    $balanceSnapshot = Get-Content -LiteralPath $ProviderBalancePath -Raw | ConvertFrom-Json
+    if ($balanceSnapshot.source -ne 'OFFICIAL_READ_ONLY_BALANCE_API' -or -not $balanceSnapshot.isAvailable -or
+        [decimal]$balanceSnapshot.totalBalance * 1000000 -lt $runReservationMicroCny -or
+        ([DateTime]::UtcNow - [DateTime]$balanceSnapshot.checkedAt).TotalHours -gt 1) {
+        throw '只读官方余额快照不足或过期。'
     }
 }
 if ($budgetBasisBeforeMicroCny + $runReservationMicroCny -gt $projectLimitMicroCny) {
@@ -120,7 +129,7 @@ $base = (git rev-parse origin/main).Trim()
 $projectName = "customer-agent-$RunId"
 $imageTag = "gate-$RunId"
 $evidenceDir = Join-Path $repoRoot ".local/gate-evidence/$RunId"
-$reportPath = Join-Path $repoRoot $(if ($InvestigationDiagnostic) { 'docs/delivery/issue-174-investigation-diagnostic-01-report.json' } else { 'docs/delivery/issue-174-live-report-04.json' })
+$reportPath = Join-Path $repoRoot $(if ($InvestigationDiagnostic) { 'docs/delivery/issue-174-investigation-diagnostic-01-report.json' } else { 'docs/delivery/issue-174-live-report-05.json' })
 $formalPath = Join-Path $evidenceDir 'formal-metrics.json'
 $overridePath = Join-Path ([IO.Path]::GetTempPath()) "$RunId.override.yaml"
 $catalogPath = Join-Path $repoRoot 'docs/implementation/issue-174-live-scenarios.json'
@@ -160,7 +169,8 @@ function Assert-FrozenCatalog {
     if (
         $catalog.status -ne 'FROZEN_AUTHORIZED_NOT_RUN' -or
         $catalog.executionAuthorized -ne $true -or
-        $catalog.revision -ne 4 -or
+        $catalog.revision -ne 5 -or
+        $catalog.runId -ne $RunId -or
         $catalog.liveFreeze.promptVersionsBySeam.intake -ne 'intake-v3' -or
         $catalog.liveFreeze.promptVersionsBySeam.action -ne 'investigation-action-v4' -or
         $catalog.liveFreeze.model -ne 'deepseek-v4-flash' -or
@@ -245,8 +255,10 @@ function Assert-LiveUsage($Usage, [switch]$RequireAllSeams) {
     }
     if ($Usage.KnownTokens -gt $knownTokenLimit) { throw '已持久化 token 数超过冻结上限。' }
     if ($Usage.ChargedMicroCny -gt $runReservationMicroCny) { throw '真实费用上界超过本次预留。' }
+    $failureCount = @($Usage.Formal.failureClassifications.PSObject.Properties).Count +
+        @($Usage.Formal.knowledgeFailures.PSObject.Properties).Count
+    if ($failureCount -ne 0) { throw '已记录模型或知识检索失败，停止后续场景。' }
     if ($RequireAllSeams) {
-        $failureCount = @($Usage.Formal.failureClassifications.PSObject.Properties).Count
         if (
             [int]$Usage.Database.activeGenerations -ne 0 -or
             [int]$Usage.Formal.observedGenerationCount -ne [int]$Usage.Database.generationCount -or
@@ -262,8 +274,7 @@ function Assert-LiveUsage($Usage, [switch]$RequireAllSeams) {
             $Usage.Formal.judgment.promptVersion -ne 'investigation-judgment-v1' -or
             $Usage.Formal.judgment.schemaVersion -ne 'investigation-judgment-v1' -or
             [int]$Usage.Database.supportAttempts -le 0 -or
-            [int]$Usage.Database.supportWrongProtocol -ne 0 -or
-            $failureCount -ne 0
+            [int]$Usage.Database.supportWrongProtocol -ne 0
         ) { throw '全部生成接缝的真实模型、终态、协议或失败分类证据不闭合。' }
     }
 }
@@ -515,6 +526,7 @@ def _diagnostic_response_failure(classification):
             customerKnowledge = [ordered]@{ semantic = 'NOT_EVALUATED_KNOWN_LIMITATION'; canonicalCitation = 'PASS'; bodySanity = 'PASS' }
             supportKnowledge = [ordered]@{ semantic = 'NOT_EVALUATED_KNOWN_LIMITATION'; canonicalCitation = 'PASS'; bodySanity = 'PASS' }
             failureClassifications = $usage.Formal.failureClassifications
+            knowledgeFailures = $usage.Formal.knowledgeFailures
             latencyMs = [ordered]@{
                 maxGenerationTerminal = [long]$usage.Database.maxGenerationMs
                 maxFirstPublicDelta = [long]$usage.Database.maxFirstDeltaMs

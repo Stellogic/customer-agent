@@ -33,6 +33,7 @@ def aggregate_checkpoint_metrics(
     judgment_calls = 0
     judgment_attempts = 0
     failures: dict[str, int] = {}
+    knowledge_failures: dict[str, int] = {}
     included_states: list[str] = []
     handoff_with_model_calls = 0
     usage_trusted = True
@@ -86,6 +87,9 @@ def aggregate_checkpoint_metrics(
             classification = evidence.get("failureClassification")
             if isinstance(classification, str) and classification:
                 failures[classification] = failures.get(classification, 0) + 1
+        knowledge_failure = values.get("knowledge_failure")
+        if isinstance(knowledge_failure, str) and knowledge_failure:
+            knowledge_failures[knowledge_failure] = knowledge_failures.get(knowledge_failure, 0) + 1
         included_states.append(terminal_state)
         if terminal_state == "HANDED_OFF" and action_calls > 0:
             handoff_with_model_calls += 1
@@ -125,6 +129,7 @@ def aggregate_checkpoint_metrics(
             "handoffWithModelCallsCount": handoff_with_model_calls,
         },
         "failureClassifications": failures,
+        "knowledgeFailures": knowledge_failures,
     }
 
 
