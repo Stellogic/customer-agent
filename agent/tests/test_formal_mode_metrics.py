@@ -4,7 +4,6 @@ from baseline_agent.deepseek_investigation_action_model import (
     ACTION_PROMPT_VERSION,
     ACTION_SCHEMA_VERSION,
 )
-
 from baseline_agent.formal_mode_metrics import (
     aggregate_checkpoint_metrics,
     collect_formal_metrics,
