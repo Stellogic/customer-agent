@@ -77,7 +77,12 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                             String sql = invocation.getArgument(0, String.class);
                             if (sql.startsWith("select t.order_reference"))
                                 return List.of("ORDER-122");
-                            if (sql.startsWith("select description")) return List.of("原始问题");
+                            if (sql.startsWith("select description")) return List.of("物流状态查询摘要");
+                            if (sql.startsWith("select author, body"))
+                                return List.of(
+                                        new CustomerCommunicationMessage("CUSTOMER", "请解释物流状态"),
+                                        new CustomerCommunicationMessage("SUPPORT", "正在核验"),
+                                        new CustomerCommunicationMessage("CUSTOMER", "请继续查询"));
                             return List.of();
                         });
         JdbcAgentInvestigationService service =
@@ -93,7 +98,10 @@ class JdbcAgentInvestigationServiceAuthorizationTest {
                                 com.stellogic.customeragent.knowledge.AgentKnowledgeRetrievalAdapter
                                         .class));
 
-        service.customerCommunicationContext(UUID.randomUUID(), UUID.randomUUID());
+        CustomerCommunicationContext context =
+                service.customerCommunicationContext(UUID.randomUUID(), UUID.randomUUID());
+        assertThat(context.syntheticCustomerText()).isEqualTo("请解释物流状态");
+        assertThat(context.publicConversation()).hasSize(3);
 
         String conversationSql =
                 mockingDetails(jdbc).getInvocations().stream()

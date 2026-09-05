@@ -11,6 +11,7 @@ def create_customer_ticket(
     description: str,
     duplicate_action: str = "CREATE_NEW",
     existing_ticket_id: str | None = None,
+    intake_followup: str | None = None,
 ) -> httpx.Response:
     """Create one smoke-test ticket through the public v4 intake contract."""
     response = client.post(
@@ -58,6 +59,21 @@ def create_customer_ticket(
 
     if snapshot["status"] != "READY_TO_CONFIRM":
         raise AssertionError(f"intake did not become confirmable: {snapshot}")
+    if intake_followup is not None:
+        response = client.post(
+            f"{spring_url}/api/customer/v2/intakes/{snapshot['intakeId']}/messages",
+            headers={"Idempotency-Key": f"{request_id}:followup"},
+            json={
+                "schema": "customer-intake-v4",
+                "message": intake_followup,
+                "expectedVersion": snapshot["version"],
+            },
+        )
+        if response.status_code not in {200, 201}:
+            return response
+        snapshot = response.json()
+        if snapshot["status"] != "READY_TO_CONFIRM":
+            raise AssertionError(f"intake followup did not remain confirmable: {snapshot}")
     response = client.post(
         f"{spring_url}/api/customer/v2/intakes/{snapshot['intakeId']}/messages",
         headers={"Idempotency-Key": f"{request_id}:confirm"},

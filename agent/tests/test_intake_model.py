@@ -87,6 +87,28 @@ async def test_fixed_fake_keeps_the_customer_description_as_the_issue_summary() 
 
 
 @pytest.mark.asyncio
+async def test_followup_preserves_the_confirmed_issue_prefix_required_by_spring() -> None:
+    model = FixedFakeIntakeModel()
+    orders = (VisibleOrder("ORDER-DELAY-001", "配送中的合成订单"),)
+    first = await model.understand(
+        IntakeModelInput(
+            customer_message="订单 ORDER-DELAY-001 的物流延迟问题：请解释物流状态",
+            visible_orders=orders,
+        )
+    )
+    followup = await model.understand(
+        IntakeModelInput(
+            customer_message="请立即补偿",
+            visible_orders=orders,
+            current_order_reference=first.candidate_order_reference,
+            current_issues=first.issues,
+        )
+    )
+    assert followup.status == "READY_TO_CONFIRM"
+    assert followup.issues == first.issues
+
+
+@pytest.mark.asyncio
 async def test_fixed_fake_asks_a_natural_clarification_when_issue_is_unclear() -> None:
     model = FixedFakeIntakeModel()
 

@@ -451,8 +451,10 @@ async def test_terminal_handoff_and_budget_failure_preserve_controlled_action_re
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("issue_kind", ["LOGISTICS_DELAY", "ORDER_OPERATION_OR_RULE"])
 async def test_default_business_graph_never_constructs_or_calls_a_shadow_provider(
     monkeypatch: pytest.MonkeyPatch,
+    issue_kind: str,
 ) -> None:
     calls: list[tuple[str, str]] = []
     model_contexts: list[dict] = []
@@ -504,11 +506,13 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
             "requested_by": "spring",
             "ticket_id": "ticket-116",
             "generation_id": "generation-116",
+            "issue_kind": issue_kind,
         }
     )
 
     assert "shadow_comparison" not in result
     assert model_contexts
+    assert model_contexts[-1]["issueKind"] == issue_kind
     assert all(
         context["siblingTickets"]
         == [

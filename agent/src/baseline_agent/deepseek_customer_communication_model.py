@@ -409,13 +409,23 @@ async def _read_streamed_response(
                 if model_input.knowledge is not None:
                     # 知识分支完整缓冲:Spring 验证引用和当前授权前不能向客户公开任何正文。
                     continue
-                body_prefix = _partial_json_string_field(output_text, "body")
-                if body_prefix is None:
+                body_field = _partial_json_string_field(output_text, "body")
+                if body_field is None:
+                    continue
+                body_prefix, body_complete = body_field
+                if not body_prefix and not body_complete:
                     continue
                 if not is_authorized_body_prefix(
-                    body_prefix, model_input.order_reference, complete=False
+                    body_prefix, model_input.order_reference, complete=body_complete
                 ):
                     raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+                if not body_complete:
+                    order_upper = model_input.order_reference.upper()
+                    for size in range(min(len(body_prefix), len(order_upper) - 1), 0, -1):
+                        if body_prefix.upper().endswith(order_upper[:size]):
+                            # 只暂存尚未确定的订单号尾部, 其前面的正文继续发布。
+                            body_prefix = body_prefix[:-size]
+                            break
                 new_delta = body_prefix[len(published_body) :]
                 if new_delta:
                     await publish(new_delta)
@@ -436,7 +446,7 @@ async def _read_streamed_response(
     return _StreamedResponse(final_response, output_text_matches)
 
 
-def _partial_json_string_field(value: str, field: str) -> str | None:
+def _partial_json_string_field(value: str, field: str) -> tuple[str, bool] | None:
     match = re.search(rf'{re.escape(json.dumps(field))}\s*:\s*"', value)
     if match is None:
         return None
@@ -445,7 +455,7 @@ def _partial_json_string_field(value: str, field: str) -> str | None:
     while index < len(value):
         character = value[index]
         if character == '"':
-            return "".join(decoded)
+            return "".join(decoded), True
         if character != "\\":
             if ord(character) < 0x20:
                 raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
@@ -453,18 +463,18 @@ def _partial_json_string_field(value: str, field: str) -> str | None:
             index += 1
             continue
         if index + 1 >= len(value):
-            return "".join(decoded)
+            return "".join(decoded), False
         escape = value[index : index + 2]
         if escape == "\\u":
             if index + 6 > len(value):
-                return "".join(decoded)
+                return "".join(decoded), False
             escape = value[index : index + 6]
         try:
             decoded.append(json.loads(f'"{escape}"'))
         except json.JSONDecodeError:
             raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT) from None
         index += len(escape)
-    return "".join(decoded)
+    return "".join(decoded), False
 
 
 def _response_output_text(payload: dict[str, Any]) -> str:

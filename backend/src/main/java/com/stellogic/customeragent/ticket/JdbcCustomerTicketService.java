@@ -43,7 +43,10 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
     public TicketCreationResult create(CreateCustomerTicket command) {
         String digest =
                 StableParameterDigest.sha256(
-                        command.orderReference(), command.description(), command.issueKind());
+                        command.orderReference(),
+                        command.description(),
+                        json.writeValueAsString(command.customerMessages()),
+                        command.issueKind());
         jdbc.query(
                 "select pg_advisory_xact_lock(hashtextextended(?, 0))",
                 (ResultSetExtractor<Void>) resultSet -> null,
@@ -140,15 +143,23 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
                     ticketId,
                     databaseTime);
         }
+        int messageSequence = 0;
+        for (String customerMessage : command.customerMessages()) {
+            jdbc.update(
+                    "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at)"
+                            + " values (?, ?, ?, 'CUSTOMER', ?, ?)",
+                    UUID.randomUUID(),
+                    ticketId,
+                    ++messageSequence,
+                    customerMessage,
+                    databaseTime);
+        }
         jdbc.update(
-                "insert into public_message (id, ticket_id, message_sequence, author, body,"
-                        + " sent_at) values (?, ?, 1, 'CUSTOMER', ?, ?), (?, ?, 2, 'SUPPORT', ?, ?)",
+                "insert into public_message (id, ticket_id, message_sequence, author, body, sent_at)"
+                        + " values (?, ?, ?, 'SUPPORT', ?, ?)",
                 UUID.randomUUID(),
                 ticketId,
-                command.description(),
-                databaseTime,
-                UUID.randomUUID(),
-                ticketId,
+                messageSequence + 1,
                 acknowledgement,
                 databaseTime);
         jdbc.update(
@@ -406,7 +417,12 @@ public class JdbcCustomerTicketService implements CustomerTicketService {
         TicketCreationResult result =
                 create(
                         new CreateCustomerTicket(
-                                customerId, requestId, orderReference, description, issueKind));
+                                customerId,
+                                requestId,
+                                orderReference,
+                                description,
+                                List.of(description),
+                                issueKind));
         jdbc.update(
                 "update support_ticket set follow_up_of = ? where id = ?",
                 originalTicketId,

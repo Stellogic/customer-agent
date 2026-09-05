@@ -49,7 +49,8 @@ final class AutoResolutionPolicy {
                                             == InvestigationRiskScenario.LOGISTICS_DELAY
                                     && order.delaySeconds() < Duration.ofHours(24).toSeconds()
                                     && !order.fullyRefunded()
-                                    && onlyQuestions(customerText, STATUS_QUESTION)
+                                    && onlyQuestions(
+                                            customerText, STATUS_QUESTION, order.orderReference())
                             ? (order.delaySeconds() == 0
                                     ? "COMPLETED_NON_COMPENSATION_CHECK"
                                     : scenario)
@@ -59,7 +60,8 @@ final class AutoResolutionPolicy {
                                             == InvestigationRiskScenario
                                                     .ORDER_ADDRESS_OR_CANCEL_RULE
                                     && !order.fullyRefunded()
-                                    && onlyQuestions(customerText, RULE_QUESTION)
+                                    && onlyQuestions(
+                                            customerText, RULE_QUESTION, order.orderReference())
                             ? scenario
                             : null;
             default -> null;
@@ -101,9 +103,17 @@ final class AutoResolutionPolicy {
                 || Set.of("STALLED", "SUSPECTED_LOST").contains(order.logisticsStatus());
     }
 
-    private static boolean onlyQuestions(String customerText, Pattern question) {
-        return !customerText.isBlank()
-                && customerText
+    private static boolean onlyQuestions(
+            String customerText, Pattern question, String orderReference) {
+        // The intake form prefixes the description with the selected order. Keep the
+        // stored words intact and remove only this exact wrapper for question matching.
+        String prefix = "订单 " + orderReference + " 的物流延迟问题：";
+        String description =
+                customerText.startsWith(prefix)
+                        ? customerText.substring(prefix.length())
+                        : customerText;
+        return !description.isBlank()
+                && description
                         .lines()
                         .filter(line -> !line.isBlank())
                         .allMatch(line -> question.matcher(line.strip()).matches());
