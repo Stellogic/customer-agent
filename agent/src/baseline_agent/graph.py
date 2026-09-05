@@ -362,6 +362,7 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 capability_request_scope,
                 state.get("investigation_progress"),
                 state.get("sibling_ticket_summary", {}).get("tickets", []),
+                issue_kind,
             )
         except ActionLoopFailure as error:
             failed_action_records = _checkpoint_action_records(error.records)
@@ -747,6 +748,7 @@ async def _advance_investigation_action_loop(
     request_scope: str,
     checkpoint: dict[str, object] | None,
     sibling_tickets: object,
+    issue_kind: str,
 ):
     capability_headers = {
         **scope_headers,
@@ -808,6 +810,7 @@ async def _advance_investigation_action_loop(
             )
             if context is None:
                 raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
+            model_context["issueKind"] = issue_kind
             customer_messages = [
                 message["body"]
                 for message in context["publicConversation"]

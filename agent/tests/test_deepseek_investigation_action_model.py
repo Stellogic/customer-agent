@@ -229,6 +229,7 @@ async def test_final_decision_can_choose_knowledge_without_promoting_customer_te
             "orderRuleSummary": "ADDRESS_CHANGE_AND_CANCEL_RULES_V1",
             "evidenceCatalog": _evidence_catalog(),
             "customerQuestion": "包裹显示签收但没有收到，怎么办？",
+            "issueKind": "LOGISTICS_DELAY",
         }
     )
 
@@ -237,6 +238,7 @@ async def test_final_decision_can_choose_knowledge_without_promoting_customer_te
     assert len(captured) == 1
     model_input = json.loads(captured[0]["input"])
     assert "customerQuestion" not in model_input["syntheticInvestigationFacts"]
+    assert model_input["syntheticInvestigationFacts"]["issueKind"] == "LOGISTICS_DELAY"
     assert model_input["customerQuestion"] == "包裹显示签收但没有收到，怎么办？"
     assert "knowledgeQuery" in captured[0]["text"]["format"]["schema"]["required"]
 
