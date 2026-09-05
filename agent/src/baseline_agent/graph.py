@@ -8,6 +8,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from baseline_agent.customer_communication_model import (
+    CustomerCommunicationFailure,
+    CustomerCommunicationFailureCode,
     CustomerCommunicationInput,
     CustomerCommunicationModel,
     CustomerConversationMessage,
@@ -612,7 +614,12 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                     on_body_delta=None if knowledge_result is not None else publish_delta,
                 )
                 validate_customer_reply_envelope(communication_input, customer_reply)
-            except Exception:
+            except Exception as error:
+                if (
+                    isinstance(error, CustomerCommunicationFailure)
+                    and error.code is CustomerCommunicationFailureCode.PUBLICATION_FAILED
+                ):
+                    return await reply_handoff("INVALID_MODEL_OUTPUT")
                 if correction_attempt == 0:
                     continue
                 return await reply_handoff("INVALID_MODEL_OUTPUT")
