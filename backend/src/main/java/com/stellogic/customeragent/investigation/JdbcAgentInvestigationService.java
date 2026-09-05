@@ -154,7 +154,13 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                                 new CustomerCommunicationMessage(rs.getString(1), rs.getString(2)),
                         ticketId);
         return new CustomerCommunicationContext(
-                "customer-communication-input-v1", descriptions.getFirst(), conversation);
+                "customer-communication-input-v1",
+                conversation.stream()
+                        .filter(message -> "CUSTOMER".equals(message.author()))
+                        .map(CustomerCommunicationMessage::body)
+                        .findFirst()
+                        .orElse(descriptions.getFirst()),
+                conversation);
     }
 
     @Override
@@ -691,13 +697,12 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         ticketId);
         if (Boolean.TRUE.equals(hasProposal)) return null;
         return jdbc.queryForObject(
-                "select issue_kind, description || E'\\n"
-                        + "' || coalesce((select string_agg(body, E'\\n"
+                "select issue_kind, coalesce((select string_agg(body, E'\\n"
                         + "' order by message_sequence) from public_message m where m.ticket_id = t.id"
                         + " and m.author = 'CUSTOMER' and not exists(select 1 from"
                         + " customer_clarification_request c where c.ticket_id = t.id and c.status ="
                         + " 'ANSWERED' and c.answered_at = m.sent_at and c.answer_summary ="
-                        + " trim(m.body))), '') from support_ticket t where id = ?",
+                        + " trim(m.body))), description) from support_ticket t where id = ?",
                 (rs, row) -> {
                     String scenario =
                             AutoResolutionPolicy.scenario(

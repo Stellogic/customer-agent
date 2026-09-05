@@ -645,6 +645,15 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                 timestamp(now),
                 command.intakeId());
         java.util.ArrayList<UUID> ticketIds = new java.util.ArrayList<>();
+        // reply() has appended the current confirmation as the last transcript entry.
+        List<String> customerMessages =
+                jdbc.query(
+                        "select body from customer_intake_transcript where intake_id = ?"
+                                + " and author = 'CUSTOMER' and ordinal < (select max(ordinal)"
+                                + " from customer_intake_transcript where intake_id = ?) order by ordinal",
+                        (rs, row) -> rs.getString(1),
+                        command.intakeId(),
+                        command.intakeId());
         int ordinal = 0;
         for (ProposedIntakeIssue issue : current.issues()) {
             ordinal++;
@@ -660,6 +669,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                                             + issue.kind(),
                                     current.orderReference(),
                                     issue.summary(),
+                                    customerMessages,
                                     issue.kind()));
             ticketIds.add(created.ticketId());
             jdbc.update(
