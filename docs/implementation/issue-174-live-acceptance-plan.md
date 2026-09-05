@@ -1,6 +1,6 @@
 # #174 真实 DeepSeek 发布验收
 
-状态：**第6版 FROZEN_AUTHORIZED_NOT_RUN**。
+状态：**第6版 INCOMPLETE：第一场景浏览器通过，两次调查完成；指标记录供应商错误后停止**。详见[第6轮结果](../delivery/issue-174-live-06-result.md)。
 
 ## 第6版复验冻结
 
@@ -8,7 +8,7 @@
 
 沿用原五场景、模型、prompt/schema及全部上限和断言。run05失败和intake单次诊断未复现的结论保留；尚未证明根因，不宣称新增产品修复。本轮使用已修复的`/artifacts/test-results`输出路径，保存失败浏览器上下文到本地，原始响应和账户余额不公开。报告写入`docs/delivery/issue-174-live-report-06.json`。
 
-当前本轮真实验收和#174最终完整门禁均NOT_RUN。以下第5版及更早内容为历史快照，不作为当前调用授权或预算依据。
+本轮已执行并停止，后四场景NOT_RUN，整轮预留保留；下方冻结入口为历史，禁止重跑。#174最终完整门禁NOT_RUN。以下第5版及更早内容为历史快照，不作为当前调用授权或预算依据。
 
 状态：**第5版 INCOMPLETE：初次受理澄清失败，未进入调查；后四场景NOT_RUN**。详见[第5轮结果](../delivery/issue-174-live-05-result.md)。PR #225已合入`474e6068ca1f562a60d67518bba1619a1a3582ef`，并发修复完整门禁`issue224-final-20260905a` PASS。此前第4轮及诊断仍保留原结论，见[诊断汇总](../delivery/issue-174-live-04-diagnostics.md)。
 
