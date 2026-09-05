@@ -1,0 +1,26 @@
+{
+  "schema": "issue174-investigation-diagnostic-v1",
+  "status": "INCOMPLETE",
+  "runId": "issue217-live-20260905a",
+  "releaseAcceptance": false,
+  "testedHead": "d9d81da799673f840350a5d6c6e528666c236a13",
+  "base": "ca0977ab245f9f346ccdf51f013ebff38bfd592d",
+  "model": "deepseek-v4-flash",
+  "completedScenarios": 0,
+  "failure": "存在供应商尝试但 usage 未确认，保留预算预留并停止。",
+  "calls": {
+    "logical": 12,
+    "providerAttempts": 12
+  },
+  "tokens": {
+    "knownTotal": 5276,
+    "intake": null
+  },
+  "cost": {
+    "observedUpperMicroCny": 58809,
+    "reservedMicroCny": 1000000,
+    "pending": 1,
+    "note": "任一场景失败都可能包含未持久化的受理尝试；保留整轮预留，禁止再次使用。"
+  },
+  "productionScope": "NOT_EVALUATED"
+}

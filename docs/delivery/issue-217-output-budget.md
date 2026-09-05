@@ -29,3 +29,13 @@ Standards / Spec 双轴静态审查均 PASS，未发现阻塞；不替代运行�
 容器代理小文件探测恢复，但 Pyright/nodeenv 的大文件下载仍不稳定。Agent Dockerfile 仅在 test 阶段复用前端固定的 node:24.19.0-bookworm-slim，复制 Node/npm，使 Pyright 使用现成工具。base/runtime、依赖版本与检查命令不变。该增量 Standards/Spec 均 PASS。
 
 issue217-static-20260905e 完整 Agent test 目标通过：111 files already formatted，Ruff lint PASS，Pyright 0 errors/0 warnings，pytest 453 passed、3 skipped（34.17 秒）。本轮专用镜像已移除。此前中断构建仍记作未完成，不将其计入通过结果。下一步为冻结的单场景真实验证及最终完整门禁。
+
+## 2026-09-05 单场景真实观察：未通过
+
+冻结运行 issue217-live-20260905a 已执行一次，testedHead=d9d81da799673f840350a5d6c6e528666c236a13。服务内导入路径核验成功，输出额度确为128/1024。浏览器收到确认接口HTTP201，但 confirmed=false，因而停止；不能将建单确认UI记作通过。
+
+原生检查点同时显示一代调查已启动：行动7次、业务判断1次、客户沟通2次，最终INVALID_MODEL_OUTPUT转人工，没有成功代次。已知5276 token；客户沟通用量缺失，usageTrusted=false。产品原有两次沟通纠正尝试包含在这一次运行中，不是额外复跑。结论额度修复已让本轮进入业务判断，但不能据此声称浏览器结论/回复验收通过，不能证明旧SCHEMA_MISMATCH与OUTPUT_TRUNCATED同源。
+
+报告算式中的0.058809元仅包含已观测部分与受理保守估值，并不是本轮完整费用上界或平台实扣。整轮1元预留保持PENDING；历史十二笔保留，现共十三笔PENDING。原runner异常分支未更新phase，接续协调只将本轮RUNNING改为INCOMPLETE_PENDING_USAGE，未改变金额或attempt状态。没有重复付费运行。
+
+本轮容器、卷、网络、八个精确镜像标签清理回读为空，TEST_GATE_FREE；原基线执行器仍运行。聚合证据见 issue-217-live-20260905a-result.json 与 issue-217-live-20260905a-failure.json；不保留原始模型正文、浏览器截图/trace或密钥。未转Ready、未运行最终完整门禁、未合入或关票。下一步只定位新出现的客户回复失败，不放宽解析或增加自动重试。
