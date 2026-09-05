@@ -427,3 +427,60 @@ def test_deepseek_configuration_reads_only_explicit_deepseek_settings() -> None:
 
     assert config.api_key == "secret"
     assert config.model == "deepseek-v4-flash"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_judgment_evidence_does_not_include_another_call_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import importlib
+
+    graph_module = importlib.import_module("baseline_agent.graph")
+    successful_started = asyncio.Event()
+    failed_finished = asyncio.Event()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        facts = json.loads(body["input"])["syntheticInvestigationFacts"]
+        if facts["delaySeconds"] == 288000:
+            successful_started.set()
+            await failed_finished.wait()
+            return httpx.Response(200, json=_response())
+        return httpx.Response(400, json={"error": {"code": "invalid_request"}})
+
+    audit = InMemoryModelCallAuditSink()
+    model = DeepSeekResponsesInvestigationModel(
+        DeepSeekResponsesConfig(api_key="test-only", max_attempts=1),
+        transport=httpx.MockTransport(handler),
+        audit_sink=audit,
+    )
+    monkeypatch.setattr(graph_module, "investigation_judgment_model", model)
+
+    async def successful_call() -> dict[str, object]:
+        offset = graph_module._judgment_audit_offset()
+        await model.judge(MODEL_INPUT)
+        return graph_module._judgment_call_evidence(offset, "")
+
+    async def failed_call() -> dict[str, object]:
+        await successful_started.wait()
+        offset = graph_module._judgment_audit_offset()
+        try:
+            with pytest.raises(InvestigationJudgmentFailure):
+                await model.judge(
+                    InvestigationJudgmentInput(
+                        order_reference="ORDER-DELAY-002",
+                        delay_seconds=3600,
+                        evidence_refs=("order:ORDER-DELAY-002", "logistics:ORDER-DELAY-002"),
+                    )
+                )
+            return graph_module._judgment_call_evidence(offset, "MODEL_CALL_FAILED")
+        finally:
+            failed_finished.set()
+
+    successful, failed = await asyncio.gather(successful_call(), failed_call())
+    assert len(audit.records) == 2
+    assert failed["providerAttempts"] == 1
+    assert failed["failureClassification"] == "MODEL_CALL_FAILED"
+    assert successful["providerAttempts"] == 1
+    assert successful["failureClassification"] == ""
+    assert successful["tokens"] == 27

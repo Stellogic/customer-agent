@@ -1,0 +1,22 @@
+{
+  "schema": "issue174-intake-diagnostic-v1",
+  "releaseAcceptance": false,
+  "stage": "OBSERVED",
+  "headingWithinFiveSeconds": false,
+  "observations": [
+    {
+      "httpStatus": 201,
+      "elapsedMs": 3989,
+      "status": "NEEDS_CLARIFICATION",
+      "issueCount": 0,
+      "issueKinds": []
+    },
+    {
+      "httpStatus": 201,
+      "elapsedMs": 2803,
+      "status": "NEEDS_CLARIFICATION",
+      "issueCount": 0,
+      "issueKinds": []
+    }
+  ]
+}

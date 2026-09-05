@@ -8,6 +8,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from baseline_agent.customer_communication_model import (
+    CustomerCommunicationFailure,
+    CustomerCommunicationFailureCode,
     CustomerCommunicationInput,
     CustomerCommunicationModel,
     CustomerConversationMessage,
@@ -612,7 +614,12 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                     on_body_delta=None if knowledge_result is not None else publish_delta,
                 )
                 validate_customer_reply_envelope(communication_input, customer_reply)
-            except Exception:
+            except Exception as error:
+                if (
+                    isinstance(error, CustomerCommunicationFailure)
+                    and error.code is CustomerCommunicationFailureCode.PUBLICATION_FAILED
+                ):
+                    return await reply_handoff("INVALID_MODEL_OUTPUT")
                 if correction_attempt == 0:
                     continue
                 return await reply_handoff("INVALID_MODEL_OUTPUT")
@@ -962,7 +969,9 @@ def _judgment_audit_offset() -> int | None:
     if not isinstance(investigation_judgment_model, DeepSeekResponsesInvestigationModel):
         return None
     sink = investigation_judgment_model.audit_sink
-    return len(sink.records) if isinstance(sink, InMemoryModelCallAuditSink) else None
+    if isinstance(sink, InMemoryModelCallAuditSink):
+        return len(sink.current_task_records())
+    return None
 
 
 def _judgment_call_evidence(offset: int | None, failure: str) -> dict[str, object]:
@@ -979,7 +988,7 @@ def _judgment_call_evidence(offset: int | None, failure: str) -> dict[str, objec
     sink = investigation_judgment_model.audit_sink
     if not isinstance(sink, InMemoryModelCallAuditSink):
         raise RuntimeError("formal judgment audit sink is not readable")
-    records = sink.records[offset:]
+    records = sink.current_task_records()[offset:]
     input_tokens = sum(record.input_tokens or 0 for record in records)
     output_tokens = sum(record.output_tokens or 0 for record in records)
     classifications = {
@@ -1000,7 +1009,9 @@ def _communication_audit_offset() -> int | None:
     if not isinstance(customer_communication_model, DeepSeekResponsesCustomerCommunicationModel):
         return None
     sink = customer_communication_model.audit_sink
-    return len(sink.records) if isinstance(sink, InMemoryModelCallAuditSink) else None
+    if isinstance(sink, InMemoryModelCallAuditSink):
+        return len(sink.current_task_records())
+    return None
 
 
 def _communication_call_evidence(
@@ -1023,7 +1034,7 @@ def _communication_call_evidence(
     sink = customer_communication_model.audit_sink
     if not isinstance(sink, InMemoryModelCallAuditSink):
         raise RuntimeError("formal communication audit sink is not readable")
-    records = sink.records[offset:]
+    records = sink.current_task_records()[offset:]
     input_tokens = sum(record.input_tokens or 0 for record in records)
     output_tokens = sum(record.output_tokens or 0 for record in records)
     classifications = {

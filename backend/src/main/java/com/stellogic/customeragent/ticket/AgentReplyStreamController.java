@@ -83,7 +83,11 @@ final class AgentReplyStreamController {
                 throw badRequest("invalid content chunk index");
             }
             chunkIndex = index.asInt();
-            delta = requiredText(payload, "delta");
+            JsonNode content = payload.get("delta");
+            if (content == null || !content.isString() || content.asText().isEmpty()) {
+                throw badRequest("invalid public reply content delta");
+            }
+            delta = content.asText();
             if (delta.length() > 512) throw badRequest("content delta is too large");
         } else if (type == AgentReplyStreamEventType.PROGRESS) {
             stage = requiredText(payload, "stage");

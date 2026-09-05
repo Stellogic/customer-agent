@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol
+from weakref import WeakKeyDictionary
 
 import httpx
 
@@ -37,6 +38,7 @@ class DeepSeekFailureClassification(StrEnum):
     READ_TIMEOUT = "READ_TIMEOUT"
     DEADLINE_EXCEEDED = "DEADLINE_EXCEEDED"
     PROVIDER_REQUEST_REJECTED = "PROVIDER_REQUEST_REJECTED"
+    PUBLIC_REPLY_PUBLISH_FAILED = "PUBLIC_REPLY_PUBLISH_FAILED"
     TRANSIENT_PROVIDER_ERROR = "TRANSIENT_PROVIDER_ERROR"
     PROVIDER_FAILED = "PROVIDER_FAILED"
     PROVIDER_INCOMPLETE = "PROVIDER_INCOMPLETE"
@@ -148,9 +150,19 @@ class ModelCallAuditSink(Protocol):
 class InMemoryModelCallAuditSink:
     def __init__(self) -> None:
         self.records: list[ModelCallAttemptRecord] = []
+        self._task_records: WeakKeyDictionary[asyncio.Task[Any], list[ModelCallAttemptRecord]] = (
+            WeakKeyDictionary()
+        )
+
+    def current_task_records(self) -> list[ModelCallAttemptRecord]:
+        task = asyncio.current_task()
+        if task is None:
+            raise RuntimeError("model audit requires an asyncio task")
+        return self._task_records.setdefault(task, [])
 
     async def record(self, record: ModelCallAttemptRecord) -> None:
         self.records.append(record)
+        self.current_task_records().append(record)
 
 
 def estimate_flash_cost_micros(input_tokens: int, output_tokens: int) -> int:

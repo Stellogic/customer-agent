@@ -2,7 +2,7 @@
   "issue": 174,
   "artifactKind": "frozen-live-scenario-catalog",
   "status": "FROZEN_AUTHORIZED_NOT_RUN",
-  "baselineCommit": "origin/main@474e6068ca1f562a60d67518bba1619a1a3582ef",
+  "baselineCommit": "origin/main@23475db",
   "plan": "issue-174-live-acceptance-plan.md",
   "description": "调用前冻结的独立合成发布场景；真实结果仅由授权 runner 和发布报告给出。",
   "executionAuthorized": true,
@@ -37,18 +37,15 @@
   },
   "sharedProjectBudget": {
     "currency": "CNY",
-    "cumulativeLimit": 11,
+    "cumulativeLimit": 8,
     "archivedCumulativeUpperBound": 3.810222,
-    "archivedUnsettled": 3.8,
-    "arithmeticRemainingAtSnapshot": 0.389778,
+    "archivedUnsettled": 2.8,
+    "arithmeticRemainingAtSnapshot": 1.389778,
     "liveLedgerSpent": 3.810222,
-    "liveAvailable": 1.1,
+    "liveAvailable": 1.389778,
     "issue174Reserved": 1,
     "ledgerReference": "D:\\customer-agent\\.local\\issue190-sufficiency\\cost-ledger.json（调用前 live 回读）",
-    "policy": "累计授权11元保持不变，旧26笔PENDING及失败均保留。历史核对点上界2元加后续15笔预留7.9元共9.9元；本轮最多新增1元，预留后10.9元。liveAvailable为项目授权余量，不是平台余额或实扣。",
-    "billingReconciliation": "../delivery/issue-174-billing-reconciliation.json",
-    "postCheckpointReserved": 7.9,
-    "pendingCountBeforeRun": 26
+    "policy": "保留十笔旧PENDING共2.8元；本轮最多预留1元，累计占用上界7.610222元，禁止复用旧预留。"
   },
   "currentStage": {
     "logicalCalls": 0,
@@ -62,7 +59,7 @@
     "model": "deepseek-v4-flash",
     "promptVersionsBySeam": {
       "intake": "intake-v3",
-      "action": "investigation-action-v4",
+      "action": "investigation-action-v3",
       "judgment": "investigation-judgment-v1",
       "customerCommunication": "customer-communication-v2/customer-knowledge-communication-v1",
       "supportAssistance": "support-assistance-answer-v2"
@@ -97,9 +94,7 @@
         "L174-03": 260000,
         "L174-04": 280000,
         "L174-05": 120000
-      },
-      "actionLoopMaxActions": 8,
-      "actionLoopMaxProviderAttempts": 8
+      }
     },
     "latencyLimitsMs": {
       "intakeRead": 10000,
@@ -114,10 +109,10 @@
   "prerequisites": [
     "#173 已完成：PR #210 merged，Issue #173 closed，issue173-final-20260903b PASS。",
     "#190 检索 64/64 已绑定；#169 35/48 由用户接受为 KNOWN_LIMITATIONS；#170 已交付但回答质量未单独评估。",
-    "历史平台累计实扣上界2 CNY为用户报告；26笔旧预留保留，本轮在总11 CNY内另预留最多1 CNY。",
+    "共享账本已结算 3.810222 CNY，保留十笔 PENDING 共2.80 CNY；项目上限8 CNY，本轮最多预留1 CNY。",
     "固定模型、prompt/schema、五个场景、调用/尝试/token/成本/时间上限。",
     "仅使用合成订单和公开知识；真实 Chromium 经 Spring，关闭 shadow 和 fake 回退。",
-    "第7轮错误来源未能回溯确认，保留INCOMPLETE。第8轮修复离线验证的Spring空白内容片段拒绝与发布回调错误误分类，发布失败不再从第0块纠正重发；保留原供应商请求及完整正文验证。"
+    "协调任务已明确授权本轮真实 DeepSeek 费用与正式交付。"
   ],
   "fixturePolicy": "仅描述合成输入事实；订单引用占位符待映射为本次隔离栈独有订单。只准备订单/支付/物流/知识输入，不预写工单、消息、代次、提案、审批、执行或 HUMAN 结果。",
   "observationPolicy": "真实 Chromium 可见 UI 发起业务，只观察同源 Spring 产品 API/SSE/页面；不直接请求 provider/Agent，不 mock 成功，不通过内部 publish 或 SQL 制造业务结果。",
@@ -252,8 +247,7 @@
         "bindingStatus": "BOUND_CURRENT_MAIN"
       },
       "customerInputs": [
-        "物流节点超过承诺时间没有更新时该怎么处理？请说明依据并展示来源。",
-        "物流延迟，请人工客服处理本工单，并说明适用政策。"
+        "ORDER-L174-04-<run> 这次延迟适用什么规则？请告诉我依据，我想查看来源。"
       ],
       "actions": [
         "客户路径自然受理确认，经实际调查读取有依据回答并核对公开来源",
@@ -265,7 +259,7 @@
         "两条正文只做关键词边界 sanity；语义质量保持 NOT_EVALUATED/KNOWN_LIMITATION，不宣称本轮小样本证明完整正确率",
         "客服建议不自动发送公开消息，不改变处理模式或产生补偿副作用"
       ],
-      "countingNote": "已有上游费用关联原记录不重复计费，新浏览器场景调用计入项目历史累计共享8元；不新增充分性调用或复制 #190 实验指标。",
+      "countingNote": "已有上游费用关联原记录不重复计费，新浏览器场景调用计入项目历史累计共享5元；不新增充分性调用或复制 #190 实验指标。",
       "pending": [],
       "sourceReferences": [
         "frontend/src/App.tsx",
@@ -308,6 +302,5 @@
       ]
     }
   ],
-  "revision": 8,
-  "runId": "issue174-live-08"
+  "revision": 3
 }

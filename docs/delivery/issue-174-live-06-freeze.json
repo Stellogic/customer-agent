@@ -37,7 +37,7 @@
   },
   "sharedProjectBudget": {
     "currency": "CNY",
-    "cumulativeLimit": 11,
+    "cumulativeLimit": 9,
     "archivedCumulativeUpperBound": 3.810222,
     "archivedUnsettled": 3.8,
     "arithmeticRemainingAtSnapshot": 0.389778,
@@ -45,10 +45,10 @@
     "liveAvailable": 1.1,
     "issue174Reserved": 1,
     "ledgerReference": "D:\\customer-agent\\.local\\issue190-sufficiency\\cost-ledger.json（调用前 live 回读）",
-    "policy": "累计授权11元保持不变，旧26笔PENDING及失败均保留。历史核对点上界2元加后续15笔预留7.9元共9.9元；本轮最多新增1元，预留后10.9元。liveAvailable为项目授权余量，不是平台余额或实扣。",
+    "policy": "用户追加1 CNY，将项目累计授权提高至9 CNY，并明确允许一次原五场景复验，本轮最多新增1 CNY，失败立即停止。历史核对点上界2 CNY加后续13笔预留5.9 CNY，项目授权内未预留1.1 CNY；本轮预留后累计预算依据8.9 CNY。24笔旧PENDING和旧失败完整保留。liveAvailable为项目授权余量，不是平台余额；支付能力由本地官方只读快照确认。历史估算和预留不代表平台账单。",
     "billingReconciliation": "../delivery/issue-174-billing-reconciliation.json",
-    "postCheckpointReserved": 7.9,
-    "pendingCountBeforeRun": 26
+    "postCheckpointReserved": 5.9,
+    "pendingCountBeforeRun": 24
   },
   "currentStage": {
     "logicalCalls": 0,
@@ -114,10 +114,10 @@
   "prerequisites": [
     "#173 已完成：PR #210 merged，Issue #173 closed，issue173-final-20260903b PASS。",
     "#190 检索 64/64 已绑定；#169 35/48 由用户接受为 KNOWN_LIMITATIONS；#170 已交付但回答质量未单独评估。",
-    "历史平台累计实扣上界2 CNY为用户报告；26笔旧预留保留，本轮在总11 CNY内另预留最多1 CNY。",
+    "历史平台累计实扣上界2 CNY为用户报告，未经Agent独立核实；24笔旧预留保留，新调用在用户追加后的总9 CNY内另行预留。",
     "固定模型、prompt/schema、五个场景、调用/尝试/token/成本/时间上限。",
     "仅使用合成订单和公开知识；真实 Chromium 经 Spring，关闭 shadow 和 fake 回退。",
-    "第7轮错误来源未能回溯确认，保留INCOMPLETE。第8轮修复离线验证的Spring空白内容片段拒绝与发布回调错误误分类，发布失败不再从第0块纠正重发；保留原供应商请求及完整正文验证。"
+    "用户明确追加1 CNY并授权一次原五场景复验；沿用已合入PR #225的主线。run05失败保留，单次intake诊断未复现，未证明根因；本轮仅补齐失败浏览器工件输出路径，未修改产品模型、提示词或业务断言。"
   ],
   "fixturePolicy": "仅描述合成输入事实；订单引用占位符待映射为本次隔离栈独有订单。只准备订单/支付/物流/知识输入，不预写工单、消息、代次、提案、审批、执行或 HUMAN 结果。",
   "observationPolicy": "真实 Chromium 可见 UI 发起业务，只观察同源 Spring 产品 API/SSE/页面；不直接请求 provider/Agent，不 mock 成功，不通过内部 publish 或 SQL 制造业务结果。",
@@ -308,6 +308,6 @@
       ]
     }
   ],
-  "revision": 8,
-  "runId": "issue174-live-08"
+  "revision": 6,
+  "runId": "issue174-live-06"
 }

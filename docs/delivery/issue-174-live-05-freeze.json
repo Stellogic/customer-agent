@@ -37,18 +37,18 @@
   },
   "sharedProjectBudget": {
     "currency": "CNY",
-    "cumulativeLimit": 11,
+    "cumulativeLimit": 8,
     "archivedCumulativeUpperBound": 3.810222,
     "archivedUnsettled": 3.8,
     "arithmeticRemainingAtSnapshot": 0.389778,
     "liveLedgerSpent": 3.810222,
-    "liveAvailable": 1.1,
+    "liveAvailable": 1.2,
     "issue174Reserved": 1,
     "ledgerReference": "D:\\customer-agent\\.local\\issue190-sufficiency\\cost-ledger.json（调用前 live 回读）",
-    "policy": "累计授权11元保持不变，旧26笔PENDING及失败均保留。历史核对点上界2元加后续15笔预留7.9元共9.9元；本轮最多新增1元，预留后10.9元。liveAvailable为项目授权余量，不是平台余额或实扣。",
+    "policy": "项目累计授权仍为8 CNY，历史核对点上界2 CNY加后续11笔预留4.8 CNY，项目授权内未预留1.2 CNY，本轮最多1 CNY。22笔旧PENDING保留。liveAvailable指项目授权余量，不是平台余额；当前支付能力另由本地官方只读余额快照确认，余额不公开。liveLedgerSpent及archived字段仅为历史估算快照，不代表平台账单。",
     "billingReconciliation": "../delivery/issue-174-billing-reconciliation.json",
-    "postCheckpointReserved": 7.9,
-    "pendingCountBeforeRun": 26
+    "postCheckpointReserved": 4.8,
+    "pendingCountBeforeRun": 22
   },
   "currentStage": {
     "logicalCalls": 0,
@@ -114,10 +114,10 @@
   "prerequisites": [
     "#173 已完成：PR #210 merged，Issue #173 closed，issue173-final-20260903b PASS。",
     "#190 检索 64/64 已绑定；#169 35/48 由用户接受为 KNOWN_LIMITATIONS；#170 已交付但回答质量未单独评估。",
-    "历史平台累计实扣上界2 CNY为用户报告；26笔旧预留保留，本轮在总11 CNY内另预留最多1 CNY。",
+    "用户提供的历史平台累计实扣上界2 CNY，未经Agent独立核实；旧十一笔预留保留，新调用在总8 CNY内另行预留。",
     "固定模型、prompt/schema、五个场景、调用/尝试/token/成本/时间上限。",
     "仅使用合成订单和公开知识；真实 Chromium 经 Spring，关闭 shadow 和 fake 回退。",
-    "第7轮错误来源未能回溯确认，保留INCOMPLETE。第8轮修复离线验证的Spring空白内容片段拒绝与发布回调错误误分类，发布失败不再从第0块纠正重发；保留原供应商请求及完整正文验证。"
+    "用户已授权继续；PR #225已合入474e6068ca1f562a60d67518bba1619a1a3582ef，issue224-final-20260905a完整门禁PASS，五场景与issue174-live-05已在本轮调用前冻结。"
   ],
   "fixturePolicy": "仅描述合成输入事实；订单引用占位符待映射为本次隔离栈独有订单。只准备订单/支付/物流/知识输入，不预写工单、消息、代次、提案、审批、执行或 HUMAN 结果。",
   "observationPolicy": "真实 Chromium 可见 UI 发起业务，只观察同源 Spring 产品 API/SSE/页面；不直接请求 provider/Agent，不 mock 成功，不通过内部 publish 或 SQL 制造业务结果。",
@@ -308,6 +308,6 @@
       ]
     }
   ],
-  "revision": 8,
-  "runId": "issue174-live-08"
+  "revision": 5,
+  "runId": "issue174-live-05"
 }

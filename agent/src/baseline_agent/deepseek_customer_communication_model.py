@@ -133,7 +133,12 @@ class DeepSeekResponsesCustomerCommunicationModel:
                 async def publish(delta: str) -> None:
                     nonlocal published_body, published_length
                     if on_body_delta is not None:
-                        await on_body_delta(delta)
+                        try:
+                            await on_body_delta(delta)
+                        except Exception as error:
+                            raise CustomerCommunicationFailure(
+                                CustomerCommunicationFailureCode.PUBLICATION_FAILED
+                            ) from error
                     published_length += len(delta)
                     published_body += delta
 
@@ -217,14 +222,18 @@ class DeepSeekResponsesCustomerCommunicationModel:
                     ):
                         continue
                     raise _failure() from error
-                except CustomerCommunicationFailure:
+                except CustomerCommunicationFailure as error:
                     await self._record(
                         internal_call_id,
                         attempt_id,
                         attempt_number,
                         attempt_started,
                         request_body,
-                        DeepSeekFailureClassification.SCHEMA_MISMATCH,
+                        (
+                            DeepSeekFailureClassification.PUBLIC_REPLY_PUBLISH_FAILED
+                            if error.code is CustomerCommunicationFailureCode.PUBLICATION_FAILED
+                            else DeepSeekFailureClassification.SCHEMA_MISMATCH
+                        ),
                         payload if isinstance(payload, dict) else None,
                         provider_http_status=200,
                         validation_diagnostic=validation_diagnostic,

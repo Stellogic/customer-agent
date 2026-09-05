@@ -1,18 +1,100 @@
-# #174 真实 DeepSeek 发布验收：隔离静态准备
+# #174 真实 DeepSeek 发布验收
 
-状态：**CODE_READY_NO_TESTS / NOT_RUN**。日期：2026-09-01。基线：`origin/main@e34b601`。
+状态：**第8版 FROZEN_AUTHORIZED_NOT_RUN**。
 
-本文件及 [独立合成场景清单](issue-174-live-scenarios.json) 是验收设计，不是 runner、运行配置、执行许可或验收报告。当前授权的模型逻辑调用、供应商尝试及费用均为 **0**，`executionAuthorized=false`；项目累计付费共享上限为 **6 元人民币**，不是本票新增额度。未来 live 可分配余额及调用上限待核对冻结，不能把空值解释为无限制。本阶段没有运行任何验证。
+产品修复由实施票 #226 承接，与 PR #214 统一交付；#174 保留发布验收职责。
+
+## 第8版复验冻结
+
+累计授权仍为11元，26笔旧预留完整保留；历史核对上界2元加后续预留7.9元共9.9元。本轮最多新增预留1元后10.9元，不将程序估算、预留与平台实扣混用。入口`pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-08`，见[调用前冻结](../delivery/issue-174-live-08-freeze.json)。沿用原五场景及模型、提示、schema、调用和费用上限；首次场景失败或已知模型/知识错误即停。
+
+离线验证发现两个独立缺陷：Spring用非空白文本校验流式delta，拒绝合法空格片段；客户沟通适配器把Spring发布回调的HTTP异常算成供应商拒绝。本轮允许非空的空白片段原样进入既有流状态机，保留512片段/1000正文长度及累计正文授权校验；发布失败有独立分类并停止同一流的纠正重发。原模型请求、重试参数、超时与业务判定均未修改。已保存的第7轮状态不能凭候选原因重判。
+
+本轮继续保存本地逐次审计元数据；不保存原始供应商正文和密钥。真实本轮与#174最终完整门禁NOT_RUN，以下均为历史记录。
+
+状态：**第7版 INCOMPLETE：L174-01浏览器通过，客户回复失败后停止**。见[第7轮结果](../delivery/issue-174-live-07-result.md)。
+
+## 第7版复验冻结
+
+用户将本次额度从1元提高到3元，累计授权由9元提高至11元；已经执行的run06预留1元包含在本次3元中。25笔旧PENDING均保留，历史核对点上界2元加后续预留6.9元共8.9元，本轮另预留1元后为9.9元。平台余额仅本地只读核对，不公开，也不以估算替代实扣。
+
+本轮入口`pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-07`，[调用前冻结副本](../delivery/issue-174-live-07-freeze.json)保留。沿用原五场景和全部模型、提示、schema、次数、费用与时间上限，场景失败或已知模型/知识失败即停止。单轮最多1元。
+
+并发审计回归已证明共享列表按offset截取会把另一任务的记录计入成功调用。本轮按asyncio任务归属读取判断与沟通审计，保留全量审计历史；不更改业务判断或HTTP请求。runner追加仅元数据的运行时观察器，保存逐次HTTP状态、调用标识与usage到本地，既有记录方法先执行，原始正文和密钥不保存。观察器在模型调用前检查导入。旧run06无法凭此重判或确定具体供应商错误原因。
+
+本轮已执行并保留预留，禁止重跑；#174最终完整门禁NOT_RUN；以下内容是历史快照，旧RunId与旧授权不可用于重跑。
+
+状态：**第6版 INCOMPLETE：第一场景浏览器通过，两次调查完成；指标记录供应商错误后停止**。详见[第6轮结果](../delivery/issue-174-live-06-result.md)。
+
+## 第6版复验冻结
+
+用户明确追加1元，将项目总授权从8元提高到9元，允许再运行一次原五场景真实DeepSeek复验，本轮最多新增1元，失败立即停止。入口为`pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-06`；调用前归档见[run06 freeze](../delivery/issue-174-live-06-freeze.json)。24笔旧PENDING完整保留：历史核对点上界2元加后续13笔预留5.9元，本轮另预留1元后预算依据为8.9元。预留、程序估算与平台实扣分别记录。
+
+沿用原五场景、模型、prompt/schema及全部上限和断言。run05失败和intake单次诊断未复现的结论保留；尚未证明根因，不宣称新增产品修复。本轮使用已修复的`/artifacts/test-results`输出路径，保存失败浏览器上下文到本地，原始响应和账户余额不公开。报告写入`docs/delivery/issue-174-live-report-06.json`。
+
+本轮已执行并停止，后四场景NOT_RUN，整轮预留保留；下方冻结入口为历史，禁止重跑。#174最终完整门禁NOT_RUN。以下第5版及更早内容为历史快照，不作为当前调用授权或预算依据。
+
+状态：**第5版 INCOMPLETE：初次受理澄清失败，未进入调查；后四场景NOT_RUN**。详见[第5轮结果](../delivery/issue-174-live-05-result.md)。PR #225已合入`474e6068ca1f562a60d67518bba1619a1a3582ef`，并发修复完整门禁`issue224-final-20260905a` PASS。此前第4轮及诊断仍保留原结论，见[诊断汇总](../delivery/issue-174-live-04-diagnostics.md)。
+
+## 第5版复验冻结
+
+入口为`pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-05`，调用前归档见[run05 freeze](../delivery/issue-174-live-05-freeze.json)。沿用原模型、prompt/schema、五个场景及每段上限，最多执行一次。当前余额仅通过本地官方只读快照核对，累计预算仍独立执行原8 CNY授权上限，22笔旧预留完整保留；不将预留视为实扣或释放未知消费。
+
+本轮显式使用主线的10个Agent任务槽，消除调查等待嵌套知识编码的自等待。正式指标增加已持久化知识检索失败码的独立聚合；每场景后发现模型或知识失败即停止后续运行。报告写入`docs/delivery/issue-174-live-report-05.json`。知识失败与模型失败不互相替代；五场景及既有业务断言不变。
+
+第5轮已失败，整轮预留保留；下方冻结配置为调用前历史，禁止使用旧RunId重跑。最终#174完整门禁NOT_RUN。#169已接受的35/48局限与#170回答质量NOT_EVALUATED保留。以下第4版及更早段落是历史快照，旧命令、预算和待执行描述不作为当前运行依据。
+
+状态：**第4版 INCOMPLETE：受理建单通过，后台回复校验/usage未通过，后四场景NOT_RUN**。详见[第4轮结果](../delivery/issue-174-live-04-result.md)。产品基线为 `origin/main@52daf02fc05e899bdfc2ac2648bb256da707f5c8`；PR #222 已统一交付 #217/#219/#221/#223，完整确定性门禁 `issue221-final-20260905d` PASS。
+
+## 第4版复验冻结
+
+入口为 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-04`，调用前归档见 [run04 freeze](../delivery/issue-174-live-04-freeze.json)。全部生成仍用 deepseek-v4-flash；产品 action prompt 为 investigation-action-v4，schema 为 investigation-action-v3，结论输出上限随主线为1024。五场景、各段费用预留和通过标准不变；行动/尝试每代各8，全局逻辑调用100、供应商尝试100、已知token 200000、单轮1 CNY，最多执行一次。
+
+18笔旧PENDING保留。费用核对点后的7笔预留合计2.75 CNY，扣除用户当时确认的3.8 CNY后保守未预留1.05 CNY。本轮预留1 CNY，2 CNY历史平台实扣上界加新增预留仍在8 CNY总授权内。历史费用上界来自用户，不冒充独立平台账单；预留不称为实际扣款。失败保留整轮预留与完整场景分母，不自动重跑。
+
+L174-04 客服输入改用“请人工客服处理本工单”，与既有 #173 C 一致，避免“请转人工”进入受理协助而无法确认工单。仍由真实产品转入HUMAN、客服领取并请求辅助；引用及无副作用断言不变。报告写入 `docs/delivery/issue-174-live-report-04.json`。真实模型结果和最终 #174 完整门禁均待执行。#169 35/48 的已接受局限与 #170 回答质量 NOT_EVALUATED 原样保留。
+
+以下第3版及更早内容均为历史快照，涉及旧预算、基线、草案状态与命令不再作为当前运行依据；失败结果保持不变。
+历史状态：**第 3 版 INCOMPLETE：L174-01 PASS，L174-02 FAIL，其余三项 NOT_RUN**。基线：`origin/main@23475db`，已合入 #215 / PR #216 的受理修复。详见 [第三轮结果](../delivery/issue-174-live-03-result.md)。第2版仍为 INCOMPLETE；全部旧失败与诊断结果保留，不回写。
+
+## 第 3 版复验冻结
+
+费用口径更正：用户随后明确确认截至当前 DeepSeek 平台累计实扣不足2元并授权继续。经读取共享账本，3.810222元全部来自 charged_upper_micro_cny 估算，prior_paid_micro_cny=0；3.80元为失败/诊断预留，不是实扣。之前称“已结算”的文字只描述旧程序状态，不应解释为平台账单。新的[费用核对点](../delivery/issue-174-billing-reconciliation.json)以用户提供的平台历史累计上界2元覆盖既有消费，未由 Agent 独立核实；旧记录保留，不重复累加。仍沿用8元总授权，后续调用新增预留另计。因此“剩余仅0.389778元”的旧估算不再作为当前余额不足结论。当前草案仍不执行，须完成 schema 诊断安排及对应新运行冻结。
+
+历史准备快照（已被上段费用核对点取代）：已将运行器的单代次动作/尝试上限从错误的6修正为产品默认8；这是新版草案，不修改第3版失败结果。第3版调用前清单归档为 [run03 freeze](../delivery/issue-174-live-03-freeze.json)。当前场景清单 revision=4、DRAFT_NOT_AUTHORIZED，入口在读取密钥或写账本之前拒绝执行。新 RunId、账本准入和报告路径尚未冻结，不能用旧运行标识重跑。总费用上限、全局调用上限和五项结果标准没有提高。现有未预留0.389778元不足1元发布预留，schema失败仍需定位；此处准备不代表修复全部阻塞。
+
+用户在确认修复票已完成后要求继续发布验收。固定模型仍为 deepseek-v4-flash；受理提示改为实施票已交付的 intake-v3，模型 schema 按首次识别、澄清、其他受理路径分别为 customer_intake_issue_assessments、customer_intake_clarification、customer_intake_understanding。其他接缝版本及五场景的输入、阈值、分段预算和调用上限不变。原第2版浏览器交互已经逐项回答当前问题，可兼容首次一项拟建、另一项待澄清的合法状态，不更改产品实现。
+
+RunId 冻结为 `issue174-live-03`，入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-03`，新报告写入 `docs/delivery/issue-174-live-report-03.json`。调用前已结算 3.810222 元，十笔 PENDING 共 2.80 元完整保留，剩余未预留 1.389778 元；本轮最多预留1元，累计占用上界7.610222元，不超过授权8元。脚本在锁内再次核对旧预留身份与金额。失败立即停止并保留整轮预留，不自动重跑。
+
+#215 的真实三请求建单成功和完整离线门禁仅作为修复前置证据，不能代替本票五场景真实发布验收。以下第2版和第1版段落保留为历史冻结，以本节及 revision=3 场景清单为当前运行依据。
+
+## 第 2 版复验修正
+
+诊断03证明候选订单匹配，但首个澄清问题为 PACKAGE_NOT_RECEIVED；旧用例固定回答重复扣款，随后数据库出现 AGENT_UNAVAILABLE。`AgentServerIntakeUnderstandingGateway` 要求只处理待澄清队列头部；#153 规格要求逐项澄清不确定问题，并未规定两类问题的固定提问顺序。修正验收交互为回答当前页面问题，每类最多一次、最多两轮；最终仍须得到两个精确类别并一次确认创建两张独立工单。不改产品代码、模型或提示，不放宽五秒响应等待，不减少五场景要求。
+
+用户额外授权 3 元后，累计预算上限为 8 元。旧四笔 PENDING 共 1.30 元保留，已结算 3.810222 元；本轮新增预留最多 1 元，调用前占用上界 6.110222 元。场景分段预算和调用/尝试/token 上限保持不变。入口 RunId 为 `issue174-live-02`，报告单独写入 `docs/delivery/issue-174-live-report-02.json`，不会覆盖旧失败报告。下方旧起点和命令属于第1版历史冻结记录，当前以本段及修订版场景清单为准。
+
+[独立合成场景清单](issue-174-live-scenarios.json) 已在任何本轮供应商调用前冻结；下方保留 2026-09-01 静态设计作为历史，不再代表当前前置和预算状态。协调任务已明确授权本轮真实 DeepSeek 运行与正式交付。
 
 规格依据：[GitHub #174](https://github.com/Stellogic/customer-agent/issues/174)、[父规格 #149](../specs/issue-149.md)、[票据镜像](../tickets/spec-149/issue-174.md)。2026-09-01 只读回读时，#174 仍为 OPEN，尚无对应 PR；本次以协调任务的明确派发为所有权依据。
 
-## 范围与前置
+## 本轮冻结配置
 
-- 仅准备这两份文件，不修改公共 runner、预算设施、产品代码、#173 文件或 #190 实验账本，不创建运行产物或修改 Issue/PR。
-- **#173 前置仍有效**：#173 为 OPEN，PR #210 仍是 Draft/NOT_RUN。其隔离静态场景不等于确定性全栈验收完成；#150 及原生依赖状态也须在未来运行前重新核对。本阶段不解除任何前置。
-- 当前规则允许开发期间提交；禁止未过最终门禁合并或关票。旧规格的“普通 CI”在本项目按本地确定性检查理解，GitHub Actions 保持关闭。
-- 禁止测试、格式化/格式检查、lint、类型检查、构建、Docker/Compose、浏览器、产品 API、模型、锁查询/获取及合入。Git/Issue 只读核对、文档编辑、静态双 CR 和范围内提交不构成运行许可。
-- #174 正式目标包括预算门禁及真实证据，本阶段只完成静态设计，不能表述为 #174 已实现或交付。
+- 前置：#173 已正式完成，PR #210 已合入，Issue #173 已关闭；`issue173-final-20260903b` 的 RAG 64/64、浏览器 59/59 与六阶段检查均 PASS。
+- 分层证据：#190 检索 64/64 已交付；#169 客户回答为用户接受的 `KNOWN_LIMITATIONS`，语义 35/48，不改阈值也不重跑；#170 已交付，但客服回答质量仍为 `NOT_EVALUATED`，不得外推。
+- 模型与回退：全部生成接缝固定 `deepseek-v4-flash`，formal 模式开启，shadow 关闭，不允许 fixed fake 回退、换模型或随机重跑。
+- 场景：固定运行 #173 A、D、B 与本票 L174-04、L174-05，共五项。它们覆盖自然语言多问题、不同调查终态、追加消息围栏、客户/客服知识引用和签收未收到的安全转人工。
+- 上限：逻辑调用 100、供应商尝试 100、已持久化 token 200000；行动循环每代费用上限 10000 micro-USD、单次生成 16000 token、120 秒和 6 次 provider 尝试；整轮只执行一次。五段场景预留依次为 220000、120000、260000、280000、120000 micro-CNY，总和精确为 1 CNY；每段开始前回读累计费用，上一段 usage 未确认或已侵占下一段额度即停止。
+- 预算：共享人民币账本调用前累计 `3.810222 CNY`、`0 PENDING`，用户总上限 `5 CNY`；本轮最多预留 `1 CNY`，最多剩余 `1.189778 CNY`。formal 指标按 micro-USD × 7 保守折算，客服按输入/输出 token 的 3/9 micro-CNY 计，受理未持久化 usage，因此每次按 `20000 micro-CNY` 上界结算。
+- 输入和路径：只使用合成订单和仓库公开知识；真实 Chromium 可见操作经 Spring、PostgreSQL 和 LangGraph 到 DeepSeek。浏览器不直连 provider、Agent 私有接口或数据库。
+- 结果边界：五项发布场景必须 5/5；L174-02 绑定现行 #173 D 的 23 小时低风险回复、五分钟候选与取消，不再沿用早期 12 小时候选描述；L174-04 固定绑定 `customer-delivery-help-v1` 与 `logistics-delay-v2` 并检查语义和 canonical 引用；L174-05 精确核对 `PACKAGE_SIGNED_NOT_RECEIVED` 原因。任何供应商、schema、安全或公开投影失败均诚实记 FAIL 并停止。发布场景不构成生产准确率、可用性或客服回答质量证明。
+
+执行入口为 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-20260903a`。脚本先核对共享账本和工作树，登记唯一预算预留，再按正式锁协议运行；无调用的启动失败撤销预留，发生调用后仅在 PASS 且 usage 可信时结算；任一场景失败保留整轮 PENDING 预留并保存脱敏报告，避免未持久化尝试被漏计。最终证据写入 `docs/delivery/issue-174-live-report.json`，浏览器工件写入忽略目录 `.local/gate-evidence/<runId>/browser`。
+
+## 2026-09-01 历史静态设计
+
+以下内容保留当时的设计依据和未知项。涉及 `CODE_READY_NO_TESTS`、6 元上限、未授权、#169/#170/#173 未完成或 `NOT_RUN` 的陈述只描述当时快照，由上面的 2026-09-03 冻结配置取代。
 
 ## 已有真实接缝及不能借用的证据
 
