@@ -1,11 +1,11 @@
 {
   "issue": 174,
   "artifactKind": "frozen-live-scenario-catalog",
-  "status": "FROZEN_AUTHORIZED_NOT_RUN",
+  "status": "INCOMPLETE",
   "baselineCommit": "origin/main@52daf02fc05e899bdfc2ac2648bb256da707f5c8",
   "plan": "issue-174-live-acceptance-plan.md",
   "description": "调用前冻结的独立合成发布场景；真实结果仅由授权 runner 和发布报告给出。",
-  "executionAuthorized": true,
+  "executionAuthorized": false,
   "qualityProtocol": "rag-layered-v2",
   "evidenceResponsibilities": {
     "retrieval": "#190：有答案 Recall@5 >= 0.90、MRR@5 >= 0.75；错误版本/范围/越权 Top-5 命中率各为0；无答案题完整执行，候选不决定拒答。",
@@ -55,9 +55,9 @@
     "providerAttempts": 0,
     "costMicrosUsd": 0,
     "costScope": "仅本静态阶段新增消耗，不代表全项目历史累计为0",
-    "metricsStatus": "NOT_RUN"
+    "metricsStatus": "INCOMPLETE_SEE_RUN04_REPORT"
   },
-  "freezeStatus": "FROZEN_AUTHORIZED_NOT_RUN",
+  "freezeStatus": "EXECUTED_INCOMPLETE",
   "liveFreeze": {
     "model": "deepseek-v4-flash",
     "promptVersionsBySeam": {

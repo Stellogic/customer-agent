@@ -1,6 +1,6 @@
 # #174 真实 DeepSeek 发布验收
 
-状态：**第4版已冻结授权，NOT_RUN**。产品基线为 `origin/main@52daf02fc05e899bdfc2ac2648bb256da707f5c8`；PR #222 已统一交付 #217/#219/#221/#223，完整确定性门禁 `issue221-final-20260905d` PASS。
+状态：**第4版 INCOMPLETE：受理建单通过，后台回复校验/usage未通过，后四场景NOT_RUN**。详见[第4轮结果](../delivery/issue-174-live-04-result.md)。产品基线为 `origin/main@52daf02fc05e899bdfc2ac2648bb256da707f5c8`；PR #222 已统一交付 #217/#219/#221/#223，完整确定性门禁 `issue221-final-20260905d` PASS。
 
 ## 第4版复验冻结
 
