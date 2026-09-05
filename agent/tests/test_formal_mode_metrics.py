@@ -1,5 +1,10 @@
 import pytest
 
+from baseline_agent.deepseek_investigation_action_model import (
+    ACTION_PROMPT_VERSION,
+    ACTION_SCHEMA_VERSION,
+)
+
 from baseline_agent.formal_mode_metrics import (
     aggregate_checkpoint_metrics,
     collect_formal_metrics,
@@ -46,8 +51,8 @@ def test_aggregates_only_formal_customer_communication_checkpoints_without_ident
     assert report["totalTokens"] == 700
     assert report["usageTrusted"] is True
     assert report["action"] == {
-        "promptVersion": "investigation-action-v3",
-        "schemaVersion": "investigation-action-v3",
+        "promptVersion": ACTION_PROMPT_VERSION,
+        "schemaVersion": ACTION_SCHEMA_VERSION,
         "logicalCalls": 2,
         "providerAttempts": 2,
     }

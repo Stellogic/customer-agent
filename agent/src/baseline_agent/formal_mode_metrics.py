@@ -8,6 +8,11 @@ from pathlib import Path
 import httpx
 import psycopg
 
+from baseline_agent.deepseek_investigation_action_model import (
+    ACTION_PROMPT_VERSION,
+    ACTION_SCHEMA_VERSION,
+)
+
 _FORMAL_COMMUNICATION_MODE = "deepseek-v4-flash-customer-communication-formal-v1"
 
 
@@ -94,8 +99,8 @@ def aggregate_checkpoint_metrics(
         "totalTokens": total_tokens,
         "usageTrusted": usage_trusted,
         "action": {
-            "promptVersion": "investigation-action-v3",
-            "schemaVersion": "investigation-action-v3",
+            "promptVersion": ACTION_PROMPT_VERSION,
+            "schemaVersion": ACTION_SCHEMA_VERSION,
             "logicalCalls": aggregate_action_calls,
             "providerAttempts": action_attempts,
         },
