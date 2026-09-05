@@ -12,6 +12,9 @@ COPY langgraph.json ./
 COPY src ./src
 
 FROM base AS test
+COPY --from=node:24.19.0-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:24.19.0-bookworm-slim /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 COPY tests ./tests
 COPY tests/fixtures/knowledge-history /docs/implementation/evidence
 COPY smoke.py ./

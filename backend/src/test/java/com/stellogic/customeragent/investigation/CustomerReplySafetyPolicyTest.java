@@ -177,6 +177,18 @@ class CustomerReplySafetyPolicyTest {
     }
 
     @Test
+    void acceptsOnlyUnfinishedPrefixesOfTheScopedOrder() {
+        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("订单 ORDER-12", ORDER, false))
+                .isTrue();
+        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("订单 ORDER-12", ORDER, true))
+                .isFalse();
+        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("订单 ORDER-12。", ORDER, false))
+                .isFalse();
+        assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("订单 ORDER-123", ORDER, false))
+                .isFalse();
+    }
+
+    @Test
     void authorizesSafeNaturalLanguagePrefixesWithoutFixedTemplateWhitelist() {
         assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix("根据调查，订单 ORD", ORDER, false))
                 .isTrue();

@@ -824,6 +824,44 @@ def main() -> None:
             "Idempotency-Key": request_id,
         }
 
+    # #219: 只准备独立代次夹具; 分片事件与流状态经真实 Spring API/PostgreSQL 写入。
+    stream_ticket, stream_generation = create_generation_race_ticket("ORDER-DELAY-UNDER-24")
+    stream_path = (
+        f"{spring_url}/internal/agent/tickets/{stream_ticket}"
+        f"/generations/{stream_generation}/public-reply-events"
+    )
+    first_fragment = "根据调查，订单 ORDER-DELAY-UNDER-"
+    last_fragment = "24 当前不符合补偿条件。"
+    with httpx.Client(timeout=20.0) as client:
+        for ordinal, (event, expected_status) in enumerate(
+            (
+                ({"type": "STREAM_STARTED"}, 202),
+                ({"type": "CONTENT_DELTA", "chunkIndex": 0, "delta": first_fragment}, 202),
+                ({"type": "CONTENT_DELTA", "chunkIndex": 1, "delta": "WRONG"}, 422),
+                ({"type": "CONTENT_DELTA", "chunkIndex": 1, "delta": last_fragment}, 202),
+            )
+        ):
+            response = client.post(
+                stream_path,
+                headers=agent_headers(
+                    stream_generation,
+                    "PUBLISH_PUBLIC_REPLY_EVENT",
+                    f"issue219-stream-{stream_generation}-{ordinal}",
+                ),
+                json=event,
+            )
+            expect_status(response, expected_status)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select body, next_chunk_index from agent_public_reply_stream where generation_id = %s",
+            (stream_generation,),
+        ).fetchone() == (first_fragment + last_fragment, 2)
+        assert connection.execute(
+            "select count(*) from customer_public_event where ticket_id = %s "
+            "and event_type = 'AGENT_REPLY_CONTENT_DELTA'",
+            (stream_ticket,),
+        ).fetchone() == (2,)
+
     def old_tool_action(
         client: httpx.Client, ticket_id: uuid.UUID, generation_id: uuid.UUID
     ) -> httpx.Response:
