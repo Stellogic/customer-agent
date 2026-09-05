@@ -39,7 +39,30 @@ export async function createSingleTicket(page: Page, reference: string, descript
   await page.getByRole("button", { name: "确认，就是这个问题" }).click();
   const response = await confirmed;
   expect(response.status()).toBe(201);
-  const result = (await response.json()) as { ticketIds: string[]; confirmed: boolean };
+  const result = (await response.json()) as {
+    ticketIds: string[];
+    confirmed: boolean;
+    status: string;
+    remainingOrderCount: number;
+    completedOrderCount: number;
+    candidateOrder: { reference: string } | null;
+  };
+  if (!result.confirmed) {
+    console.info(
+      "INTAKE_CONFIRMATION_OBSERVATION",
+      JSON.stringify({
+        httpStatus: response.status(),
+        status: ["CONFIRMED", "READY_TO_CONFIRM", "NEEDS_CLARIFICATION"].includes(result.status)
+          ? result.status
+          : "OTHER",
+        confirmed: result.confirmed,
+        ticketCount: result.ticketIds.length,
+        remainingOrderCount: result.remainingOrderCount,
+        completedOrderCount: result.completedOrderCount,
+        candidateMatchesFixture: result.candidateOrder?.reference === reference,
+      }),
+    );
+  }
   expect(result.confirmed).toBe(true);
   expect(result.ticketIds).toHaveLength(1);
   expect(result.ticketIds[0]).toMatch(/^[0-9a-f-]{36}$/i);
