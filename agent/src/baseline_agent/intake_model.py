@@ -158,7 +158,7 @@ class FixedFakeIntakeModel:
                 assistant_message=f"你说的是不是订单 {candidate.reference} 的物流或支付问题？也可以直接纠正我的理解。",
                 remaining_order_references=remaining_order_references,
             )
-        if len(issues) == 1 and issues[0].kind == "LOGISTICS_DELAY":
+        if not current_issues and len(issues) == 1 and issues[0].kind == "LOGISTICS_DELAY":
             issues = (
                 IntakeIssue(
                     "LOGISTICS_DELAY",

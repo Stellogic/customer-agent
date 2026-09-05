@@ -824,6 +824,44 @@ def main() -> None:
             "Idempotency-Key": request_id,
         }
 
+    # #219: 只准备独立代次夹具; 分片事件与流状态经真实 Spring API/PostgreSQL 写入。
+    stream_ticket, stream_generation = create_generation_race_ticket("ORDER-DELAY-UNDER-24")
+    stream_path = (
+        f"{spring_url}/internal/agent/tickets/{stream_ticket}"
+        f"/generations/{stream_generation}/public-reply-events"
+    )
+    first_fragment = "根据调查，订单 ORDER-DELAY-UNDER-"
+    last_fragment = "24 当前不符合补偿条件。"
+    with httpx.Client(timeout=20.0) as client:
+        for ordinal, (event, expected_status) in enumerate(
+            (
+                ({"type": "STREAM_STARTED"}, 202),
+                ({"type": "CONTENT_DELTA", "chunkIndex": 0, "delta": first_fragment}, 202),
+                ({"type": "CONTENT_DELTA", "chunkIndex": 1, "delta": "WRONG"}, 422),
+                ({"type": "CONTENT_DELTA", "chunkIndex": 1, "delta": last_fragment}, 202),
+            )
+        ):
+            response = client.post(
+                stream_path,
+                headers=agent_headers(
+                    stream_generation,
+                    "PUBLISH_PUBLIC_REPLY_EVENT",
+                    f"issue219-stream-{stream_generation}-{ordinal}",
+                ),
+                json=event,
+            )
+            expect_status(response, expected_status)
+    with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+        assert connection.execute(
+            "select body, next_chunk_index from agent_public_reply_stream where generation_id = %s",
+            (stream_generation,),
+        ).fetchone() == (first_fragment + last_fragment, 2)
+        assert connection.execute(
+            "select count(*) from customer_public_event where ticket_id = %s "
+            "and event_type = 'AGENT_REPLY_CONTENT_DELTA'",
+            (stream_ticket,),
+        ).fetchone() == (2,)
+
     def old_tool_action(
         client: httpx.Client, ticket_id: uuid.UUID, generation_id: uuid.UUID
     ) -> httpx.Response:
@@ -953,6 +991,72 @@ def main() -> None:
 
     race_conclusion(False)
     race_conclusion(True)
+
+    # #223: Exercise intake persistence before independently checking conclusion eligibility.
+    for intake_followup, expected_candidate in (
+        (None, True),
+        ("请立即补偿", False),
+    ):
+        with customer_browser_client(spring_url) as client:
+            created_223 = create_customer_ticket(
+                client,
+                spring_url,
+                f"issue223-{uuid.uuid4()}",
+                "ORDER-DELAY-UNDER-24",
+                "请解释物流状态",
+                intake_followup=intake_followup,
+            )
+            expect_status(created_223, 201)
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            customer_messages = connection.execute(
+                "select body from public_message where ticket_id = %s and author = 'CUSTOMER' order by message_sequence",
+                (created_223.json()["ticketId"],),
+            ).fetchall()
+        expected_messages = [("订单 ORDER-DELAY-UNDER-24 的物流延迟问题：请解释物流状态",)]
+        if intake_followup is not None:
+            expected_messages.append((intake_followup,))
+        assert customer_messages == expected_messages
+        customer_text = "\n".join(row[0] for row in customer_messages)
+        ticket_223, generation_223 = create_generation_race_ticket("ORDER-DELAY-UNDER-24")
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            connection.execute(
+                "update support_ticket set description = '物流状态查询摘要' where id = %s",
+                (ticket_223,),
+            )
+            connection.execute(
+                "update public_message set body = %s where ticket_id = %s and message_sequence = 1",
+                (customer_text, ticket_223),
+            )
+        with httpx.Client(timeout=20.0) as client:
+            facts_223 = collect_investigation_facts(
+                client,
+                spring_url,
+                ticket_223,
+                generation_223,
+                agent_headers(generation_223, "USE_INVESTIGATION_CAPABILITY", "issue223-facts"),
+            )
+            accepted_223 = client.post(
+                f"{spring_url}/internal/agent/tickets/{ticket_223}/generations/{generation_223}/conclusions",
+                headers=agent_headers(
+                    generation_223, "SUBMIT_INVESTIGATION_CONCLUSION", "issue223-conclusion"
+                ),
+                json={
+                    "compensationRequired": False,
+                    "reasonCode": "DELAY_UNDER_24_HOURS",
+                    "delayHours": facts_223["delayHours"],
+                    "delaySeconds": facts_223["delaySeconds"],
+                    "orderReference": "ORDER-DELAY-UNDER-24",
+                    "evidenceRefs": facts_223["evidenceRefs"],
+                    **evidence_sufficiency("ORDER-DELAY-UNDER-24"),
+                    **customer_reply("ORDER-DELAY-UNDER-24", facts_223["evidenceRefs"], False),
+                },
+            )
+            expect_status(accepted_223, 200)
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
+            assert connection.execute(
+                "select exists(select 1 from ticket_auto_resolution where ticket_id = %s and status = 'PENDING')",
+                (ticket_223,),
+            ).fetchone() == (expected_candidate,)
 
     no_compensation_request = f"issue-14-{uuid.uuid4()}"
     no_compensation_payload = {

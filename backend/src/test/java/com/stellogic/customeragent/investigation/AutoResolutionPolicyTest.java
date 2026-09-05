@@ -11,6 +11,26 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class AutoResolutionPolicyTest {
     @Test
+    void intakeFormWrapperKeepsTheSameQuestionAndDisputeRules() {
+        var order = order(false, false, false, 0, "IN_TRANSIT", 23);
+        String message = "订单 ORDER-162 的物流延迟问题：请解释物流状态";
+        assertThat(
+                        scenario(
+                                DecisionReasonCode.DELAY_UNDER_24_HOURS,
+                                InvestigationRiskScenario.LOGISTICS_DELAY,
+                                order,
+                                message))
+                .isEqualTo("AUTHORITATIVE_STATUS_EXPLANATION");
+        assertThat(
+                        scenario(
+                                DecisionReasonCode.DELAY_UNDER_24_HOURS,
+                                InvestigationRiskScenario.LOGISTICS_DELAY,
+                                order,
+                                message + "\n请立即补偿"))
+                .isNull();
+    }
+
+    @Test
     void knowledgeQuestionMayContinueWithoutGrantingAutomaticResolutionOrHidingBusinessRisk() {
         var conclusion =
                 conclusion(

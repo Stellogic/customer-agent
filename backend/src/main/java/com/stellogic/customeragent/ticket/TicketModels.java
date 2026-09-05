@@ -10,6 +10,7 @@ record CreateCustomerTicket(
         String requestId,
         String orderReference,
         String description,
+        List<String> customerMessages,
         String issueKind) {}
 
 record TicketCreationResult(UUID ticketId, boolean replayed) {}

@@ -1,0 +1,65 @@
+{
+  "schema": "issue217-action-diagnostic-v1",
+  "productAcceptance": false,
+  "outcome": "VALID_DECISION",
+  "diagnostics": [],
+  "claims": [
+    {
+      "referenceKind": "order",
+      "applicability": [
+        "ORDER_IDENTITY"
+      ]
+    },
+    {
+      "referenceKind": "logistics",
+      "applicability": [
+        "LOGISTICS_STATUS"
+      ]
+    },
+    {
+      "referenceKind": "payment",
+      "applicability": [
+        "PAYMENT_STATUS",
+        "REFUND_STATUS"
+      ]
+    },
+    {
+      "referenceKind": "compensation",
+      "applicability": [
+        "EXISTING_COMPENSATION"
+      ]
+    },
+    {
+      "referenceKind": "order-actions",
+      "applicability": [
+        "PENDING_ACTIONS"
+      ]
+    },
+    {
+      "referenceKind": "policy",
+      "applicability": [
+        "POLICY_BASIS"
+      ]
+    },
+    {
+      "referenceKind": "order-rule",
+      "applicability": [
+        "ORDER_RULE"
+      ]
+    }
+  ],
+  "audits": [
+    {
+      "attemptNumber": 1,
+      "httpStatus": 200,
+      "status": "completed",
+      "classification": null,
+      "inputTokens": 992,
+      "outputTokens": 249,
+      "totalTokens": 1241,
+      "usageReported": true,
+      "durationMs": 2346
+    }
+  ],
+  "attemptLimit": 1
+}

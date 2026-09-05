@@ -32,7 +32,7 @@ from baseline_agent.investigation_action_loop import (
 
 _RESPONSES_ENDPOINT = "https://api.deepseek.com/responses"
 _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 503})
-ACTION_PROMPT_VERSION = "investigation-action-v3"
+ACTION_PROMPT_VERSION = "investigation-action-v4"
 ACTION_SCHEMA_VERSION = "investigation-action-v3"
 
 
@@ -46,6 +46,7 @@ class DeepSeekActionConfig:
     max_attempts: int = 2
     retry_base_delay_seconds: float = 0.2
     max_output_tokens: int = 128
+    conclusion_max_output_tokens: int = 1024
 
     def __post_init__(self) -> None:
         if (
@@ -57,6 +58,7 @@ class DeepSeekActionConfig:
             or not 1 <= self.max_attempts <= 2
             or self.retry_base_delay_seconds < 0
             or not 32 <= self.max_output_tokens <= 256
+            or not 512 <= self.conclusion_max_output_tokens <= 2048
         ):
             raise ActionLoopFailure(ActionLoopFailureCode.MODEL_CALL_FAILED)
 
@@ -291,6 +293,7 @@ def _controlled_facts(facts: dict) -> dict[str, object]:
         "siblingTickets",
         "evidenceCatalog",
         "customerQuestion",
+        "issueKind",
     }
     if not set(facts).issubset(allowed):
         raise _failure()
@@ -461,6 +464,8 @@ def _build_request(
         "model": config.model,
         "instructions": (
             "Choose exactly one next action for a synthetic support-ticket investigation. "
+            "Return exactly one JSON object matching the supplied schema, without Markdown "
+            "code fences or surrounding explanation. "
             "Use only the enumerated action and return no facts or identifiers. "
             "Missing facts are expected investigation work, not uncertainty: when matchStatus is "
             "missing select CONFIRM_ORDER; when it is AMBIGUOUS select REQUEST_CLARIFICATION; "
@@ -469,6 +474,13 @@ def _build_request(
             "For SUBMIT_CONCLUSION, independently select evidenceReference values only from the "
             "supplied evidenceCatalog and state each selected fact's applicability; Spring will "
             "validate whether that evidence combination is sufficient. "
+            "issueKind is the Spring-confirmed investigation type; the customer's wording "
+            "does not replace it. For LOGISTICS_DELAY, evidence must cover ORDER_IDENTITY, "
+            "DELAY_DURATION, ORDER_ELIGIBILITY, EXISTING_COMPENSATION, PENDING_ACTIONS and "
+            "POLICY_BASIS when those facts are supported by the supplied catalog. "
+            "DELAY_DURATION covers measured delay hours/seconds, not only LOGISTICS_STATUS. "
+            "ORDER_ELIGIBILITY covers payment, cancellation and refund eligibility together; "
+            "PAYMENT_STATUS and REFUND_STATUS alone do not express that eligibility review. "
             "When customerQuestion is supplied, also choose knowledgeQuery: null when Spring "
             "facts alone answer the question, otherwise a short natural-language query for "
             "general customer guidance. Never put identifiers or private facts in the query. "
@@ -494,7 +506,9 @@ def _build_request(
             separators=(",", ":"),
             sort_keys=True,
         ),
-        "max_output_tokens": config.max_output_tokens,
+        "max_output_tokens": config.conclusion_max_output_tokens
+        if is_submission
+        else config.max_output_tokens,
         "reasoning": {"effort": "none"},
         "stream": False,
         "text": {
