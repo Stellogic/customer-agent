@@ -21,3 +21,11 @@ Standards / Spec 双轴静态审查均 PASS，未发现阻塞；不替代运行�
 宿主显式本地代理可读取Node公开文件，但Clash仅监听127.0.0.1:7897，Docker Desktop的手动代理指向host.docker.internal:7897，容器经内置代理返回CONNECT EOF。修改Desktop代理并重启会影响正在运行的基线补偿执行器，正在等待用户确认。未改变全局代理、未重启引擎、未触发供应商调用。
 
 产品差异与临时单场景runner的Standards/Spec静态复核通过。启动清理采用先确认独立project为空、再记录本轮创建所有权，覆盖部分启动失败。真实方案见[冻结记录](issue-217-live-freeze.md)。单场景真实验证、最终完整门禁均NOT_RUN；PR仍为Draft，Issue仍开放。本次未新增账本条目，历史12笔PENDING保留。
+
+## 2026-09-05 环境恢复与全量静态检查
+
+用户已明确允许修正 Docker Desktop 代理并重启。已备份设置，仅将 HTTP/HTTPS 代理地址改为 http://127.0.0.1:7897。重启时出现 sailor-ingest.sock 启动错误，用户点击 Quit 后重新启动成功；引擎及原基线执行器恢复。未清理运行中的 socket 或业务数据。
+
+容器代理小文件探测恢复，但 Pyright/nodeenv 的大文件下载仍不稳定。Agent Dockerfile 仅在 test 阶段复用前端固定的 node:24.19.0-bookworm-slim，复制 Node/npm，使 Pyright 使用现成工具。base/runtime、依赖版本与检查命令不变。该增量 Standards/Spec 均 PASS。
+
+issue217-static-20260905e 完整 Agent test 目标通过：111 files already formatted，Ruff lint PASS，Pyright 0 errors/0 warnings，pytest 453 passed、3 skipped（34.17 秒）。本轮专用镜像已移除。此前中断构建仍记作未完成，不将其计入通过结果。下一步为冻结的单场景真实验证及最终完整门禁。
