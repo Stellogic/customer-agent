@@ -54,7 +54,7 @@ test("Issue #174 L174-04：真实客户知识引用与客服辅助", async ({ br
     const humanTicket = await createSingleTicket(
       customer,
       humanReference,
-      "物流延迟，请转人工客服核实并说明适用政策。",
+      "物流延迟，请人工客服处理本工单，并说明适用政策。",
     );
     await expect(customer.getByText("人工客服处理中", { exact: true })).toBeVisible({
       timeout: 90_000,
@@ -124,7 +124,7 @@ test("Issue #174 L174-04：真实客户知识引用与客服辅助", async ({ br
 
 test("Issue #174 L174-05：签收未收到安全转人工且无补偿副作用", async ({ browser }) => {
   test.setTimeout(120_000);
-    const reference = prepareOrder({ logisticsStatus: "SIGNED" });
+  const reference = prepareOrder({ logisticsStatus: "SIGNED" });
   const context = await newAcceptanceContext(browser, { viewport: { width: 390, height: 844 } });
   try {
     const page = await context.newPage();

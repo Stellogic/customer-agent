@@ -56,7 +56,16 @@ function Get-SettledMicroCny($Ledger) {
 $ledger = Read-SharedLedger
 $settledBefore = Get-SettledMicroCny $ledger
 $pending = @($ledger.attempts | Where-Object status -eq 'PENDING')
-$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 11 }
+$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 18 }
+$additionalPending = [ordered]@{
+    'issue174-investigation-diagnostic-01' = 1000000
+    'issue217-live-20260905a' = 1000000
+    'issue217-reply-diagnostic-20260905a' = 100000
+    'issue217-live-20260905b' = 200000
+    'issue217-live-20260905c' = 200000
+    'issue217-action-diagnostic-20260905a' = 50000
+    'issue221-live-20260905a' = 200000
+}
 if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pending.Count -ne 5 -or
     @($pending | Where-Object { $_.phase -eq 'issue174-live-20260903a' -and $_.reserved_micro_cny -eq 1000000 }).Count -ne 1 -or
     @($pending | Where-Object { $_.phase -eq 'issue174-intake-diagnostic-01' -and $_.reserved_micro_cny -eq 100000 }).Count -ne 1 -or
@@ -66,12 +75,17 @@ if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pend
     throw '第四阶段诊断须保留已知的五笔 PENDING，且只能使用冻结的新运行标识。'
 }
 if (-not $IntakeDiagnostic) {
-    $expectedRunId = if ($InvestigationDiagnostic) { 'issue174-investigation-diagnostic-01' } else { 'issue174-live-04' }
-    if ($RunId -ne $expectedRunId -or $pending.Count -ne 11) { throw '须使用冻结运行标识并保留十一笔 PENDING。' }
+    if ($InvestigationDiagnostic) { throw '旧诊断已结束；本次冻结仅允许五场景发布复验。' }
+    if ($RunId -ne 'issue174-live-04' -or $pending.Count -ne 18) { throw '须使用冻结运行标识并保留十八笔 PENDING。' }
     foreach ($prior in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03', 'issue174-intake-diagnostic-01', 'issue174-intake-diagnostic-02', 'issue174-intake-diagnostic-03', 'issue174-intake-diagnostic-04', 'issue215-intake-diagnostic-01', 'issue215-intake-diagnostic-02', 'issue215-intake-diagnostic-03', 'issue215-intake-diagnostic-04')) {
         $amount = if ($prior -in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03')) { 1000000 } else { 100000 }
         if (@($pending | Where-Object { $_.phase -eq $prior -and $_.reserved_micro_cny -eq $amount }).Count -ne 1) {
             throw '发布复验账本预留身份或金额不符。'
+        }
+    }
+    foreach ($phase in $additionalPending.Keys) {
+        if (@($pending | Where-Object { $_.phase -eq $phase -and $_.reserved_micro_cny -eq $additionalPending[$phase] }).Count -ne 1) {
+            throw '核对点后的预留身份或金额不符。'
         }
     }
 }
@@ -82,14 +96,16 @@ $pendingBeforeMicroCny = [long](($pending | Measure-Object reserved_micro_cny -S
 $budgetBasisBeforeMicroCny = $settledBefore + $pendingBeforeMicroCny
 if (-not $IntakeDiagnostic) {
     $billing = Get-Content (Join-Path $PSScriptRoot '../docs/delivery/issue-174-billing-reconciliation.json') -Raw | ConvertFrom-Json
+    $additionalReserved = [long](($additionalPending.Values | Measure-Object -Sum).Sum)
+    $legacyPending = @($pending | Where-Object { $_.phase -notin $additionalPending.Keys })
     if ($billing.source -ne 'USER_REPORTED_PROVIDER_TOTAL' -or
         $billing.legacyEstimatedUpperMicroCny -ne $settledBefore -or
-        $billing.legacyPendingReservedMicroCny -ne $pendingBeforeMicroCny -or
-        @(Compare-Object @($billing.coveredPendingPhases) @($pending.phase)).Count -ne 0) {
+        $billing.legacyPendingReservedMicroCny -ne ($pendingBeforeMicroCny - $additionalReserved) -or
+        @(Compare-Object @($billing.coveredPendingPhases) @($legacyPending.phase)).Count -ne 0) {
         throw '费用核对点与历史账本不符，禁止遗漏新消费。'
     }
-    $budgetBasisBeforeMicroCny = [long]$billing.historicalPaidUpperMicroCny
-    if ($runReservationMicroCny -gt [long]$billing.userReportedAvailableMicroCny) {
+    $budgetBasisBeforeMicroCny = [long]$billing.historicalPaidUpperMicroCny + $additionalReserved
+    if ($runReservationMicroCny -gt ([long]$billing.userReportedAvailableMicroCny - $additionalReserved)) {
         throw '本轮预留超过用户确认的当前可用额度。'
     }
 }
@@ -146,6 +162,7 @@ function Assert-FrozenCatalog {
         $catalog.executionAuthorized -ne $true -or
         $catalog.revision -ne 4 -or
         $catalog.liveFreeze.promptVersionsBySeam.intake -ne 'intake-v3' -or
+        $catalog.liveFreeze.promptVersionsBySeam.action -ne 'investigation-action-v4' -or
         $catalog.liveFreeze.model -ne 'deepseek-v4-flash' -or
         [int]$catalog.liveFreeze.logicalCallLimit -ne $logicalCallLimit -or
         [int]$catalog.liveFreeze.providerAttemptLimit -ne $providerAttemptLimit -or
@@ -240,7 +257,7 @@ function Assert-LiveUsage($Usage, [switch]$RequireAllSeams) {
             [int]$Usage.Formal.judgment.providerAttempts -le 0 -or
             [int]$Usage.Formal.customerCommunication.logicalCalls -le 0 -or
             [int]$Usage.Formal.customerCommunication.providerAttempts -le 0 -or
-            $Usage.Formal.action.promptVersion -ne 'investigation-action-v3' -or
+            $Usage.Formal.action.promptVersion -ne 'investigation-action-v4' -or
             $Usage.Formal.action.schemaVersion -ne 'investigation-action-v3' -or
             $Usage.Formal.judgment.promptVersion -ne 'investigation-judgment-v1' -or
             $Usage.Formal.judgment.schemaVersion -ne 'investigation-judgment-v1' -or
@@ -474,8 +491,9 @@ def _diagnostic_response_failure(classification):
             runPending = 0
             priorPendingCount = $expectedPendingCount
             priorReservedMicroCny = $pendingBeforeMicroCny
-            budgetBasis = 'USER_REPORTED_PROVIDER_TOTAL_PLUS_NEW_RUN_ESTIMATE'
-            historicalPaidUpperMicroCny = $budgetBasisBeforeMicroCny
+            budgetBasis = 'USER_REPORTED_TOTAL_PLUS_POST_CHECKPOINT_RESERVATIONS_AND_NEW_RUN_ESTIMATE'
+            historicalPaidUpperMicroCny = [long]$billing.historicalPaidUpperMicroCny
+            postCheckpointReservedMicroCny = $additionalReserved
             providerVerifiedByAgent = $false
             totalCommittedUpperMicroCny = $budgetBasisBeforeMicroCny + $usage.ChargedMicroCny
         }
@@ -526,6 +544,11 @@ def _diagnostic_response_failure(classification):
     }
 } catch {
     $runFailure = $_
+    if ($reservationWritten -and $providerMayHaveRun) {
+        $current = Read-SharedLedger
+        $current.phases.$RunId.status = 'INCOMPLETE_PENDING_USAGE'
+        $current | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $LedgerPath -Encoding utf8
+    }
     if (-not $IntakeDiagnostic -and $reservationWritten -and $providerMayHaveRun -and $artifactsAvailable) {
         try {
             $usage = Get-LiveUsage
