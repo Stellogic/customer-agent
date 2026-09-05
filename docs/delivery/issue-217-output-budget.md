@@ -39,3 +39,9 @@ issue217-static-20260905e 完整 Agent test 目标通过：111 files already for
 报告算式中的0.058809元仅包含已观测部分与受理保守估值，并不是本轮完整费用上界或平台实扣。整轮1元预留保持PENDING；历史十二笔保留，现共十三笔PENDING。原runner异常分支未更新phase，接续协调只将本轮RUNNING改为INCOMPLETE_PENDING_USAGE，未改变金额或attempt状态。没有重复付费运行。
 
 本轮容器、卷、网络、八个精确镜像标签清理回读为空，TEST_GATE_FREE；原基线执行器仍运行。聚合证据见 issue-217-live-20260905a-result.json 与 issue-217-live-20260905a-failure.json；不保留原始模型正文、浏览器截图/trace或密钥。未转Ready、未运行最终完整门禁、未合入或关票。下一步只定位新出现的客户回复失败，不放宽解析或增加自动重试。
+
+## 单次回复适配器诊断
+
+issue217-reply-diagnostic-20260905a已按静态双轴PASS方案执行一次，前置无密钥离线请求检查通过。固定合成输入调用594ms：HTTP200，INVALID_OUTPUT，审计分类SCHEMA_MISMATCH、usageReported=false。sys.settrace仅记录到_read_streamed_response第418行的正文前缀策略拒绝；没有保存正文，因此尚不能判定具体触发哪项正文规则，也不能把该单独诊断等同于前轮每一次沟通失败的证明。
+
+本轮0.1元预留完整保留；当前十四笔PENDING，用户核对点后累计预留2.1元，3.8元可用授权的保守未预留部分1.7元。镜像/容器已按本轮所有权清理，锁回读FREE。下一步用离线合法回复分片复现流处理路径，不追加付费抽样。
