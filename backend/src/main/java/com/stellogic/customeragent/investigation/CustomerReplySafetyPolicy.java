@@ -66,6 +66,13 @@ public final class CustomerReplySafetyPolicy {
         Matcher referencedOrders = ORDER_REFERENCE_PATTERN.matcher(body);
         while (referencedOrders.find()) {
             if (!scopedOrderReference.equalsIgnoreCase(referencedOrders.group())) {
+                if (!complete
+                        && referencedOrders.end() == body.length()
+                        && scopedOrderReference
+                                .toUpperCase(Locale.ROOT)
+                                .startsWith(referencedOrders.group().toUpperCase(Locale.ROOT))) {
+                    continue;
+                }
                 return false;
             }
         }

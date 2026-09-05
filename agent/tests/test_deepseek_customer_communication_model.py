@@ -213,6 +213,23 @@ async def test_valid_reply_survives_body_and_order_stream_boundaries(boundary: s
 
 
 @pytest.mark.asyncio
+async def test_closed_body_with_partial_order_is_rejected_before_publishing() -> None:
+    published: list[str] = []
+
+    async def publish(delta: str) -> None:
+        published.append(delta)
+
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(_completed("订单 ORDER-C1"))),
+    )
+
+    with pytest.raises(CustomerCommunicationFailure):
+        await model.compose(_input(), publish)
+    assert published == []
+
+
+@pytest.mark.asyncio
 async def test_completed_empty_body_is_still_rejected_after_waiting_for_stream_content() -> None:
     model = DeepSeekResponsesCustomerCommunicationModel(
         DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
