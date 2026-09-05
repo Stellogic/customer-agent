@@ -1,6 +1,6 @@
 # #174 真实 DeepSeek 发布验收
 
-状态：**第5版 FROZEN_AUTHORIZED_NOT_RUN**。PR #225已合入`474e6068ca1f562a60d67518bba1619a1a3582ef`，并发修复完整门禁`issue224-final-20260905a` PASS。此前第4轮及诊断仍保留原结论，见[诊断汇总](../delivery/issue-174-live-04-diagnostics.md)。
+状态：**第5版 INCOMPLETE：初次受理澄清失败，未进入调查；后四场景NOT_RUN**。详见[第5轮结果](../delivery/issue-174-live-05-result.md)。PR #225已合入`474e6068ca1f562a60d67518bba1619a1a3582ef`，并发修复完整门禁`issue224-final-20260905a` PASS。此前第4轮及诊断仍保留原结论，见[诊断汇总](../delivery/issue-174-live-04-diagnostics.md)。
 
 ## 第5版复验冻结
 
@@ -8,7 +8,7 @@
 
 本轮显式使用主线的10个Agent任务槽，消除调查等待嵌套知识编码的自等待。正式指标增加已持久化知识检索失败码的独立聚合；每场景后发现模型或知识失败即停止后续运行。报告写入`docs/delivery/issue-174-live-report-05.json`。知识失败与模型失败不互相替代；五场景及既有业务断言不变。
 
-当前真实模型调用和最终#174完整门禁均NOT_RUN。#169已接受的35/48局限与#170回答质量NOT_EVALUATED保留。以下第4版及更早段落是历史快照，旧命令、预算和待执行描述不作为当前运行依据。
+第5轮已失败，整轮预留保留；下方冻结配置为调用前历史，禁止使用旧RunId重跑。最终#174完整门禁NOT_RUN。#169已接受的35/48局限与#170回答质量NOT_EVALUATED保留。以下第4版及更早段落是历史快照，旧命令、预算和待执行描述不作为当前运行依据。
 
 状态：**第4版 INCOMPLETE：受理建单通过，后台回复校验/usage未通过，后四场景NOT_RUN**。详见[第4轮结果](../delivery/issue-174-live-04-result.md)。产品基线为 `origin/main@52daf02fc05e899bdfc2ac2648bb256da707f5c8`；PR #222 已统一交付 #217/#219/#221/#223，完整确定性门禁 `issue221-final-20260905d` PASS。
 
