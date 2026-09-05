@@ -1,0 +1,32 @@
+{
+  "schema": "issue217-reply-adapter-diagnostic-v1",
+  "productAcceptance": false,
+  "outcome": "ADAPTER_FAILURE",
+  "failureCode": "INVALID_OUTPUT",
+  "exceptionSites": [
+    {
+      "function": "_read_streamed_response",
+      "line": 418,
+      "exceptionType": "CustomerCommunicationFailure"
+    },
+    {
+      "function": "compose",
+      "line": 141,
+      "exceptionType": "CustomerCommunicationFailure"
+    }
+  ],
+  "audits": [
+    {
+      "attemptNumber": 1,
+      "httpStatus": 200,
+      "classification": "SCHEMA_MISMATCH",
+      "inputTokens": null,
+      "outputTokens": null,
+      "totalTokens": null,
+      "usageReported": false,
+      "durationMs": 594
+    }
+  ],
+  "attemptLimit": 1,
+  "reservationMicroCny": 100000
+}

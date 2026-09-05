@@ -1,0 +1,55 @@
+{
+  "status": "SINGLE_SCENARIO_OBSERVATION",
+  "releaseAcceptance": false,
+  "runId": "issue217-live-20260905b",
+  "testedHead": "cad8d6dd150bcd64498d5f1b3ed2d83a4a51d0f5",
+  "parseFailures": [],
+  "formalMetrics": {
+    "action": {
+      "logicalCalls": 7,
+      "promptVersion": "investigation-action-v3",
+      "providerAttempts": 7,
+      "schemaVersion": "investigation-action-v3"
+    },
+    "customerCommunication": {
+      "estimatedCostMicros": 566,
+      "logicalCalls": 1,
+      "promptVersions": [
+        "customer-communication-v2",
+        "customer-knowledge-communication-v1"
+      ],
+      "providerAttempts": 1,
+      "schemaVersions": [
+        "customer-reply-v1",
+        "customer-reply-v2"
+      ],
+      "tokens": 874,
+      "totalDurationMs": 1771
+    },
+    "estimatedCostMicros": 3047,
+    "failureClassifications": {
+      "FACT_CONFLICT": 1
+    },
+    "generationResults": {
+      "handoffCount": 1,
+      "handoffWithModelCallsCount": 1,
+      "successCount": 0
+    },
+    "judgment": {
+      "logicalCalls": 1,
+      "promptVersion": "investigation-judgment-v1",
+      "providerAttempts": 1,
+      "schemaVersion": "investigation-judgment-v1"
+    },
+    "model": "deepseek-v4-flash",
+    "observedGenerationCount": 1,
+    "schemaVersion": "issue-129-aggregate-provider-metrics-v1",
+    "totalLogicalCalls": 9,
+    "totalProviderAttempts": 9,
+    "totalTokens": 5926,
+    "usageTrusted": true
+  },
+  "generationWaitFailure": null,
+  "reservationMicroCny": 200000,
+  "pending": true
+}
