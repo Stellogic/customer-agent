@@ -33,6 +33,7 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
     expect(screen.queryByRole("navigation", { name: "内部工作区" })).not.toBeInTheDocument();
 
     const description = `React 全栈验收 ${globalThis.crypto.randomUUID()}`;
+    const customerMessage = `订单 ORDER-DELAY-001 的物流延迟问题：${description}`;
     fireEvent.change(screen.getByLabelText("订单编号"), { target: { value: "ORDER-DELAY-001" } });
     fireEvent.change(screen.getByLabelText("问题描述"), { target: { value: description } });
     fireEvent.click(screen.getByRole("button", { name: "开始智能受理" }));
@@ -47,14 +48,14 @@ describe.skipIf(!liveBaseUrl)("客户帮助中心全栈验收", () => {
     fireEvent.click(screen.getByRole("button", { name: "确认，就是这个问题" }));
 
     expect(await screen.findByText("调查中")).toBeInTheDocument();
-    expect(screen.getByText(description)).toBeInTheDocument();
+    expect(screen.getByText(customerMessage)).toBeInTheDocument();
     const restoredUrl = globalThis.location.href;
     expect(restoredUrl).toContain("?ticket=");
 
     firstRender.unmount();
     render(<RootApplication />);
     expect(await screen.findByRole("banner", { name: "客户帮助中心" })).toBeInTheDocument();
-    expect(await screen.findByText(description)).toBeInTheDocument();
+    expect(await screen.findByText(customerMessage)).toBeInTheDocument();
   });
 
   it("客服工作台从独立 Spring 快照恢复共享队列且不公开转人工理由详情", async () => {

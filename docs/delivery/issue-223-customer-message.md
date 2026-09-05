@@ -20,3 +20,7 @@
 第二轮完整门禁 `issue221-final-20260905b` 已通过原话读回正例，但受理补充触发 STATE_CONSISTENCY：FixedFakeIntakeModel 把补充内容重写为既有 issue.summary，违反 Spring 保留 currentIssues 前缀的契约。一行修正使摘要仅在首次识别时生成；真实模型路径未改。
 
 定向运行 `issue223-intake-focused`：受理模型 13 项测试通过（0.52 秒），Ruff 通过；隔离 Spring/Agent/PostgreSQL 实际受理、确认、调查两条路径均通过：无补充时一条客户原话且候选存在，单独补偿补充时两条客户原话且无候选。没有调用真实供应商。专属容器、卷、网络和精确镜像标签已清理。本次确定性主链路已验证，最终完整门禁使用新提交重跑。
+
+c 轮完整门禁的集成 smoke（415 个 checkpoint）及审批时间测试通过；随后旧 React 集成测试仍精确查找模型摘要而失败，DOM 已展示完整客户原话。两处断言同步为完整表单原话（包含订单前缀），继续精确校验首次显示和刷新恢复。
+
+`issue223-react-focused`：前端规范化检查 234 passed / 3 skipped，独立 React→Spring→PostgreSQL 集成 2/2 通过；本轮专属资源清理完成。最终完整门禁采用新提交，不复用 c 轮失败。
