@@ -16,4 +16,8 @@ PR #220 由 Draft 转 Ready 触发一次集中 AI 风险审查。批量处理两
 
 修复后的聚焦回归 62 passed；`issue219-review-static` 的 Ruff format/lint PASS、Pyright 0 errors/0 warnings、pytest 459 passed、3 skipped（35.89秒），后端 Gradle check（含 Checkstyle、Spotless、测试）PASS。Standards / Spec 初审与本批增量确认均 PASS。运行没有供应商调用，精确清理自身镜像并释放共享锁。
 
-同时增加真实 Spring API / PostgreSQL smoke：合法订单前缀返回 202，偏离授权订单的后缀返回 422，同序号正确后缀仍返回 202；读回拼接正文、分片序号和两条客户增量事件。此 smoke 尚待最终完整本地门禁执行；最终门禁与合并读回集中记录于本票 PR。离线验证不等于真实模型语义或 #217/#174 验收；原 confirmed=false 和历史未知用量继续保留，后续按独立冻结运行处理。
+同时增加真实 Spring API / PostgreSQL smoke：合法订单前缀返回 202，偏离授权订单的后缀返回 422，同序号正确后缀仍返回 202；读回拼接正文、分片序号和两条客户增量事件。该 smoke 已在 `issue219-final-20260905a` 通过。该次完整门禁在 b88351f 通过（23分钟），包括 59 个主浏览器场景及并行、时钟和会话阶段；资源已精确清理。它只能证明此旧提交，不用于以下新增修正的最终交付。
+
+新提交的自动审查提供了闭引号单独分片的进一步复现：旧代码在引号到达前已发布 `订单 ORDER-C1`。`issue219-quote-red` 为 1 failed（0.21秒）。因此未闭合正文现在只暂存末尾仍可能属于授权订单号的部分，其前面正文继续发布；完整订单或后续文字到达后正常续发，错误正文关闭时先拒绝。回归同时验证订单号首字母与中段切分、闭引号单独分片；没有把普通回复改成全量缓冲。
+
+`issue219-quote-green`：聚焦 64 passed（0.25秒）；Ruff format/lint PASS、Pyright 0 errors/0 warnings、Agent 全量 461 passed、3 skipped（33.44秒），Standards / Spec 本批增量确认均 PASS。最终完整门禁与合并读回集中记录于本票 PR。离线验证不等于真实模型语义或 #217/#174 验收；原 confirmed=false 和历史未知用量继续保留，后续按独立冻结运行处理。

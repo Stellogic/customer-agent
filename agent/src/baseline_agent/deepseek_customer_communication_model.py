@@ -419,6 +419,13 @@ async def _read_streamed_response(
                     body_prefix, model_input.order_reference, complete=body_complete
                 ):
                     raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+                if not body_complete:
+                    order_upper = model_input.order_reference.upper()
+                    for size in range(min(len(body_prefix), len(order_upper) - 1), 0, -1):
+                        if body_prefix.upper().endswith(order_upper[:size]):
+                            # 只暂存尚未确定的订单号尾部, 其前面的正文继续发布。
+                            body_prefix = body_prefix[:-size]
+                            break
                 new_delta = body_prefix[len(published_body) :]
                 if new_delta:
                     await publish(new_delta)

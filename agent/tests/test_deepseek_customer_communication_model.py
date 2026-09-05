@@ -182,7 +182,7 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("boundary", ["body_start", "order_middle"])
+@pytest.mark.parametrize("boundary", ["body_start", "order_start", "order_middle"])
 async def test_valid_reply_survives_body_and_order_stream_boundaries(boundary: str) -> None:
     body = (
         "经核验，订单 ORDER-C129 的本次物流延迟不足 24 小时，当前不符合补偿条件。"
@@ -190,9 +190,11 @@ async def test_valid_reply_survives_body_and_order_stream_boundaries(boundary: s
     )
     payload = _completed(body, "NO_COMPENSATION_RESOLUTION")
     text = payload["output"][0]["content"][0]["text"]
-    split_at = (
-        text.index(body) if boundary == "body_start" else text.index("ORDER-C129") + len("ORDER-C1")
-    )
+    split_at = {
+        "body_start": text.index(body),
+        "order_start": text.index("ORDER-C129") + 1,
+        "order_middle": text.index("ORDER-C129") + len("ORDER-C1"),
+    }[boundary]
     published: list[str] = []
 
     async def publish(delta: str) -> None:
@@ -210,6 +212,29 @@ async def test_valid_reply_survives_body_and_order_stream_boundaries(boundary: s
     assert "".join(published) == body
     assert all(published)
     assert len(published) == (1 if boundary == "body_start" else 2)
+    if boundary != "body_start":
+        assert published[0] == "经核验，订单 "
+
+
+@pytest.mark.asyncio
+async def test_split_closing_quote_does_not_publish_partial_order() -> None:
+    body = "订单 ORDER-C1"
+    payload = _completed(body)
+    text = payload["output"][0]["content"][0]["text"]
+    published: list[str] = []
+
+    async def publish(delta: str) -> None:
+        published.append(delta)
+
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(
+            lambda _: _streamed(payload, split_at=text.index(body) + len(body))
+        ),
+    )
+    with pytest.raises(CustomerCommunicationFailure):
+        await model.compose(_input(), publish)
+    assert published == ["订单 "]
 
 
 @pytest.mark.asyncio
