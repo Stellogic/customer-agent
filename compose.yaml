@@ -95,7 +95,7 @@ services:
         read_only: true
         bind:
           create_host_path: false
-    command: ["--server-log-level", "ERROR"]
+    command: ["--server-log-level", "ERROR", "--n-jobs-per-worker", "10"]
     # 私有编排运行时的第三方错误日志会携带 thread/run/checkpoint 标识；产品日志面不采集该流。
     logging:
       driver: "none"
