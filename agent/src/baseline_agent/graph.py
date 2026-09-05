@@ -962,7 +962,9 @@ def _judgment_audit_offset() -> int | None:
     if not isinstance(investigation_judgment_model, DeepSeekResponsesInvestigationModel):
         return None
     sink = investigation_judgment_model.audit_sink
-    return len(sink.records) if isinstance(sink, InMemoryModelCallAuditSink) else None
+    if isinstance(sink, InMemoryModelCallAuditSink):
+        return len(sink.current_task_records())
+    return None
 
 
 def _judgment_call_evidence(offset: int | None, failure: str) -> dict[str, object]:
@@ -979,7 +981,7 @@ def _judgment_call_evidence(offset: int | None, failure: str) -> dict[str, objec
     sink = investigation_judgment_model.audit_sink
     if not isinstance(sink, InMemoryModelCallAuditSink):
         raise RuntimeError("formal judgment audit sink is not readable")
-    records = sink.records[offset:]
+    records = sink.current_task_records()[offset:]
     input_tokens = sum(record.input_tokens or 0 for record in records)
     output_tokens = sum(record.output_tokens or 0 for record in records)
     classifications = {
@@ -1000,7 +1002,9 @@ def _communication_audit_offset() -> int | None:
     if not isinstance(customer_communication_model, DeepSeekResponsesCustomerCommunicationModel):
         return None
     sink = customer_communication_model.audit_sink
-    return len(sink.records) if isinstance(sink, InMemoryModelCallAuditSink) else None
+    if isinstance(sink, InMemoryModelCallAuditSink):
+        return len(sink.current_task_records())
+    return None
 
 
 def _communication_call_evidence(
@@ -1023,7 +1027,7 @@ def _communication_call_evidence(
     sink = customer_communication_model.audit_sink
     if not isinstance(sink, InMemoryModelCallAuditSink):
         raise RuntimeError("formal communication audit sink is not readable")
-    records = sink.records[offset:]
+    records = sink.current_task_records()[offset:]
     input_tokens = sum(record.input_tokens or 0 for record in records)
     output_tokens = sum(record.output_tokens or 0 for record in records)
     classifications = {
