@@ -1,0 +1,26 @@
+{
+  "schema": "issue174-investigation-diagnostic-v1",
+  "status": "INCOMPLETE",
+  "runId": "issue217-live-20260905c",
+  "releaseAcceptance": false,
+  "testedHead": "cad8d6dd150bcd64498d5f1b3ed2d83a4a51d0f5",
+  "base": "ca0977ab245f9f346ccdf51f013ebff38bfd592d",
+  "model": "deepseek-v4-flash",
+  "completedScenarios": 0,
+  "failure": "#217 真实调查未完整到达结论及客户回复；停止，不自动重跑。",
+  "calls": {
+    "logical": 9,
+    "providerAttempts": 9
+  },
+  "tokens": {
+    "knownTotal": 4988,
+    "intake": null
+  },
+  "cost": {
+    "observedUpperMicroCny": 57941,
+    "reservedMicroCny": 200000,
+    "pending": 1,
+    "note": "任一场景失败都可能包含未持久化的受理尝试；保留整轮预留，禁止再次使用。"
+  },
+  "productionScope": "NOT_EVALUATED"
+}
