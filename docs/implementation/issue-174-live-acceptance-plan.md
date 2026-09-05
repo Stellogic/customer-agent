@@ -1,5 +1,15 @@
 # #174 真实 DeepSeek 发布验收
 
+状态：**第6版 FROZEN_AUTHORIZED_NOT_RUN**。
+
+## 第6版复验冻结
+
+用户明确追加1元，将项目总授权从8元提高到9元，允许再运行一次原五场景真实DeepSeek复验，本轮最多新增1元，失败立即停止。入口为`pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-06`；调用前归档见[run06 freeze](../delivery/issue-174-live-06-freeze.json)。24笔旧PENDING完整保留：历史核对点上界2元加后续13笔预留5.9元，本轮另预留1元后预算依据为8.9元。预留、程序估算与平台实扣分别记录。
+
+沿用原五场景、模型、prompt/schema及全部上限和断言。run05失败和intake单次诊断未复现的结论保留；尚未证明根因，不宣称新增产品修复。本轮使用已修复的`/artifacts/test-results`输出路径，保存失败浏览器上下文到本地，原始响应和账户余额不公开。报告写入`docs/delivery/issue-174-live-report-06.json`。
+
+当前本轮真实验收和#174最终完整门禁均NOT_RUN。以下第5版及更早内容为历史快照，不作为当前调用授权或预算依据。
+
 状态：**第5版 INCOMPLETE：初次受理澄清失败，未进入调查；后四场景NOT_RUN**。详见[第5轮结果](../delivery/issue-174-live-05-result.md)。PR #225已合入`474e6068ca1f562a60d67518bba1619a1a3582ef`，并发修复完整门禁`issue224-final-20260905a` PASS。此前第4轮及诊断仍保留原结论，见[诊断汇总](../delivery/issue-174-live-04-diagnostics.md)。
 
 ## 第5版复验冻结

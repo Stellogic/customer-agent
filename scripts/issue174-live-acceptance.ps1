@@ -15,7 +15,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 . "$PSScriptRoot/gate-images.ps1"
 . "$PSScriptRoot/gate-resources.ps1"
 
-$projectLimitMicroCny = 8000000
+$projectLimitMicroCny = 9000000
 $expectedPriorMicroCny = 3810222
 $runReservationMicroCny = if ($IntakeDiagnostic) { 100000 } else { 1000000 }
 $logicalCallLimit = 100
@@ -57,7 +57,7 @@ function Get-SettledMicroCny($Ledger) {
 $ledger = Read-SharedLedger
 $settledBefore = Get-SettledMicroCny $ledger
 $pending = @($ledger.attempts | Where-Object status -eq 'PENDING')
-$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 22 }
+$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 24 }
 $additionalPending = [ordered]@{
     'issue174-investigation-diagnostic-01' = 1000000
     'issue217-live-20260905a' = 1000000
@@ -70,6 +70,8 @@ $additionalPending = [ordered]@{
     'issue174-reply-diagnostic-05' = 50000
     'issue174-product-diagnostic-06' = 220000
     'issue174-remaining-diagnostic-07' = 780000
+    'issue174-live-05' = 1000000
+    'issue174-intake-diagnostic-06' = 100000
 }
 if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pending.Count -ne 5 -or
     @($pending | Where-Object { $_.phase -eq 'issue174-live-20260903a' -and $_.reserved_micro_cny -eq 1000000 }).Count -ne 1 -or
@@ -81,7 +83,7 @@ if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pend
 }
 if (-not $IntakeDiagnostic) {
     if ($InvestigationDiagnostic) { throw '旧诊断已结束；本次冻结仅允许五场景发布复验。' }
-    if ($RunId -ne 'issue174-live-05' -or $pending.Count -ne 22) { throw '须使用冻结运行标识并保留二十二笔 PENDING。' }
+    if ($RunId -ne 'issue174-live-06' -or $pending.Count -ne 24) { throw '须使用冻结运行标识并保留二十四笔 PENDING。' }
     foreach ($prior in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03', 'issue174-intake-diagnostic-01', 'issue174-intake-diagnostic-02', 'issue174-intake-diagnostic-03', 'issue174-intake-diagnostic-04', 'issue215-intake-diagnostic-01', 'issue215-intake-diagnostic-02', 'issue215-intake-diagnostic-03', 'issue215-intake-diagnostic-04')) {
         $amount = if ($prior -in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03')) { 1000000 } else { 100000 }
         if (@($pending | Where-Object { $_.phase -eq $prior -and $_.reserved_micro_cny -eq $amount }).Count -ne 1) {
@@ -129,7 +131,7 @@ $base = (git rev-parse origin/main).Trim()
 $projectName = "customer-agent-$RunId"
 $imageTag = "gate-$RunId"
 $evidenceDir = Join-Path $repoRoot ".local/gate-evidence/$RunId"
-$reportPath = Join-Path $repoRoot $(if ($InvestigationDiagnostic) { 'docs/delivery/issue-174-investigation-diagnostic-01-report.json' } else { 'docs/delivery/issue-174-live-report-05.json' })
+$reportPath = Join-Path $repoRoot $(if ($InvestigationDiagnostic) { 'docs/delivery/issue-174-investigation-diagnostic-01-report.json' } else { 'docs/delivery/issue-174-live-report-06.json' })
 $formalPath = Join-Path $evidenceDir 'formal-metrics.json'
 $overridePath = Join-Path ([IO.Path]::GetTempPath()) "$RunId.override.yaml"
 $catalogPath = Join-Path $repoRoot 'docs/implementation/issue-174-live-scenarios.json'
@@ -169,7 +171,7 @@ function Assert-FrozenCatalog {
     if (
         $catalog.status -ne 'FROZEN_AUTHORIZED_NOT_RUN' -or
         $catalog.executionAuthorized -ne $true -or
-        $catalog.revision -ne 5 -or
+        $catalog.revision -ne 6 -or
         $catalog.runId -ne $RunId -or
         $catalog.liveFreeze.promptVersionsBySeam.intake -ne 'intake-v3' -or
         $catalog.liveFreeze.promptVersionsBySeam.action -ne 'investigation-action-v4' -or
