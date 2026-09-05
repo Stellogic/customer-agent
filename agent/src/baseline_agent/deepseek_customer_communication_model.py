@@ -410,7 +410,7 @@ async def _read_streamed_response(
                     # 知识分支完整缓冲:Spring 验证引用和当前授权前不能向客户公开任何正文。
                     continue
                 body_prefix = _partial_json_string_field(output_text, "body")
-                if body_prefix is None:
+                if not body_prefix:
                     continue
                 if not is_authorized_body_prefix(
                     body_prefix, model_input.order_reference, complete=False

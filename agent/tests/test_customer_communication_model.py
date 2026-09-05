@@ -98,6 +98,12 @@ def test_reply_may_omit_redundant_order_reference() -> None:
     )
 
 
+@pytest.mark.parametrize("body", ["订单 ORDER-16。", "订单 ORDER-163"])
+def test_stream_order_prefix_does_not_allow_terminated_or_diverging_order(body: str) -> None:
+    assert not is_authorized_body_prefix(body, "ORDER-162", complete=False)
+    assert not is_authorized_body_prefix(body, "ORDER-162", complete=True)
+
+
 @pytest.mark.parametrize(
     "promise",
     [

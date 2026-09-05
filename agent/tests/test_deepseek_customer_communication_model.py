@@ -1,5 +1,6 @@
 import json
 from dataclasses import replace
+from typing import Any
 
 import httpx
 import pytest
@@ -53,7 +54,7 @@ def _input_with_knowledge() -> CustomerCommunicationInput:
     )
 
 
-def _completed(body: str, intent: str = "COMPENSATION_REVIEW_PENDING") -> dict[str, object]:
+def _completed(body: str, intent: str = "COMPENSATION_REVIEW_PENDING") -> dict[str, Any]:
     evidence = (
         [] if intent == "CLARIFICATION_REQUIRED" else ["order:ORDER-C129", "logistics:ORDER-C129"]
     )
@@ -178,6 +179,48 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
     record = model.audit_sink.records[0]
     assert record.total_tokens == 110
     assert record.failure_classification is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("boundary", ["body_start", "order_middle"])
+async def test_valid_reply_survives_body_and_order_stream_boundaries(boundary: str) -> None:
+    body = (
+        "经核验，订单 ORDER-C129 的本次物流延迟不足 24 小时，当前不符合补偿条件。"
+        "本次核验结论已给出，后续处理以页面状态为准；如仍需帮助，请继续回复。"
+    )
+    payload = _completed(body, "NO_COMPENSATION_RESOLUTION")
+    text = payload["output"][0]["content"][0]["text"]
+    split_at = (
+        text.index(body) if boundary == "body_start" else text.index("ORDER-C129") + len("ORDER-C1")
+    )
+    published: list[str] = []
+
+    async def publish(delta: str) -> None:
+        published.append(delta)
+
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(payload, split_at=split_at)),
+    )
+    reply = await model.compose(
+        replace(_input(review_required=False), delay_seconds=23 * 60 * 60), publish
+    )
+
+    assert reply.body == body
+    assert "".join(published) == body
+    assert all(published)
+    assert len(published) == (1 if boundary == "body_start" else 2)
+
+
+@pytest.mark.asyncio
+async def test_completed_empty_body_is_still_rejected_after_waiting_for_stream_content() -> None:
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(_completed(""))),
+    )
+
+    with pytest.raises(CustomerCommunicationFailure):
+        await model.compose(_input())
 
 
 @pytest.mark.asyncio

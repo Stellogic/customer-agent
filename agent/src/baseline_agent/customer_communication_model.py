@@ -267,6 +267,12 @@ def customer_reply_body_policy_violation(
         return "PREMATURE_TICKET_STATUS"
     for match in _ORDER_REFERENCE_PATTERN.finditer(body):
         if match.group(0).upper() != order_reference.upper():
+            if (
+                not complete
+                and match.end() == len(body)
+                and order_reference.upper().startswith(match.group(0).upper())
+            ):
+                continue
             return "ORDER_REFERENCE_SCOPE"
     if complete and not _has_only_allowed_compensation_language(
         body, _infer_intent_from_compensation_language(body)
