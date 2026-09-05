@@ -648,9 +648,12 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
         // reply() has appended the current confirmation as the last transcript entry.
         List<String> customerMessages =
                 jdbc.query(
-                        "select body from customer_intake_transcript where intake_id = ?"
+                        "select body from customer_intake_transcript t where intake_id = ?"
                                 + " and author = 'CUSTOMER' and ordinal < (select max(ordinal)"
-                                + " from customer_intake_transcript where intake_id = ?) order by ordinal",
+                                + " from customer_intake_transcript where intake_id = ?)"
+                                + " and (ordinal = 1 or exists(select 1 from customer_intake_message m"
+                                + " where m.intake_id = t.intake_id and m.customer_message = t.body"
+                                + " and m.created_at = t.created_at)) order by ordinal",
                         (rs, row) -> rs.getString(1),
                         command.intakeId(),
                         command.intakeId());
