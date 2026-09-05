@@ -16,3 +16,7 @@
 首次完整门禁 `issue221-final-20260905a` 在已新增的 smoke 原文断言处失败：去重按钮通过 transcript 记为 CUSTOMER 的“作为新问题继续创建”混入真实发言。查询现限定首条原话或能匹配实际 customer_intake_message 的记录，并保留 ordinal 顺序和当前确认排除。失败记录保留，未签发通过证据；本轮专属资源及精确镜像标签已清理、锁 FREE。修正后重新验证，不复用失败轮次。
 
 `issue223-component-d` 的后端格式、Checkstyle、测试全部通过，变更 Python 静态检查通过；Standards / Spec 分别确认真实消息来源修正。随后在新提交运行完整门禁。
+
+第二轮完整门禁 `issue221-final-20260905b` 已通过原话读回正例，但受理补充触发 STATE_CONSISTENCY：FixedFakeIntakeModel 把补充内容重写为既有 issue.summary，违反 Spring 保留 currentIssues 前缀的契约。一行修正使摘要仅在首次识别时生成；真实模型路径未改。
+
+定向运行 `issue223-intake-focused`：受理模型 13 项测试通过（0.52 秒），Ruff 通过；隔离 Spring/Agent/PostgreSQL 实际受理、确认、调查两条路径均通过：无补充时一条客户原话且候选存在，单独补偿补充时两条客户原话且无候选。没有调用真实供应商。专属容器、卷、网络和精确镜像标签已清理。本次确定性主链路已验证，最终完整门禁使用新提交重跑。
