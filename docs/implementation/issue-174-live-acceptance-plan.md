@@ -1,6 +1,17 @@
 # #174 真实 DeepSeek 发布验收
 
-状态：**第 3 版 INCOMPLETE：L174-01 PASS，L174-02 FAIL，其余三项 NOT_RUN**。基线：`origin/main@23475db`，已合入 #215 / PR #216 的受理修复。详见 [第三轮结果](../delivery/issue-174-live-03-result.md)。第2版仍为 INCOMPLETE；全部旧失败与诊断结果保留，不回写。
+状态：**第4版已冻结授权，NOT_RUN**。产品基线为 `origin/main@52daf02fc05e899bdfc2ac2648bb256da707f5c8`；PR #222 已统一交付 #217/#219/#221/#223，完整确定性门禁 `issue221-final-20260905d` PASS。
+
+## 第4版复验冻结
+
+入口为 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-04`，调用前归档见 [run04 freeze](../delivery/issue-174-live-04-freeze.json)。全部生成仍用 deepseek-v4-flash；产品 action prompt 为 investigation-action-v4，schema 为 investigation-action-v3，结论输出上限随主线为1024。五场景、各段费用预留和通过标准不变；行动/尝试每代各8，全局逻辑调用100、供应商尝试100、已知token 200000、单轮1 CNY，最多执行一次。
+
+18笔旧PENDING保留。费用核对点后的7笔预留合计2.75 CNY，扣除用户当时确认的3.8 CNY后保守未预留1.05 CNY。本轮预留1 CNY，2 CNY历史平台实扣上界加新增预留仍在8 CNY总授权内。历史费用上界来自用户，不冒充独立平台账单；预留不称为实际扣款。失败保留整轮预留与完整场景分母，不自动重跑。
+
+L174-04 客服输入改用“请人工客服处理本工单”，与既有 #173 C 一致，避免“请转人工”进入受理协助而无法确认工单。仍由真实产品转入HUMAN、客服领取并请求辅助；引用及无副作用断言不变。报告写入 `docs/delivery/issue-174-live-report-04.json`。真实模型结果和最终 #174 完整门禁均待执行。#169 35/48 的已接受局限与 #170 回答质量 NOT_EVALUATED 原样保留。
+
+以下第3版及更早内容均为历史快照，涉及旧预算、基线、草案状态与命令不再作为当前运行依据；失败结果保持不变。
+历史状态：**第 3 版 INCOMPLETE：L174-01 PASS，L174-02 FAIL，其余三项 NOT_RUN**。基线：`origin/main@23475db`，已合入 #215 / PR #216 的受理修复。详见 [第三轮结果](../delivery/issue-174-live-03-result.md)。第2版仍为 INCOMPLETE；全部旧失败与诊断结果保留，不回写。
 
 ## 第 3 版复验冻结
 

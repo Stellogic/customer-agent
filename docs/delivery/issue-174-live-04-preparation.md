@@ -1,11 +1,11 @@
 # #174 第四轮发布复验准备
 
-状态：等待 PR #222 完整门禁及主线整合；场景清单仍为 DRAFT_NOT_READY，不允许调用供应商。
+状态：PR #222 已合入52daf02，完整确定性门禁 issue221-final-20260905d PASS。原工作树已整合主线，场景清单及归档已冻结为 FROZEN_AUTHORIZED_NOT_RUN，RunId 为 issue174-live-04。
 
-#217/#219/#221/#223 产品修复统一由 PR #222 交付，本票仅同步验收工具。完成整合后，将以新 origin/main 为基线冻结五个原发布场景；模型仍为 deepseek-v4-flash，action prompt 随产品为 investigation-action-v4，schema 仍为v3。总上限不变：100次逻辑调用、100次供应商尝试、200000已知token、单轮1 CNY，各场景最多运行一次。
+#217/#219/#221/#223 产品修复统一由 PR #222 交付，本票仅同步验收工具。以 origin/main@52daf02 为基线冻结五个原发布场景；模型仍为 deepseek-v4-flash，action prompt 随产品为 investigation-action-v4，schema 仍为v3。总上限不变：100次逻辑调用、100次供应商尝试、200000已知token、单轮1 CNY，各场景最多运行一次。
 
 共享账本的18笔 PENDING 保留不变。其中原核对点覆盖11笔，核对点后7笔预留共2.75 CNY；旧3.8 CNY可用授权扣除新增预留后为1.05 CNY，足以预留本轮1 CNY。2 CNY历史平台费用上界与新增预留分别报告，不把预留称为实际扣款，不释放旧失败记录。原8 CNY累计授权不变。
 
 L174-04 的客服路径原输入含“请转人工”，会触发人工受理而无法进入本场景的单工单确认流程。改用已有 #173 C 的同源表达“请人工客服处理本工单”，仍要求真实工单转人工、由客服领取并调用辅助，原引用和无副作用断言不变。失败轮次另把账本 phase 标为 INCOMPLETE_PENDING_USAGE，保持整轮预留，避免已结束运行继续显示 RUNNING。
 
-PowerShell 解析与差异检查通过；预算及场景输入增量 Standards / Spec 已静态复核。前置产品门禁尚在执行，本轮真实调用和最终 #174 完整门禁均 NOT_RUN。
+PowerShell 解析与差异检查通过；预算及场景输入增量 Standards / Spec 已静态复核。前置产品门禁已通过，本轮真实调用和最终 #174 完整门禁均 NOT_RUN。
