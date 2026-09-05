@@ -45,3 +45,11 @@ issue217-static-20260905e 完整 Agent test 目标通过：111 files already for
 issue217-reply-diagnostic-20260905a已按静态双轴PASS方案执行一次，前置无密钥离线请求检查通过。固定合成输入调用594ms：HTTP200，INVALID_OUTPUT，审计分类SCHEMA_MISMATCH、usageReported=false。sys.settrace仅记录到_read_streamed_response第418行的正文前缀策略拒绝；没有保存正文，因此尚不能判定具体触发哪项正文规则，也不能把该单独诊断等同于前轮每一次沟通失败的证明。
 
 本轮0.1元预留完整保留；当前十四笔PENDING，用户核对点后累计预留2.1元，3.8元可用授权的保守未预留部分1.7元。镜像/容器已按本轮所有权清理，锁回读FREE。下一步用离线合法回复分片复现流处理路径，不追加付费抽样。
+
+## 流分片修复后的主链路进展
+
+issue217-live-20260905b 在独立整合提交 cad8d6dd150bcd64498d5f1b3ed2d83a4a51d0f5 执行一次，包含本票输出额度修复、#219 的 3c712e2 流分片修复和 #174 验收工具。本轮确认建单的 confirmed=true、单工单和 UUID 断言通过；客户回复真实调用成功一次（874 token，1771ms），无此前的 INVALID_MODEL_OUTPUT。
+
+行动7次、业务判断1次、客户沟通1次，调查共9次真实尝试、5926已知token、usageTrusted=true。Spring接收最终结论返回422后，现有Graph统一归类FACT_CONFLICT并转人工，浏览器未看到自动解决候选，整场仍未通过。该分类不能直接证明事实字段冲突；本轮未保留细分拒绝审计，下一步只采集已有Spring系统拒绝码以定位阻塞，不放宽业务校验。
+
+本轮0.2元预留保留PENDING；报告0.061329元仅为已知用量及受理保守估算，并非平台实扣。当前15笔PENDING，核对点后占用2.3元，用户确认3.8元可用额保守未预留部分1.5元。所有本轮容器、卷、网络和精确镜像标签已清理，TEST_GATE_FREE，基线执行器保留。聚合证据见 issue-217-live-20260905b-result.json 与 issue-217-live-20260905b-failure.json；不提交模型正文或浏览器截图。最终完整门禁NOT_RUN，未合入、未关票。
