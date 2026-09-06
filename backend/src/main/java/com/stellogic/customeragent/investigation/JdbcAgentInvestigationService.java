@@ -436,8 +436,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 StableParameterDigest.sha256(
                         Boolean.toString(conclusion.compensationRequired()),
                         conclusion.reasonCode().name(),
-                        Integer.toString(conclusion.delayHours()),
-                        Long.toString(conclusion.delaySeconds()),
+                        String.valueOf(conclusion.delayHours()),
+                        String.valueOf(conclusion.delaySeconds()),
                         conclusion.orderReference(),
                         String.join("\n", conclusion.evidenceRefs()),
                         conclusion.sufficiency().riskScenario().name(),
@@ -488,6 +488,20 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         }
 
         ScopedOrder order = currentOrder(ticketId, generationId);
+        String issueKind =
+                jdbc.queryForObject(
+                        "select issue_kind from support_ticket where id = ?",
+                        String.class,
+                        ticketId);
+        boolean payment = "DUPLICATE_CHARGE".equals(issueKind);
+        if (payment
+                        != (conclusion.sufficiency().riskScenario()
+                                == InvestigationRiskScenario.DUPLICATE_CHARGE)
+                || (payment
+                        && (conclusion.reasonCode() != DecisionReasonCode.DUPLICATE_CHARGE
+                                || conclusion.compensationRequired()))) {
+            reject(ticketId, "DETERMINISTIC_REVIEW_FAILED");
+        }
         List<PersistedInvestigationFact> persistedFacts = persistedFacts(ticketId, generationId);
         String evidenceFailure =
                 EvidenceSufficiencyPolicy.validate(conclusion, persistedFacts, clock.instant());
@@ -503,14 +517,20 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         if (!factsStillMatchCurrentOrder(persistedFacts, order)) {
             reject(ticketId, "EVIDENCE_STALE");
         }
-        List<String> expectedEvidence = order.evidenceRefs();
+        List<String> expectedEvidence =
+                payment
+                        ? List.of(
+                                actualEvidence(persistedFacts, "ORDER"),
+                                actualEvidence(persistedFacts, "PAYMENT"))
+                        : order.evidenceRefs();
         boolean factsMatch =
-                conclusion.delayHours() == order.delayHours()
-                        && conclusion.delaySeconds() == order.delaySeconds()
+                (payment
+                                || (conclusion.delayHours() == order.delayHours()
+                                        && conclusion.delaySeconds() == order.delaySeconds()))
                         && conclusion.orderReference().equals(order.orderReference())
                         && conclusion.evidenceRefs().equals(expectedEvidence);
         if (!factsMatch) reject(ticketId, "DETERMINISTIC_REVIEW_FAILED");
-        validateCustomerReply(ticketId, conclusion, order);
+        validateCustomerReply(ticketId, conclusion, order, expectedEvidence);
         CustomerKnowledgeProjection knowledgeProjection =
                 validateKnowledgeReply(generationId, conclusion.customerReply());
 
@@ -850,13 +870,39 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "malformed investigation conclusion");
         }
+        boolean payment =
+                conclusion.sufficiency().riskScenario()
+                        == InvestigationRiskScenario.DUPLICATE_CHARGE;
+        if (payment
+                ? (conclusion.delayHours() != null || conclusion.delaySeconds() != null)
+                : (conclusion.delayHours() == null || conclusion.delaySeconds() == null)) {
+            reject(ticketId, "MALFORMED_CONCLUSION");
+        }
+    }
+
+    private static String actualEvidence(List<PersistedInvestigationFact> facts, String factType) {
+        return facts.stream()
+                .filter(fact -> fact.factType().equals(factType))
+                .findFirst()
+                .orElseThrow()
+                .evidenceReference();
     }
 
     private void validateCustomerReply(
-            UUID ticketId, InvestigationConclusion conclusion, ScopedOrder order) {
+            UUID ticketId,
+            InvestigationConclusion conclusion,
+            ScopedOrder order,
+            List<String> expectedEvidence) {
         String rejection =
                 CustomerReplySafetyPolicy.rejectionReason(
-                        conclusion, order.orderReference(), order.evidenceRefs());
+                        conclusion,
+                        order.orderReference(),
+                        expectedEvidence,
+                        new CustomerReplySafetyPolicy.PaymentFacts(
+                                order.paid(),
+                                order.cancelled(),
+                                order.fullyRefunded(),
+                                order.duplicateChargeSuspected()));
         if (rejection != null) reject(ticketId, rejection);
     }
 

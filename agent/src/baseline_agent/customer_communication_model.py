@@ -42,6 +42,14 @@ class CustomerConversationMessage:
 
 
 @dataclass(frozen=True)
+class PaymentCommunicationFacts:
+    paid: bool
+    cancelled: bool
+    fully_refunded: bool
+    duplicate_charge_suspected: bool
+
+
+@dataclass(frozen=True)
 class CustomerCommunicationInput:
     order_reference: str
     delay_seconds: int | None
@@ -52,6 +60,7 @@ class CustomerCommunicationInput:
     risk_scenario: str | None = None
     logistics_status: str | None = None
     knowledge: KnowledgeRetrievalResult | None = None
+    payment_facts: PaymentCommunicationFacts | None = None
 
 
 @dataclass(frozen=True)
@@ -116,7 +125,7 @@ class StructuredCustomerCommunicationModel:
             ) from None
         envelope = parse_customer_reply_envelope(raw)
         validate_customer_reply_envelope(model_input, envelope)
-        if on_body_delta is not None:
+        if on_body_delta is not None and model_input.risk_scenario != "DUPLICATE_CHARGE":
             await on_body_delta(envelope.body)
         return envelope
 
@@ -140,7 +149,12 @@ class FixedFakeCustomerCommunicationModel:
         else:
             intent = CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
             escalation_required = False
-        body = default_customer_reply_body(model_input.order_reference, intent)
+        body = (
+            _default_payment_reply_body(model_input)
+            if model_input.risk_scenario == "DUPLICATE_CHARGE"
+            and intent is not CustomerReplyIntent.HUMAN_HANDOFF
+            else default_customer_reply_body(model_input.order_reference, intent)
+        )
         envelope = CustomerReplyEnvelope(
             schema_version=CUSTOMER_REPLY_SCHEMA_VERSION,
             body=body,
@@ -156,7 +170,7 @@ class FixedFakeCustomerCommunicationModel:
             referenced_order=model_input.order_reference,
         )
         validate_customer_reply_envelope(model_input, envelope)
-        if on_body_delta is not None:
+        if on_body_delta is not None and model_input.risk_scenario != "DUPLICATE_CHARGE":
             await on_body_delta(envelope.body)
         return envelope
 
@@ -202,6 +216,30 @@ def validate_customer_communication_input(model_input: CustomerCommunicationInpu
         f"order:{model_input.order_reference}",
         f"logistics:{model_input.order_reference}",
     )
+    if model_input.risk_scenario == "DUPLICATE_CHARGE":
+        payment = model_input.payment_facts
+        facts_complete = (
+            isinstance(payment, PaymentCommunicationFacts)
+            and all(
+                type(value) is bool
+                for value in (
+                    payment.paid,
+                    payment.cancelled,
+                    payment.fully_refunded,
+                    payment.duplicate_charge_suspected,
+                )
+            )
+            and model_input.delay_seconds is None
+            and model_input.logistics_status is None
+            and model_input.compensation_review_required is False
+        )
+        facts_absent = False
+        expected_evidence = (
+            f"order:{model_input.order_reference}",
+            f"payment:{model_input.order_reference}",
+        )
+    elif model_input.payment_facts is not None:
+        raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_INPUT)
     conversation_valid = all(
         isinstance(message, CustomerConversationMessage)
         and message.author in {"CUSTOMER", "SUPPORT", "AGENT"}
@@ -399,6 +437,8 @@ def _has_grounded_investigation_narrative(
 ) -> bool:
     if _PERSON_NAME_CLAIM_PATTERN.search(body) is not None:
         return False
+    if model_input.risk_scenario == "DUPLICATE_CHARGE":
+        return _has_grounded_payment_narrative(model_input, body)
     if model_input.delay_seconds is not None:
         claimed_hours = [int(match.group(1)) for match in re.finditer(r"(\d+)\s*小时", body)]
         authority_hours = model_input.delay_seconds // 3600
@@ -410,9 +450,72 @@ def _has_grounded_investigation_narrative(
     return True
 
 
+def _payment_status_statements(payment: PaymentCommunicationFacts) -> tuple[str, str]:
+    # 未全额退款不等于从未退款;只陈述工具实际提供的聚合状态。
+    return (
+        "支付状态为已支付" if payment.paid else "支付状态为未支付",
+        "全额退款状态为已完成" if payment.fully_refunded else "全额退款状态为未完成",
+    )
+
+
+def _default_payment_reply_body(model_input: CustomerCommunicationInput) -> str:
+    assert model_input.payment_facts is not None
+    paid, refunded = _payment_status_statements(model_input.payment_facts)
+    return (
+        f"订单 {model_input.order_reference} 的记录显示{paid}，{refunded}。"
+        "现有信息不足以确认是否发生重复扣款或查明原因，需要人工核查。本次调查未执行退款。"
+    )
+
+
+def _has_grounded_payment_narrative(model_input: CustomerCommunicationInput, body: str) -> bool:
+    payment = model_input.payment_facts
+    if payment is None:
+        return False
+    statements = _payment_status_statements(payment)
+    if not all(statement in body for statement in statements):
+        return False
+    if "人工核查" not in body or "未执行退款" not in body:
+        return False
+    if not any(word in body for word in ("不足以确认", "尚未确认", "无法确认")):
+        return False
+    remainder = body
+    for statement in statements:
+        remainder = remainder.replace(statement, "")
+    # 聚合状态不是逐笔流水;仅阻止明确与本合同矛盾的事实/原因断言。
+    return (
+        re.search(
+            r"(?:已|已经|未|尚未)(?:支付|付款|退款|退回)|支付成功|退款成功|从未退款|"
+            r"原因(?:是|为)|已确认(?:发生)?重复扣款|(?:两|2)笔|物流|延迟|小时",
+            remainder,
+        )
+        is None
+    )
+
+
 def customer_communication_provider_request(
     model_input: CustomerCommunicationInput,
 ) -> dict[str, object]:
+    authorized: dict[str, object] = {
+        "orderReference": model_input.order_reference,
+        "delaySeconds": model_input.delay_seconds,
+        "compensationReviewRequired": model_input.compensation_review_required,
+        "evidenceRefs": list(model_input.evidence_refs),
+    }
+    if model_input.risk_scenario == "DUPLICATE_CHARGE":
+        payment = model_input.payment_facts
+        assert payment is not None
+        authorized = {
+            "riskScenario": "DUPLICATE_CHARGE",
+            "orderReference": model_input.order_reference,
+            "paymentFacts": {
+                "paid": payment.paid,
+                "cancelled": payment.cancelled,
+                "fullyRefunded": payment.fully_refunded,
+                "duplicateChargeSuspected": payment.duplicate_charge_suspected,
+            },
+            "compensationReviewRequired": False,
+            "evidenceRefs": list(model_input.evidence_refs),
+        }
     return {
         "schemaVersion": "customer-communication-input-v1",
         "untrustedCustomerData": {
@@ -422,12 +525,7 @@ def customer_communication_provider_request(
                 for message in model_input.public_conversation
             ],
         },
-        "authorizedInvestigation": {
-            "orderReference": model_input.order_reference,
-            "delaySeconds": model_input.delay_seconds,
-            "compensationReviewRequired": model_input.compensation_review_required,
-            "evidenceRefs": list(model_input.evidence_refs),
-        },
+        "authorizedInvestigation": authorized,
         **(
             {
                 "untrustedKnowledge": [

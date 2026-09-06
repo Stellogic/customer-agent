@@ -229,12 +229,32 @@ enum InvestigationCapability {
 record InvestigationConclusion(
         boolean compensationRequired,
         DecisionReasonCode reasonCode,
-        int delayHours,
-        long delaySeconds,
+        Integer delayHours,
+        Long delaySeconds,
         String orderReference,
         List<String> evidenceRefs,
         EvidenceSufficiencyClaim sufficiency,
-        CustomerReplyEnvelope customerReply) {}
+        CustomerReplyEnvelope customerReply) {
+    InvestigationConclusion(
+            boolean compensationRequired,
+            DecisionReasonCode reasonCode,
+            int delayHours,
+            long delaySeconds,
+            String orderReference,
+            List<String> evidenceRefs,
+            EvidenceSufficiencyClaim sufficiency,
+            CustomerReplyEnvelope customerReply) {
+        this(
+                compensationRequired,
+                reasonCode,
+                Integer.valueOf(delayHours),
+                Long.valueOf(delaySeconds),
+                orderReference,
+                evidenceRefs,
+                sufficiency,
+                customerReply);
+    }
+}
 
 record EvidenceSufficiencyClaim(
         InvestigationRiskScenario riskScenario,

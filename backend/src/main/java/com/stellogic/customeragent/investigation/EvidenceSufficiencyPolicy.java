@@ -45,6 +45,13 @@ final class EvidenceSufficiencyPolicy {
                     "PENDING_ACTION_COUNT", EvidenceApplicability.PENDING_ACTIONS,
                     "POLICY", EvidenceApplicability.POLICY_BASIS);
 
+    private static final Map<String, EvidenceApplicability> DUPLICATE_CHARGE_REQUIRED =
+            PAYMENT_REQUIRED.entrySet().stream()
+                    .filter(entry -> !entry.getKey().equals("POLICY"))
+                    .collect(
+                            java.util.stream.Collectors.toUnmodifiableMap(
+                                    Map.Entry::getKey, Map.Entry::getValue));
+
     private static final Map<String, EvidenceApplicability> ORDER_RULE_REQUIRED =
             Map.of(
                     "ORDER", EvidenceApplicability.ORDER_IDENTITY,
@@ -72,7 +79,7 @@ final class EvidenceSufficiencyPolicy {
                             InvestigationRiskScenario.PACKAGE_SUSPECTED_LOST,
                             LOGISTICS_STATUS_REQUIRED,
                             InvestigationRiskScenario.DUPLICATE_CHARGE,
-                            PAYMENT_REQUIRED,
+                            DUPLICATE_CHARGE_REQUIRED,
                             InvestigationRiskScenario.REFUND_STATUS,
                             PAYMENT_REQUIRED,
                             InvestigationRiskScenario.ORDER_ADDRESS_OR_CANCEL_RULE,
@@ -85,11 +92,13 @@ final class EvidenceSufficiencyPolicy {
     static RequiredInvestigationFacts requiredFacts(String issueKind) {
         // Other scenarios retain their existing model path until the next scenario slice migrates
         // them.
-        if (!"LOGISTICS_DELAY".equals(issueKind)) return null;
+        if (!"LOGISTICS_DELAY".equals(issueKind) && !"DUPLICATE_CHARGE".equals(issueKind))
+            return null;
+        InvestigationRiskScenario scenario = InvestigationRiskScenario.valueOf(issueKind);
         return new RequiredInvestigationFacts(
                 VERSION,
-                InvestigationRiskScenario.LOGISTICS_DELAY,
-                LOGISTICS_DELAY_REQUIRED.entrySet().stream()
+                scenario,
+                REQUIRED_BY_SCENARIO.get(scenario).entrySet().stream()
                         .sorted(Map.Entry.comparingByKey())
                         .map(entry -> requirement(entry.getKey(), entry.getValue()))
                         .toList());

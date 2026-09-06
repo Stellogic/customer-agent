@@ -29,6 +29,7 @@
         'e2e/issue166.knowledge-catalog.spec.ts'
         'e2e/issue190.hybrid-retrieval.spec.ts'
         'e2e/issue173.full-stack.spec.ts'
+        'e2e/issue229.full-stack.spec.ts'
         'e2e/issue173.auto-resolution-clock.spec.ts'
         'e2e/issue192.customer-help-docs.spec.ts'
         'e2e/issue193.internal-shell.spec.ts'

@@ -10,6 +10,57 @@ class CustomerReplySafetyPolicyTest {
     private static final List<String> EVIDENCE = List.of("order:ORDER-122", "logistics:ORDER-122");
 
     @Test
+    void paymentExplanationMustMatchAuthorityAndLeaveDuplicateChargeUnresolved() {
+        String unresolved = "现有信息不足以确认是否发生重复扣款或查明原因，需要人工核查。本次调查未执行退款。";
+        for (boolean refunded : List.of(false, true)) {
+            var facts = new CustomerReplySafetyPolicy.PaymentFacts(true, false, refunded, true);
+            String grounded = "支付状态为已支付，全额退款状态为" + (refunded ? "已完成。" : "未完成。") + unresolved;
+            assertThat(paymentRejection(grounded, facts)).isNull();
+            assertThat(paymentRejection(grounded.replace("支付状态为已支付", "支付状态为未支付"), facts))
+                    .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT");
+        }
+        var facts = new CustomerReplySafetyPolicy.PaymentFacts(true, false, false, true);
+        String grounded = "支付状态为已支付，全额退款状态为未完成。" + unresolved;
+        assertThat(paymentRejection(grounded.replace("全额退款状态为未完成", "全额退款状态为已完成"), facts))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT");
+        assertThat(paymentRejection(grounded + "已确认发生重复扣款，两笔交易均由系统重复执行。", facts))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT");
+        assertThat(paymentRejection(grounded + "从未退款。", facts))
+                .isEqualTo("CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT");
+        assertThat(paymentRejection(grounded + "已为您退款100元。", facts)).isNotNull();
+    }
+
+    private static String paymentRejection(
+            String body, CustomerReplySafetyPolicy.PaymentFacts facts) {
+        List<String> evidence = List.of("order:ORDER-122", "payment:ORDER-122");
+        var reply =
+                new CustomerReplyEnvelope(
+                        "customer-reply-v1",
+                        body,
+                        CustomerReplyIntent.NO_COMPENSATION_RESOLUTION,
+                        evidence,
+                        false,
+                        ORDER);
+        var conclusion =
+                new InvestigationConclusion(
+                        false,
+                        DecisionReasonCode.DUPLICATE_CHARGE,
+                        null,
+                        null,
+                        ORDER,
+                        evidence,
+                        new EvidenceSufficiencyClaim(
+                                InvestigationRiskScenario.DUPLICATE_CHARGE,
+                                EvidenceSufficiencyPolicy.VERSION,
+                                List.of(
+                                        new ConclusionEvidence(
+                                                "payment:ORDER-122",
+                                                List.of(EvidenceApplicability.PAYMENT_STATUS)))),
+                        reply);
+        return CustomerReplySafetyPolicy.rejectionReason(conclusion, ORDER, evidence, facts);
+    }
+
+    @Test
     void neitherStreamingNorCompleteRepliesCanDeclareResolutionBeforeSpringDecides() {
         String body = "经核验，订单 ORDER-122 的物流延迟不足 24 小时，当前不符合补偿条件，工单已解决。";
         assertThat(CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(body, ORDER, false)).isFalse();

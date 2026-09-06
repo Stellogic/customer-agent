@@ -6,6 +6,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class CustomerReplySafetyPolicy {
+    record PaymentFacts(
+            boolean paid,
+            boolean cancelled,
+            boolean fullyRefunded,
+            boolean duplicateChargeSuspected) {}
+
     static boolean unsafeKnowledgeBody(String body) {
         return MONEY_PATTERN.matcher(body).find()
                 || RESPONSE_TIME_PROMISE_PATTERN.matcher(body).find()
@@ -105,6 +111,14 @@ public final class CustomerReplySafetyPolicy {
             InvestigationConclusion conclusion,
             String scopedOrderReference,
             List<String> scopedEvidence) {
+        return rejectionReason(conclusion, scopedOrderReference, scopedEvidence, null);
+    }
+
+    static String rejectionReason(
+            InvestigationConclusion conclusion,
+            String scopedOrderReference,
+            List<String> scopedEvidence,
+            PaymentFacts paymentFacts) {
         CustomerReplyEnvelope reply = conclusion.customerReply();
         CustomerReplyIntent expectedIntent =
                 conclusion.compensationRequired()
@@ -145,10 +159,36 @@ public final class CustomerReplySafetyPolicy {
         if (!hasOnlyAllowedCompensationLanguage(reply.body(), reply.intent())) {
             return "CUSTOMER_REPLY_CONTAINS_UNAPPROVED_PROMISE";
         }
-        if (!hasGroundedNarrative(reply.body(), conclusion)) {
+        boolean payment =
+                conclusion.sufficiency() != null
+                        && conclusion.sufficiency().riskScenario()
+                                == InvestigationRiskScenario.DUPLICATE_CHARGE;
+        if (payment
+                ? !hasGroundedPaymentNarrative(reply.body(), paymentFacts)
+                : !hasGroundedNarrative(reply.body(), conclusion)) {
             return "CUSTOMER_REPLY_CONTAINS_UNSUPPORTED_FACT";
         }
         return null;
+    }
+
+    private static boolean hasGroundedPaymentNarrative(String body, PaymentFacts facts) {
+        if (facts == null) return false;
+        String paid = facts.paid() ? "支付状态为已支付" : "支付状态为未支付";
+        String refunded = facts.fullyRefunded() ? "全额退款状态为已完成" : "全额退款状态为未完成";
+        if (!body.contains(paid)
+                || !body.contains(refunded)
+                || !body.contains("人工核查")
+                || !body.contains("未执行退款")
+                || !(body.contains("不足以确认") || body.contains("尚未确认") || body.contains("无法确认"))) {
+            return false;
+        }
+        // Aggregate order status cannot establish individual charges or a refund of this dispute.
+        String remaining = body.replace(paid, "").replace(refunded, "");
+        return !Pattern.compile(
+                        "(?:已|已经|未|尚未)(?:支付|付款|退款|退回)|支付成功|退款成功|从未退款|"
+                                + "原因(?:是|为)|已确认(?:发生)?重复扣款|(?:两|2)笔|物流|延迟|小时")
+                .matcher(remaining)
+                .find();
     }
 
     private static boolean hasGroundedNarrative(String body, InvestigationConclusion conclusion) {

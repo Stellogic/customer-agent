@@ -26,7 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 
 class RequiredFactsCatalogTest {
     @ParameterizedTest
-    @ValueSource(strings = {"LOGISTICS_DELAY", "DUPLICATE_CHARGE"})
+    @ValueSource(strings = {"LOGISTICS_DELAY", "DUPLICATE_CHARGE", "PACKAGE_NOT_RECEIVED"})
     @SuppressWarnings("unchecked")
     void authorizedCatalogExposesOnlyTheMigratedScenarioRequirements(String issueKind)
             throws Exception {
@@ -72,13 +72,13 @@ class RequiredFactsCatalogTest {
         JsonNode catalog = json.readTree(response);
         assertThat(catalog.has("requiredFacts")).isTrue();
         JsonNode requirements = catalog.get("requiredFacts");
-        if (!issueKind.equals("LOGISTICS_DELAY")) {
+        if (issueKind.equals("PACKAGE_NOT_RECEIVED")) {
             assertThat(requirements.isNull()).isTrue();
             return;
         }
         assertThat(requirements.path("policyVersion").asText())
                 .isEqualTo(EvidenceSufficiencyPolicy.VERSION);
-        assertThat(requirements.path("riskScenario").asText()).isEqualTo("LOGISTICS_DELAY");
+        assertThat(requirements.path("riskScenario").asText()).isEqualTo(issueKind);
         Map<String, List<Object>> mappings = new HashMap<>();
         for (JsonNode fact : requirements.path("facts")) {
             mappings.put(
@@ -88,6 +88,48 @@ class RequiredFactsCatalogTest {
                             fact.path("resultField").asText(),
                             fact.path("evidenceIndex").asInt(),
                             fact.path("applicability").asText()));
+        }
+        if (issueKind.equals("DUPLICATE_CHARGE")) {
+            assertThat(mappings)
+                    .containsExactlyInAnyOrderEntriesOf(
+                            Map.of(
+                                    "ORDER",
+                                            List.of(
+                                                    "CONFIRM_ORDER",
+                                                    "orderReference",
+                                                    0,
+                                                    "ORDER_IDENTITY"),
+                                    "PAYMENT",
+                                            List.of(
+                                                    "READ_PAYMENT_AND_REFUNDS",
+                                                    "paid",
+                                                    0,
+                                                    "PAYMENT_STATUS"),
+                                    "ORDER_CANCELLATION",
+                                            List.of(
+                                                    "READ_PAYMENT_AND_REFUNDS",
+                                                    "cancelled",
+                                                    0,
+                                                    "ORDER_ELIGIBILITY"),
+                                    "REFUND_STATUS",
+                                            List.of(
+                                                    "READ_PAYMENT_AND_REFUNDS",
+                                                    "fullyRefunded",
+                                                    0,
+                                                    "REFUND_STATUS"),
+                                    "EXISTING_COMPENSATION",
+                                            List.of(
+                                                    "READ_COMPENSATION_AND_PENDING_ACTIONS",
+                                                    "existingCompensation",
+                                                    0,
+                                                    "EXISTING_COMPENSATION"),
+                                    "PENDING_ACTION_COUNT",
+                                            List.of(
+                                                    "READ_COMPENSATION_AND_PENDING_ACTIONS",
+                                                    "pendingActionCount",
+                                                    1,
+                                                    "PENDING_ACTIONS")));
+            return;
         }
         assertThat(mappings)
                 .containsExactlyInAnyOrderEntriesOf(

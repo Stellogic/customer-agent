@@ -14,6 +14,7 @@ from baseline_agent.customer_communication_model import (
     CustomerCommunicationModel,
     CustomerConversationMessage,
     CustomerReplyIntent,
+    PaymentCommunicationFacts,
     validate_customer_reply_envelope,
 )
 from baseline_agent.customer_communication_model_runtime import (
@@ -477,31 +478,34 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
             "progress-rules",
             {"type": "PROGRESS", "stage": "QUERYING_RULES"},
         )
-        judgment_audit_offset = _judgment_audit_offset()
-        try:
-            judgment = await investigation_judgment_model.judge(
-                InvestigationJudgmentInput(
-                    order_reference=facts["orderReference"],
-                    delay_seconds=facts["delaySeconds"],
-                    evidence_refs=tuple(facts["evidenceRefs"]),
+        judgment = None
+        judgment_evidence = None
+        if issue_kind != "DUPLICATE_CHARGE":
+            judgment_audit_offset = _judgment_audit_offset()
+            try:
+                judgment = await investigation_judgment_model.judge(
+                    InvestigationJudgmentInput(
+                        order_reference=facts["orderReference"],
+                        delay_seconds=facts["delaySeconds"],
+                        evidence_refs=tuple(facts["evidenceRefs"]),
+                    )
                 )
-            )
-        except Exception:
-            return await _human_handoff(
-                client,
-                base_url,
-                ticket_id,
-                generation_id,
-                scope_headers,
-                "INVALID_MODEL_OUTPUT",
-                _controlled_summary_facts(facts),
-                action_records,
-                _completed_run_evidence(
-                    loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
-                ),
-                _judgment_call_evidence(judgment_audit_offset, "MODEL_CALL_FAILED"),
-            )
-        judgment_evidence = _judgment_call_evidence(judgment_audit_offset, "")
+            except Exception:
+                return await _human_handoff(
+                    client,
+                    base_url,
+                    ticket_id,
+                    generation_id,
+                    scope_headers,
+                    "INVALID_MODEL_OUTPUT",
+                    _controlled_summary_facts(facts),
+                    action_records,
+                    _completed_run_evidence(
+                        loop_result, "SAFE_HANDOFF", state.get("investigation_run_evidence")
+                    ),
+                    _judgment_call_evidence(judgment_audit_offset, "MODEL_CALL_FAILED"),
+                )
+            judgment_evidence = _judgment_call_evidence(judgment_audit_offset, "")
         communication_context = await _read_customer_communication_context(
             client, base_url, ticket_id, generation_id, scope_headers
         )
@@ -570,9 +574,11 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 return failed
         communication_input = CustomerCommunicationInput(
             order_reference=facts["orderReference"],
-            delay_seconds=facts["delaySeconds"],
+            delay_seconds=facts.get("delaySeconds"),
             compensation_review_required=(
-                judgment.compensation_review_required if issue_kind == "LOGISTICS_DELAY" else False
+                judgment.compensation_review_required
+                if issue_kind == "LOGISTICS_DELAY" and judgment is not None
+                else False
             ),
             evidence_refs=tuple(facts["evidenceRefs"]),
             synthetic_customer_text=communication_context["syntheticCustomerText"],
@@ -581,6 +587,14 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 for message in communication_context["publicConversation"]
             ),
             risk_scenario=_risk_scenario_for(issue_kind, facts),
+            payment_facts=PaymentCommunicationFacts(
+                paid=facts["paid"],
+                cancelled=facts["cancelled"],
+                fully_refunded=facts["fullyRefunded"],
+                duplicate_charge_suspected=facts["duplicateChargeSuspected"],
+            )
+            if issue_kind == "DUPLICATE_CHARGE"
+            else None,
             logistics_status=facts.get("logisticsStatus")
             if isinstance(facts.get("logisticsStatus"), str)
             else None,
@@ -629,7 +643,9 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
             try:
                 customer_reply = await customer_communication_model.compose(
                     communication_input,
-                    on_body_delta=None if knowledge_result is not None else publish_delta,
+                    on_body_delta=None
+                    if knowledge_result is not None or issue_kind == "DUPLICATE_CHARGE"
+                    else publish_delta,
                 )
                 validate_customer_reply_envelope(communication_input, customer_reply)
             except Exception as error:
@@ -679,7 +695,7 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 return await reply_handoff("TOOL_RETRY_EXHAUSTED")
             break
         assert customer_reply is not None
-        return {
+        completed_state: BaselineState = {
             "facts": facts,
             "conclusion": conclusion,
             "customer_reply": customer_reply.as_request_value(),
@@ -691,13 +707,15 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 "CONCLUSION_SUBMITTED",
                 state.get("investigation_run_evidence"),
             ),
-            "investigation_judgment_evidence": judgment_evidence,
             "customer_communication_evidence": _communication_call_evidence(
                 communication_audit_offset,
                 "",
                 state.get("customer_communication_evidence"),
             ),
         }
+        if judgment_evidence is not None:
+            completed_state["investigation_judgment_evidence"] = judgment_evidence
+        return completed_state
 
 
 async def investigate_ticket(state: BaselineState) -> BaselineState:
@@ -781,7 +799,8 @@ async def _advance_investigation_action_loop(
     }
     required_facts = None
     if checkpoint is None or (
-        issue_kind == "LOGISTICS_DELAY" and "requiredFacts" not in checkpoint
+        issue_kind in {"LOGISTICS_DELAY", "DUPLICATE_CHARGE"}
+        and checkpoint.get("requiredFacts") is None
     ):
         catalog_response = await _request_with_retries(
             lambda: client.get(
@@ -798,7 +817,7 @@ async def _advance_investigation_action_loop(
         if not _valid_capability_catalog(catalog):
             raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
         required_facts = catalog.get("requiredFacts")
-        if issue_kind == "LOGISTICS_DELAY" and required_facts is None:
+        if issue_kind in {"LOGISTICS_DELAY", "DUPLICATE_CHARGE"} and required_facts is None:
             raise ActionLoopFailure(ActionLoopFailureCode.INVALID_TOOL_RESPONSE)
         if required_facts is not None and required_facts["riskScenario"] != issue_kind:
             raise ActionLoopFailure(ActionLoopFailureCode.INVALID_TOOL_RESPONSE)
@@ -928,7 +947,9 @@ def _normalize_loop_facts(
             reference
             for capability in (
                 InvestigationCapability.CONFIRM_ORDER,
-                InvestigationCapability.READ_LOGISTICS,
+                InvestigationCapability.READ_PAYMENT_AND_REFUNDS
+                if required_facts["riskScenario"] == "DUPLICATE_CHARGE"
+                else InvestigationCapability.READ_LOGISTICS,
             )
             for record in records
             if record.action_type == capability.value
@@ -1500,10 +1521,14 @@ def _unsafe_facts_reason(
         return "INVALID_TOOL_RESPONSE"
     expected_evidence = [
         f"order:{facts['orderReference']}",
-        f"logistics:{facts['orderReference']}",
+        f"payment:{facts['orderReference']}"
+        if issue_kind == "DUPLICATE_CHARGE"
+        else f"logistics:{facts['orderReference']}",
     ]
     if evidence != expected_evidence:
         return "INVALID_TOOL_RESPONSE"
+    if issue_kind == "DUPLICATE_CHARGE":
+        return None
     if facts["delaySeconds"] != facts["delayHours"] * 60 * 60:
         return "FACT_CONFLICT"
     if facts["logisticsStatus"] not in {
@@ -1568,9 +1593,26 @@ def _controlled_summary_facts(facts: object) -> list[dict[str, str]]:
     order_reference = facts.get("orderReference")
     if not isinstance(order_reference, str):
         return []
-    if evidence != [f"order:{order_reference}", f"logistics:{order_reference}"]:
+    if len(evidence) != 2 or evidence[0] != f"order:{order_reference}":
         return []
     allowed = [{"type": "ORDER", "value": order_reference, "evidenceReference": evidence[0]}]
+    if evidence[1] == f"payment:{order_reference}":
+        for name, fact_type, yes, no in (
+            ("paid", "PAYMENT", "PAID", "UNPAID"),
+            ("cancelled", "ORDER_CANCELLATION", "CANCELLED", "NOT_CANCELLED"),
+            ("fullyRefunded", "REFUND_STATUS", "FULLY_REFUNDED", "NOT_FULLY_REFUNDED"),
+        ):
+            if isinstance(facts.get(name), bool):
+                allowed.append(
+                    {
+                        "type": fact_type,
+                        "value": yes if facts[name] else no,
+                        "evidenceReference": evidence[1],
+                    }
+                )
+        return allowed
+    if evidence[1] != f"logistics:{order_reference}":
+        return []
     if isinstance(facts.get("delaySeconds"), int) and not isinstance(
         facts.get("delaySeconds"), bool
     ):
@@ -1761,7 +1803,7 @@ def await_clarification(state: BaselineState) -> BaselineState:
 
 def _build_conclusion(
     facts: dict,
-    judgment: InvestigationJudgment,
+    judgment: InvestigationJudgment | None,
     evidence_claims: tuple[EvidenceClaim, ...],
     issue_kind: str = "LOGISTICS_DELAY",
     sufficiency_policy_version: str = "evidence-sufficiency-v1",
@@ -1769,13 +1811,18 @@ def _build_conclusion(
     risk_scenario = _risk_scenario_for(issue_kind, facts)
     reason_code = _reason_code_for(issue_kind, facts, judgment)
     compensation_required = (
-        issue_kind == "LOGISTICS_DELAY" and judgment.compensation_review_required
+        issue_kind == "LOGISTICS_DELAY"
+        and judgment is not None
+        and judgment.compensation_review_required
     )
     return {
         "compensationRequired": compensation_required,
         "reasonCode": reason_code,
-        "delayHours": facts["delayHours"],
-        "delaySeconds": facts["delaySeconds"],
+        **(
+            {"delayHours": facts["delayHours"], "delaySeconds": facts["delaySeconds"]}
+            if issue_kind != "DUPLICATE_CHARGE"
+            else {}
+        ),
         "orderReference": facts["orderReference"],
         "evidenceRefs": facts["evidenceRefs"],
         "riskScenario": risk_scenario,
@@ -1795,16 +1842,15 @@ def _risk_scenario_for(issue_kind: str, facts: dict) -> str:
             return "PACKAGE_SUSPECTED_LOST"
         return "LOGISTICS_STALLED"
     if issue_kind == "DUPLICATE_CHARGE":
-        if facts.get("fullyRefunded"):
-            return "REFUND_STATUS"
         return "DUPLICATE_CHARGE"
     if issue_kind == "ORDER_OPERATION_OR_RULE":
         return "ORDER_ADDRESS_OR_CANCEL_RULE"
     return "OTHER_GENERAL"
 
 
-def _reason_code_for(issue_kind: str, facts: dict, judgment: InvestigationJudgment) -> str:
+def _reason_code_for(issue_kind: str, facts: dict, judgment: InvestigationJudgment | None) -> str:
     if issue_kind == "LOGISTICS_DELAY":
+        assert judgment is not None
         return judgment.reason_code.value
     if issue_kind == "PACKAGE_NOT_RECEIVED":
         status = facts.get("logisticsStatus")
@@ -1814,8 +1860,6 @@ def _reason_code_for(issue_kind: str, facts: dict, judgment: InvestigationJudgme
             return "PACKAGE_SUSPECTED_LOST"
         return "LOGISTICS_STALLED"
     if issue_kind == "DUPLICATE_CHARGE":
-        if facts.get("fullyRefunded"):
-            return "REFUND_STATUS_EXPLAINED"
         return "DUPLICATE_CHARGE"
     if issue_kind == "ORDER_OPERATION_OR_RULE":
         return "ORDER_RULE_EXPLAINED"
@@ -1859,7 +1903,11 @@ def after_investigation(state: BaselineState) -> str:
         return "investigate_ticket"
     if state.get("facts", {}).get("matchStatus") == "AMBIGUOUS":
         return "request_clarification"
-    if state.get("conclusion") and shadow_mode_enabled():
+    if (
+        state.get("conclusion")
+        and state.get("issue_kind") != "DUPLICATE_CHARGE"
+        and shadow_mode_enabled()
+    ):
         return "shadow_investigation"
     return END
 

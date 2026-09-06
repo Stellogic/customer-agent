@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from baseline_agent.customer_communication_evaluation import (
@@ -15,6 +17,127 @@ from baseline_agent.customer_communication_model import (
     default_customer_reply_body,
     is_authorized_body_prefix,
 )
+
+
+def _payment_input() -> CustomerCommunicationInput:
+    from baseline_agent.customer_communication_model import PaymentCommunicationFacts
+
+    return CustomerCommunicationInput(
+        order_reference="ORDER-C129",
+        delay_seconds=None,
+        compensation_review_required=False,
+        evidence_refs=("order:ORDER-C129", "payment:ORDER-C129"),
+        risk_scenario="DUPLICATE_CHARGE",
+        payment_facts=PaymentCommunicationFacts(
+            paid=True, cancelled=False, fully_refunded=False, duplicate_charge_suspected=True
+        ),
+        synthetic_customer_text="疑似重复扣款，请核查。",
+    )
+
+
+def _payment_reply() -> dict:
+    return {
+        "schemaVersion": "customer-reply-v1",
+        "body": (
+            "订单 ORDER-C129 的记录显示支付状态为已支付，全额退款状态为未完成。"
+            "现有信息不足以确认是否发生重复扣款或查明原因，需要人工核查。本次调查未执行退款。"
+        ),
+        "intent": "NO_COMPENSATION_RESOLUTION",
+        "evidenceRefs": ["order:ORDER-C129", "payment:ORDER-C129"],
+        "escalationRequired": False,
+        "referencedOrder": "ORDER-C129",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("structured", [False, True])
+async def test_payment_reply_uses_known_status_without_logistics_or_refund_action(
+    structured,
+) -> None:
+    requests: list[dict] = []
+
+    class Provider:
+        async def generate(self, request: dict) -> dict:
+            requests.append(request)
+            return _payment_reply()
+
+    model = (
+        StructuredCustomerCommunicationModel(Provider())
+        if structured
+        else FixedFakeCustomerCommunicationModel()
+    )
+    reply = await model.compose(_payment_input())
+
+    assert reply.intent is CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
+    assert reply.evidence_refs == ("order:ORDER-C129", "payment:ORDER-C129")
+    assert reply.escalation_required is False
+    assert "已支付" in reply.body
+    assert "未完成" in reply.body
+    assert "人工核查" in reply.body
+    assert "未执行退款" in reply.body
+    assert "物流" not in reply.body
+    if structured:
+        facts = requests[0]["authorizedInvestigation"]
+        assert facts == {
+            "riskScenario": "DUPLICATE_CHARGE",
+            "orderReference": "ORDER-C129",
+            "paymentFacts": {
+                "paid": True,
+                "cancelled": False,
+                "fullyRefunded": False,
+                "duplicateChargeSuspected": True,
+            },
+            "compensationReviewRequired": False,
+            "evidenceRefs": ["order:ORDER-C129", "payment:ORDER-C129"],
+        }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("paid", "fully_refunded"), [(True, True), (False, False)])
+async def test_payment_reply_describes_historical_aggregate_status(paid, fully_refunded) -> None:
+    model_input = _payment_input()
+    model_input = replace(
+        model_input,
+        payment_facts=replace(model_input.payment_facts, paid=paid, fully_refunded=fully_refunded),
+    )
+    reply = await FixedFakeCustomerCommunicationModel().compose(model_input)
+
+    assert ("支付状态为已支付" if paid else "支付状态为未支付") in reply.body
+    assert ("全额退款状态为已完成" if fully_refunded else "全额退款状态为未完成") in reply.body
+    assert "未执行退款" in reply.body
+    assert "不足以确认" in reply.body
+    assert "从未退款" not in reply.body
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("missing", ["payment", "evidence"])
+async def test_payment_requires_actual_payment_input_and_scoped_evidence(missing) -> None:
+    model_input = _payment_input()
+    model_input = (
+        replace(model_input, payment_facts=None)
+        if missing == "payment"
+        else replace(model_input, evidence_refs=("order:ORDER-C129",))
+    )
+    with pytest.raises(CustomerCommunicationFailure) as failure:
+        await FixedFakeCustomerCommunicationModel().compose(model_input)
+    assert failure.value.code is CustomerCommunicationFailureCode.INVALID_INPUT
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "wrong_claim",
+    ["已退款 100 元。", "已确认发生重复扣款，原因是系统重试。", "从未退款。"],
+)
+async def test_payment_rejects_invented_refund_cause_and_never_refunded_claim(wrong_claim) -> None:
+    class Provider:
+        async def generate(self, _: dict) -> dict:
+            result = _payment_reply()
+            result["body"] += wrong_claim
+            return result
+
+    with pytest.raises(CustomerCommunicationFailure) as failure:
+        await StructuredCustomerCommunicationModel(Provider()).compose(_payment_input())
+    assert failure.value.code is CustomerCommunicationFailureCode.INVALID_OUTPUT
 
 
 @pytest.mark.asyncio

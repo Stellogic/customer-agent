@@ -229,6 +229,8 @@ public final class AgentInvestigationController {
     }
 
     private InvestigationConclusion parseConclusion(UUID ticketId, JsonNode payload) {
+        boolean payment =
+                payload != null && "DUPLICATE_CHARGE".equals(payload.path("riskScenario").asText());
         Set<String> expected =
                 Set.of(
                         "compensationRequired",
@@ -241,6 +243,11 @@ public final class AgentInvestigationController {
                         "sufficiencyPolicyVersion",
                         "evidence",
                         "customerReply");
+        if (payment) {
+            expected = new java.util.HashSet<>(expected);
+            expected.remove("delayHours");
+            expected.remove("delaySeconds");
+        }
         if (payload == null || !payload.isObject() || !expected.equals(properties(payload))) {
             return malformedConclusion(ticketId);
         }
@@ -272,8 +279,8 @@ public final class AgentInvestigationController {
             return new InvestigationConclusion(
                     requiredBoolean(payload, "compensationRequired"),
                     DecisionReasonCode.valueOf(requiredText(payload, "reasonCode")),
-                    requiredInt(payload, "delayHours"),
-                    requiredLong(payload, "delaySeconds"),
+                    payment ? null : Integer.valueOf(requiredInt(payload, "delayHours")),
+                    payment ? null : Long.valueOf(requiredLong(payload, "delaySeconds")),
                     requiredText(payload, "orderReference"),
                     requiredTextList(payload, "evidenceRefs"),
                     new EvidenceSufficiencyClaim(

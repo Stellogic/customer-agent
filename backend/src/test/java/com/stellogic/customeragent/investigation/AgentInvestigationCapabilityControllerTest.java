@@ -290,6 +290,79 @@ class AgentInvestigationCapabilityControllerTest {
     }
 
     @Test
+    void acceptsPaymentConclusionWithoutInventedDelayOrLogisticsEvidence() throws Exception {
+        when(service.submit(eq(TICKET_ID), eq(GENERATION_ID), eq("reply-request"), any()))
+                .thenReturn(
+                        new ConclusionAcceptance(
+                                true, TicketLifecycleState.INVESTIGATING, null, null, null));
+        String payload =
+                """
+                {
+                  "compensationRequired":false,"reasonCode":"DUPLICATE_CHARGE",
+                  "orderReference":"ORDER-122",
+                  "evidenceRefs":["order:ORDER-122","payment:ORDER-122"],
+                  "riskScenario":"DUPLICATE_CHARGE","sufficiencyPolicyVersion":"evidence-sufficiency-v1",
+                  "evidence":[
+                    {"evidenceReference":"order:ORDER-122","applicability":["ORDER_IDENTITY"]},
+                    {"evidenceReference":"payment:ORDER-122","applicability":["PAYMENT_STATUS","REFUND_STATUS","ORDER_ELIGIBILITY"]},
+                    {"evidenceReference":"compensation:ORDER-122","applicability":["EXISTING_COMPENSATION"]},
+                    {"evidenceReference":"order-actions:ORDER-122","applicability":["PENDING_ACTIONS"]}
+                  ],
+                  "customerReply":{
+                    "schemaVersion":"customer-reply-v1",
+                    "body":"订单 ORDER-122 的支付状态为已支付，全额退款状态为未完成。重复扣款原因尚未查明，将交由人工核查，本次未执行退款。",
+                    "intent":"NO_COMPENSATION_RESOLUTION",
+                    "evidenceRefs":["order:ORDER-122","payment:ORDER-122"],
+                    "escalationRequired":false,"referencedOrder":"ORDER-122"
+                  }
+                }
+                """;
+        mvc.perform(
+                        post(
+                                        "/internal/agent/tickets/{ticketId}/generations/{generationId}/conclusions",
+                                        TICKET_ID,
+                                        GENERATION_ID)
+                                .headers(conclusionHeaders())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload))
+                .andExpect(status().isOk());
+        verify(service)
+                .submit(
+                        eq(TICKET_ID),
+                        eq(GENERATION_ID),
+                        eq("reply-request"),
+                        org.mockito.ArgumentMatchers.argThat(
+                                conclusion ->
+                                        conclusion.reasonCode()
+                                                        == DecisionReasonCode.DUPLICATE_CHARGE
+                                                && conclusion
+                                                        .evidenceRefs()
+                                                        .equals(
+                                                                List.of(
+                                                                        "order:ORDER-122",
+                                                                        "payment:ORDER-122"))));
+    }
+
+    @Test
+    void logisticsStillRejectsMissingDelayAtTheHttpBoundary() throws Exception {
+        String payload =
+                validConclusion("")
+                        .replace("\"delayHours\": 80,", "")
+                        .replace("\"delaySeconds\": 288000,", "");
+        mvc.perform(
+                        post(
+                                        "/internal/agent/tickets/{ticketId}/generations/{generationId}/conclusions",
+                                        TICKET_ID,
+                                        GENERATION_ID)
+                                .headers(conclusionHeaders())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload))
+                .andExpect(status().isUnprocessableEntity());
+        verify(service).auditRejected(TICKET_ID, "MALFORMED_CONCLUSION");
+        org.mockito.Mockito.verifyNoMoreInteractions(service);
+    }
+
+    @Test
     void rejectsConfidenceWithoutAReviewableEvidenceSufficiencyClaim() throws Exception {
         mvc.perform(
                         post(

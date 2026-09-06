@@ -8,6 +8,7 @@ import pytest
 from baseline_agent.customer_communication_model import (
     CustomerCommunicationFailure,
     CustomerCommunicationFailureCode,
+    FixedFakeCustomerCommunicationModel,
     StructuredCustomerCommunicationModel,
 )
 from baseline_agent.graph import (
@@ -38,6 +39,138 @@ from baseline_agent.investigation_model import (
     InvestigationReasonCode,
 )
 from baseline_agent.shadow_investigation import ShadowCandidate
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("fully_refunded", "legacy_checkpoint"), [(False, False), (True, False), (False, True)]
+)
+async def test_payment_graph_uses_payment_evidence_without_logistics_judgment(
+    monkeypatch: pytest.MonkeyPatch, fully_refunded: bool, legacy_checkpoint: bool
+) -> None:
+    catalog = _capability_catalog("DUPLICATE_CHARGE")
+    requirements = [
+        ("ORDER", "CONFIRM_ORDER", "orderReference", 0, "ORDER_IDENTITY"),
+        ("PAYMENT", "READ_PAYMENT_AND_REFUNDS", "paid", 0, "PAYMENT_STATUS"),
+        ("ORDER_CANCELLATION", "READ_PAYMENT_AND_REFUNDS", "cancelled", 0, "ORDER_ELIGIBILITY"),
+        ("REFUND_STATUS", "READ_PAYMENT_AND_REFUNDS", "fullyRefunded", 0, "REFUND_STATUS"),
+        (
+            "EXISTING_COMPENSATION",
+            "READ_COMPENSATION_AND_PENDING_ACTIONS",
+            "existingCompensation",
+            0,
+            "EXISTING_COMPENSATION",
+        ),
+        (
+            "PENDING_ACTION_COUNT",
+            "READ_COMPENSATION_AND_PENDING_ACTIONS",
+            "pendingActionCount",
+            1,
+            "PENDING_ACTIONS",
+        ),
+    ]
+    catalog["requiredFacts"] = {
+        "policyVersion": "evidence-sufficiency-v1",
+        "riskScenario": "DUPLICATE_CHARGE",
+        "facts": [
+            dict(
+                zip(
+                    ("factType", "capability", "resultField", "evidenceIndex", "applicability"),
+                    row,
+                    strict=True,
+                )
+            )
+            for row in requirements
+        ],
+    }
+    facts = _with_facts(fullyRefunded=fully_refunded, duplicateChargeSuspected=True)
+    calls: list[tuple[str, dict]] = []
+    native_client = httpx.AsyncClient
+
+    def spring(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if request.method == "GET":
+            if path.endswith("/capabilities"):
+                payload = catalog
+            elif path.endswith("/sibling-summary"):
+                payload = {"schemaVersion": "sibling-ticket-summary-v1", "tickets": []}
+            else:
+                payload = _catalog_or_customer_context(path)
+        else:
+            calls.append((path, json.loads(request.content)))
+            if "/capabilities/" in path:
+                payload = _capability_result(path, facts)
+            else:
+                payload = {"accepted": True, "lifecycleState": "INVESTIGATING"}
+        return httpx.Response(200, json=payload)
+
+    class ForbiddenLogisticsJudgment:
+        async def judge(self, _: object) -> object:
+            pytest.fail("payment investigation must not call the logistics judgment")
+
+    def forbidden_shadow() -> None:
+        pytest.fail("payment investigation must not construct a logistics shadow model")
+
+    monkeypatch.setattr(
+        "baseline_agent.graph.httpx.AsyncClient",
+        lambda **kwargs: native_client(**kwargs, transport=httpx.MockTransport(spring)),
+    )
+    monkeypatch.setattr(
+        "baseline_agent.graph.investigation_action_model", DeterministicActionModel()
+    )
+    monkeypatch.setattr(
+        "baseline_agent.graph.investigation_judgment_model", ForbiddenLogisticsJudgment()
+    )
+    monkeypatch.setattr("baseline_agent.graph.shadow_candidate_factory", forbidden_shadow)
+    monkeypatch.setattr(
+        "baseline_agent.graph.customer_communication_model", FixedFakeCustomerCommunicationModel()
+    )
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    monkeypatch.setenv("AGENT_INVESTIGATION_SHADOW_MODE", "offline")
+    checkpoint = None
+    if legacy_checkpoint:
+
+        async def confirm(_):
+            return _capability_result("/CONFIRM_ORDER", facts)
+
+        first = await ActionLoop(DeterministicActionModel().choose, ActionBudget()).advance(
+            None, confirm
+        )
+        assert isinstance(first, ActionLoopContinuation)
+        checkpoint = first.checkpoint
+        assert checkpoint["requiredFacts"] is None
+    result = await graph.ainvoke(
+        {
+            "investigation_progress": checkpoint,
+            "requested_by": "spring",
+            "ticket_id": "ticket-payment",
+            "generation_id": "generation-payment",
+            "issue_kind": "DUPLICATE_CHARGE",
+        }
+    )
+    conclusions = [body for path, body in calls if path.endswith("/conclusions")]
+    assert len(conclusions) == 1
+    conclusion = conclusions[0]
+    assert conclusion["riskScenario"] == "DUPLICATE_CHARGE"
+    assert conclusion["reasonCode"] == "DUPLICATE_CHARGE"
+    assert conclusion["compensationRequired"] is False
+    assert conclusion["evidenceRefs"] == ["order:ORDER-116", "payment:ORDER-116"]
+    assert "delayHours" not in conclusion and "delaySeconds" not in conclusion
+    assert "delaySeconds" not in result["facts"] and "logisticsStatus" not in result["facts"]
+    expected_reads = {
+        "READ_PAYMENT_AND_REFUNDS",
+        "READ_COMPENSATION_AND_PENDING_ACTIONS",
+    }
+    if not legacy_checkpoint:
+        expected_reads.add("CONFIRM_ORDER")
+    assert {
+        path.rsplit("/", 1)[-1] for path, _ in calls if "/capabilities/" in path
+    } == expected_reads
+    assert len(result["investigation_actions"]) == 4
+    assert not any(path.endswith("/human-handoff") for path, _ in calls)
+    assert not result.get("investigation_judgment_evidence", {}).get("providerAttempts")
+    assert "shadow_comparison" not in result
 
 
 @pytest.mark.asyncio
