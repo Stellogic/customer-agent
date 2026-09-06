@@ -32,7 +32,7 @@ from baseline_agent.investigation_action_loop import (
 
 _RESPONSES_ENDPOINT = "https://api.deepseek.com/responses"
 _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 503})
-ACTION_PROMPT_VERSION = "investigation-action-v4"
+ACTION_PROMPT_VERSION = "investigation-action-v5"
 ACTION_SCHEMA_VERSION = "investigation-action-v3"
 
 
@@ -481,6 +481,19 @@ def _build_request(
             "DELAY_DURATION covers measured delay hours/seconds, not only LOGISTICS_STATUS. "
             "ORDER_ELIGIBILITY covers payment, cancellation and refund eligibility together; "
             "PAYMENT_STATUS and REFUND_STATUS alone do not express that eligibility review. "
+            "For DUPLICATE_CHARGE (including fully refunded orders), evidence must cover "
+            "ORDER_IDENTITY, PAYMENT_STATUS, ORDER_ELIGIBILITY, REFUND_STATUS, "
+            "EXISTING_COMPENSATION, PENDING_ACTIONS and POLICY_BASIS. The payment/refund "
+            "capability's evidence supports the separate payment, cancellation eligibility "
+            "and refund checks; ORDER_ELIGIBILITY alone cannot replace PAYMENT_STATUS "
+            "or REFUND_STATUS. For PACKAGE_NOT_RECEIVED, cover ORDER_IDENTITY, "
+            "LOGISTICS_STATUS, ORDER_ELIGIBILITY, EXISTING_COMPENSATION, PENDING_ACTIONS "
+            "and POLICY_BASIS; DELAY_DURATION alone cannot replace LOGISTICS_STATUS. "
+            "For ORDER_OPERATION_OR_RULE, cover ORDER_IDENTITY, ORDER_RULE, "
+            "ORDER_ELIGIBILITY, PENDING_ACTIONS and POLICY_BASIS. For OTHER, cover "
+            "ORDER_IDENTITY, PENDING_ACTIONS and POLICY_BASIS. All applicability claims "
+            "must refer to supporting evidence from the supplied catalog; the presence "
+            "of an unrelated fact never substitutes for a required applicability. "
             "When customerQuestion is supplied, also choose knowledgeQuery: null when Spring "
             "facts alone answer the question, otherwise a short natural-language query for "
             "general customer guidance. Never put identifiers or private facts in the query. "
