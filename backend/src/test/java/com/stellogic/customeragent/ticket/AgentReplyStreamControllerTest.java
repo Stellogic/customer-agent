@@ -76,6 +76,35 @@ class AgentReplyStreamControllerTest {
     }
 
     @Test
+    void preservesWhitespaceOnlyContentDelta() throws Exception {
+        org.mockito.Mockito.when(service.append(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new AgentReplyStreamResult(false));
+        mvc.perform(
+                        post(
+                                        "/internal/agent/tickets/{ticketId}/generations/{generationId}/public-reply-events",
+                                        TICKET_ID,
+                                        GENERATION_ID)
+                                .header("Authorization", "Bearer agent-secret")
+                                .header("X-Agent-Generation-Id", GENERATION_ID)
+                                .header("X-Agent-Operation", "PUBLISH_PUBLIC_REPLY_EVENT")
+                                .header("Idempotency-Key", "stream-whitespace")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"type\":\"CONTENT_DELTA\",\"chunkIndex\":1,\"delta\":\" \"}"))
+                .andExpect(status().isAccepted());
+        verify(service)
+                .append(
+                        new AgentReplyStreamCommand(
+                                TICKET_ID,
+                                GENERATION_ID,
+                                "stream-whitespace",
+                                AgentReplyStreamEventType.CONTENT_DELTA,
+                                1,
+                                " ",
+                                null));
+    }
+
+    @Test
     void rejectsInternalFieldsBeforeTheyReachTheProductEventLog() throws Exception {
         mvc.perform(
                         post(

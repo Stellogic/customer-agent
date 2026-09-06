@@ -34,6 +34,7 @@
         'e2e/issue193.internal-shell.spec.ts'
     )
     Excluded = @{
+        'e2e/issue226.explicit-confirmation.spec.ts' = '仅由 issue226-confirmation-regression.ps1 在受控外部 Agent 的隔离栈中运行；补充故障回归，不代替正常产品链路门禁。'
         'e2e/issue215.intake-diagnostic.spec.ts' = '仅由持锁、冻结预算的诊断入口显式启用，不属于离线完整门禁。'
         'e2e/issue129.flash-customer-communication.spec.ts' = '仅由显式授权的真实模型验收脚本运行，不属于离线完整门禁。'
     }

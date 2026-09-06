@@ -26,6 +26,7 @@ class CustomerCommunicationFailureCode(StrEnum):
     INVALID_INPUT = "INVALID_INPUT"
     INVALID_OUTPUT = "INVALID_OUTPUT"
     MODEL_CALL_FAILED = "MODEL_CALL_FAILED"
+    PUBLICATION_FAILED = "PUBLICATION_FAILED"
 
 
 class CustomerCommunicationFailure(Exception):
