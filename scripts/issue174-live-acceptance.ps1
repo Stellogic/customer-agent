@@ -15,7 +15,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 . "$PSScriptRoot/gate-images.ps1"
 . "$PSScriptRoot/gate-resources.ps1"
 
-$projectLimitMicroCny = 11000000
+$projectLimitMicroCny = 12000000
 $expectedPriorMicroCny = 3810222
 $runReservationMicroCny = if ($IntakeDiagnostic) { 100000 } else { 1000000 }
 $logicalCallLimit = 100
@@ -57,7 +57,7 @@ function Get-SettledMicroCny($Ledger) {
 $ledger = Read-SharedLedger
 $settledBefore = Get-SettledMicroCny $ledger
 $pending = @($ledger.attempts | Where-Object status -eq 'PENDING')
-$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 26 }
+$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 27 }
 $additionalPending = [ordered]@{
     'issue174-investigation-diagnostic-01' = 1000000
     'issue217-live-20260905a' = 1000000
@@ -74,6 +74,7 @@ $additionalPending = [ordered]@{
     'issue174-intake-diagnostic-06' = 100000
     'issue174-live-06' = 1000000
     'issue174-live-07' = 1000000
+    'issue174-live-08' = 1000000
 }
 if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pending.Count -ne 5 -or
     @($pending | Where-Object { $_.phase -eq 'issue174-live-20260903a' -and $_.reserved_micro_cny -eq 1000000 }).Count -ne 1 -or
@@ -85,7 +86,7 @@ if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pend
 }
 if (-not $IntakeDiagnostic) {
     if ($InvestigationDiagnostic) { throw '旧诊断已结束；本次冻结仅允许五场景发布复验。' }
-    if ($RunId -ne 'issue174-live-08' -or $pending.Count -ne 26) { throw '须使用冻结运行标识并保留二十六笔 PENDING。' }
+    if ($RunId -ne 'issue174-live-09' -or $pending.Count -ne 27) { throw '须使用冻结运行标识并保留二十七笔 PENDING。' }
     foreach ($prior in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03', 'issue174-intake-diagnostic-01', 'issue174-intake-diagnostic-02', 'issue174-intake-diagnostic-03', 'issue174-intake-diagnostic-04', 'issue215-intake-diagnostic-01', 'issue215-intake-diagnostic-02', 'issue215-intake-diagnostic-03', 'issue215-intake-diagnostic-04')) {
         $amount = if ($prior -in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03')) { 1000000 } else { 100000 }
         if (@($pending | Where-Object { $_.phase -eq $prior -and $_.reserved_micro_cny -eq $amount }).Count -ne 1) {
@@ -133,7 +134,7 @@ $base = (git rev-parse origin/main).Trim()
 $projectName = "customer-agent-$RunId"
 $imageTag = "gate-$RunId"
 $evidenceDir = Join-Path $repoRoot ".local/gate-evidence/$RunId"
-$reportPath = Join-Path $repoRoot $(if ($InvestigationDiagnostic) { 'docs/delivery/issue-174-investigation-diagnostic-01-report.json' } else { 'docs/delivery/issue-174-live-report-08.json' })
+$reportPath = Join-Path $repoRoot $(if ($InvestigationDiagnostic) { 'docs/delivery/issue-174-investigation-diagnostic-01-report.json' } else { 'docs/delivery/issue-174-live-report-09.json' })
 $formalPath = Join-Path $evidenceDir 'formal-metrics.json'
 $overridePath = Join-Path ([IO.Path]::GetTempPath()) "$RunId.override.yaml"
 $catalogPath = Join-Path $repoRoot 'docs/implementation/issue-174-live-scenarios.json'
@@ -173,7 +174,7 @@ function Assert-FrozenCatalog {
     if (
         $catalog.status -ne 'FROZEN_AUTHORIZED_NOT_RUN' -or
         $catalog.executionAuthorized -ne $true -or
-        $catalog.revision -ne 8 -or
+        $catalog.revision -ne 9 -or
         $catalog.runId -ne $RunId -or
         $catalog.liveFreeze.promptVersionsBySeam.intake -ne 'intake-v3' -or
         $catalog.liveFreeze.promptVersionsBySeam.action -ne 'investigation-action-v4' -or
@@ -361,11 +362,59 @@ async def _issue174_record(self, record):
 InMemoryModelCallAuditSink.record = _issue174_record
 '@
         [IO.File]::WriteAllText($auditSourcePath, $auditSource)
+        $graphSourcePath = Join-Path $evidenceDir 'graph.py'
+        $graphSource = Get-Content (Join-Path $repoRoot 'agent/src/baseline_agent/graph.py') -Raw
+        $graphSource += @'
+
+
+import json as _issue174_json
+import re as _issue174_re
+
+ISSUE174_REJECTION_OBSERVER = True
+_original_issue174_request = _request_with_retries
+
+
+async def _request_with_retries(request):
+    try:
+        return await _original_issue174_request(request)
+    except httpx.HTTPStatusError as error:
+        if error.request.url.path.endswith("/conclusions"):
+            conclusion = _issue174_json.loads(error.request.content)
+            reply = conclusion.get("customerReply", {})
+            body = reply.get("body", "")
+            item = {
+                "httpStatus": error.response.status_code,
+                "reasonCode": conclusion.get("reasonCode"),
+                "riskScenario": conclusion.get("riskScenario"),
+                "compensationRequired": conclusion.get("compensationRequired"),
+                "delayHours": conclusion.get("delayHours"),
+                "delaySeconds": conclusion.get("delaySeconds"),
+                "replySchema": reply.get("schemaVersion"),
+                "replyIntent": reply.get("intent"),
+                "escalationRequired": reply.get("escalationRequired"),
+                "orderMatchesReply": conclusion.get("orderReference") == reply.get("referencedOrder"),
+                "evidenceMatchesReply": conclusion.get("evidenceRefs") == reply.get("evidenceRefs"),
+                "conclusionEvidenceCount": len(conclusion.get("evidenceRefs", [])),
+                "replyEvidenceCount": len(reply.get("evidenceRefs", [])),
+                "bodyLength": len(body),
+                "bodyIsBlank": not body.strip(),
+                "claimedDelayHours": _issue174_re.findall(r"(\d+)\s*小时", body),
+                "mentionsPendingApproval": "补偿建议正在等待人工审批" in body,
+            }
+            with open("/diagnostics/rejected-conclusions.jsonl", "a", encoding="utf-8") as output:
+                output.write(_issue174_json.dumps(item, ensure_ascii=False) + "\n")
+        raise
+'@
+        [IO.File]::WriteAllText($graphSourcePath, $graphSource)
         @"
     volumes:
       - type: bind
         source: $($auditSourcePath.Replace('\', '/'))
         target: /app/src/baseline_agent/deepseek_investigation_model.py
+        read_only: true
+      - type: bind
+        source: $($graphSourcePath.Replace('\', '/'))
+        target: /app/src/baseline_agent/graph.py
         read_only: true
       - type: bind
         source: $($evidenceDir.Replace('\', '/'))
@@ -426,7 +475,7 @@ def _diagnostic_response_failure(classification):
     $artifactsAvailable = $true
     if (-not $IntakeDiagnostic -and -not $InvestigationDiagnostic) {
         Invoke-Compose @('exec', '--no-TTY', 'agent-server', 'python', '-c',
-            'from baseline_agent import deepseek_investigation_model as m; assert m.ISSUE174_AUDIT_OBSERVER; from pathlib import Path; p=Path("/diagnostics/.write-probe"); p.write_text("ready"); p.unlink(); print("AUDIT_OBSERVER_IMPORT_AND_WRITE_PASS")')
+            'from baseline_agent import deepseek_investigation_model as m; assert m.ISSUE174_AUDIT_OBSERVER; import importlib; g=importlib.import_module("baseline_agent.graph"); assert g.ISSUE174_REJECTION_OBSERVER; from pathlib import Path; p=Path("/diagnostics/.write-probe"); p.write_text("ready"); p.unlink(); print("AUDIT_OBSERVER_IMPORT_AND_WRITE_PASS")')
     }
 
     if ($IntakeDiagnostic) {
