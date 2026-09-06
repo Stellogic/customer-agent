@@ -82,6 +82,64 @@ final class EvidenceSufficiencyPolicy {
 
     private EvidenceSufficiencyPolicy() {}
 
+    static RequiredInvestigationFacts requiredFacts(String issueKind) {
+        // Other scenarios retain their existing model path until the next scenario slice migrates
+        // them.
+        if (!"LOGISTICS_DELAY".equals(issueKind)) return null;
+        return new RequiredInvestigationFacts(
+                VERSION,
+                InvestigationRiskScenario.LOGISTICS_DELAY,
+                LOGISTICS_DELAY_REQUIRED.entrySet().stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .map(entry -> requirement(entry.getKey(), entry.getValue()))
+                        .toList());
+    }
+
+    private static RequiredInvestigationFact requirement(
+            String factType, EvidenceApplicability applicability) {
+        CapabilityFactSource source = CapabilityFactSource.forFact(factType);
+        return new RequiredInvestigationFact(
+                factType,
+                source.capability(),
+                source.resultField(),
+                source.evidenceIndex(),
+                applicability);
+    }
+
+    static List<RequiredInvestigationFact> missingRequirements(
+            InvestigationConclusion conclusion, List<PersistedInvestigationFact> facts) {
+        EvidenceSufficiencyClaim claim = conclusion.sufficiency();
+        if (claim == null
+                || claim.riskScenario() == null
+                || !REQUIRED_BY_SCENARIO.containsKey(claim.riskScenario())) return List.of();
+        Map<String, PersistedInvestigationFact> byType = new HashMap<>();
+        facts.forEach(fact -> byType.put(fact.factType(), fact));
+        return REQUIRED_BY_SCENARIO.get(claim.riskScenario()).entrySet().stream()
+                .filter(
+                        entry -> {
+                            PersistedInvestigationFact fact = byType.get(entry.getKey());
+                            return fact == null
+                                    || claim.evidence() == null
+                                    || claim.evidence().stream()
+                                            .noneMatch(
+                                                    evidence ->
+                                                            evidence != null
+                                                                    && fact.evidenceReference()
+                                                                            .equals(
+                                                                                    evidence
+                                                                                            .evidenceReference())
+                                                                    && evidence.applicability()
+                                                                            != null
+                                                                    && evidence.applicability()
+                                                                            .contains(
+                                                                                    entry
+                                                                                            .getValue()));
+                        })
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> requirement(entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
     static String validate(
             InvestigationConclusion conclusion,
             List<PersistedInvestigationFact> facts,

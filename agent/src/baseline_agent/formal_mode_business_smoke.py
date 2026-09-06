@@ -113,6 +113,7 @@ def _verify_autonomous_actions(
     if not isinstance(actions, list):
         raise RuntimeError("formal autonomous action records are missing")
     action_types = [action.get("actionType") for action in actions if isinstance(action, dict)]
+    logistics = values.get("issue_kind", "LOGISTICS_DELAY") == "LOGISTICS_DELAY"
     required = {
         "CONFIRM_ORDER",
         "READ_LOGISTICS",
@@ -122,6 +123,9 @@ def _verify_autonomous_actions(
         "READ_ORDER_RULES",
         "SUBMIT_CONCLUSION",
     }
+    if logistics:
+        required.remove("READ_ORDER_RULES")
+    expected_model_calls = 1 if logistics else 6
     if len(action_types) != len(required) or set(action_types) != required:
         raise RuntimeError(f"formal autonomous action set is incomplete: {action_types}")
     if any(
@@ -147,7 +151,7 @@ def _verify_autonomous_actions(
         or run_evidence["failureClassification"] != ""
         or run_evidence["toolRounds"] != 5
         or not isinstance(run_evidence["providerAttempts"], int)
-        or not 1 <= run_evidence["providerAttempts"] <= 6
+        or not 1 <= run_evidence["providerAttempts"] <= expected_model_calls
         or not isinstance(run_evidence["tokens"], int)
         or not 1 <= run_evidence["tokens"] <= 12_000
         or not isinstance(run_evidence["costMicros"], int)
@@ -157,13 +161,15 @@ def _verify_autonomous_actions(
     model_calls = run_evidence["modelCalls"]
     if (
         not isinstance(model_calls, list)
-        or len(model_calls) != 6
+        or len(model_calls) != expected_model_calls
         or [call.get("callNumber") for call in model_calls if isinstance(call, dict)]
-        != list(range(1, 7))
+        != list(range(1, expected_model_calls + 1))
         or sum(call.get("providerAttempts", 0) for call in model_calls if isinstance(call, dict))
         != run_evidence["providerAttempts"]
     ):
         raise RuntimeError("formal autonomous per-call evidence is incomplete")
+    if logistics and model_calls[0].get("selectedAction") != "SUBMIT_CONCLUSION":
+        raise RuntimeError("required logistics reads were incorrectly counted as model choices")
     judgment_evidence = values.get("investigation_judgment_evidence")
     if (
         not isinstance(judgment_evidence, dict)
@@ -226,8 +232,8 @@ def _verify_autonomous_actions(
         + judgment_evidence["costMicros"]
         + communication_evidence["costMicros"]
     )
-    logical_limit = 8 if expect_customer_communication else 7
-    attempt_limit = 9 if expect_customer_communication else 7
+    logical_limit = expected_model_calls + 1 + int(expect_customer_communication)
+    attempt_limit = expected_model_calls + 1 + (2 if expect_customer_communication else 0)
     if total_logical_calls > logical_limit or total_provider_attempts > attempt_limit:
         raise RuntimeError("formal provider call hard limit was exceeded")
     serialized = json.dumps(values, ensure_ascii=False)
@@ -255,7 +261,7 @@ def _validate_success_state(state: dict[str, object]) -> None:
         "handoffReasonCode": None,
         "proposalCount": 1,
         "handoffRequestCount": 0,
-        "authoritativeFactCount": 8,
+        "authoritativeFactCount": 11,
         "agentCommandCount": 6,
     }
     actual = {name: state.get(name) for name in expected}

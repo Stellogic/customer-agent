@@ -48,7 +48,8 @@ class AgentInvestigationCapabilityControllerTest {
                                                                 "matchStatus",
                                                                 InvestigationCapabilityValueType
                                                                         .STRING,
-                                                                true))))));
+                                                                true)))),
+                                null));
 
         mvc.perform(
                         get(

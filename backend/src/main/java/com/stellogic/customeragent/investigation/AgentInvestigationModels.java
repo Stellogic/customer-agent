@@ -4,7 +4,70 @@ import java.util.List;
 import java.util.UUID;
 
 record InvestigationCapabilityCatalog(
-        String schemaVersion, List<InvestigationCapabilityDefinition> capabilities) {}
+        String schemaVersion,
+        List<InvestigationCapabilityDefinition> capabilities,
+        RequiredInvestigationFacts requiredFacts) {}
+
+record RequiredInvestigationFacts(
+        String policyVersion,
+        InvestigationRiskScenario riskScenario,
+        List<RequiredInvestigationFact> facts) {}
+
+record RequiredInvestigationFact(
+        String factType,
+        InvestigationCapability capability,
+        String resultField,
+        int evidenceIndex,
+        EvidenceApplicability applicability) {}
+
+record CapabilityFactSource(
+        InvestigationCapability capability, String resultField, int evidenceIndex) {
+    // Describes existing capability outputs; scenario requirements remain in
+    // EvidenceSufficiencyPolicy.
+    static CapabilityFactSource forFact(String factType) {
+        return switch (factType) {
+            case "ORDER" ->
+                    new CapabilityFactSource(
+                            InvestigationCapability.CONFIRM_ORDER, "orderReference", 0);
+            case "LOGISTICS_DELAY_HOURS" ->
+                    new CapabilityFactSource(
+                            InvestigationCapability.READ_LOGISTICS, "delayHours", 0);
+            case "LOGISTICS_DELAY_SECONDS" ->
+                    new CapabilityFactSource(
+                            InvestigationCapability.READ_LOGISTICS, "delaySeconds", 0);
+            case "LOGISTICS_STATUS" ->
+                    new CapabilityFactSource(
+                            InvestigationCapability.READ_LOGISTICS, "logisticsStatus", 0);
+            case "PAYMENT" ->
+                    new CapabilityFactSource(
+                            InvestigationCapability.READ_PAYMENT_AND_REFUNDS, "paid", 0);
+            case "ORDER_CANCELLATION" ->
+                    new CapabilityFactSource(
+                            InvestigationCapability.READ_PAYMENT_AND_REFUNDS, "cancelled", 0);
+            case "REFUND_STATUS" ->
+                    new CapabilityFactSource(
+                            InvestigationCapability.READ_PAYMENT_AND_REFUNDS, "fullyRefunded", 0);
+            case "EXISTING_COMPENSATION" ->
+                    new CapabilityFactSource(
+                            InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
+                            "existingCompensation",
+                            0);
+            case "PENDING_ACTION_COUNT" ->
+                    new CapabilityFactSource(
+                            InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
+                            "pendingActionCount",
+                            1);
+            case "POLICY" ->
+                    new CapabilityFactSource(
+                            InvestigationCapability.READ_APPLICABLE_POLICY, "policyVersion", 0);
+            case "ORDER_RULE" ->
+                    new CapabilityFactSource(
+                            InvestigationCapability.READ_ORDER_RULES, "orderRuleSummary", 0);
+            default ->
+                    throw new IllegalArgumentException("unknown capability fact type: " + factType);
+        };
+    }
+}
 
 record CustomerCommunicationContext(
         String schemaVersion,

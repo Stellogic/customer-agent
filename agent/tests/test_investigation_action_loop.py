@@ -49,6 +49,123 @@ def _evidence_claims() -> tuple[EvidenceClaim, ...]:
     )
 
 
+def _required_logistics_facts() -> dict:
+    # Spring 能力目录给出的策略样例;模型不自行维护这份必需规则。
+    rows = [
+        ("ORDER", "CONFIRM_ORDER", "orderReference", 0, "ORDER_IDENTITY"),
+        ("LOGISTICS_DELAY_HOURS", "READ_LOGISTICS", "delayHours", 0, "DELAY_DURATION"),
+        ("LOGISTICS_DELAY_SECONDS", "READ_LOGISTICS", "delaySeconds", 0, "DELAY_DURATION"),
+        ("PAYMENT", "READ_PAYMENT_AND_REFUNDS", "paid", 0, "ORDER_ELIGIBILITY"),
+        ("ORDER_CANCELLATION", "READ_PAYMENT_AND_REFUNDS", "cancelled", 0, "ORDER_ELIGIBILITY"),
+        ("REFUND_STATUS", "READ_PAYMENT_AND_REFUNDS", "fullyRefunded", 0, "ORDER_ELIGIBILITY"),
+        (
+            "EXISTING_COMPENSATION",
+            "READ_COMPENSATION_AND_PENDING_ACTIONS",
+            "existingCompensation",
+            0,
+            "EXISTING_COMPENSATION",
+        ),
+        (
+            "PENDING_ACTION_COUNT",
+            "READ_COMPENSATION_AND_PENDING_ACTIONS",
+            "pendingActionCount",
+            1,
+            "PENDING_ACTIONS",
+        ),
+        ("POLICY", "READ_APPLICABLE_POLICY", "policyVersion", 0, "POLICY_BASIS"),
+    ]
+    return {
+        "policyVersion": "evidence-sufficiency-v1",
+        "riskScenario": "LOGISTICS_DELAY",
+        "facts": [
+            dict(
+                zip(
+                    ("factType", "capability", "resultField", "evidenceIndex", "applicability"),
+                    row,
+                    strict=True,
+                )
+            )
+            for row in rows
+        ],
+    }
+
+
+@pytest.mark.asyncio
+async def test_required_fact_reads_resume_without_model_calls_and_ground_submission() -> None:
+    chosen_contexts: list[dict] = []
+    read_capabilities: set[InvestigationCapability] = set()
+
+    async def choose(context: dict) -> ActionDecision:
+        chosen_contexts.append(context)
+        return ActionDecision.from_values(
+            TerminalAction.SUBMIT_CONCLUSION, {}, ActionUsage(tokens=17, cost_micros=2)
+        )
+
+    async def execute(action) -> dict:
+        read_capabilities.add(action.kind)
+        return _progress_for(action.kind)
+
+    loop = ActionLoop(choose, ActionBudget(), required_facts=_required_logistics_facts())
+    first = await loop.advance(None, execute)
+    assert isinstance(first, ActionLoopContinuation)
+    assert first.checkpoint["modelCalls"] == []
+    assert first.checkpoint["providerAttempts"] == 0
+    assert chosen_contexts == []
+    checkpoint = first.checkpoint
+    # 新实例从持久化 checkpoint 恢复必读策略,不能丢失或重复调用已取得事实。
+    while True:
+        result = await ActionLoop(choose, ActionBudget()).advance(checkpoint, execute)
+        if not isinstance(result, ActionLoopContinuation):
+            break
+        checkpoint = result.checkpoint
+
+    assert read_capabilities == {
+        InvestigationCapability.CONFIRM_ORDER,
+        InvestigationCapability.READ_LOGISTICS,
+        InvestigationCapability.READ_PAYMENT_AND_REFUNDS,
+        InvestigationCapability.READ_COMPENSATION_AND_PENDING_ACTIONS,
+        InvestigationCapability.READ_APPLICABLE_POLICY,
+    }
+    assert len(chosen_contexts) == 1
+    assert result.terminal_action is TerminalAction.SUBMIT_CONCLUSION
+    assert result.provider_attempts == 1
+    assert result.tokens == 17
+    assert result.cost_micros == 2
+    assert len(result.model_calls) == 1
+    assert len(result.records) == 6
+    assert {
+        claim.evidence_reference: set(claim.applicability) for claim in result.evidence_claims
+    } == {
+        "order:ORDER-120": {"ORDER_IDENTITY"},
+        "logistics:ORDER-120": {"DELAY_DURATION"},
+        "payment:ORDER-120": {"ORDER_ELIGIBILITY"},
+        "compensation:ORDER-120": {"EXISTING_COMPENSATION"},
+        "order-actions:ORDER-120": {"PENDING_ACTIONS"},
+        "policy:delay-policy-v1": {"POLICY_BASIS"},
+    }
+
+
+@pytest.mark.asyncio
+async def test_failed_program_read_identifies_capability_without_model_call() -> None:
+    async def choose(_: dict) -> ActionDecision:
+        raise AssertionError("required read must not call the model")
+
+    async def execute(_) -> dict:
+        raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
+
+    with pytest.raises(ActionLoopFailure) as caught:
+        await ActionLoop(choose, ActionBudget(), required_facts=_required_logistics_facts()).run(
+            execute
+        )
+    error = caught.value
+    assert error.code is ActionLoopFailureCode.TOOL_FAILURE
+    assert [(record.action_type, record.result_code) for record in error.records] == [
+        ("CONFIRM_ORDER", "TOOL_FAILURE")
+    ]
+    assert error.model_calls == ()
+    assert error.provider_attempts == error.tokens == error.cost_micros == 0
+
+
 @pytest.mark.parametrize(
     ("tokens", "cost_micros", "provider_attempts"),
     [(-1, 0, 1), (0, -1, 1), (0, 0, 0), (True, 0, 1)],

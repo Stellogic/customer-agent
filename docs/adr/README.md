@@ -18,6 +18,8 @@
 | [一个 React 应用使用两个界面壳](./0001-one-react-application-two-shells.md) | accepted | 客户与内部工作台的界面壳、路由、导航和数据投影边界 |
 | [渐进采用内部工作台组件栈](./0002-incremental-internal-workbench-stack.md) | accepted | Vite、React Router、Ant Design 与 Pro Components 的采用边界 |
 | [分离登录入口并保持单主体 Session](./0003-separate-login-entry-single-subject-session.md) | accepted | 客户/内部登录入口、Session 主体、capability、CSRF 与 SSE 重授权 |
+| [采用受控的 L2 Agent 自治](./0006-bounded-level-two-agent-autonomy.md) | accepted；必需事实与证据职责部分被 ADR 0010 替代 | 受控调查自治、Spring 业务权威；原决定保留供追溯 |
+| [程序承担必需事实读取与规则明确的证据对应](./0010-deterministic-required-facts-and-evidence.md) | accepted | Spring 定义场景必需规则，程序执行必读与机械证据对应，模型承担补充调查和语义判断 |
 
 ## 工程与验证 ADR
 
@@ -35,6 +37,7 @@
 | [#11 客服工单调查与补偿审批 Agent MVP 首个纵向切片](../specs/issue-11.md) | Spring 业务权威、LangGraph 私有编排、可靠提交、权限与数据边界、产品事件投影、持久化和验收矩阵 |
 | [#71 统一客户帮助中心与内部工作台的登录、鉴权及路由](../specs/issue-71.md) | 双界面壳、身份与 Session、页面 capability、资源授权、路由和迁移边界 |
 | [#95 依据高保真原型统一视觉体验](../specs/issue-95.md) | 原型与真实 DTO/API/权限的边界，以及既有架构决策不被视觉实现替代的约束 |
+| [#227 收敛核心客服路径与必需事实及证据职责](../specs/issue-227.md) | 对 #149 的局部修订；必需事实、补充调查和证据职责，物流与支付场景契约及阶段交付边界 |
 
 ## Wayfinder 历史决策链
 

@@ -32,8 +32,9 @@ from baseline_agent.investigation_action_loop import (
 
 _RESPONSES_ENDPOINT = "https://api.deepseek.com/responses"
 _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 503})
-ACTION_PROMPT_VERSION = "investigation-action-v4"
-ACTION_SCHEMA_VERSION = "investigation-action-v3"
+# v5/v6 保留给旧分支候选;v7 标识必需事实转由程序负责的新契约。
+ACTION_PROMPT_VERSION = "investigation-action-v7"
+ACTION_SCHEMA_VERSION = "investigation-action-v4"
 
 
 @dataclass(frozen=True)
@@ -294,11 +295,27 @@ def _controlled_facts(facts: dict) -> dict[str, object]:
         "evidenceCatalog",
         "customerQuestion",
         "issueKind",
+        "requiredFacts",
+        "requiredFactsComplete",
+        "actionBudget",
     }
     if not set(facts).issubset(allowed):
         raise _failure()
     if "customerQuestion" in facts and not isinstance(facts["customerQuestion"], str):
         raise _failure()
+    if ("requiredFacts" in facts or "requiredFactsComplete" in facts) and (
+        not isinstance(facts.get("requiredFacts"), dict)
+        or not isinstance(facts.get("requiredFactsComplete"), bool)
+    ):
+        raise _failure()
+    if "actionBudget" in facts:
+        budget = facts["actionBudget"]
+        if (
+            not isinstance(budget, dict)
+            or set(budget) != {"remainingActions", "remainingProviderAttempts"}
+            or not all(type(value) is int and value >= 0 for value in budget.values())
+        ):
+            raise _failure()
     sibling_tickets = facts.get("siblingTickets", [])
     if (
         not isinstance(sibling_tickets, list)
@@ -352,6 +369,25 @@ def _allowed_actions(facts: dict[str, object]) -> tuple[str, ...]:
     reference = facts.get("orderReference")
     if match_status != "UNIQUE" or not isinstance(reference, str) or not reference:
         return (TerminalAction.HANDOFF.value,)
+    if facts.get("requiredFactsComplete") is True:
+        catalog = facts.get("evidenceCatalog", [])
+        assert isinstance(catalog, list)
+        completed = {item["actionType"] for item in catalog}
+        budget = facts.get("actionBudget")
+        can_read_more = not isinstance(budget, dict) or (
+            budget["remainingActions"] >= 2 and budget["remainingProviderAttempts"] >= 2
+        )
+        return (
+            *(
+                capability.value
+                for capability in InvestigationCapability
+                if capability is not InvestigationCapability.CONFIRM_ORDER
+                and capability.value not in completed
+                and can_read_more
+            ),
+            TerminalAction.HANDOFF.value,
+            TerminalAction.SUBMIT_CONCLUSION.value,
+        )
     completion_markers = {
         InvestigationCapability.READ_LOGISTICS: "delaySeconds",
         InvestigationCapability.READ_PAYMENT_AND_REFUNDS: "paid",
@@ -417,7 +453,7 @@ def _build_request(
     facts: dict[str, object],
     allowed_actions: tuple[str, ...],
 ) -> dict[str, Any]:
-    is_submission = allowed_actions == (TerminalAction.SUBMIT_CONCLUSION.value,)
+    is_submission = TerminalAction.SUBMIT_CONCLUSION.value in allowed_actions
     properties: dict[str, Any] = {
         "action": {"type": "string", "enum": list(allowed_actions)},
     }
@@ -426,7 +462,7 @@ def _build_request(
         evidence_references = _catalog_references(facts)
         properties["evidence"] = {
             "type": "array",
-            "minItems": 1,
+            "minItems": 0 if facts.get("requiredFactsComplete") is True else 1,
             "maxItems": len(evidence_references),
             "items": {
                 "type": "object",
@@ -467,20 +503,26 @@ def _build_request(
             "Return exactly one JSON object matching the supplied schema, without Markdown "
             "code fences or surrounding explanation. "
             "Use only the enumerated action and return no facts or identifiers. "
-            "Missing facts are expected investigation work, not uncertainty: when matchStatus is "
-            "missing select CONFIRM_ORDER; when it is AMBIGUOUS select REQUEST_CLARIFICATION; "
-            "when it is UNIQUE select any one still-unread fact capability. Submit only after all "
-            "order, logistics, payment/refund, compensation/pending-action and policy facts exist. "
-            "For SUBMIT_CONCLUSION, independently select evidenceReference values only from the "
-            "supplied evidenceCatalog and state each selected fact's applicability; Spring will "
-            "validate whether that evidence combination is sufficient. "
-            "issueKind is the Spring-confirmed investigation type; the customer's wording "
-            "does not replace it. For LOGISTICS_DELAY, evidence must cover ORDER_IDENTITY, "
-            "DELAY_DURATION, ORDER_ELIGIBILITY, EXISTING_COMPENSATION, PENDING_ACTIONS and "
-            "POLICY_BASIS when those facts are supported by the supplied catalog. "
-            "DELAY_DURATION covers measured delay hours/seconds, not only LOGISTICS_STATUS. "
-            "ORDER_ELIGIBILITY covers payment, cancellation and refund eligibility together; "
-            "PAYMENT_STATUS and REFUND_STATUS alone do not express that eligibility review. "
+            "When requiredFactsComplete is true, the program has read Spring-required facts "
+            "and will construct their mandatory evidence applicability from authoritative results. "
+            "Do not repeat those reads or mechanically reproduce their evidence: evidence=[] is "
+            "valid for SUBMIT_CONCLUSION. Decide whether optional investigation, handoff or "
+            "submission is appropriate. Clarification is available for AMBIGUOUS order matches. "
+            "Unread optional capabilities "
+            "are choices, not requirements; READ_ORDER_RULES is not required for logistics. "
+            "For non-submission actions return evidence=[] and knowledgeQuery=null when those "
+            "fields occur in the schema. Supplemental evidence must use only actual supplied "
+            "evidenceCatalog references and supported applicability. "
+            "When requiredFactsComplete is absent, use the existing investigation path: missing "
+            "matchStatus requires CONFIRM_ORDER, AMBIGUOUS requires REQUEST_CLARIFICATION, "
+            "and UNIQUE requires the still-unread capabilities offered by the action enum. "
+            "On that path SUBMIT_CONCLUSION requires selecting sufficient evidence from the "
+            "catalog, including ORDER_IDENTITY, DELAY_DURATION, ORDER_ELIGIBILITY, "
+            "EXISTING_COMPENSATION, PENDING_ACTIONS and POLICY_BASIS for LOGISTICS_DELAY. "
+            "DELAY_DURATION covers measured delay hours/seconds; ORDER_ELIGIBILITY covers "
+            "payment, cancellation and refund eligibility together. Spring validates evidence. "
+            "issueKind is the Spring-confirmed investigation type; customer wording does not "
+            "replace it. "
             "When customerQuestion is supplied, also choose knowledgeQuery: null when Spring "
             "facts alone answer the question, otherwise a short natural-language query for "
             "general customer guidance. Never put identifiers or private facts in the query. "
@@ -577,10 +619,10 @@ def _parse_response(
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.INVALID_JSON) from None
     expected_fields = (
         {"action", "evidence"}
-        if allowed_actions == (TerminalAction.SUBMIT_CONCLUSION.value,)
+        if TerminalAction.SUBMIT_CONCLUSION.value in allowed_actions
         else {"action"}
     )
-    if allowed_actions == (TerminalAction.SUBMIT_CONCLUSION.value,) and "customerQuestion" in facts:
+    if TerminalAction.SUBMIT_CONCLUSION.value in allowed_actions and "customerQuestion" in facts:
         expected_fields.add("knowledgeQuery")
     if not isinstance(structured, dict) or set(structured) != expected_fields:
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
@@ -594,11 +636,17 @@ def _parse_response(
         not isinstance(knowledge_query, str) or not 1 <= len(knowledge_query.strip()) <= 200
     ):
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
+    if action != TerminalAction.SUBMIT_CONCLUSION.value and (
+        structured.get("evidence", []) != [] or knowledge_query is not None
+    ):
+        raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     evidence_claims: tuple[EvidenceClaim, ...] = ()
     if "evidence" in structured:
         evidence = structured["evidence"]
         catalog_references = set(_catalog_references(facts))
-        if not isinstance(evidence, list) or not evidence:
+        if not isinstance(evidence, list) or (
+            not evidence and facts.get("requiredFactsComplete") is not True
+        ):
             raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
         try:
             evidence_claims = tuple(
