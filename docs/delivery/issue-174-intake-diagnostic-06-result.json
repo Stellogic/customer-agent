@@ -1,0 +1,56 @@
+{
+  "schema": "issue174-intake-single-request-diagnostic-v1",
+  "runId": "issue174-intake-diagnostic-06",
+  "testedHead": "d96b8950bae74fd2e8342109162030d2ae3c286b",
+  "releaseAcceptance": false,
+  "outcome": "INITIAL_INTAKE_VALID_PREVIOUS_FAILURE_NOT_REPRODUCED",
+  "browser": {
+    "schema": "issue174-intake-diagnostic-v1",
+    "releaseAcceptance": false,
+    "stage": "INITIAL_OBSERVED",
+    "headingWithinFiveSeconds": null,
+    "responseMessageVisible": null,
+    "observations": [
+      {
+        "httpStatus": 201,
+        "elapsedMs": 5696,
+        "status": "NEEDS_CLARIFICATION",
+        "assisted": false,
+        "candidatePresent": true,
+        "candidateMatchesFixture": true,
+        "clarificationKind": "DUPLICATE_CHARGE",
+        "issueCount": 1,
+        "issueKinds": [
+          "PACKAGE_NOT_RECEIVED"
+        ]
+      }
+    ]
+  },
+  "model": [
+    {
+      "stage": "HTTP_RESPONSE",
+      "httpStatus": 200,
+      "providerStatus": "completed",
+      "input_tokens": 2077,
+      "output_tokens": 521,
+      "total_tokens": 2598
+    },
+    {
+      "stage": "RETURNED",
+      "durationMs": 3160,
+      "visibleOrderCount": 30,
+      "candidatePresent": true,
+      "candidateMentionedInInput": true,
+      "issueKinds": [
+        "PACKAGE_NOT_RECEIVED"
+      ],
+      "pendingKinds": [
+        "DUPLICATE_CHARGE"
+      ],
+      "status": "NEEDS_CLARIFICATION"
+    }
+  ],
+  "reservationMicroCny": 100000,
+  "reservationStatus": "PENDING",
+  "rawPromptOrResponseSaved": false
+}

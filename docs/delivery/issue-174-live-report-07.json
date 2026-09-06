@@ -1,0 +1,26 @@
+{
+  "schema": "issue-174-live-release-v1",
+  "status": "INCOMPLETE",
+  "runId": "issue174-live-07",
+  "releaseAcceptance": true,
+  "testedHead": "3571f267547fa75beb84ace03f413503022ebc64",
+  "base": "474e6068ca1f562a60d67518bba1619a1a3582ef",
+  "model": "deepseek-v4-flash",
+  "completedScenarios": 1,
+  "failure": "存在供应商尝试但 usage 未确认，保留预算预留并停止。",
+  "calls": {
+    "logical": 22,
+    "providerAttempts": 22
+  },
+  "tokens": {
+    "knownTotal": 13487,
+    "intake": null
+  },
+  "cost": {
+    "observedUpperMicroCny": 106802,
+    "reservedMicroCny": 1000000,
+    "pending": 1,
+    "note": "任一场景失败都可能包含未持久化的受理尝试；保留整轮预留，禁止再次使用。"
+  },
+  "productionScope": "NOT_EVALUATED"
+}

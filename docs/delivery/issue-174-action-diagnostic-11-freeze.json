@@ -1,0 +1,17 @@
+{
+  "maxOutputTokens": 1024,
+  "availableBeforeMicroCny": 3220000,
+  "reservedMicroCny": 100000,
+  "maximumProviderAttempts": 1,
+  "businessSideEffects": "NONE",
+  "maximumLogicalCalls": 1,
+  "budgetBasisBeforeMicroCny": 12900000,
+  "runId": "issue174-action-diagnostic-11",
+  "schema": "investigation-action-v3",
+  "note": "独立合成事实，仅诊断行动最终响应；不创建工单，不冒充真实发布验收，旧29笔预留保留。",
+  "releaseAcceptance": false,
+  "status": "AUTHORIZED_NOT_RUN",
+  "projectLimitMicroCny": 16120000,
+  "model": "deepseek-v4-flash",
+  "prompt": "investigation-action-v5"
+}

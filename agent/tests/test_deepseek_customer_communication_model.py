@@ -703,3 +703,39 @@ def _streamed_with_delta(payload: dict[str, object], delta: str) -> httpx.Respon
     return httpx.Response(
         200, headers={"Content-Type": "text/event-stream"}, content=content.encode()
     )
+
+
+@pytest.mark.asyncio
+async def test_spring_publication_http_error_is_not_a_provider_rejection() -> None:
+    from baseline_agent.deepseek_investigation_model import InMemoryModelCallAuditSink
+
+    audit = InMemoryModelCallAuditSink()
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(
+            lambda _: _streamed(
+                _completed(
+                    "调查结果显示，订单 ORDER-C129 的物流出现延迟。"
+                    "补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
+                )
+            )
+        ),
+        audit_sink=audit,
+    )
+
+    published: list[str] = []
+
+    async def publish(_delta: str) -> None:
+        published.append(_delta)
+        response = httpx.Response(
+            400, request=httpx.Request("POST", "http://backend/public-reply-events")
+        )
+        response.raise_for_status()
+
+    with pytest.raises(CustomerCommunicationFailure) as failure:
+        await model.compose(_input(), on_body_delta=publish)
+    assert published
+    assert failure.value.code.value == "PUBLICATION_FAILED"
+    assert len(audit.records) == 1
+    assert audit.records[0].provider_http_status == 200
+    assert audit.records[0].failure_classification.value == "PUBLIC_REPLY_PUBLISH_FAILED"

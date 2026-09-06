@@ -1,0 +1,17 @@
+{
+  "maxOutputTokens": 384,
+  "prompt": "customer-communication-v2",
+  "status": "AUTHORIZED_NOT_RUN",
+  "releaseAcceptance": false,
+  "businessSideEffects": "NONE",
+  "maximumProviderAttempts": 1,
+  "reservedMicroCny": 100000,
+  "availableBeforeMicroCny": 3140000,
+  "maximumLogicalCalls": 1,
+  "budgetBasisBeforeMicroCny": 16000000,
+  "model": "deepseek-v4-flash",
+  "note": "仅合成物流延迟回复流，回调不发布客户消息；记录失败行号/异常类型/受控校验信息，不保存原始响应。33笔旧预留保留。",
+  "runId": "issue174-reply-diagnostic-14",
+  "projectLimitMicroCny": 19140000,
+  "schema": "customer-reply-v1"
+}

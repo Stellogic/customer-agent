@@ -1,0 +1,48 @@
+{
+  "runId": "issue174-action-diagnostic-11",
+  "releaseAcceptance": false,
+  "maximumAttempts": 1,
+  "reservedMicroCny": 100000,
+  "businessSideEffects": "NONE",
+  "status": "PARSE_PASS_NOT_RELEASE_ACCEPTANCE",
+  "selectedAction": "SUBMIT_CONCLUSION",
+  "claimsByCapability": {
+    "CONFIRM_ORDER": [
+      [
+        "ORDER_IDENTITY"
+      ]
+    ],
+    "READ_LOGISTICS": [],
+    "READ_PAYMENT_AND_REFUNDS": [
+      [
+        "PAYMENT_STATUS",
+        "REFUND_STATUS",
+        "ORDER_ELIGIBILITY"
+      ]
+    ],
+    "READ_COMPENSATION_AND_PENDING_ACTIONS": [
+      [
+        "EXISTING_COMPENSATION"
+      ],
+      [
+        "PENDING_ACTIONS"
+      ]
+    ],
+    "READ_APPLICABLE_POLICY": [
+      [
+        "POLICY_BASIS"
+      ]
+    ],
+    "READ_ORDER_RULES": []
+  },
+  "attempts": [
+    {
+      "httpStatus": 200,
+      "responseStatus": "completed",
+      "failure": null,
+      "inputTokens": 1295,
+      "outputTokens": 131,
+      "totalTokens": 1426
+    }
+  ]
+}

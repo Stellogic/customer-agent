@@ -32,7 +32,7 @@ from baseline_agent.investigation_action_loop import (
 
 _RESPONSES_ENDPOINT = "https://api.deepseek.com/responses"
 _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 503})
-ACTION_PROMPT_VERSION = "investigation-action-v4"
+ACTION_PROMPT_VERSION = "investigation-action-v6"
 ACTION_SCHEMA_VERSION = "investigation-action-v3"
 
 
@@ -412,6 +412,35 @@ def _known_facts_require_handoff(facts: dict[str, object]) -> bool:
     )
 
 
+def _required_applicabilities(issue_kind: object) -> dict[str, list[str]]:
+    # Mirrors the existing Spring evidence-sufficiency-v1 requirements, not model claims.
+    required = {
+        "CONFIRM_ORDER": ["ORDER_IDENTITY"],
+        "READ_APPLICABLE_POLICY": ["POLICY_BASIS"],
+        "READ_COMPENSATION_AND_PENDING_ACTIONS": ["PENDING_ACTIONS"],
+    }
+    if issue_kind in {"LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED", "DUPLICATE_CHARGE"}:
+        required["READ_COMPENSATION_AND_PENDING_ACTIONS"] = [
+            "EXISTING_COMPENSATION",
+            "PENDING_ACTIONS",
+        ]
+        required["READ_PAYMENT_AND_REFUNDS"] = ["ORDER_ELIGIBILITY"]
+    if issue_kind in {"LOGISTICS_DELAY", "PACKAGE_NOT_RECEIVED"}:
+        required["READ_LOGISTICS"] = [
+            "DELAY_DURATION" if issue_kind == "LOGISTICS_DELAY" else "LOGISTICS_STATUS"
+        ]
+    elif issue_kind == "DUPLICATE_CHARGE":
+        required["READ_PAYMENT_AND_REFUNDS"] = [
+            "PAYMENT_STATUS",
+            "ORDER_ELIGIBILITY",
+            "REFUND_STATUS",
+        ]
+    elif issue_kind == "ORDER_OPERATION_OR_RULE":
+        required["READ_ORDER_RULES"] = ["ORDER_RULE"]
+        required["READ_PAYMENT_AND_REFUNDS"] = ["ORDER_ELIGIBILITY"]
+    return required
+
+
 def _build_request(
     config: DeepSeekActionConfig,
     facts: dict[str, object],
@@ -474,13 +503,15 @@ def _build_request(
             "For SUBMIT_CONCLUSION, independently select evidenceReference values only from the "
             "supplied evidenceCatalog and state each selected fact's applicability; Spring will "
             "validate whether that evidence combination is sufficient. "
-            "issueKind is the Spring-confirmed investigation type; the customer's wording "
-            "does not replace it. For LOGISTICS_DELAY, evidence must cover ORDER_IDENTITY, "
-            "DELAY_DURATION, ORDER_ELIGIBILITY, EXISTING_COMPENSATION, PENDING_ACTIONS and "
-            "POLICY_BASIS when those facts are supported by the supplied catalog. "
-            "DELAY_DURATION covers measured delay hours/seconds, not only LOGISTICS_STATUS. "
-            "ORDER_ELIGIBILITY covers payment, cancellation and refund eligibility together; "
-            "PAYMENT_STATUS and REFUND_STATUS alone do not express that eligibility review. "
+            "currentActionContract.allowedActions is the complete set allowed THIS turn. "
+            "Do not repeat a completed capability or choose an action outside that list. "
+            "For submission, currentActionContract.requiredApplicabilitiesByCapability "
+            "states the Spring requirements for this issueKind. Find supporting references "
+            "under that capability in evidenceCatalog and cover every required applicability. "
+            "A single reference may support multiple applicable facts: combine them into "
+            "one applicability array and emit each evidenceReference only once. "
+            "Do not claim applicability without supporting facts. The customer's wording "
+            "does not replace the Spring-confirmed issueKind or this contract. "
             "When customerQuestion is supplied, also choose knowledgeQuery: null when Spring "
             "facts alone answer the question, otherwise a short natural-language query for "
             "general customer guidance. Never put identifiers or private facts in the query. "
@@ -494,6 +525,14 @@ def _build_request(
         ),
         "input": json.dumps(
             {
+                "currentActionContract": {
+                    "allowedActions": list(allowed_actions),
+                    "requiredApplicabilitiesByCapability": _required_applicabilities(
+                        facts.get("issueKind", "LOGISTICS_DELAY")
+                    )
+                    if is_submission
+                    else {},
+                },
                 "syntheticInvestigationFacts": {
                     key: value for key, value in facts.items() if key != "customerQuestion"
                 },

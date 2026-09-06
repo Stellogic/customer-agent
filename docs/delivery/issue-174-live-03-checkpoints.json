@@ -1,0 +1,34 @@
+{
+  "runId": "issue174-live-03",
+  "source": "local runner log aggregate JSON checkpoints",
+  "checkpoints": [
+    {
+      "stage": "after-L174-01",
+      "observedGenerationCount": 2,
+      "totalProviderAttempts": 10,
+      "totalTokens": 5881,
+      "failureClassifications": {
+        "SCHEMA_MISMATCH": 2
+      }
+    },
+    {
+      "stage": "before-L174-02",
+      "observedGenerationCount": 2,
+      "totalProviderAttempts": 10,
+      "totalTokens": 5881,
+      "failureClassifications": {
+        "SCHEMA_MISMATCH": 2
+      }
+    },
+    {
+      "stage": "after-L174-02-failure",
+      "observedGenerationCount": 3,
+      "totalProviderAttempts": 16,
+      "totalTokens": 9222,
+      "failureClassifications": {
+        "BUDGET_EXHAUSTED": 1,
+        "SCHEMA_MISMATCH": 2
+      }
+    }
+  ]
+}

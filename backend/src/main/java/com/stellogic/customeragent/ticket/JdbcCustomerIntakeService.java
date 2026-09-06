@@ -176,6 +176,11 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
             return retainHumanAssistance(command.customerId(), command.intakeId(), now);
         }
 
+        if ("READY_TO_CONFIRM".equals(current.status()) && "确认提交".equals(command.message())) {
+            return confirm(
+                    command, current, "已确认，" + current.issues().size() + " 张客服工单已原子创建并开始独立处理。");
+        }
+
         List<CustomerVisibleOrderSummary> orders = visibleOrders(command.customerId());
         IntakeUnderstanding understanding;
         try {

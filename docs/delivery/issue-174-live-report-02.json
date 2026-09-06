@@ -1,0 +1,25 @@
+{
+  "schema": "issue-174-live-release-v1",
+  "status": "INCOMPLETE",
+  "runId": "issue174-live-02",
+  "testedHead": "5fa32540efdfd872322f4fa5ef0a54f0449ee976",
+  "base": "c28971eed633ba1128f299e6f6f964efd024be15",
+  "model": "deepseek-v4-flash",
+  "completedScenarios": 0,
+  "failure": "Program \"docker.exe\" ended with non-zero exit code: 1 (0x00000001).",
+  "calls": {
+    "logical": 2,
+    "providerAttempts": 2
+  },
+  "tokens": {
+    "knownTotal": 0,
+    "intake": null
+  },
+  "cost": {
+    "observedUpperMicroCny": 40000,
+    "reservedMicroCny": 1000000,
+    "pending": 1,
+    "note": "任一场景失败都可能包含未持久化的受理尝试；保留整轮预留，禁止再次使用。"
+  },
+  "productionScope": "NOT_EVALUATED"
+}

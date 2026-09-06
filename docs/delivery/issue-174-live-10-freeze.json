@@ -1,0 +1,313 @@
+{
+  "issue": 174,
+  "artifactKind": "frozen-live-scenario-catalog",
+  "status": "FROZEN_AUTHORIZED_NOT_RUN",
+  "baselineCommit": "origin/main@474e6068ca1f562a60d67518bba1619a1a3582ef",
+  "plan": "issue-174-live-acceptance-plan.md",
+  "description": "调用前冻结的独立合成发布场景；真实结果仅由授权 runner 和发布报告给出。",
+  "executionAuthorized": true,
+  "qualityProtocol": "rag-layered-v2",
+  "evidenceResponsibilities": {
+    "retrieval": "#190：有答案 Recall@5 >= 0.90、MRR@5 >= 0.75；错误版本/范围/越权 Top-5 命中率各为0；无答案题完整执行，候选不决定拒答。",
+    "customerAnswer": "#169：自身真实回答路径的拒答 precision >= 0.90、recall >= 0.85，结构/引用/语义分别报告。",
+    "supportAnswer": "#170：自身真实 HUMAN 辅助路径的同一回答门槛，不以客户成绩替代，不自动发送或产生副作用。",
+    "release": "#174：核对上游版本化证据并承接真实浏览器发布；#173 保留确定性全栈前置。",
+    "dependencyDirection": "#190 独立交付后由 #169/#170 消费；#173/#174 后续汇总，不反向阻塞上游，不增加独立充分性模型。",
+    "evidenceStatus": "LAYERED_EVIDENCE_BOUND_WITH_KNOWN_LIMITATIONS",
+    "retrievalEvidence": {
+      "status": "FORMALLY_DELIVERED",
+      "sources": [
+        "docs/eval/rag-layered-v2.md",
+        "docs/implementation/issue-190-layered-validation.md",
+        "PR #203 / Issue #190"
+      ],
+      "sampleCount": 64,
+      "recallAt5": 0.9444444444,
+      "mrrAt5": 0.8680555556,
+      "wrongVersionTop5Rate": 0,
+      "wrongScopeTop5Rate": 0,
+      "unauthorizedTop5Rate": 0,
+      "answerQuality": "NOT_EVALUATED"
+    },
+    "answerEvidence": {
+      "customer": "ACCEPTED_WITH_KNOWN_LIMITATIONS_35_OF_48_PR208",
+      "support": "FORMALLY_DELIVERED_PR209_ANSWER_QUALITY_NOT_EVALUATED",
+      "deterministicFullStack": "PASS_ISSUE173_FINAL_20260903B_PR210"
+    }
+  },
+  "sharedProjectBudget": {
+    "currency": "CNY",
+    "cumulativeLimit": 13,
+    "archivedCumulativeUpperBound": 3.810222,
+    "archivedUnsettled": 3.8,
+    "arithmeticRemainingAtSnapshot": 0.389778,
+    "liveLedgerSpent": 3.810222,
+    "liveAvailable": 1.1,
+    "issue174Reserved": 1,
+    "ledgerReference": "D:\\customer-agent\\.local\\issue190-sufficiency\\cost-ledger.json（调用前 live 回读）",
+    "policy": "用户明确允许公开第9轮结果和候选修复，并追加最多1元，将累计上限12元提高至13元，允许一次原五场景复验，首次失败即停。28笔旧PENDING保留；历史核对上界2元加后续17笔预留9.9元为11.9元，本轮另预留最多1元后12.9元。项目余量不是平台余额或实扣。",
+    "billingReconciliation": "../delivery/issue-174-billing-reconciliation.json",
+    "postCheckpointReserved": 9.9,
+    "pendingCountBeforeRun": 28
+  },
+  "currentStage": {
+    "logicalCalls": 0,
+    "providerAttempts": 0,
+    "costMicrosUsd": 0,
+    "costScope": "仅本静态阶段新增消耗，不代表全项目历史累计为0",
+    "metricsStatus": "NOT_RUN"
+  },
+  "freezeStatus": "FROZEN_AUTHORIZED_NOT_RUN",
+  "liveFreeze": {
+    "model": "deepseek-v4-flash",
+    "promptVersionsBySeam": {
+      "intake": "intake-v3",
+      "action": "investigation-action-v5",
+      "judgment": "investigation-judgment-v1",
+      "customerCommunication": "customer-communication-v2/customer-knowledge-communication-v1",
+      "supportAssistance": "support-assistance-answer-v2"
+    },
+    "schemaVersionsBySeam": {
+      "intake": "customer_intake_issue_assessments/customer_intake_clarification/customer_intake_understanding",
+      "action": "investigation-action-v3",
+      "judgment": "investigation-judgment-v1",
+      "customerCommunication": "customer-reply-v1/customer-reply-v2",
+      "supportAssistance": "support-assistance-answer-v2"
+    },
+    "productProjectionVersions": {
+      "intake": "customer-intake-v4",
+      "conversation": "public-conversation-v2",
+      "knowledge": "knowledge-catalog-v1"
+    },
+    "scenarioSetVersion": "issue-174-live-scenarios-v1",
+    "fixtureVersion": "issue173-intake-v1+logistics-status",
+    "logicalCallLimit": 100,
+    "providerAttemptLimit": 100,
+    "tokenLimit": 200000,
+    "costLimitMicrosUsd": 142857,
+    "limitsByScenario": {
+      "scenarios": 5,
+      "maximumRuns": 1,
+      "runCostUpperMicroCny": 1000000,
+      "actionLoopCostUpperMicrosUsdPerGeneration": 10000,
+      "intakeCallUpperMicroCny": 20000,
+      "scenarioReservationsMicroCny": {
+        "L174-01": 220000,
+        "L174-02": 120000,
+        "L174-03": 260000,
+        "L174-04": 280000,
+        "L174-05": 120000
+      },
+      "actionLoopMaxActions": 8,
+      "actionLoopMaxProviderAttempts": 8
+    },
+    "latencyLimitsMs": {
+      "intakeRead": 10000,
+      "generationWallClock": 120000,
+      "supportRequest": 30000,
+      "browserScenario": 180000
+    },
+    "pricingReference": "formal adapter USD micro cost x7 conservative CNY; support input/output 3/9 micro-CNY per token; intake usage unavailable and charged at 20000 micro-CNY per call",
+    "structurePassThreshold": 1.0
+  },
+  "nullMeaning": "运行后确实无法取得的指标才可为 null，并须说明原因；冻结上限均为有限值。",
+  "prerequisites": [
+    "#173 已完成：PR #210 merged，Issue #173 closed，issue173-final-20260903b PASS。",
+    "#190 检索 64/64 已绑定；#169 35/48 由用户接受为 KNOWN_LIMITATIONS；#170 已交付但回答质量未单独评估。",
+    "历史平台累计实扣上界2 CNY为用户报告；28笔旧预留保留，在总13 CNY内另预留最多1 CNY。",
+    "固定模型、prompt/schema、五个场景、调用/尝试/token/成本/时间上限。",
+    "仅使用合成订单和公开知识；真实 Chromium 经 Spring，关闭 shadow 和 fake 回退。",
+    "用户允许公开第9轮记录和候选修复，并追加1元复验一次。action prompt v5补齐既有场景证据要求，schema、业务权限、五场景及首次失败即停规则不变。保留受控拒绝元数据观察器，禁止保存原始载荷。"
+  ],
+  "fixturePolicy": "仅描述合成输入事实；订单引用占位符待映射为本次隔离栈独有订单。只准备订单/支付/物流/知识输入，不预写工单、消息、代次、提案、审批、执行或 HUMAN 结果。",
+  "observationPolicy": "真实 Chromium 可见 UI 发起业务，只观察同源 Spring 产品 API/SSE/页面；不直接请求 provider/Agent，不 mock 成功，不通过内部 publish 或 SQL 制造业务结果。",
+  "answerEvidencePolicy": "同一次 DeepSeek 调用判断知识资料充分性并回答，不新增默认独立充分性调用。仅检索/模型/解析成功且合法说明资料不足才算正常拒答，允许必要追问、不仅因此转人工；故障分类单列且保留完整分母。结构/引用/语义独立报告，不新设单条引文24字符限制；不保存原始prompt/response/思维链/key。",
+  "historyPolicy": "保留 #189 原资产/标签/数值目标、旧协议与 FAIL/STOPPED，不回算旧成绩、不读验收错题调prompt或选参、不复制 #190 账本。",
+  "scenarios": [
+    {
+      "id": "L174-01",
+      "title": "同订单多个问题先澄清再一次确认",
+      "status": "FROZEN_NOT_RUN",
+      "fixture": {
+        "orderAlias": "ORDER-L174-01-<run>",
+        "facts": [
+          "订单属于当前合成客户，只有一个匹配候选",
+          "客户自然语言同时陈述包裹未收到并怀疑重复扣款；fixture不预先把重复扣款写成权威事实",
+          "无既有同问题工单，避免把去重恢复误判为本次建单"
+        ],
+        "bindingStatus": "BOUND_ISSUE173_A"
+      },
+      "customerInputs": [
+        "ORDER-L174-01-<run> 的包裹没收到，而且疑似重复扣款",
+        "若询问包裹未收到：是的，包裹至今仍未收到",
+        "若询问重复扣款：是的，确实重复扣款"
+      ],
+      "actions": [
+        "从问题描述提交第一句，查看订单候选和待澄清问题",
+        "按页面当前问题逐项回复，每类最多一次、总计最多两次；必须得到未收货及重复扣款两个问题后仅确认一次",
+        "刷新订单分组并分别进入两个工单，只观察真实公开结果"
+      ],
+      "expectedObservations": [
+        "确认前 ticketIds 为空，没有正式工单入口",
+        "允许先澄清包裹未收到或重复扣款；未经确认的类别不得建单，已确认类别必须保留，最终类别精确为PACKAGE_NOT_RECEIVED和DUPLICATE_CHARGE",
+        "确认响应返回两个不同 ticketIds 与共同 sharedIntakeRecordId",
+        "刷新后仍存在两个独立工单入口；不把两个 ID 当并行运行或事务竞态证明"
+      ],
+      "countingNote": "统计全部受理轮次、确认产生的两个工单以及各自后台调用，即使某个工单未在浏览器打开。",
+      "pending": [],
+      "sourceReferences": [
+        "frontend/e2e/issue153.atomic-multi-issue-intake.spec.ts",
+        "frontend/src/App.tsx"
+      ]
+    },
+    {
+      "id": "L174-02",
+      "title": "23小时低风险回复与五分钟自动解决候选",
+      "status": "FROZEN_NOT_RUN",
+      "fixture": {
+        "orderAlias": "ORDER-L174-02-<run>",
+        "facts": [
+          "当前客户的明确订单，物流事实已核实且相互一致",
+          "延迟23小时；真实模型给出低风险说明，Spring仅创建可取消的五分钟自动解决候选"
+        ],
+        "bindingStatus": "BOUND_ISSUE173_D"
+      },
+      "customerInputs": [
+        "请解释物流状态"
+      ],
+      "actions": [
+        "通过自然受理确认建单",
+        "等待真实调查回复及五分钟候选",
+        "刷新核对并由客户取消候选"
+      ],
+      "expectedObservations": [
+        "真实回复经Spring接受，候选等待期精确为300秒",
+        "刷新仍为同一候选，取消后持久为CANCELLED",
+        "没有批准或执行补偿"
+      ],
+      "countingNote": "记录受理、行动、判断和沟通调用，不从工具固定顺序反推事实充分。",
+      "pending": [],
+      "sourceReferences": [
+        "frontend/e2e/issue124.offline-fullstack-readiness.spec.ts",
+        "frontend/src/App.tsx"
+      ]
+    },
+    {
+      "id": "L174-03",
+      "title": "长延迟调查中追加消息与旧代次围栏",
+      "status": "FROZEN_NOT_RUN",
+      "fixture": {
+        "orderAlias": "ORDER-L174-03-<run>",
+        "facts": [
+          "当前客户的订单，已支付 268 CNY，延迟 80 小时",
+          "真实权威物流未送达，冻结规则允许提出补偿，订单额度足够",
+          "补偿仍须人工审批，不预造提案"
+        ],
+        "bindingStatus": "BOUND_ISSUE173_B"
+      },
+      "customerInputs": [
+        "ORDER-L174-03-<run> 已经很久没更新，请调查物流延迟。",
+        "补充一下，我仍未收到包裹，请按最新物流核实，不要把它算成已签收。"
+      ],
+      "actions": [
+        "自然受理确认建单，在真实生成尚在途时从公开消息输入提交补充",
+        "观察 Spring 接受新消息、代次推进及旧生成后续公开写入受阻",
+        "等待最新代次公开终态并刷新核对，不进行审批或执行"
+      ],
+      "expectedObservations": [
+        "新消息真实接受且持久存在一次，仍属原工单",
+        "新消息接受后旧代次不得继续新增公开片段或业务副作用，既有合法历史不要求删除",
+        "当前有效回复符合最新事实，最多产生待人工审批投影，不宣称已批准/已执行",
+        "如果未捕捉到真实重叠与旧写入拒绝证据，围栏结论保持未验证，不能凭代次变化判通过"
+      ],
+      "countingNote": "旧代次已发请求及在途取消照计，新代次全计；无稳定时序时不得付费循环重试。",
+      "pending": [],
+      "sourceReferences": [
+        "backend/src/main/java/com/stellogic/customeragent/ticket/CustomerTicketV2Controller.java",
+        "frontend/src/App.tsx"
+      ]
+    },
+    {
+      "id": "L174-04",
+      "title": "客户与客服有答案路径的真实引用发布 smoke",
+      "status": "FROZEN_NOT_RUN",
+      "upstreamEvidence": {
+        "retrievalReport": "docs/implementation/issue-190-layered-validation.md",
+        "customerAnswerReport": "docs/implementation/issue-169-answer-d-blocker.md",
+        "supportAnswerReport": "docs/implementation/issue-170-rag-layered-v2.md",
+        "frozenSampleBindings": {
+          "customer": "customer-delivery-help-v1",
+          "support": "logistics-delay-v2",
+          "releaseAssertions": "semantic-keywords+canonical article/version/title/updatedAt/snippet"
+        },
+        "bindingPolicy": "本轮只绑定两个有答案发布 smoke；#169 的完整有/无答案统计原样承接，#170 回答质量保持 NOT_EVALUATED，不用本轮小样本替代。"
+      },
+      "fixture": {
+        "orderAlias": "ORDER-L174-04-<run>",
+        "facts": [
+          "当前客户的物流延迟订单，可检索 CUSTOMER_PUBLIC 的 customer-delivery-help v1",
+          "客服工单由真实产品流程转入 HUMAN 并由 support-demo 领取，可检索 INTERNAL/SUPPORT 的 logistics-delay v2",
+          "两条路径都要求模型输出经 Spring canonical 引用校验，不预写工单、人工状态或回答"
+        ],
+        "bindingStatus": "BOUND_CURRENT_MAIN"
+      },
+      "customerInputs": [
+        "物流节点超过承诺时间没有更新时该怎么处理？请说明依据并展示来源。",
+        "物流延迟，请人工客服处理本工单，并说明适用政策。"
+      ],
+      "actions": [
+        "客户路径自然受理确认，经实际调查读取有依据回答并核对公开来源",
+        "客服路径经真实UI转人工并由负责客服领取，请求政策建议并核对 canonical 引用，不发送草稿"
+      ],
+      "expectedObservations": [
+        "客户回答通过产品 strict schema 与 Spring 引用校验，展示真实友好标题和更新时间",
+        "客服建议状态为SUPPORTED，引用精确绑定 logistics-delay v2 的标题、更新时间和逐字片段",
+        "两条正文只做关键词边界 sanity；语义质量保持 NOT_EVALUATED/KNOWN_LIMITATION，不宣称本轮小样本证明完整正确率",
+        "客服建议不自动发送公开消息，不改变处理模式或产生补偿副作用"
+      ],
+      "countingNote": "已有上游费用关联原记录不重复计费，新浏览器场景调用计入项目历史累计共享8元；不新增充分性调用或复制 #190 实验指标。",
+      "pending": [],
+      "sourceReferences": [
+        "frontend/src/App.tsx",
+        "https://github.com/Stellogic/customer-agent/issues/149",
+        "https://github.com/Stellogic/customer-agent/issues/174",
+        "https://github.com/Stellogic/customer-agent/issues/169",
+        "https://github.com/Stellogic/customer-agent/issues/170",
+        "https://github.com/Stellogic/customer-agent/issues/190"
+      ]
+    },
+    {
+      "id": "L174-05",
+      "title": "签收未收到高风险场景安全转人工",
+      "status": "FROZEN_NOT_RUN",
+      "fixture": {
+        "orderAlias": "ORDER-L174-05-<run>",
+        "facts": [
+          "当前客户的明确订单，权威物流状态为SIGNED",
+          "客户事实为实际未收到，Spring风险场景为PACKAGE_SIGNED_NOT_RECEIVED"
+        ],
+        "bindingStatus": "SIGNED_ORDER_HIGH_RISK_BOUND"
+      },
+      "customerInputs": [
+        "物流页面显示已签收，但我实际没有收到包裹，请核实后处理，不要直接赔付。"
+      ],
+      "actions": [
+        "自然受理确认建单，由真实调查遇到输入冲突",
+        "观察 Spring 公开处理模式和安全说明，再刷新核对"
+      ],
+      "expectedObservations": [
+        "Spring将工单转为HUMAN且原因精确为PACKAGE_SIGNED_NOT_RECEIVED",
+        "不存在补偿提案或执行记录",
+        "刷新后仍为人工处理；供应商或schema失败因原因不同而不能冒充通过"
+      ],
+      "countingNote": "包括失败行动/判断及取消在途请求；缺失 usage 为未知，不记零费用。",
+      "pending": [],
+      "sourceReferences": [
+        "docs/specs/issue-149.md",
+        "backend/src/main/java/com/stellogic/customeragent/ticket/CustomerTicketV2Controller.java"
+      ]
+    }
+  ],
+  "revision": 10,
+  "runId": "issue174-live-10"
+}

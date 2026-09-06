@@ -1,0 +1,31 @@
+{
+  "schema": "issue174-intake-diagnostic-v1",
+  "releaseAcceptance": false,
+  "stage": "OBSERVED",
+  "headingWithinFiveSeconds": false,
+  "responseMessageVisible": null,
+  "observations": [
+    {
+      "httpStatus": 201,
+      "elapsedMs": 3609,
+      "status": "NEEDS_CLARIFICATION",
+      "assisted": false,
+      "candidatePresent": true,
+      "candidateMatchesFixture": true,
+      "clarificationKind": "PACKAGE_NOT_RECEIVED",
+      "issueCount": 0,
+      "issueKinds": []
+    },
+    {
+      "httpStatus": 201,
+      "elapsedMs": 2453,
+      "status": "NEEDS_CLARIFICATION",
+      "assisted": false,
+      "candidatePresent": true,
+      "candidateMatchesFixture": true,
+      "clarificationKind": "OTHER",
+      "issueCount": 0,
+      "issueKinds": []
+    }
+  ]
+}

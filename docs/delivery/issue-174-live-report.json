@@ -1,0 +1,27 @@
+{
+  "schema": "issue-174-live-release-v1",
+  "status": "INCOMPLETE",
+  "runId": "issue174-live-20260903a",
+  "testedHead": "4ddca8a00c8909a2989c303cf090079162f6cfc6",
+  "base": "c28971eed633ba1128f299e6f6f964efd024be15",
+  "model": "deepseek-v4-flash",
+  "completedScenarios": 0,
+  "failure": "L174-01: frontend/e2e/issue173.full-stack.spec.ts:22 expected heading 请确认 2 个问题 within 5000 ms; heading was not visible. Later scenarios NOT_RUN.",
+  "calls": {
+    "logical": 2,
+    "providerAttempts": 2,
+    "evidence": "Inferred from persisted intake operation counts; not complete provider usage audit."
+  },
+  "tokens": {
+    "knownTotal": 0,
+    "intake": null
+  },
+  "cost": {
+    "observedUpperMicroCny": 40000,
+    "reservedMicroCny": 1000000,
+    "pending": 1,
+    "note": "任一场景失败都可能包含未持久化的受理尝试；保留整轮预留，禁止再次使用。"
+  },
+  "productionScope": "NOT_EVALUATED",
+  "diagnosis": "Exact cause UNDETERMINED: trace/error-context were written outside the mounted artifacts directory and were not exported before the ephemeral container was removed."
+}

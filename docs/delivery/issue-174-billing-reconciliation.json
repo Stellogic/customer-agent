@@ -1,0 +1,25 @@
+{
+  "schema": "issue174-billing-reconciliation-v1",
+  "source": "USER_REPORTED_PROVIDER_TOTAL",
+  "providerVerifiedByAgent": false,
+  "userReportedAvailableMicroCny": 3800000,
+  "userStatement": "到现在为止DeepSeek平台费用一共不足两元，可以继续；目前至少还有3.8元预算",
+  "historicalPaidUpperMicroCny": 2000000,
+  "projectLimitMicroCny": 8000000,
+  "legacyEstimatedUpperMicroCny": 3810222,
+  "legacyPendingReservedMicroCny": 3800000,
+  "coveredPendingPhases": [
+    "issue174-live-20260903a",
+    "issue174-live-02",
+    "issue174-live-03",
+    "issue174-intake-diagnostic-01",
+    "issue174-intake-diagnostic-02",
+    "issue174-intake-diagnostic-03",
+    "issue174-intake-diagnostic-04",
+    "issue215-intake-diagnostic-01",
+    "issue215-intake-diagnostic-02",
+    "issue215-intake-diagnostic-03",
+    "issue215-intake-diagnostic-04"
+  ],
+  "policy": "历史估算及预留完整保留，不改成零、不伪造逐次实扣；历史全部消费由用户提供的平台累计上界覆盖，新调用另行预留计入8元上限，禁止同时重复累加历史估算和历史实扣上界。"
+}

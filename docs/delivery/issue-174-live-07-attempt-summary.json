@@ -1,0 +1,37 @@
+{
+  "schema": "issue174-controlled-attempt-summary-v1",
+  "runId": "issue174-live-07",
+  "note": "httpStatus来自既有adapter审计；客户沟通回调HTTP异常也会被既有实现误计为供应商异常，不能由此判定来源。",
+  "groups": [
+    {
+      "promptVersion": "investigation-action-v4",
+      "recordedHttpStatus": 200,
+      "recordedFailure": null,
+      "count": 14
+    },
+    {
+      "promptVersion": "investigation-judgment-v1",
+      "recordedHttpStatus": 200,
+      "recordedFailure": null,
+      "count": 2
+    },
+    {
+      "promptVersion": "customer-communication-v2",
+      "recordedHttpStatus": 400,
+      "recordedFailure": "PROVIDER_REQUEST_REJECTED",
+      "count": 1
+    },
+    {
+      "promptVersion": "customer-communication-v2",
+      "recordedHttpStatus": 409,
+      "recordedFailure": "PROVIDER_REQUEST_REJECTED",
+      "count": 1
+    },
+    {
+      "promptVersion": "customer-communication-v2",
+      "recordedHttpStatus": 200,
+      "recordedFailure": null,
+      "count": 1
+    }
+  ]
+}
