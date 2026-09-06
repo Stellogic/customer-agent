@@ -582,8 +582,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publishCustomerReply(
-                ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
+        publishCustomerReply(ticketId, generationId, conclusion, knowledgeProjection, now);
         int updated =
                 jdbc.update(
                         "update support_ticket set handling_mode = 'HUMAN',"
@@ -635,8 +634,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         }
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publishCustomerReply(
-                ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
+        publishCustomerReply(ticketId, generationId, conclusion, knowledgeProjection, now);
         if ("KNOWLEDGE_CONVERSATION".equals(scenario)
                 || (conclusion.customerReply().knowledge() != null
                         && conclusion.customerReply().knowledge().status()
@@ -809,8 +807,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publishCustomerReply(
-                ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
+        publishCustomerReply(ticketId, generationId, conclusion, knowledgeProjection, now);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at,"
                         + " subject_type, subject_id) values (?, ?, 'spring-system', ?,"
@@ -955,11 +952,19 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private void publishCustomerReply(
             UUID ticketId,
             UUID generationId,
-            CustomerReplyEnvelope reply,
+            InvestigationConclusion conclusion,
             CustomerKnowledgeProjection projection,
             Instant now) {
+        CustomerReplyEnvelope reply = conclusion.customerReply();
         if (projection == null) {
-            publicProjection.completeAgentReplyStream(ticketId, generationId, reply.body(), now);
+            if (conclusion.sufficiency().riskScenario()
+                    == InvestigationRiskScenario.DUPLICATE_CHARGE) {
+                publicProjection.completeBufferedAgentReplyStream(
+                        ticketId, generationId, reply.body(), now);
+            } else {
+                publicProjection.completeAgentReplyStream(
+                        ticketId, generationId, reply.body(), now);
+            }
             publicProjection.appendAgentMessage(ticketId, generationId, reply.body(), now, false);
             return;
         }

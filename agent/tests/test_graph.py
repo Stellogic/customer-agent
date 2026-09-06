@@ -43,10 +43,14 @@ from baseline_agent.shadow_investigation import ShadowCandidate
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("fully_refunded", "legacy_checkpoint"), [(False, False), (True, False), (False, True)]
+    ("fully_refunded", "legacy_checkpoint", "communication_failure"),
+    [(False, False, False), (True, False, False), (False, True, False), (False, False, True)],
 )
 async def test_payment_graph_uses_payment_evidence_without_logistics_judgment(
-    monkeypatch: pytest.MonkeyPatch, fully_refunded: bool, legacy_checkpoint: bool
+    monkeypatch: pytest.MonkeyPatch,
+    fully_refunded: bool,
+    legacy_checkpoint: bool,
+    communication_failure: bool,
 ) -> None:
     catalog = _capability_catalog("DUPLICATE_CHARGE")
     requirements = [
@@ -125,6 +129,15 @@ async def test_payment_graph_uses_payment_evidence_without_logistics_judgment(
     monkeypatch.setattr(
         "baseline_agent.graph.customer_communication_model", FixedFakeCustomerCommunicationModel()
     )
+    if communication_failure:
+
+        class FailedCommunication:
+            async def compose(self, *_args, **_kwargs):
+                raise ValueError("controlled payment provider failure")
+
+        monkeypatch.setattr(
+            "baseline_agent.graph.customer_communication_model", FailedCommunication()
+        )
     monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
     monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
     monkeypatch.setenv("AGENT_INVESTIGATION_SHADOW_MODE", "offline")
@@ -150,6 +163,16 @@ async def test_payment_graph_uses_payment_evidence_without_logistics_judgment(
         }
     )
     conclusions = [body for path, body in calls if path.endswith("/conclusions")]
+    if communication_failure:
+        assert conclusions == []
+        handoff = [body for path, body in calls if path.endswith("/human-handoff")]
+        assert len(handoff) == 1
+        assert handoff[0]["reasonCode"] == "INVALID_MODEL_OUTPUT"
+        assert handoff[0]["summary"]["facts"] == [
+            {"type": "ORDER", "value": "ORDER-116", "evidenceReference": "order:ORDER-116"},
+            {"type": "PAYMENT", "value": "PAID", "evidenceReference": "payment:ORDER-116"},
+        ]
+        return
     assert len(conclusions) == 1
     conclusion = conclusions[0]
     assert conclusion["riskScenario"] == "DUPLICATE_CHARGE"

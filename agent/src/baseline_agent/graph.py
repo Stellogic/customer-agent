@@ -1597,19 +1597,14 @@ def _controlled_summary_facts(facts: object) -> list[dict[str, str]]:
         return []
     allowed = [{"type": "ORDER", "value": order_reference, "evidenceReference": evidence[0]}]
     if evidence[1] == f"payment:{order_reference}":
-        for name, fact_type, yes, no in (
-            ("paid", "PAYMENT", "PAID", "UNPAID"),
-            ("cancelled", "ORDER_CANCELLATION", "CANCELLED", "NOT_CANCELLED"),
-            ("fullyRefunded", "REFUND_STATUS", "FULLY_REFUNDED", "NOT_FULLY_REFUNDED"),
-        ):
-            if isinstance(facts.get(name), bool):
-                allowed.append(
-                    {
-                        "type": fact_type,
-                        "value": yes if facts[name] else no,
-                        "evidenceReference": evidence[1],
-                    }
-                )
+        if isinstance(facts.get("paid"), bool):
+            allowed.append(
+                {
+                    "type": "PAYMENT",
+                    "value": "PAID" if facts["paid"] else "UNPAID",
+                    "evidenceReference": evidence[1],
+                }
+            )
         return allowed
     if evidence[1] != f"logistics:{order_reference}":
         return []
