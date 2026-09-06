@@ -1,5 +1,15 @@
 # #174 真实 DeepSeek 发布验收
 
+状态：**第10版 FROZEN_AUTHORIZED_NOT_RUN**。
+
+## 第10版复验冻结
+
+用户明确允许公开第9轮结果和候选修复，并追加最多1元，将累计预算上限12元提高至13元。28笔旧PENDING保留；历史核对上界2元加后续17笔预留9.9元为11.9元，本轮最多新增1元后12.9元。费用预留及程序估算不代表平台实扣。
+
+入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-10`，见[调用前冻结](../delivery/issue-174-live-10-freeze.json)。仅 action prompt 升级为 investigation-action-v5，补齐 Spring 已有各场景适用性要求；原五场景、schema、权限、调用与预算上限保持，首次失败即停。第9轮不能重判，候选实际效果尚待本轮验证。产品改动由 #226 承接。
+
+Agent 聚焦检查470 passed/3 skipped，格式、lint、类型检查及双轴静态审查通过。沿用仅受控字段的拒绝观察器，不保存原始载荷。真实本轮与最终完整门禁 NOT_RUN。以下为历史快照。
+
 状态：**第9版 INCOMPLETE：重复扣款结论的证据适用性被 Spring 拒绝**。见[第9轮结果](../delivery/issue-174-live-09-result.md)。
 
 ## 第9版复验冻结
