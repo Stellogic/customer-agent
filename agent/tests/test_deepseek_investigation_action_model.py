@@ -583,3 +583,53 @@ async def test_program_path_keeps_clarification_for_ambiguous_order() -> None:
     schema = captured[0]["text"]["format"]["schema"]
     assert schema["properties"]["action"]["enum"] == ["REQUEST_CLARIFICATION"]
     assert schema["required"] == ["action"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("actions", "attempts", "action", "allowed"),
+    [
+        (1, 2, "SUBMIT_CONCLUSION", True),
+        (2, 1, "SUBMIT_CONCLUSION", True),
+        (1, 2, "READ_ORDER_RULES", False),
+        (2, 1, "READ_ORDER_RULES", False),
+        (2, 2, "READ_ORDER_RULES", True),
+    ],
+)
+async def test_optional_read_reserves_an_action_and_provider_attempt_for_submission(
+    actions: int, attempts: int, action: str, allowed: bool
+) -> None:
+    captured: list[dict] = []
+
+    def supplier(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        payload = _completed_action(action)
+        payload["output"][0]["content"][0]["text"] = json.dumps(
+            {"action": action, "evidence": [], "knowledgeQuery": None}
+        )
+        return httpx.Response(200, json=payload)
+
+    audit = InMemoryModelCallAuditSink()
+    model = DeepSeekResponsesInvestigationActionModel(
+        DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
+        transport=httpx.MockTransport(supplier),
+        audit_sink=audit,
+    )
+    facts = {
+        **_program_completed_facts(),
+        "actionBudget": {"remainingActions": actions, "remainingProviderAttempts": attempts},
+    }
+    if allowed:
+        decision = await model.choose(facts)
+        assert decision.action.kind.value == action
+    else:
+        with pytest.raises(ActionLoopFailure) as failure:
+            await model.choose(facts)
+        assert failure.value.failure_classification == "SCHEMA_MISMATCH"
+
+    assert len(captured) == 1
+    offered = captured[0]["text"]["format"]["schema"]["properties"]["action"]["enum"]
+    assert ("READ_ORDER_RULES" in offered) == (actions >= 2 and attempts >= 2)
+    assert "SUBMIT_CONCLUSION" in offered
+    assert "HANDOFF" in offered
+    assert len(audit.records) == 1

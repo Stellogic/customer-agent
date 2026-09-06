@@ -28,3 +28,13 @@ Spring 的 `EvidenceSufficiencyPolicy.LOGISTICS_DELAY_REQUIRED` 是物流必需�
 局部日志保存在本工作树 `.local`，不提交原始运行输出。最终交付须完成最终版本的仓库完整门禁、PR 合入、Issue 关闭及 origin/main 回读。
 
 浏览器最终专项 issue228-logistics-green02：2 passed（25.4 秒），Prettier、ESLint、TypeScript 通过，实际代次隔离及两个物流终点均通过；cleanupPassed=true，paidCalls=0。完整门禁尚待该实现固定提交后执行。
+
+## 集中审查与完整门禁后的修正
+
+首次完整门禁 `issue228-final-f6c6cf0` 在 smoke 的旧物流事实断言失败：仍期待 ORDER_RULE 及七条命令。已按真实新契约核对十一项实际事实、六个证据引用、六条命令，去掉要求机械读取顺序不同的断言；保留可选能力与授权、过期、冲突负例。该轮容器、卷、网络已清空，本轮八个临时镜像由协调者精确清理并回读。
+
+同一次 Ready 触发的 Code Review 与 Security Review 均已完成。代码审查提出三个增量问题：预算余量不足仍提供补查、归一化保留旧字段清单、旧物流断点未接入策略。现已为补查预留提交动作及供应商尝试，按策略引用的能力契约派生字段；旧断点首次恢复获取当前授权目录并保留已读记录及消耗，新断点显式保存 null 区分已查询但尚未迁移的其他场景，避免逐步重复读目录。五项 provider 预算回归先失败，旧断点回归先失败；修复后全 Agent `489 passed, 3 skipped`，格式、lint、类型检查通过。Standards / Spec 增量复核均 PASS，无新增阻塞。
+
+聚焦 smoke 的首轮因临时入口未开启正式 smoke 所需的 offline shadow 而失败，已修正入口，不改产品或门槛。次轮通过前面的新物流断言，在转人工后重放旧手工证据组合时先收到 409；测试已改为精确重放真实已提交的结论与回复，仍严格要求 403 权限失效，原改内容 409 负例保留。两轮结果及清理回读原样保存，不计作通过。
+
+修正后的真实聚焦 smoke issue228-smoke-green03 为 PASS，转人工后的精确重放权限拒绝与其余完整 smoke 断言通过，cleanupPassed=true、paidCalls=0。新最终提交的完整门禁待执行。

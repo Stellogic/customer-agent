@@ -780,7 +780,9 @@ async def _advance_investigation_action_loop(
         "X-Agent-Operation": "USE_INVESTIGATION_CAPABILITY",
     }
     required_facts = None
-    if checkpoint is None:
+    if checkpoint is None or (
+        issue_kind == "LOGISTICS_DELAY" and "requiredFacts" not in checkpoint
+    ):
         catalog_response = await _request_with_retries(
             lambda: client.get(
                 f"{base_url}/internal/agent/tickets/{ticket_id}/generations/{generation_id}/capabilities",
@@ -1255,8 +1257,15 @@ def _valid_required_facts(policy: object) -> bool:
 
 
 def _normalized_fact_fields(required_facts: dict | None) -> set[str]:
-    # 本票只迁移物流;订单规则可补查,但不是提交物流结论的前提。
-    return REQUIRED_FACT_FIELDS - {"orderRuleSummary"} if required_facts else REQUIRED_FACT_FIELDS
+    if required_facts is None:
+        return REQUIRED_FACT_FIELDS
+    capabilities = {InvestigationCapability(fact["capability"]) for fact in required_facts["facts"]}
+    return {"evidenceRefs"} | {
+        field.name
+        for capability in capabilities
+        for field in CAPABILITY_CONTRACTS[capability].result_fields
+        if field.name != "capability"
+    }
 
 
 def _parse_capability_fields(fields: list) -> tuple[CapabilityField, ...] | None:
@@ -1505,12 +1514,12 @@ def _unsafe_facts_reason(
     if issue_kind != "LOGISTICS_DELAY":
         return None
     if (
-        not facts["paid"]
-        or facts["cancelled"]
-        or facts["fullyRefunded"]
-        or facts["existingCompensation"]
-        or facts["pendingActionCount"] != 0
-        or facts["policyVersion"] != "delay-policy-v1"
+        ("paid" in facts and not facts["paid"])
+        or facts.get("cancelled")
+        or facts.get("fullyRefunded")
+        or facts.get("existingCompensation")
+        or ("pendingActionCount" in facts and facts["pendingActionCount"] != 0)
+        or ("policyVersion" in facts and facts["policyVersion"] != "delay-policy-v1")
     ):
         return "UNSUPPORTED_SCENARIO"
     return None

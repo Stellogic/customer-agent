@@ -297,6 +297,7 @@ def _controlled_facts(facts: dict) -> dict[str, object]:
         "issueKind",
         "requiredFacts",
         "requiredFactsComplete",
+        "actionBudget",
     }
     if not set(facts).issubset(allowed):
         raise _failure()
@@ -307,6 +308,14 @@ def _controlled_facts(facts: dict) -> dict[str, object]:
         or not isinstance(facts.get("requiredFactsComplete"), bool)
     ):
         raise _failure()
+    if "actionBudget" in facts:
+        budget = facts["actionBudget"]
+        if (
+            not isinstance(budget, dict)
+            or set(budget) != {"remainingActions", "remainingProviderAttempts"}
+            or not all(type(value) is int and value >= 0 for value in budget.values())
+        ):
+            raise _failure()
     sibling_tickets = facts.get("siblingTickets", [])
     if (
         not isinstance(sibling_tickets, list)
@@ -364,12 +373,17 @@ def _allowed_actions(facts: dict[str, object]) -> tuple[str, ...]:
         catalog = facts.get("evidenceCatalog", [])
         assert isinstance(catalog, list)
         completed = {item["actionType"] for item in catalog}
+        budget = facts.get("actionBudget")
+        can_read_more = not isinstance(budget, dict) or (
+            budget["remainingActions"] >= 2 and budget["remainingProviderAttempts"] >= 2
+        )
         return (
             *(
                 capability.value
                 for capability in InvestigationCapability
                 if capability is not InvestigationCapability.CONFIRM_ORDER
                 and capability.value not in completed
+                and can_read_more
             ),
             TerminalAction.HANDOFF.value,
             TerminalAction.SUBMIT_CONCLUSION.value,

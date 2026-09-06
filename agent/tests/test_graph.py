@@ -22,7 +22,10 @@ from baseline_agent.graph import (
     request_clarification,
 )
 from baseline_agent.investigation_action_loop import (
+    ActionBudget,
     ActionDecision,
+    ActionLoop,
+    ActionLoopContinuation,
     ActionUsage,
     DeterministicActionModel,
     TerminalAction,
@@ -791,15 +794,25 @@ def _capability_result(url: str, facts: dict) -> dict:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("scenario_matches", [True, False])
+@pytest.mark.parametrize(
+    ("scenario_matches", "legacy_checkpoint", "omit_payment"),
+    [(True, False, False), (False, False, False), (True, True, False), (True, False, True)],
+)
 async def test_graph_uses_spring_required_fact_policy_before_model_submission(
-    monkeypatch: pytest.MonkeyPatch, scenario_matches: bool
+    monkeypatch: pytest.MonkeyPatch,
+    scenario_matches: bool,
+    legacy_checkpoint: bool,
+    omit_payment: bool,
 ) -> None:
     from test_investigation_action_loop import _required_logistics_facts
 
     policy = _required_logistics_facts()
     # 区别于旧硬编码版本,验证目录版本完整经过断点恢复到最终结论。
     policy["policyVersion"] = "evidence-sufficiency-graph-test"
+    if omit_payment:
+        policy["facts"] = [
+            fact for fact in policy["facts"] if fact["capability"] != "READ_PAYMENT_AND_REFUNDS"
+        ]
     catalog = {**_capability_catalog(), "requiredFacts": policy}
     facts = _with_facts(delayHours=23, delaySeconds=23 * 60 * 60)
     contexts: list[dict] = []
@@ -852,8 +865,23 @@ async def test_graph_uses_spring_required_fact_policy_before_model_submission(
     monkeypatch.setattr("baseline_agent.graph.investigation_action_model", ChoosingSubmission())
     monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
     monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    checkpoint = None
+    if legacy_checkpoint:
+
+        async def confirm(_):
+            return _capability_result("/CONFIRM_ORDER", facts)
+
+        first = await ActionLoop(DeterministicActionModel().choose, ActionBudget()).advance(
+            None, confirm
+        )
+        assert isinstance(first, ActionLoopContinuation)
+        checkpoint = first.checkpoint
+        checkpoint.pop("requiredFacts", None)
+        returned_refs.update(first.checkpoint["records"][0]["evidenceReferences"])
+        assert "requiredFacts" not in checkpoint
     result = await investigate_ticket(
         {
+            "investigation_progress": checkpoint,
             "requested_by": "spring",
             "ticket_id": "ticket-required-policy",
             "generation_id": "generation-required-policy",
@@ -870,13 +898,19 @@ async def test_graph_uses_spring_required_fact_policy_before_model_submission(
         assert submissions == []
         return
 
-    assert reads == [
-        "CONFIRM_ORDER",
+    expected_reads = {
         "READ_LOGISTICS",
-        "READ_PAYMENT_AND_REFUNDS",
         "READ_COMPENSATION_AND_PENDING_ACTIONS",
         "READ_APPLICABLE_POLICY",
-    ]
+    }
+    if not omit_payment:
+        expected_reads.add("READ_PAYMENT_AND_REFUNDS")
+    if not legacy_checkpoint:
+        expected_reads.add("CONFIRM_ORDER")
+    assert set(reads) == expected_reads
+    if omit_payment:
+        assert "paid" not in result["facts"]
+        assert "fullyRefunded" not in result["facts"]
     assert len(contexts) == 1
     assert contexts[0]["requiredFactsComplete"] is True
     assert contexts[0]["requiredFacts"] == policy

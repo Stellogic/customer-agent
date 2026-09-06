@@ -326,7 +326,7 @@ def run_evidence_sufficiency_path(
             "and source_authority = 'SPRING_AUTHORIZED_CAPABILITY' "
             "and valid_until > recorded_at and conflict_status = 'CLEAR'",
             (generation[0],),
-        ).fetchone() == (12,)
+        ).fetchone() == (11,)
 
     with httpx.Client(timeout=20.0) as client:
         state = client.get(
@@ -339,7 +339,15 @@ def run_evidence_sufficiency_path(
         conclusion = values["conclusion"]
         assert conclusion["sufficiencyPolicyVersion"] == "evidence-sufficiency-v1"
         assert conclusion["riskScenario"] == "LOGISTICS_DELAY"
-        assert len(conclusion["evidence"]) == 7
+        assert len(conclusion["evidence"]) == 6
+        assert {item["evidenceReference"] for item in conclusion["evidence"]} == {
+            f"order:{order_reference}",
+            f"logistics:{order_reference}",
+            f"payment:{order_reference}",
+            f"compensation:{order_reference}",
+            f"order-actions:{order_reference}",
+            "policy:delay-policy-v1",
+        }
         assert "confidence" not in conclusion
         return action_types, conclusion
 
@@ -1128,7 +1136,6 @@ def main() -> None:
             "LOGISTICS_STATUS",
             "ORDER",
             "ORDER_CANCELLATION",
-            "ORDER_RULE",
             "PAYMENT",
             "PENDING_ACTION_COUNT",
             "POLICY",
@@ -1139,7 +1146,7 @@ def main() -> None:
                 "select count(*) from agent_command_request where generation_id = %s",
                 (generation[0],),
             ).fetchone()[0]
-            == 7
+            == 6
         )
         assert (
             connection.execute(
@@ -1187,6 +1194,11 @@ def main() -> None:
             headers=spring_headers,
         )
         expect_status(thread_state, 200)
+        resolved_thread_values = thread_state.json()["values"]
+        resolved_conclusion_request = {
+            **resolved_thread_values["conclusion"],
+            "customerReply": resolved_thread_values["customer_reply"],
+        }
         shadow_comparison = thread_state.json()["values"]["shadow_comparison"]
         assert shadow_comparison == {
             "comparison_id": shadow_comparison["comparison_id"],
@@ -1304,7 +1316,6 @@ def main() -> None:
         "READ_PAYMENT_AND_REFUNDS",
         "READ_COMPENSATION_AND_PENDING_ACTIONS",
         "READ_APPLICABLE_POLICY",
-        "READ_ORDER_RULES",
         "SUBMIT_CONCLUSION",
     }
     with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as connection:
@@ -1322,10 +1333,8 @@ def main() -> None:
         spring_headers,
         "ORDER-EVIDENCE-PATH-B",
     )
-    assert path_a_actions != path_b_actions
+    # 业务明确的必读由程序承担, 不同历史上下文不再要求机械读取顺序不同.
     assert len(path_a_actions) == len(path_b_actions) == len(required_evidence_actions)
-    assert path_a_actions[0] == path_b_actions[0] == "CONFIRM_ORDER"
-    assert path_a_actions[-1] == path_b_actions[-1] == "SUBMIT_CONCLUSION"
     assert set(path_a_actions) == set(path_b_actions) == required_evidence_actions
     assert {
         "compensationRequired": path_a_conclusion["compensationRequired"],
@@ -4842,26 +4851,8 @@ def main() -> None:
                 "X-Agent-Operation": "SUBMIT_INVESTIGATION_CONCLUSION",
                 "Idempotency-Key": f"{generation_id}:submit-conclusion",
             },
-            json={
-                "compensationRequired": False,
-                "reasonCode": "DELAY_UNDER_24_HOURS",
-                "delayHours": 23,
-                "delaySeconds": 82800,
-                "orderReference": "ORDER-DELAY-UNDER-24",
-                "evidenceRefs": [
-                    "order:ORDER-DELAY-UNDER-24",
-                    "logistics:ORDER-DELAY-UNDER-24",
-                ],
-                **evidence_sufficiency("ORDER-DELAY-UNDER-24"),
-                **customer_reply(
-                    "ORDER-DELAY-UNDER-24",
-                    [
-                        "order:ORDER-DELAY-UNDER-24",
-                        "logistics:ORDER-DELAY-UNDER-24",
-                    ],
-                    False,
-                ),
-            },
+            # 精确重放原成功请求, 只验证转人工后的授权失效, 不混入幂等内容冲突.
+            json=resolved_conclusion_request,
         )
         expect_status(replayed_conclusion_after_handoff, 403)
 

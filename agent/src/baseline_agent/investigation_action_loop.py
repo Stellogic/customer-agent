@@ -563,7 +563,7 @@ def _load_progress(
             or checked_numeric["remainingWallClockMs"] > budget.max_wall_clock_ms
         ):
             raise ValueError
-        policy = checkpoint.get("requiredFacts")
+        policy = checkpoint.get("requiredFacts", required_facts)
         if policy is not None and not isinstance(policy, dict):
             raise ValueError
         return _ActionLoopProgress(
@@ -587,11 +587,7 @@ def _load_progress(
 
 def _dump_progress(progress: _ActionLoopProgress) -> dict[str, object]:
     return {
-        **(
-            {"requiredFacts": progress.required_facts}
-            if progress.required_facts is not None
-            else {}
-        ),
+        "requiredFacts": progress.required_facts,
         "facts": dict(progress.facts),
         "records": [
             {
@@ -691,6 +687,10 @@ def _seen_from_checkpoint(value: object) -> tuple[InvestigationAction, int]:
 def _choice_context(progress: _ActionLoopProgress) -> dict[str, object]:
     context = dict(progress.facts)
     if progress.required_facts is not None:
+        context["actionBudget"] = {
+            "remainingActions": progress.remaining_actions,
+            "remainingProviderAttempts": progress.remaining_provider_attempts,
+        }
         context["requiredFacts"] = progress.required_facts
         context["requiredFactsComplete"] = bool(_required_evidence_claims(progress, complete=False))
     context["evidenceCatalog"] = [
