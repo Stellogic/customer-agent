@@ -1,10 +1,50 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 import { login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
 import { queryFixtureSql } from "./support/database";
 import { createSingleTicket, intakeReply, prepareOrder } from "./support/issue173-intake";
 
 // 已登记串行门禁；完整 AC、运行证据与复用边界见 issue-173-acceptance-plan.md。
+
+function expectRequiredLogisticsFacts(ticketId: string) {
+  // 补充核对真实产品调查产生的首代次记录；不注入事实，也不限定读取顺序。
+  const investigation = JSON.parse(
+    queryFixtureSql(`
+      SELECT json_build_object(
+        'capabilities', (SELECT json_agg(DISTINCT response_payload->>'capability')
+          FROM agent_command_request WHERE generation_id = g.id
+            AND operation = 'USE_INVESTIGATION_CAPABILITY'),
+        'factTypes', (SELECT json_agg(fact_type)
+          FROM investigation_fact WHERE generation_id = g.id)
+      ) FROM agent_processing_generation g
+      WHERE g.ticket_id = '${ticketId}' AND g.generation_number = 1;
+    `),
+  ) as { capabilities: string[]; factTypes: string[] };
+  expect(investigation.capabilities).toEqual(
+    expect.arrayContaining([
+      "CONFIRM_ORDER",
+      "READ_LOGISTICS",
+      "READ_PAYMENT_AND_REFUNDS",
+      "READ_COMPENSATION_AND_PENDING_ACTIONS",
+      "READ_APPLICABLE_POLICY",
+    ]),
+  );
+  expect(investigation.factTypes).toEqual(
+    expect.arrayContaining([
+      "ORDER",
+      "LOGISTICS_DELAY_HOURS",
+      "LOGISTICS_DELAY_SECONDS",
+      "PAYMENT",
+      "ORDER_CANCELLATION",
+      "REFUND_STATUS",
+      "EXISTING_COMPENSATION",
+      "PENDING_ACTION_COUNT",
+      "POLICY",
+    ]),
+  );
+  expect(investigation.capabilities).not.toContain("READ_ORDER_RULES");
+  expect(investigation.factTypes).not.toContain("ORDER_RULE");
+}
 
 test("Issue #173 A：自然语言多问题澄清、一次建单与订单分组恢复", async ({ browser }) => {
   test.setTimeout(90_000);
@@ -63,6 +103,7 @@ test("Issue #173 D：真实低风险回复产生五分钟候选，刷新后仍�
     const notice = page.getByRole("region", { name: "自动解决状态" });
     const cancel = notice.getByRole("button", { name: "仍需帮助，取消自动解决" });
     await expect(cancel).toBeVisible({ timeout: 60_000 });
+    expectRequiredLogisticsFacts(ticketId);
     const candidate = JSON.parse(
       queryFixtureSql(`
       SELECT json_build_object('waitSeconds', extract(epoch FROM due_at - created_at)::integer, 'dueAt', due_at)
@@ -271,7 +312,7 @@ test("Issue #173 B：真实调查流、并发追加消息、旧代次隔离与�
       reference,
       "物流延迟，请核实订单后说明处理方案。",
     );
-    // 等真实 Agent 代次完成并展示公开回复；B 不依赖 C/E 已覆盖的补偿投影刷新。
+    // 首代物流调查应产生待审批提案，再验证公开流与后续并发消息的代次隔离。
     await expect
       .poll(
         () =>
@@ -282,6 +323,24 @@ test("Issue #173 B：真实调查流、并发追加消息、旧代次隔离与�
         { timeout: 60_000 },
       )
       .toBe("COMPLETED");
+    const refreshed = page.waitForResponse(
+      (response) =>
+        response.request().method() === "GET" &&
+        new URL(response.url()).pathname === `/api/customer/v2/tickets/${ticketId}`,
+    );
+    await page.reload();
+    const authoritative = await refreshed;
+    expect(authoritative.ok()).toBe(true);
+    const projection = (await authoritative.json()) as {
+      pendingCompensation: { status: string } | null;
+    };
+    expect(projection.pendingCompensation?.status).toBe("PENDING_REVIEW");
+    await expect(
+      page
+        .locator(".pending-compensation-card")
+        .getByRole("heading", { name: "待审批", exact: true }),
+    ).toBeVisible();
+    expectRequiredLogisticsFacts(ticketId);
     const agentReply = queryFixtureSql(`
       SELECT body FROM public_message
       WHERE ticket_id = '${ticketId}' AND author = 'AGENT'
@@ -316,6 +375,17 @@ test("Issue #173 B：真实调查流、并发追加消息、旧代次隔离与�
         messagePage.getByPlaceholder("继续补充消息", { exact: true }).fill(messages[index]),
       ),
     );
+    // 两次点击不保证请求相邻到达。先汇合真实请求，再在活动代次上追加第二条消息。
+    const capturedRoutes: Promise<Route>[] = [];
+    for (const messagePage of messagePages) {
+      let capture: (route: Route) => void = () => {};
+      capturedRoutes.push(
+        new Promise<Route>((resolve) => {
+          capture = resolve;
+        }),
+      );
+      await messagePage.route(`**/api/customer/v2/tickets/${ticketId}/messages`, capture);
+    }
     const accepted = messagePages.map((messagePage) =>
       messagePage.waitForResponse(
         (response) =>
@@ -328,6 +398,22 @@ test("Issue #173 B：真实调查流、并发追加消息、旧代次隔离与�
         messagePage.getByRole("button", { name: "发送新消息" }).click(),
       ),
     );
+    const [firstRoute, secondRoute] = await Promise.all(capturedRoutes);
+    const firstResponse = await firstRoute.fetch();
+    expect(firstResponse.status()).toBe(202);
+    const activeGeneration = JSON.parse(
+      queryFixtureSql(`
+      SELECT json_build_object('number', generation_number, 'status', status)
+      FROM agent_processing_generation WHERE ticket_id = '${ticketId}'
+      ORDER BY generation_number DESC LIMIT 1;
+    `),
+    ) as { number: number; status: string };
+    expect(activeGeneration.status, "第二条消息必须到达仍在处理的真实代次").toBe("ACTIVE");
+    const secondResponse = await secondRoute.fetch();
+    await Promise.all([
+      firstRoute.fulfill({ response: firstResponse }),
+      secondRoute.fulfill({ response: secondResponse }),
+    ]);
     const responses = await Promise.all(accepted);
     for (const response of responses) {
       expect(response.ok()).toBe(true);
@@ -338,27 +424,21 @@ test("Issue #173 B：真实调查流、并发追加消息、旧代次隔离与�
         replayed: false,
       });
     }
-    for (const message of messages) await expect(page.getByText(message, { exact: true })).toBeVisible();
+    for (const message of messages)
+      await expect(page.getByText(message, { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "发送新消息" })).toBeEnabled();
 
     await expect
       .poll(
         () =>
           queryFixtureSql(`
-          SELECT count(*) FROM agent_processing_generation
-          WHERE ticket_id = '${ticketId}' AND status = 'SUPERSEDED';
+          SELECT status FROM agent_processing_generation
+          WHERE ticket_id = '${ticketId}' AND generation_number = ${activeGeneration.number};
         `),
         { timeout: 30_000 },
       )
-      .not.toBe("0");
-    const staleGeneration = JSON.parse(
-      queryFixtureSql(`
-      SELECT json_build_object('number', generation_number)
-      FROM agent_processing_generation
-      WHERE ticket_id = '${ticketId}' AND status = 'SUPERSEDED'
-      ORDER BY generation_number DESC LIMIT 1;
-    `),
-    ) as { number: number };
+      .toBe("SUPERSEDED");
+    const staleGeneration = activeGeneration;
     expect(
       queryFixtureSql(`
       SELECT count(*) FROM customer_public_event
@@ -458,9 +538,7 @@ test("Issue #173 C：人工领取与公开回复、标准补偿提交和独立�
     const assistanceResponse = await assisted;
     const assistanceBody = await assistanceResponse.text();
     expect(assistanceResponse.status(), assistanceBody).toBe(500);
-    await expect(assistance.getByRole("alert")).toHaveText(
-      "知识检索暂不可用。人工处理不受影响。",
-    );
+    await expect(assistance.getByRole("alert")).toHaveText("知识检索暂不可用。人工处理不受影响。");
     expect(
       queryFixtureSql(`SELECT count(*) FROM public_message WHERE ticket_id = '${ticketId}';`),
     ).toBe(publicMessageCount);

@@ -790,6 +790,105 @@ def _capability_result(url: str, facts: dict) -> dict:
     }
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scenario_matches", [True, False])
+async def test_graph_uses_spring_required_fact_policy_before_model_submission(
+    monkeypatch: pytest.MonkeyPatch, scenario_matches: bool
+) -> None:
+    from test_investigation_action_loop import _required_logistics_facts
+
+    policy = _required_logistics_facts()
+    # 区别于旧硬编码版本,验证目录版本完整经过断点恢复到最终结论。
+    policy["policyVersion"] = "evidence-sufficiency-graph-test"
+    catalog = {**_capability_catalog(), "requiredFacts": policy}
+    facts = _with_facts(delayHours=23, delaySeconds=23 * 60 * 60)
+    contexts: list[dict] = []
+    reads: list[str] = []
+    returned_refs: set[str] = set()
+    submissions: list[dict] = []
+
+    class ChoosingSubmission:
+        async def choose(self, context: dict) -> ActionDecision:
+            contexts.append(context)
+            return ActionDecision.from_values(
+                TerminalAction.SUBMIT_CONCLUSION, {}, ActionUsage(tokens=17, cost_micros=2)
+            )
+
+    class Response:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class Client:
+        async def __aenter__(self) -> "Client":
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def get(self, url: str, **_: object) -> Response:
+            return Response(
+                catalog if url.endswith("/capabilities") else _catalog_or_customer_context(url)
+            )
+
+        async def post(self, url: str, *, json: dict, **_: object) -> Response:
+            if "/capabilities/" in url:
+                reads.append(url.rsplit("/", 1)[-1])
+                result = _capability_result(url, facts)
+                returned_refs.update(result["evidenceRefs"])
+                return Response(result)
+            if url.endswith("/conclusions"):
+                submissions.append(json)
+            if url.endswith("/handoff"):
+                return Response({"handlingMode": "HUMAN", "reasonCode": json["reasonCode"]})
+            return Response({"accepted": True})
+
+    monkeypatch.setattr("baseline_agent.graph.httpx.AsyncClient", lambda **_: Client())
+    monkeypatch.setattr("baseline_agent.graph.investigation_action_model", ChoosingSubmission())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    result = await investigate_ticket(
+        {
+            "requested_by": "spring",
+            "ticket_id": "ticket-required-policy",
+            "generation_id": "generation-required-policy",
+            "issue_kind": "LOGISTICS_DELAY" if scenario_matches else "DUPLICATE_CHARGE",
+        }
+    )
+
+    if not scenario_matches:
+        assert (
+            result["investigation_run_evidence"]["failureClassification"] == "INVALID_TOOL_RESPONSE"
+        )
+        assert reads == []
+        assert contexts == []
+        assert submissions == []
+        return
+
+    assert reads == [
+        "CONFIRM_ORDER",
+        "READ_LOGISTICS",
+        "READ_PAYMENT_AND_REFUNDS",
+        "READ_COMPENSATION_AND_PENDING_ACTIONS",
+        "READ_APPLICABLE_POLICY",
+    ]
+    assert len(contexts) == 1
+    assert contexts[0]["requiredFactsComplete"] is True
+    assert contexts[0]["requiredFacts"] == policy
+    assert len(submissions) == 1
+    conclusion = result["conclusion"]
+    assert conclusion["reasonCode"] == "DELAY_UNDER_24_HOURS"
+    assert conclusion["compensationRequired"] is False
+    assert conclusion["sufficiencyPolicyVersion"] == policy["policyVersion"]
+    assert {item["evidenceReference"] for item in conclusion["evidence"]} == returned_refs
+    assert submissions[0] == {**conclusion, "customerReply": result["customer_reply"]}
+
+
 @pytest.mark.parametrize(
     ("facts_payload", "expected_reason"),
     [

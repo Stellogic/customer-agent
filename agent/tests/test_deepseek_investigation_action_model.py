@@ -448,3 +448,138 @@ async def test_retryable_supplier_error_has_two_attempt_bound_and_no_model_fallb
     assert requests == 2
     assert captured.value.code.value == "MODEL_CALL_FAILED"
     assert captured.value.provider_attempts == 2
+
+
+def _program_completed_facts() -> dict:
+    return {
+        "matchStatus": "UNIQUE",
+        "orderReference": "ORDER-128",
+        "delayHours": 25,
+        "delaySeconds": 90_000,
+        "paid": True,
+        "cancelled": False,
+        "fullyRefunded": False,
+        "existingCompensation": False,
+        "pendingActionCount": 0,
+        "policyVersion": "delay-policy-v1",
+        "evidenceCatalog": _evidence_catalog()[:-1],
+        "requiredFacts": {
+            "policyVersion": "evidence-sufficiency-v1",
+            "riskScenario": "LOGISTICS_DELAY",
+            "facts": [
+                {
+                    "factType": "ORDER",
+                    "capability": "CONFIRM_ORDER",
+                    "resultField": "orderReference",
+                    "evidenceIndex": 0,
+                    "applicability": "ORDER_IDENTITY",
+                }
+            ],
+        },
+        "requiredFactsComplete": True,
+        "issueKind": "LOGISTICS_DELAY",
+        "customerQuestion": "物流延迟了，接下来怎么办？",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("action", "query"),
+    [
+        ("SUBMIT_CONCLUSION", "物流延迟后如何处理"),
+        ("READ_ORDER_RULES", None),
+        ("HANDOFF", None),
+    ],
+)
+async def test_program_required_facts_leave_optional_investigation_to_model(action, query) -> None:
+    captured: list[dict] = []
+
+    def supplier(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        payload = _completed_action(action)
+        payload["output"][0]["content"][0]["text"] = json.dumps(
+            {"action": action, "evidence": [], "knowledgeQuery": query}
+        )
+        return httpx.Response(200, json=payload)
+
+    audit = InMemoryModelCallAuditSink()
+    model = DeepSeekResponsesInvestigationActionModel(
+        DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
+        transport=httpx.MockTransport(supplier),
+        audit_sink=audit,
+    )
+    decision = await model.choose(_program_completed_facts())
+
+    assert decision.action.kind.value == action
+    assert decision.evidence_claims == ()
+    assert decision.knowledge_query == query
+    schema = captured[0]["text"]["format"]["schema"]
+    assert set(schema["properties"]["action"]["enum"]) == {
+        "READ_ORDER_RULES",
+        "SUBMIT_CONCLUSION",
+        "HANDOFF",
+    }
+    assert schema["properties"]["evidence"]["minItems"] == 0
+    assert set(schema["required"]) == {"action", "evidence", "knowledgeQuery"}
+    assert captured[0]["max_output_tokens"] == 1024
+    assert audit.records[0].actual_response_shape_valid
+    assert audit.records[0].total_tokens == 40
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("action", "evidence", "query"),
+    [
+        ("READ_LOGISTICS", [], None),
+        ("READ_ORDER_RULES", _evidence_payload()[:1], None),
+        ("HANDOFF", [], "物流政策"),
+        (
+            "SUBMIT_CONCLUSION",
+            [{"evidenceReference": "invented", "applicability": ["ORDER_IDENTITY"]}],
+            None,
+        ),
+    ],
+)
+async def test_program_path_rejects_read_facts_and_misplaced_submission_fields(
+    action, evidence, query
+) -> None:
+    payload = _completed_action(action)
+    payload["output"][0]["content"][0]["text"] = json.dumps(
+        {"action": action, "evidence": evidence, "knowledgeQuery": query}
+    )
+    audit = InMemoryModelCallAuditSink()
+    model = DeepSeekResponsesInvestigationActionModel(
+        DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=payload)),
+        audit_sink=audit,
+    )
+    with pytest.raises(ActionLoopFailure):
+        await model.choose(_program_completed_facts())
+    assert len(audit.records) == 1
+    assert audit.records[0].failure_classification is DeepSeekFailureClassification.SCHEMA_MISMATCH
+
+
+@pytest.mark.asyncio
+async def test_program_path_keeps_clarification_for_ambiguous_order() -> None:
+    captured: list[dict] = []
+
+    def supplier(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        return httpx.Response(200, json=_completed_action("REQUEST_CLARIFICATION"))
+
+    model = DeepSeekResponsesInvestigationActionModel(
+        DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
+        transport=httpx.MockTransport(supplier),
+    )
+    decision = await model.choose(
+        {
+            "matchStatus": "AMBIGUOUS",
+            "requiredFacts": _program_completed_facts()["requiredFacts"],
+            "requiredFactsComplete": False,
+        }
+    )
+
+    assert decision.action.kind is TerminalAction.REQUEST_CLARIFICATION
+    schema = captured[0]["text"]["format"]["schema"]
+    assert schema["properties"]["action"]["enum"] == ["REQUEST_CLARIFICATION"]
+    assert schema["required"] == ["action"]

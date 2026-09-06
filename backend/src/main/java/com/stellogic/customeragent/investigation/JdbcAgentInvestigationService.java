@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -26,6 +28,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 class JdbcAgentInvestigationService implements AgentInvestigationService {
+    private static final Logger LOG = LoggerFactory.getLogger(JdbcAgentInvestigationService.class);
     private final JdbcTemplate jdbc;
     private final AgentAccessAudit accessAudit;
     private final Clock clock;
@@ -61,11 +64,17 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     public InvestigationCapabilityCatalog capabilities(UUID ticketId, UUID generationId) {
         authorityLock.acquire(ticketId);
         requireActiveGeneration(ticketId, generationId);
+        String issueKind =
+                jdbc.queryForObject(
+                        "select issue_kind from support_ticket where id = ?",
+                        String.class,
+                        ticketId);
         return new InvestigationCapabilityCatalog(
                 "investigation-capability-catalog-v1",
                 java.util.Arrays.stream(InvestigationCapability.values())
                         .map(InvestigationCapability::definition)
-                        .toList());
+                        .toList(),
+                EvidenceSufficiencyPolicy.requiredFacts(issueKind));
     }
 
     @Override
@@ -482,7 +491,15 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         List<PersistedInvestigationFact> persistedFacts = persistedFacts(ticketId, generationId);
         String evidenceFailure =
                 EvidenceSufficiencyPolicy.validate(conclusion, persistedFacts, clock.instant());
-        if (evidenceFailure != null) reject(ticketId, evidenceFailure);
+        if (evidenceFailure != null) {
+            LOG.warn(
+                    "INVESTIGATION_EVIDENCE_REJECTED ticket={} generation={} reason={} missingRequirements={}",
+                    ticketId,
+                    generationId,
+                    evidenceFailure,
+                    EvidenceSufficiencyPolicy.missingRequirements(conclusion, persistedFacts));
+            reject(ticketId, evidenceFailure);
+        }
         if (!factsStillMatchCurrentOrder(persistedFacts, order)) {
             reject(ticketId, "EVIDENCE_STALE");
         }

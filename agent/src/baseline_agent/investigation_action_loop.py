@@ -224,6 +224,7 @@ class ActionLoopResult:
     model_calls: tuple[ActionModelCallRecord, ...]
     evidence_claims: tuple[EvidenceClaim, ...]
     knowledge_query: str | None = None
+    required_facts: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -233,6 +234,7 @@ class ActionLoopContinuation:
 
 @dataclass
 class _ActionLoopProgress:
+    required_facts: dict | None
     facts: dict
     records: list[ActionRecord]
     model_calls: list[ActionModelCallRecord]
@@ -256,6 +258,8 @@ class DeterministicActionModel:
         reference = facts.get("orderReference")
         if not isinstance(reference, str) or not reference:
             return _decision(TerminalAction.HANDOFF)
+        if facts.get("requiredFactsComplete") is True:
+            return _decision(TerminalAction.SUBMIT_CONCLUSION)
         standard_path = (
             ("delaySeconds", InvestigationCapability.READ_LOGISTICS),
             ("paid", InvestigationCapability.READ_PAYMENT_AND_REFUNDS),
@@ -287,10 +291,13 @@ class ActionLoop:
         choose: Callable[[dict], Awaitable[ActionDecision]],
         budget: ActionBudget,
         clock: Callable[[], float] = time.monotonic,
+        *,
+        required_facts: dict | None = None,
     ) -> None:
         self._choose = choose
         self._budget = budget
         self._clock = clock
+        self._required_facts = required_facts
 
     async def run(
         self, execute: Callable[[InvestigationAction], Awaitable[dict]]
@@ -307,13 +314,21 @@ class ActionLoop:
         checkpoint: dict[str, object] | None,
         execute: Callable[[InvestigationAction], Awaitable[dict]],
     ) -> ActionLoopContinuation | ActionLoopResult:
-        progress = _load_progress(checkpoint, self._budget)
-        if progress.remaining_actions <= 0 or progress.remaining_provider_attempts <= 0:
+        progress = _load_progress(checkpoint, self._budget, self._required_facts)
+        if progress.remaining_actions <= 0:
             raise self._progress_failure(ActionLoopFailureCode.BUDGET_EXHAUSTED, progress)
         step_started = self._clock()
+        decision: ActionDecision | None = None
         try:
             async with asyncio.timeout(progress.remaining_wall_clock_ms / 1000):
-                decision = await self._choose(_choice_context(progress))
+                action = _next_required_action(progress)
+                if action is None:
+                    if progress.remaining_provider_attempts <= 0:
+                        raise ActionLoopFailure(ActionLoopFailureCode.BUDGET_EXHAUSTED)
+                    decision = await self._choose(_choice_context(progress))
+                    if not isinstance(decision, ActionDecision):
+                        raise ActionLoopFailure(ActionLoopFailureCode.UNKNOWN_ACTION)
+                    action = decision.action
         except TimeoutError as error:
             raise self._progress_failure(
                 ActionLoopFailureCode.BUDGET_EXHAUSTED, progress
@@ -341,73 +356,82 @@ class ActionLoop:
             ) from error
         except Exception as error:
             raise self._progress_failure(ActionLoopFailureCode.UNKNOWN_ACTION, progress) from error
-        if not isinstance(decision, ActionDecision):
-            raise self._progress_failure(ActionLoopFailureCode.UNKNOWN_ACTION, progress)
-
         progress.remaining_actions -= 1
-        progress.tokens += decision.usage.tokens
-        progress.cost_micros += decision.usage.cost_micros
-        progress.provider_attempts += decision.usage.provider_attempts
-        progress.remaining_tokens -= decision.usage.tokens
-        progress.remaining_cost_micros -= decision.usage.cost_micros
-        progress.remaining_provider_attempts -= decision.usage.provider_attempts
-        progress.model_calls.append(
-            ActionModelCallRecord(
-                call_number=len(progress.model_calls) + 1,
-                selected_action=decision.action.kind.value,
-                provider_attempts=decision.usage.provider_attempts,
-                tokens=decision.usage.tokens,
-                cost_micros=decision.usage.cost_micros,
+        if decision is not None:
+            progress.tokens += decision.usage.tokens
+            progress.cost_micros += decision.usage.cost_micros
+            progress.provider_attempts += decision.usage.provider_attempts
+            progress.remaining_tokens -= decision.usage.tokens
+            progress.remaining_cost_micros -= decision.usage.cost_micros
+            progress.remaining_provider_attempts -= decision.usage.provider_attempts
+            progress.model_calls.append(
+                ActionModelCallRecord(
+                    call_number=len(progress.model_calls) + 1,
+                    selected_action=action.kind.value,
+                    provider_attempts=decision.usage.provider_attempts,
+                    tokens=decision.usage.tokens,
+                    cost_micros=decision.usage.cost_micros,
+                )
             )
-        )
         if (
             progress.remaining_tokens < 0
             or progress.remaining_cost_micros < 0
             or progress.remaining_provider_attempts < 0
         ):
             raise self._progress_failure(ActionLoopFailureCode.BUDGET_EXHAUSTED, progress)
-        repeats = progress.seen.get(decision.action, 0)
+        repeats = progress.seen.get(action, 0)
         if repeats > self._budget.max_repeated_actions:
             raise self._progress_failure(ActionLoopFailureCode.REPEATED_NO_PROGRESS, progress)
-        progress.seen[decision.action] = repeats + 1
+        progress.seen[action] = repeats + 1
         progress.remaining_wall_clock_ms -= round((self._clock() - step_started) * 1000)
         if progress.remaining_wall_clock_ms <= 0:
             raise self._progress_failure(ActionLoopFailureCode.BUDGET_EXHAUSTED, progress)
-        if isinstance(decision.action.kind, TerminalAction):
-            if (
-                decision.action.kind is TerminalAction.SUBMIT_CONCLUSION
-                and not decision.evidence_claims
-            ):
+        if isinstance(action.kind, TerminalAction):
+            assert decision is not None
+            claims = decision.evidence_claims
+            if action.kind is TerminalAction.SUBMIT_CONCLUSION:
+                try:
+                    claims = _merge_claims(_required_evidence_claims(progress), claims)
+                except ActionLoopFailure as error:
+                    raise self._progress_failure(error.code, progress) from error
+            if action.kind is TerminalAction.SUBMIT_CONCLUSION and not claims:
                 raise self._progress_failure(ActionLoopFailureCode.UNKNOWN_ACTION, progress)
-            progress.records.append(ActionRecord(decision.action.kind.value, (), "SELECTED"))
+            progress.records.append(ActionRecord(action.kind.value, (), "SELECTED"))
             return ActionLoopResult(
-                decision.action.kind,
+                action.kind,
                 progress.facts,
                 tuple(progress.records),
                 progress.tokens,
                 progress.cost_micros,
                 progress.provider_attempts,
                 tuple(progress.model_calls),
-                decision.evidence_claims,
+                claims,
                 decision.knowledge_query,
+                progress.required_facts,
             )
         try:
             tool_started = self._clock()
             async with asyncio.timeout(progress.remaining_wall_clock_ms / 1000):
-                result = await execute(decision.action)
+                result = await execute(action)
         except TimeoutError as error:
             raise self._progress_failure(
-                ActionLoopFailureCode.BUDGET_EXHAUSTED, progress
+                ActionLoopFailureCode.BUDGET_EXHAUSTED, progress, failed_action=action
             ) from error
         except ActionLoopFailure as error:
-            raise self._progress_failure(error.code, progress) from error
+            raise self._progress_failure(error.code, progress, failed_action=action) from error
         except Exception as error:
-            raise self._progress_failure(ActionLoopFailureCode.TOOL_FAILURE, progress) from error
+            raise self._progress_failure(
+                ActionLoopFailureCode.TOOL_FAILURE, progress, failed_action=action
+            ) from error
         progress.remaining_wall_clock_ms -= round((self._clock() - tool_started) * 1000)
         if progress.remaining_wall_clock_ms <= 0:
-            raise self._progress_failure(ActionLoopFailureCode.BUDGET_EXHAUSTED, progress)
+            raise self._progress_failure(
+                ActionLoopFailureCode.BUDGET_EXHAUSTED, progress, failed_action=action
+            )
         if not isinstance(result, dict):
-            raise self._progress_failure(ActionLoopFailureCode.TOOL_FAILURE, progress)
+            raise self._progress_failure(
+                ActionLoopFailureCode.TOOL_FAILURE, progress, failed_action=action
+            )
         before = dict(progress.facts)
         progress.facts.update(
             {
@@ -424,7 +448,7 @@ class ActionLoop:
         )
         progress.records.append(
             ActionRecord(
-                decision.action.kind.value,
+                action.kind.value,
                 controlled_evidence,
                 "PROGRESSED" if progress.facts != before else "NO_PROGRESS",
             )
@@ -437,14 +461,22 @@ class ActionLoop:
         progress: _ActionLoopProgress,
         *,
         failure_classification: str = "",
+        failed_action: InvestigationAction | None = None,
     ) -> ActionLoopFailure:
         return ActionLoopFailure(
             code,
             progress.facts,
-            tuple(progress.records),
+            tuple(progress.records)
+            + (
+                (ActionRecord(failed_action.kind.value, (), code.value),)
+                if failed_action is not None
+                else ()
+            ),
             provider_attempts=progress.provider_attempts,
             model_calls=tuple(progress.model_calls),
             failure_classification=failure_classification,
+            tokens=progress.tokens,
+            cost_micros=progress.cost_micros,
         )
 
 
@@ -465,10 +497,11 @@ _CHECKPOINT_FIELDS = {
 
 
 def _load_progress(
-    checkpoint: dict[str, object] | None, budget: ActionBudget
+    checkpoint: dict[str, object] | None, budget: ActionBudget, required_facts: dict | None = None
 ) -> _ActionLoopProgress:
     if checkpoint is None:
         return _ActionLoopProgress(
+            required_facts=required_facts,
             facts={},
             records=[],
             model_calls=[],
@@ -483,7 +516,7 @@ def _load_progress(
             remaining_provider_attempts=budget.max_provider_attempts,
         )
     try:
-        if set(checkpoint) != _CHECKPOINT_FIELDS:
+        if set(checkpoint) not in (_CHECKPOINT_FIELDS, _CHECKPOINT_FIELDS | {"requiredFacts"}):
             raise ValueError
         facts = checkpoint["facts"]
         record_values = checkpoint["records"]
@@ -519,9 +552,9 @@ def _load_progress(
             raise ValueError
         checked_numeric = cast(dict[str, int], numeric)
         if (
-            len(records) != len(model_calls)
-            or sum(seen.values()) != len(model_calls)
-            or checked_numeric["remainingActions"] + len(model_calls) != budget.max_actions
+            len(model_calls) > len(records)
+            or sum(seen.values()) != len(records)
+            or checked_numeric["remainingActions"] + len(records) != budget.max_actions
             or checked_numeric["remainingTokens"] + checked_numeric["tokens"] != budget.max_tokens
             or checked_numeric["remainingCostMicros"] + checked_numeric["costMicros"]
             != budget.max_cost_micros
@@ -530,7 +563,11 @@ def _load_progress(
             or checked_numeric["remainingWallClockMs"] > budget.max_wall_clock_ms
         ):
             raise ValueError
+        policy = checkpoint.get("requiredFacts")
+        if policy is not None and not isinstance(policy, dict):
+            raise ValueError
         return _ActionLoopProgress(
+            required_facts=policy,
             facts=dict(facts),
             records=records,
             model_calls=model_calls,
@@ -550,6 +587,11 @@ def _load_progress(
 
 def _dump_progress(progress: _ActionLoopProgress) -> dict[str, object]:
     return {
+        **(
+            {"requiredFacts": progress.required_facts}
+            if progress.required_facts is not None
+            else {}
+        ),
         "facts": dict(progress.facts),
         "records": [
             {
@@ -648,6 +690,9 @@ def _seen_from_checkpoint(value: object) -> tuple[InvestigationAction, int]:
 
 def _choice_context(progress: _ActionLoopProgress) -> dict[str, object]:
     context = dict(progress.facts)
+    if progress.required_facts is not None:
+        context["requiredFacts"] = progress.required_facts
+        context["requiredFactsComplete"] = bool(_required_evidence_claims(progress, complete=False))
     context["evidenceCatalog"] = [
         {
             "actionType": record.action_type,
@@ -657,6 +702,54 @@ def _choice_context(progress: _ActionLoopProgress) -> dict[str, object]:
         if record.evidence_references
     ]
     return context
+
+
+def _next_required_action(progress: _ActionLoopProgress) -> InvestigationAction | None:
+    if progress.required_facts is None:
+        return None
+    if "matchStatus" not in progress.facts:
+        return InvestigationAction(InvestigationCapability.CONFIRM_ORDER)
+    if progress.facts["matchStatus"] != "UNIQUE":
+        return None
+    completed = {record.action_type for record in progress.records}
+    for requirement in progress.required_facts["facts"]:
+        capability = InvestigationCapability(requirement["capability"])
+        if capability.value not in completed:
+            return InvestigationAction(
+                capability, (("orderReference", progress.facts["orderReference"]),)
+            )
+    return None
+
+
+def _required_evidence_claims(
+    progress: _ActionLoopProgress, *, complete: bool = True
+) -> tuple[EvidenceClaim, ...]:
+    if progress.required_facts is None:
+        return ()
+    references = {record.action_type: record.evidence_references for record in progress.records}
+    claims: list[EvidenceClaim] = []
+    try:
+        for requirement in progress.required_facts["facts"]:
+            if progress.facts.get(requirement["resultField"]) is None:
+                raise KeyError(requirement["factType"])
+            reference = references[requirement["capability"]][requirement["evidenceIndex"]]
+            claims.append(EvidenceClaim(reference, (requirement["applicability"],)))
+    except (KeyError, IndexError):
+        if complete:
+            raise ActionLoopFailure(ActionLoopFailureCode.INVALID_TOOL_RESPONSE) from None
+        return ()
+    return _merge_claims(tuple(claims))
+
+
+def _merge_claims(*groups: tuple[EvidenceClaim, ...]) -> tuple[EvidenceClaim, ...]:
+    merged: dict[str, list[str]] = {}
+    for group in groups:
+        for claim in group:
+            values = merged.setdefault(claim.evidence_reference, [])
+            for value in claim.applicability:
+                if value not in values:
+                    values.append(value)
+    return tuple(EvidenceClaim(reference, tuple(values)) for reference, values in merged.items())
 
 
 def _deterministic_evidence_claims(catalog: object) -> tuple[EvidenceClaim, ...]:

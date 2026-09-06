@@ -32,6 +32,7 @@ from baseline_agent.deepseek_investigation_model import (
 )
 from baseline_agent.investigation_action_loop import (
     CAPABILITY_PARAMETER_NAMES,
+    EVIDENCE_APPLICABILITIES,
     ActionBudget,
     ActionDecision,
     ActionLoop,
@@ -396,7 +397,9 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 "model_mode": _combined_model_mode(),
                 "investigation_progress": loop_result.checkpoint,
             }
-        facts = _normalize_loop_facts(loop_result.facts)
+        facts = _normalize_loop_facts(
+            loop_result.facts, loop_result.records, loop_result.required_facts
+        )
         action_records = _checkpoint_action_records(loop_result.records)
         if loop_result.terminal_action is TerminalAction.HANDOFF:
             return await _human_handoff(
@@ -413,7 +416,7 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 ),
             )
         if loop_result.terminal_action is TerminalAction.REQUEST_CLARIFICATION:
-            if _clarification_facts_reason(facts) is not None:
+            if _clarification_facts_reason(facts, loop_result.required_facts) is not None:
                 return await _human_handoff(
                     client,
                     base_url,
@@ -435,7 +438,7 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                     state.get("investigation_run_evidence"),
                 ),
             }
-        unsafe_reason = _unsafe_facts_reason(facts, issue_kind)
+        unsafe_reason = _unsafe_facts_reason(facts, issue_kind, loop_result.required_facts)
         if unsafe_reason is not None:
             return await _human_handoff(
                 client,
@@ -517,7 +520,15 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                 ),
                 judgment_evidence,
             )
-        conclusion = _build_conclusion(facts, judgment, loop_result.evidence_claims, issue_kind)
+        conclusion = _build_conclusion(
+            facts,
+            judgment,
+            loop_result.evidence_claims,
+            issue_kind,
+            loop_result.required_facts["policyVersion"]
+            if loop_result.required_facts
+            else "evidence-sufficiency-v1",
+        )
         knowledge_result = None
         knowledge_request_id = f"{generation_id}:knowledge:{capability_request_scope}"
         if loop_result.knowledge_query is not None:
@@ -768,6 +779,7 @@ async def _advance_investigation_action_loop(
         **scope_headers,
         "X-Agent-Operation": "USE_INVESTIGATION_CAPABILITY",
     }
+    required_facts = None
     if checkpoint is None:
         catalog_response = await _request_with_retries(
             lambda: client.get(
@@ -783,6 +795,9 @@ async def _advance_investigation_action_loop(
             raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE) from error
         if not _valid_capability_catalog(catalog):
             raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
+        required_facts = catalog.get("requiredFacts")
+        if required_facts is not None and required_facts["riskScenario"] != issue_kind:
+            raise ActionLoopFailure(ActionLoopFailureCode.INVALID_TOOL_RESPONSE)
 
     async def execute(action: InvestigationAction) -> dict:
         capability = InvestigationCapability(action.kind.value)
@@ -808,7 +823,7 @@ async def _advance_investigation_action_loop(
     async def choose(facts: dict) -> ActionDecision:
         model_context = dict(facts)
         model_context["siblingTickets"] = sibling_tickets
-        if {
+        if facts.get("requiredFactsComplete") is True or {
             "delaySeconds",
             "paid",
             "existingCompensation",
@@ -835,7 +850,9 @@ async def _advance_investigation_action_loop(
             )
         return await investigation_action_model.choose(model_context)
 
-    return await ActionLoop(choose, ActionBudget.configured()).advance(checkpoint, execute)
+    return await ActionLoop(
+        choose, ActionBudget.configured(), required_facts=required_facts
+    ).advance(checkpoint, execute)
 
 
 async def _search_customer_knowledge(
@@ -895,10 +912,24 @@ def _action_loop_handoff_reason(code: ActionLoopFailureCode) -> str:
     return "TOOL_RETRY_EXHAUSTED"
 
 
-def _normalize_loop_facts(collected: dict) -> dict:
-    facts = {name: collected.get(name) for name in REQUIRED_FACT_FIELDS}
+def _normalize_loop_facts(
+    collected: dict, records: tuple[ActionRecord, ...] = (), required_facts: dict | None = None
+) -> dict:
+    facts = {name: collected.get(name) for name in _normalized_fact_fields(required_facts)}
     if facts.get("matchStatus") == "AMBIGUOUS":
         facts["evidenceRefs"] = []
+        return facts
+    if required_facts is not None:
+        facts["evidenceRefs"] = [
+            reference
+            for capability in (
+                InvestigationCapability.CONFIRM_ORDER,
+                InvestigationCapability.READ_LOGISTICS,
+            )
+            for record in records
+            if record.action_type == capability.value
+            for reference in record.evidence_references
+        ]
         return facts
     order_reference = facts.get("orderReference")
     facts["evidenceRefs"] = [
@@ -1142,9 +1173,14 @@ async def _invoke_investigation_capability(
 
 
 def _valid_capability_catalog(catalog: object) -> bool:
-    if not isinstance(catalog, dict) or set(catalog) != {"schemaVersion", "capabilities"}:
+    if not isinstance(catalog, dict) or set(catalog) not in (
+        {"schemaVersion", "capabilities"},
+        {"schemaVersion", "capabilities", "requiredFacts"},
+    ):
         return False
     if catalog["schemaVersion"] != "investigation-capability-catalog-v1":
+        return False
+    if not _valid_required_facts(catalog.get("requiredFacts")):
         return False
     definitions = catalog["capabilities"]
     if not isinstance(definitions, list) or len(definitions) != len(CAPABILITY_CONTRACTS):
@@ -1174,6 +1210,53 @@ def _valid_capability_catalog(catalog: object) -> bool:
     return declared == {
         capability.value: contract for capability, contract in CAPABILITY_CONTRACTS.items()
     }
+
+
+def _valid_required_facts(policy: object) -> bool:
+    if policy is None:
+        return True
+    if not isinstance(policy, dict) or set(policy) != {"policyVersion", "riskScenario", "facts"}:
+        return False
+    if not all(
+        isinstance(policy[name], str) and policy[name] for name in ("policyVersion", "riskScenario")
+    ):
+        return False
+    requirements = policy["facts"]
+    if not isinstance(requirements, list) or not requirements:
+        return False
+    fact_types: set[str] = set()
+    for requirement in requirements:
+        if not isinstance(requirement, dict) or set(requirement) != {
+            "factType",
+            "capability",
+            "resultField",
+            "evidenceIndex",
+            "applicability",
+        }:
+            return False
+        try:
+            capability = InvestigationCapability(requirement["capability"])
+        except (ValueError, TypeError):
+            return False
+        fact_type = requirement["factType"]
+        if (
+            not isinstance(fact_type, str)
+            or not fact_type
+            or fact_type in fact_types
+            or requirement["resultField"]
+            not in {field.name for field in CAPABILITY_CONTRACTS[capability].result_fields}
+            or type(requirement["evidenceIndex"]) is not int
+            or not 0 <= requirement["evidenceIndex"] < 4
+            or requirement["applicability"] not in EVIDENCE_APPLICABILITIES
+        ):
+            return False
+        fact_types.add(fact_type)
+    return True
+
+
+def _normalized_fact_fields(required_facts: dict | None) -> set[str]:
+    # 本票只迁移物流;订单规则可补查,但不是提交物流结论的前提。
+    return REQUIRED_FACT_FIELDS - {"orderRuleSummary"} if required_facts else REQUIRED_FACT_FIELDS
 
 
 def _parse_capability_fields(fields: list) -> tuple[CapabilityField, ...] | None:
@@ -1365,12 +1448,15 @@ async def _request_with_retries(
     return None
 
 
-def _unsafe_facts_reason(facts: object, issue_kind: str = "LOGISTICS_DELAY") -> str | None:
+def _unsafe_facts_reason(
+    facts: object, issue_kind: str = "LOGISTICS_DELAY", required_facts: dict | None = None
+) -> str | None:
     if not isinstance(facts, dict):
         return "INVALID_TOOL_RESPONSE"
     present = set(facts)
+    required_fields = _normalized_fact_fields(required_facts)
     if facts.get("matchStatus") == "AMBIGUOUS":
-        return _clarification_facts_reason(facts)
+        return _clarification_facts_reason(facts, required_facts)
     typed_values = {
         "orderReference": str,
         "delayHours": int,
@@ -1387,14 +1473,14 @@ def _unsafe_facts_reason(facts: object, issue_kind: str = "LOGISTICS_DELAY") -> 
         "evidenceRefs": list,
         "matchStatus": str,
     }
-    for name in present & REQUIRED_FACT_FIELDS:
+    for name in present & required_fields:
         expected = typed_values[name]
         value = facts[name]
         if not isinstance(value, expected) or (expected is int and isinstance(value, bool)):
             return "INVALID_TOOL_RESPONSE"
-    if not REQUIRED_FACT_FIELDS.issubset(present):
+    if not required_fields.issubset(present):
         return "REQUIRED_FACT_MISSING"
-    if present != REQUIRED_FACT_FIELDS:
+    if present != required_fields:
         return "INVALID_TOOL_RESPONSE"
     if facts["matchStatus"] != "UNIQUE":
         return "INVALID_TOOL_RESPONSE"
@@ -1430,13 +1516,14 @@ def _unsafe_facts_reason(facts: object, issue_kind: str = "LOGISTICS_DELAY") -> 
     return None
 
 
-def _clarification_facts_reason(facts: object) -> str | None:
+def _clarification_facts_reason(facts: object, required_facts: dict | None = None) -> str | None:
     if not isinstance(facts, dict):
         return "INVALID_TOOL_RESPONSE"
     present = set(facts)
-    if not REQUIRED_FACT_FIELDS.issubset(present):
+    required_fields = _normalized_fact_fields(required_facts)
+    if not required_fields.issubset(present):
         return "REQUIRED_FACT_MISSING"
-    if present != REQUIRED_FACT_FIELDS:
+    if present != required_fields:
         return "INVALID_TOOL_RESPONSE"
     nullable_fields = (
         "delayHours",
@@ -1455,7 +1542,7 @@ def _clarification_facts_reason(facts: object) -> str | None:
         facts.get("matchStatus") == "AMBIGUOUS"
         and isinstance(facts.get("orderReference"), str)
         and bool(facts["orderReference"])
-        and all(facts[name] is None for name in nullable_fields)
+        and all(facts[name] is None for name in nullable_fields if name in required_fields)
         and facts["evidenceRefs"] == []
     )
     return None if valid_ambiguity else "INVALID_TOOL_RESPONSE"
@@ -1666,6 +1753,7 @@ def _build_conclusion(
     judgment: InvestigationJudgment,
     evidence_claims: tuple[EvidenceClaim, ...],
     issue_kind: str = "LOGISTICS_DELAY",
+    sufficiency_policy_version: str = "evidence-sufficiency-v1",
 ) -> dict:
     risk_scenario = _risk_scenario_for(issue_kind, facts)
     reason_code = _reason_code_for(issue_kind, facts, judgment)
@@ -1680,7 +1768,7 @@ def _build_conclusion(
         "orderReference": facts["orderReference"],
         "evidenceRefs": facts["evidenceRefs"],
         "riskScenario": risk_scenario,
-        "sufficiencyPolicyVersion": "evidence-sufficiency-v1",
+        "sufficiencyPolicyVersion": sufficiency_policy_version,
         "evidence": _merged_evidence_claims(evidence_claims, risk_scenario),
     }
 

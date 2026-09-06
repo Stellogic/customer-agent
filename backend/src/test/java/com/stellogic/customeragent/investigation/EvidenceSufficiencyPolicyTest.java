@@ -16,6 +16,8 @@ class EvidenceSufficiencyPolicyTest {
 
         assertThat(EvidenceSufficiencyPolicy.validate(conclusion(), firstPath, NOW)).isNull();
         assertThat(EvidenceSufficiencyPolicy.validate(conclusion(), secondPath, NOW)).isNull();
+        assertThat(EvidenceSufficiencyPolicy.missingRequirements(conclusion(), firstPath))
+                .isEmpty();
     }
 
     @Test
@@ -72,6 +74,19 @@ class EvidenceSufficiencyPolicyTest {
                                         .toList(),
                                 NOW))
                 .isEqualTo("REQUIRED_FACT_MISSING");
+        assertThat(
+                        EvidenceSufficiencyPolicy.missingRequirements(
+                                conclusion(),
+                                sufficientFacts().stream()
+                                        .filter(fact -> !fact.factType().equals("POLICY"))
+                                        .toList()))
+                .containsExactly(
+                        new RequiredInvestigationFact(
+                                "POLICY",
+                                InvestigationCapability.READ_APPLICABLE_POLICY,
+                                "policyVersion",
+                                0,
+                                EvidenceApplicability.POLICY_BASIS));
     }
 
     @Test
@@ -101,6 +116,11 @@ class EvidenceSufficiencyPolicyTest {
 
         assertThat(EvidenceSufficiencyPolicy.validate(missingApplicability, sufficientFacts(), NOW))
                 .isEqualTo("INVALID_EVIDENCE_APPLICABILITY");
+        assertThat(
+                        EvidenceSufficiencyPolicy.missingRequirements(
+                                missingApplicability, sufficientFacts()))
+                .extracting(RequiredInvestigationFact::factType)
+                .containsExactlyInAnyOrder("PAYMENT", "ORDER_CANCELLATION", "REFUND_STATUS");
     }
 
     @Test
