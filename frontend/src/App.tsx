@@ -1508,7 +1508,7 @@ export function App() {
                       defaultExpanded
                       items={[
                         { key: "conversation", title: "当前工单公开对话" },
-                        { key: "business-facts", title: "已核对的订单与物流事实" },
+                        { key: "business-facts", title: "已核对的订单业务事实" },
                       ]}
                     />
                   )}

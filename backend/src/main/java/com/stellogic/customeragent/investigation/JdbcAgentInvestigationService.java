@@ -591,6 +591,20 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         conclusion.reasonCode().name(),
                         ticketId);
         if (updated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
+        int queueInserted =
+                jdbc.update(
+                        "insert into shared_support_queue_entry (ticket_id, reason_code, entered_at) "
+                                + "values (?, ?, ?) on conflict do nothing",
+                        ticketId,
+                        "AGENT_HUMAN_HANDOFF",
+                        databaseTime);
+        if (queueInserted == 1) {
+            jdbc.update(
+                    "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                            + "values (?, 'SHARED_SUPPORT_QUEUE_ENTERED', 'spring-system', ?)",
+                    ticketId,
+                    databaseTime);
+        }
         publicProjection.appendHandoffMessage(
                 ticketId, generationId, "本次核验结论已给出，此工单已转由客服继续处理。", now);
         jdbc.update(

@@ -91,6 +91,8 @@ for (const fullyRefunded of [false, true]) {
             'proposals', (SELECT count(*) FROM compensation_proposal_revision WHERE ticket_id = t.id),
             'executions', (SELECT count(*) FROM compensation_execution WHERE order_reference = t.order_reference),
             'autoResolutions', (SELECT count(*) FROM ticket_auto_resolution WHERE ticket_id = t.id)
+            , 'queueEntries', (SELECT count(*) FROM shared_support_queue_entry
+              WHERE ticket_id = t.id AND reason_code = 'AGENT_HUMAN_HANDOFF')
           ) FROM support_ticket t JOIN agent_processing_generation g ON g.ticket_id = t.id
           WHERE t.id = '${ticketId}' AND g.generation_number = 1;
         `),
@@ -104,6 +106,7 @@ for (const fullyRefunded of [false, true]) {
         proposals: number;
         executions: number;
         autoResolutions: number;
+        queueEntries: number;
       };
       expect(evidence).toMatchObject({
         generationStatus: "COMPLETED",
@@ -113,6 +116,7 @@ for (const fullyRefunded of [false, true]) {
         proposals: 0,
         executions: 0,
         autoResolutions: 0,
+        queueEntries: 1,
       });
       expect(evidence.capabilities).toEqual(
         expect.arrayContaining([
@@ -158,6 +162,10 @@ for (const fullyRefunded of [false, true]) {
       if (!fullyRefunded) {
         const support = await supportContext.newPage();
         await login(support, "internal", "support-demo");
+        await expect(support.getByRole("heading", { name: "客服共享队列" })).toBeVisible();
+        await expect(
+          support.getByRole("button", { name: `领取工单 ${ticketId}`, exact: true }),
+        ).toBeVisible();
         await support
           .getByRole("table", { name: "待接手工单", exact: true })
           .getByRole("button", { name: `领取工单 ${ticketId}`, exact: true })
