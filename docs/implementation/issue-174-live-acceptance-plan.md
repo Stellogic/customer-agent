@@ -1,6 +1,14 @@
 # #174 真实 DeepSeek 发布验收
 
-状态：**第12版 FROZEN_AUTHORIZED_NOT_RUN**。
+状态：**第13版 FROZEN_AUTHORIZED_NOT_RUN**。
+
+累计授权仍16.12元，32笔旧PENDING保留，当前保守占用15元；本轮最多新增1元后16元，剩余0.12元，不是实扣或余额。
+
+入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-13`，见[冻结](../delivery/issue-174-live-13-freeze.json)。复验固定确认按钮路由修复：仅READY_TO_CONFIRM及精确“确认提交”直接复用已有Spring confirm()；待澄清、重复匹配、候选版本、幂等和事务原子建单校验保持，其他自然语言继续模型理解。无需改API/schema或新增确认接口。该明确命令减少一次不必要的模型调用，不作为模型理解成绩。
+
+原五场景、action v6/schema v3、预算/次数上限和首次失败即停规则不变。Backend规范化check通过（日志.local/issue174-confirm-button-focused2.log），双轴静态审查通过，真实本轮及最终完整门禁NOT_RUN。以下为历史快照。
+
+状态：**第12版 INCOMPLETE：前两场景通过，第三场景确认未建单**。见[结果](../delivery/issue-174-live-12-result.md)。
 
 延续用户剩余3.22元授权，累计上限16.12元。31笔旧PENDING保留，当前预算基准14元；本轮最多预留1元后15元，剩余1.12元，不是实扣或账户余额。
 
