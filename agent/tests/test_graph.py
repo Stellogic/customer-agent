@@ -1263,13 +1263,21 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("published", [False, True])
 async def test_customer_communication_failure_hands_off_without_submitting_or_sending(
     monkeypatch: pytest.MonkeyPatch,
+    published: bool,
 ) -> None:
     posts: list[str] = []
+    model_calls = 0
+    deltas: list[dict] = []
 
     class FailedCommunicationModel:
-        async def compose(self, _model_input):
+        async def compose(self, _model_input, *, on_body_delta=None):
+            nonlocal model_calls
+            model_calls += 1
+            if published:
+                await on_body_delta("订单处理中")
             raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.MODEL_CALL_FAILED)
 
     class Response:
@@ -1296,6 +1304,10 @@ async def test_customer_communication_failure_hands_off_without_submitting_or_se
             posts.append(url)
             if "/capabilities/" in url:
                 return Response(_capability_result(url, _unique_facts()))
+            if url.endswith("/public-reply-events"):
+                if json.get("type") == "CONTENT_DELTA":
+                    deltas.append(json)
+                return Response({})
             if url.endswith("/conclusions"):
                 raise AssertionError("unsafe communication must not submit a conclusion")
             return Response({"handlingMode": "HUMAN", "reasonCode": json["reasonCode"]})
@@ -1317,6 +1329,9 @@ async def test_customer_communication_failure_hands_off_without_submitting_or_se
 
     assert result["handoff"]["reasonCode"] == "INVALID_MODEL_OUTPUT"
     assert not any(url.endswith("/conclusions") for url in posts)
+
+    assert model_calls == (1 if published else 2)
+    assert len(deltas) == (1 if published else 0)
 
 
 @pytest.mark.asyncio
