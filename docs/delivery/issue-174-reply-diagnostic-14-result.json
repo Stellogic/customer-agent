@@ -1,0 +1,23 @@
+{
+  "runId": "issue174-reply-diagnostic-14",
+  "releaseAcceptance": false,
+  "maximumAttempts": 1,
+  "reservedMicroCny": 100000,
+  "businessSideEffects": "NONE",
+  "status": "STREAM_PASS_NOT_RELEASE_ACCEPTANCE",
+  "intent": "COMPENSATION_REVIEW_PENDING",
+  "bodyLength": 93,
+  "streamMatchesBody": true,
+  "attempts": [
+    {
+      "httpStatus": 200,
+      "responseStatus": "completed",
+      "failure": null,
+      "inputTokens": 635,
+      "outputTokens": 200,
+      "totalTokens": 835
+    }
+  ],
+  "publishedChunkCount": 55,
+  "publishedCharacterCount": 93
+}

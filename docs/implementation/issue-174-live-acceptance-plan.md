@@ -1,5 +1,13 @@
 # #174 真实 DeepSeek 发布验收
 
+状态：**第14版 FROZEN_AUTHORIZED_NOT_RUN**。
+
+用户将剩余额度提高到3.14元并继续；旧占用16元保留，总授权19.14元。单次回复诊断另预留0.1元后占用16.1元，当前34笔PENDING；本轮最多另预留1元后17.1元，剩余2.04元，不是实扣或账户余额。
+
+一次独立回复流诊断HTTP200，835 token，55片段共93字与最终正文一致；不发布客户消息，不是五场景验收，不重判旧失败。见[诊断结果](../delivery/issue-174-reply-diagnostic-14-result.json)。
+
+入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-14`，见[冻结](../delivery/issue-174-live-14-freeze.json)。本轮验证已离线红绿通过的“发布后停止纠正重发”修复。action v6、其他模型prompt/schema、原五场景与各限额保持，首次失败即停。观察器新增回复失败行号、异常类型和受控校验分类，不保存原始正文、异常文本、字段值或局部变量。回复观察器已用实际适配器禁网验证成功/schema/网络分支，元数据不含原始文本。真实本轮和最终完整门禁NOT_RUN。以下为历史快照。
+
 状态：**第13版 INCOMPLETE：usage不完整后停止**。见[结果](../delivery/issue-174-live-13-result.md)。当前目录禁用，无待执行付费运行。
 
 累计授权仍16.12元，32笔旧PENDING保留，当前保守占用15元；本轮最多新增1元后16元，剩余0.12元，不是实扣或余额。
@@ -22,7 +30,7 @@
 
 独立行动诊断 issue174-action-diagnostic-11 仅调用一次，HTTP200，SUBMIT_CONCLUSION解析通过，支付/退款/取消资格等证据适用性齐备，1426 token；未创建工单，不是正式验收，也不能重判旧失败。见[诊断结果](../delivery/issue-174-action-diagnostic-11-result.json)。未据未复现的错误修改产品提示或schema。
 
-入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-11`，见[调用前冻结](../delivery/issue-174-live-11-freeze.json)。原五场景、action v5/schema v3和各限额保持；首次失败即停。受控观察器增加已离线验证的失败源码行号，原始载荷不保存。真实本轮和最终完整门禁NOT_RUN。以下为历史快照。
+入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-11`，见[调用前冻结](../delivery/issue-174-live-11-freeze.json)。原五场景、action v5/schema v3和各限额保持；首次失败即停。受控观察器增加已离线验证的失败源码行号，原始载荷不保存。回复观察器已用实际适配器禁网验证成功/schema/网络分支，元数据不含原始文本。真实本轮和最终完整门禁NOT_RUN。以下为历史快照。
 
 状态：**第10版 INCOMPLETE：行动结论响应 SCHEMA_MISMATCH 后停止**。见[第10轮结果](../delivery/issue-174-live-10-result.md)。
 

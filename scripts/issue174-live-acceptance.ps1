@@ -15,7 +15,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 . "$PSScriptRoot/gate-images.ps1"
 . "$PSScriptRoot/gate-resources.ps1"
 
-$projectLimitMicroCny = 16120000
+$projectLimitMicroCny = 19140000
 $expectedPriorMicroCny = 3810222
 $runReservationMicroCny = if ($IntakeDiagnostic) { 100000 } else { 1000000 }
 $logicalCallLimit = 100
@@ -57,7 +57,7 @@ function Get-SettledMicroCny($Ledger) {
 $ledger = Read-SharedLedger
 $settledBefore = Get-SettledMicroCny $ledger
 $pending = @($ledger.attempts | Where-Object status -eq 'PENDING')
-$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 32 }
+$expectedPendingCount = if ($IntakeDiagnostic) { 5 } else { 34 }
 $additionalPending = [ordered]@{
     'issue174-investigation-diagnostic-01' = 1000000
     'issue217-live-20260905a' = 1000000
@@ -80,6 +80,8 @@ $additionalPending = [ordered]@{
     'issue174-action-diagnostic-11' = 100000
     'issue174-live-11' = 1000000
     'issue174-live-12' = 1000000
+    'issue174-live-13' = 1000000
+    'issue174-reply-diagnostic-14' = 100000
 }
 if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pending.Count -ne 5 -or
     @($pending | Where-Object { $_.phase -eq 'issue174-live-20260903a' -and $_.reserved_micro_cny -eq 1000000 }).Count -ne 1 -or
@@ -91,7 +93,7 @@ if ($IntakeDiagnostic -and ($RunId -ne 'issue174-intake-diagnostic-04' -or $pend
 }
 if (-not $IntakeDiagnostic) {
     if ($InvestigationDiagnostic) { throw '旧诊断已结束；本次冻结仅允许五场景发布复验。' }
-    if ($RunId -ne 'issue174-live-13' -or $pending.Count -ne 32) { throw '须使用冻结运行标识并保留三十二笔 PENDING。' }
+    if ($RunId -ne 'issue174-live-14' -or $pending.Count -ne 34) { throw '须使用冻结运行标识并保留三十四笔 PENDING。' }
     foreach ($prior in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03', 'issue174-intake-diagnostic-01', 'issue174-intake-diagnostic-02', 'issue174-intake-diagnostic-03', 'issue174-intake-diagnostic-04', 'issue215-intake-diagnostic-01', 'issue215-intake-diagnostic-02', 'issue215-intake-diagnostic-03', 'issue215-intake-diagnostic-04')) {
         $amount = if ($prior -in @('issue174-live-20260903a', 'issue174-live-02', 'issue174-live-03')) { 1000000 } else { 100000 }
         if (@($pending | Where-Object { $_.phase -eq $prior -and $_.reserved_micro_cny -eq $amount }).Count -ne 1) {
@@ -139,7 +141,7 @@ $base = (git rev-parse origin/main).Trim()
 $projectName = "customer-agent-$RunId"
 $imageTag = "gate-$RunId"
 $evidenceDir = Join-Path $repoRoot ".local/gate-evidence/$RunId"
-$reportPath = Join-Path $repoRoot $(if ($InvestigationDiagnostic) { 'docs/delivery/issue-174-investigation-diagnostic-01-report.json' } else { 'docs/delivery/issue-174-live-report-13.json' })
+$reportPath = Join-Path $repoRoot $(if ($InvestigationDiagnostic) { 'docs/delivery/issue-174-investigation-diagnostic-01-report.json' } else { 'docs/delivery/issue-174-live-report-14.json' })
 $formalPath = Join-Path $evidenceDir 'formal-metrics.json'
 $overridePath = Join-Path ([IO.Path]::GetTempPath()) "$RunId.override.yaml"
 $catalogPath = Join-Path $repoRoot 'docs/implementation/issue-174-live-scenarios.json'
@@ -179,7 +181,7 @@ function Assert-FrozenCatalog {
     if (
         $catalog.status -ne 'FROZEN_AUTHORIZED_NOT_RUN' -or
         $catalog.executionAuthorized -ne $true -or
-        $catalog.revision -ne 13 -or
+        $catalog.revision -ne 14 -or
         $catalog.runId -ne $RunId -or
         $catalog.liveFreeze.promptVersionsBySeam.intake -ne 'intake-v3' -or
         $catalog.liveFreeze.promptVersionsBySeam.action -ne 'investigation-action-v6' -or
@@ -363,10 +365,17 @@ async def _issue174_record(self, record):
         "totalTokens": record.total_tokens,
     }
     error = _issue174_sys.exception()
+    if error is not None:
+        item["exceptionType"] = type(error).__name__
+    if record.validation_diagnostic:
+        item["validationCategory"] = record.validation_diagnostic.get("category")
+        item["validationActualType"] = record.validation_diagnostic.get("actual_type")
     trace = error.__traceback__ if error is not None else None
     while trace is not None:
         if trace.tb_frame.f_code.co_filename.endswith("/deepseek_investigation_action_model.py"):
             item["actionFailureLine"] = trace.tb_lineno
+        if trace.tb_frame.f_code.co_filename.endswith("/deepseek_customer_communication_model.py"):
+            item["replyFailureLine"] = trace.tb_lineno
         trace = trace.tb_next
     with open("/diagnostics/provider-attempts.jsonl", "a", encoding="utf-8") as output:
         output.write(json.dumps(item) + "\n")
