@@ -339,6 +339,8 @@ services:
         $auditSource += @'
 
 
+import sys as _issue174_sys
+
 ISSUE174_AUDIT_OBSERVER = True
 _original_issue174_record = InMemoryModelCallAuditSink.record
 
@@ -356,6 +358,12 @@ async def _issue174_record(self, record):
         "outputTokens": record.output_tokens,
         "totalTokens": record.total_tokens,
     }
+    error = _issue174_sys.exception()
+    trace = error.__traceback__ if error is not None else None
+    while trace is not None:
+        if trace.tb_frame.f_code.co_filename.endswith("/deepseek_investigation_action_model.py"):
+            item["actionFailureLine"] = trace.tb_lineno
+        trace = trace.tb_next
     with open("/diagnostics/provider-attempts.jsonl", "a", encoding="utf-8") as output:
         output.write(json.dumps(item) + "\n")
 
