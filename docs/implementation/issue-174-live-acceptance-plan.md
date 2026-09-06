@@ -1,5 +1,13 @@
 # #174 真实 DeepSeek 发布验收
 
+状态：**第11版 FROZEN_AUTHORIZED_NOT_RUN**。
+
+用户将剩余额度提高到3.22元并要求继续。旧预算占用12.9元保留，累计授权16.12元；一次行动诊断预留0.1元后13元，当前30笔PENDING；本轮最多另预留1元后14元，剩余2.12元，不是实扣或账户余额。
+
+独立行动诊断 issue174-action-diagnostic-11 仅调用一次，HTTP200，SUBMIT_CONCLUSION解析通过，支付/退款/取消资格等证据适用性齐备，1426 token；未创建工单，不是正式验收，也不能重判旧失败。见[诊断结果](../delivery/issue-174-action-diagnostic-11-result.json)。未据未复现的错误修改产品提示或schema。
+
+入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-11`，见[调用前冻结](../delivery/issue-174-live-11-freeze.json)。原五场景、action v5/schema v3和各限额保持；首次失败即停。受控观察器增加已离线验证的失败源码行号，原始载荷不保存。真实本轮和最终完整门禁NOT_RUN。以下为历史快照。
+
 状态：**第10版 INCOMPLETE：行动结论响应 SCHEMA_MISMATCH 后停止**。见[第10轮结果](../delivery/issue-174-live-10-result.md)。
 
 ## 第10版复验冻结
