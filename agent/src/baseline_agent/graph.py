@@ -604,18 +604,25 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
             )
 
         customer_reply = None
+        publication_attempted = False
+        send_delta = _reply_delta_publisher(
+            client, base_url, ticket_id, generation_id, scope_headers
+        )
+
+        async def publish_delta(delta: str) -> None:
+            nonlocal publication_attempted
+            publication_attempted = True
+            await send_delta(delta)
+
         for correction_attempt in range(2):
             try:
-                publish_delta = _reply_delta_publisher(
-                    client, base_url, ticket_id, generation_id, scope_headers
-                )
                 customer_reply = await customer_communication_model.compose(
                     communication_input,
                     on_body_delta=None if knowledge_result is not None else publish_delta,
                 )
                 validate_customer_reply_envelope(communication_input, customer_reply)
             except Exception as error:
-                if (
+                if publication_attempted or (
                     isinstance(error, CustomerCommunicationFailure)
                     and error.code is CustomerCommunicationFailureCode.PUBLICATION_FAILED
                 ):
@@ -652,7 +659,7 @@ async def investigate_ticket_step(state: BaselineState) -> BaselineState:
                     and isinstance(rejection, dict)
                     and rejection.get("code") == "UNSAFE_KNOWLEDGE"
                 )
-                if correctable and correction_attempt == 0:
+                if correctable and correction_attempt == 0 and not publication_attempted:
                     continue
                 return await reply_handoff(
                     "INVALID_MODEL_OUTPUT" if correctable else "FACT_CONFLICT"
