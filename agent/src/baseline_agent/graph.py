@@ -798,6 +798,8 @@ async def _advance_investigation_action_loop(
         if not _valid_capability_catalog(catalog):
             raise ActionLoopFailure(ActionLoopFailureCode.TOOL_FAILURE)
         required_facts = catalog.get("requiredFacts")
+        if issue_kind == "LOGISTICS_DELAY" and required_facts is None:
+            raise ActionLoopFailure(ActionLoopFailureCode.INVALID_TOOL_RESPONSE)
         if required_facts is not None and required_facts["riskScenario"] != issue_kind:
             raise ActionLoopFailure(ActionLoopFailureCode.INVALID_TOOL_RESPONSE)
 

@@ -196,13 +196,13 @@ async def test_langgraph_checkpoint_resume_keeps_decremented_budget_until_handof
     first = await investigate_ticket_step(initial)
     first_checkpoint = json.loads(json.dumps(first["investigation_progress"]))
     assert first_checkpoint["remainingActions"] == 1
-    assert first_checkpoint["remainingProviderAttempts"] == 1
+    assert first_checkpoint["remainingProviderAttempts"] == 2
 
     second = await investigate_ticket_step({**initial, "investigation_progress": first_checkpoint})
     second_checkpoint = json.loads(json.dumps(second["investigation_progress"]))
     assert second_checkpoint["remainingActions"] == 0
-    assert second_checkpoint["remainingProviderAttempts"] == 0
-    assert second_checkpoint["providerAttempts"] == 2
+    assert second_checkpoint["remainingProviderAttempts"] == 2
+    assert second_checkpoint["providerAttempts"] == 0
 
     exhausted = await investigate_ticket_step(
         {**initial, "investigation_progress": second_checkpoint}
@@ -211,7 +211,7 @@ async def test_langgraph_checkpoint_resume_keeps_decremented_budget_until_handof
     assert exhausted["handoff"]["reasonCode"] == "TOOL_RETRY_EXHAUSTED"
     assert exhausted["investigation_progress"] is None
     assert exhausted["investigation_run_evidence"]["failureClassification"] == "BUDGET_EXHAUSTED"
-    assert exhausted["investigation_run_evidence"]["providerAttempts"] == 2
+    assert exhausted["investigation_run_evidence"]["providerAttempts"] == 0
     assert len(capability_calls) == 2
 
 
@@ -251,7 +251,7 @@ async def test_confirmed_package_issue_investigates_instead_of_immediate_unsuppo
             return None
 
         async def get(self, url: str, **__: object) -> Response:
-            return Response(_catalog_or_customer_context(url))
+            return Response(_catalog_or_customer_context(url, "PACKAGE_NOT_RECEIVED"))
 
         async def post(self, url: str, **_: object) -> Response:
             posts.append(url)
@@ -333,7 +333,9 @@ def _customer_communication_context() -> dict[str, object]:
     }
 
 
-def _catalog_or_customer_context(url: str) -> dict[str, object]:
+def _catalog_or_customer_context(
+    url: str, issue_kind: str = "LOGISTICS_DELAY"
+) -> dict[str, object]:
     if url.endswith("/customer-communication-context"):
         return _customer_communication_context()
     if url.endswith("/sibling-summary"):
@@ -348,7 +350,7 @@ def _catalog_or_customer_context(url: str) -> dict[str, object]:
                 }
             ],
         }
-    return _capability_catalog()
+    return _capability_catalog(issue_kind)
 
 
 @pytest.mark.asyncio
@@ -412,19 +414,18 @@ async def test_terminal_handoff_and_budget_failure_preserve_controlled_action_re
         assert result["investigation_run_evidence"] == {
             "outcome": "HANDOFF_SELECTED",
             "failureClassification": "",
-            "providerAttempts": 6,
+            "providerAttempts": 1,
             "toolRounds": 5,
             "tokens": 0,
             "costMicros": 0,
             "modelCalls": [
                 {
-                    "callNumber": index + 1,
-                    "selectedAction": action,
+                    "callNumber": 1,
+                    "selectedAction": "HANDOFF",
                     "providerAttempts": 1,
                     "tokens": 0,
                     "costMicros": 0,
                 }
-                for index, action in enumerate(action_types)
             ],
         }
     else:
@@ -432,24 +433,9 @@ async def test_terminal_handoff_and_budget_failure_preserve_controlled_action_re
         assert result["investigation_run_evidence"] == {
             "outcome": "SAFE_HANDOFF",
             "failureClassification": "BUDGET_EXHAUSTED",
-            "providerAttempts": 2,
+            "providerAttempts": 0,
             "toolRounds": 2,
-            "modelCalls": [
-                {
-                    "callNumber": 1,
-                    "selectedAction": "CONFIRM_ORDER",
-                    "providerAttempts": 1,
-                    "tokens": 0,
-                    "costMicros": 0,
-                },
-                {
-                    "callNumber": 2,
-                    "selectedAction": "READ_LOGISTICS",
-                    "providerAttempts": 1,
-                    "tokens": 0,
-                    "costMicros": 0,
-                },
-            ],
+            "modelCalls": [],
         }
 
 
@@ -486,7 +472,7 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
 
         async def get(self, url: str, **_: object) -> Response:
             calls.append(("GET", url))
-            return Response(_catalog_or_customer_context(url))
+            return Response(_catalog_or_customer_context(url, issue_kind))
 
         async def post(self, url: str, **_: object) -> Response:
             calls.append(("POST", url))
@@ -528,15 +514,12 @@ async def test_default_business_graph_never_constructs_or_calls_a_shadow_provide
         ]
         for context in model_contexts
     )
+    expected_reads = 5 if issue_kind == "LOGISTICS_DELAY" else 6
+    assert len(model_contexts) == (1 if issue_kind == "LOGISTICS_DELAY" else 7)
     assert [method for method, url in calls if not url.endswith("/public-reply-events")] == [
         "GET",
         "GET",
-        "POST",
-        "POST",
-        "POST",
-        "POST",
-        "POST",
-        "POST",
+        *(["POST"] * expected_reads),
         "GET",
         "GET",
         "POST",
@@ -687,7 +670,9 @@ def _with_facts(**overrides: object) -> dict:
     return facts
 
 
-def _capability_catalog() -> dict:
+def _capability_catalog(issue_kind: str = "LOGISTICS_DELAY") -> dict:
+    from test_investigation_action_loop import _required_logistics_facts
+
     result_fields = {
         "CONFIRM_ORDER": (
             ("capability", "STRING"),
@@ -747,6 +732,7 @@ def _capability_catalog() -> dict:
     return {
         "schemaVersion": "investigation-capability-catalog-v1",
         "capabilities": definitions,
+        "requiredFacts": _required_logistics_facts() if issue_kind == "LOGISTICS_DELAY" else None,
     }
 
 
@@ -921,6 +907,59 @@ async def test_graph_uses_spring_required_fact_policy_before_model_submission(
     assert conclusion["sufficiencyPolicyVersion"] == policy["policyVersion"]
     assert {item["evidenceReference"] for item in conclusion["evidence"]} == returned_refs
     assert submissions[0] == {**conclusion, "customerReply": result["customer_reply"]}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("policy_field", [{}, {"requiredFacts": None}])
+async def test_logistics_rejects_missing_required_policy_before_investigation(
+    monkeypatch: pytest.MonkeyPatch, policy_field: dict
+) -> None:
+    catalog = _capability_catalog()
+    catalog.pop("requiredFacts", None)
+    catalog.update(policy_field)
+    reads: list[str] = []
+    model_calls: list[dict] = []
+
+    class ChoosingSubmission:
+        async def choose(self, context: dict) -> ActionDecision:
+            model_calls.append(context)
+            return ActionDecision.from_values(TerminalAction.SUBMIT_CONCLUSION, {}, ActionUsage())
+
+    original_client = httpx.AsyncClient
+
+    def spring(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if request.method == "GET":
+            payload = (
+                catalog if path.endswith("/capabilities") else _catalog_or_customer_context(path)
+            )
+        elif "/capabilities/" in path:
+            reads.append(path)
+            payload = _capability_result(path, _unique_facts())
+        else:
+            payload = {"handlingMode": "HUMAN", "reasonCode": "INVALID_TOOL_RESPONSE"}
+        return httpx.Response(200, json=payload)
+
+    monkeypatch.setattr(
+        "baseline_agent.graph.httpx.AsyncClient",
+        lambda **kwargs: original_client(**kwargs, transport=httpx.MockTransport(spring)),
+    )
+    monkeypatch.setattr("baseline_agent.graph.investigation_action_model", ChoosingSubmission())
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    result = await investigate_ticket(
+        {
+            "requested_by": "spring",
+            "ticket_id": "ticket-missing-policy",
+            "generation_id": "generation-missing-policy",
+            "issue_kind": "LOGISTICS_DELAY",
+        }
+    )
+
+    assert result["investigation_run_evidence"]["failureClassification"] == "INVALID_TOOL_RESPONSE"
+    assert reads == []
+    assert model_calls == []
+    assert "conclusion" not in result
 
 
 @pytest.mark.parametrize(
@@ -1313,11 +1352,11 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
             },
             {
                 "evidenceReference": "logistics:ORDER-DELAY-UNDER-24",
-                "applicability": ["DELAY_DURATION", "LOGISTICS_STATUS"],
+                "applicability": ["DELAY_DURATION"],
             },
             {
                 "evidenceReference": "payment:ORDER-DELAY-UNDER-24",
-                "applicability": ["ORDER_ELIGIBILITY", "PAYMENT_STATUS", "REFUND_STATUS"],
+                "applicability": ["ORDER_ELIGIBILITY"],
             },
             {
                 "evidenceReference": "compensation:ORDER-DELAY-UNDER-24",
@@ -1330,10 +1369,6 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
             {
                 "evidenceReference": "policy:delay-policy-v1",
                 "applicability": ["POLICY_BASIS"],
-            },
-            {
-                "evidenceReference": "order-rule:ORDER-DELAY-UNDER-24",
-                "applicability": ["ORDER_RULE"],
             },
         ],
     }
@@ -1383,12 +1418,7 @@ async def test_agent_collects_scoped_facts_and_submits_no_compensation_conclusio
     )
     assert [call[0] for call in calls if not call[1].endswith("/public-reply-events")] == [
         "GET",
-        "POST",
-        "POST",
-        "POST",
-        "POST",
-        "POST",
-        "POST",
+        *(["POST"] * 5),
         "GET",
         "GET",
         "POST",
