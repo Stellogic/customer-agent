@@ -129,11 +129,21 @@ async def test_flash_selects_one_strict_action_from_minimal_normalized_facts() -
     assert body["text"]["format"]["strict"] is True
     sent = json.loads(body["input"])
     assert sent == {
+        "currentActionContract": {
+            "allowedActions": [
+                "READ_LOGISTICS",
+                "READ_PAYMENT_AND_REFUNDS",
+                "READ_COMPENSATION_AND_PENDING_ACTIONS",
+                "READ_APPLICABLE_POLICY",
+                "READ_ORDER_RULES",
+            ],
+            "requiredApplicabilitiesByCapability": {},
+        },
         "syntheticInvestigationFacts": {
             "evidenceRefs": ["order:ORDER-128"],
             "matchStatus": "UNIQUE",
             "orderReference": "ORDER-128",
-        }
+        },
     }
     assert "synthetic-test-key" not in captured[0].content.decode()
 
@@ -448,3 +458,48 @@ async def test_retryable_supplier_error_has_two_attempt_bound_and_no_model_fallb
     assert requests == 2
     assert captured.value.code.value == "MODEL_CALL_FAILED"
     assert captured.value.provider_attempts == 2
+
+
+@pytest.mark.asyncio
+async def test_request_exposes_current_actions_and_payment_evidence_contract() -> None:
+    captured: list[dict] = []
+
+    def supplier(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        return httpx.Response(200, json=_completed_action("SUBMIT_CONCLUSION"))
+
+    model = DeepSeekResponsesInvestigationActionModel(
+        DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
+        transport=httpx.MockTransport(supplier),
+    )
+    facts = {
+        "matchStatus": "UNIQUE",
+        "orderReference": "ORDER-128",
+        "issueKind": "DUPLICATE_CHARGE",
+        "delayHours": 80,
+        "delaySeconds": 288000,
+        "paid": True,
+        "cancelled": False,
+        "fullyRefunded": False,
+        "existingCompensation": False,
+        "pendingActionCount": 0,
+        "policyVersion": "delay-policy-v1",
+        "orderRuleSummary": "ADDRESS_CHANGE_AND_CANCEL_RULES_V1",
+        "evidenceCatalog": _evidence_catalog(),
+    }
+    await model.choose(facts)
+    contract = json.loads(captured[0]["input"])["currentActionContract"]
+    assert contract["allowedActions"] == ["SUBMIT_CONCLUSION"]
+    assert contract["requiredApplicabilitiesByCapability"] == {
+        "CONFIRM_ORDER": ["ORDER_IDENTITY"],
+        "READ_PAYMENT_AND_REFUNDS": ["PAYMENT_STATUS", "ORDER_ELIGIBILITY", "REFUND_STATUS"],
+        "READ_COMPENSATION_AND_PENDING_ACTIONS": ["EXISTING_COMPENSATION", "PENDING_ACTIONS"],
+        "READ_APPLICABLE_POLICY": ["POLICY_BASIS"],
+    }
+
+    facts.pop("policyVersion")
+    with pytest.raises(ActionLoopFailure):
+        await model.choose(facts)
+    next_contract = json.loads(captured[1]["input"])["currentActionContract"]
+    assert next_contract["allowedActions"] == ["READ_APPLICABLE_POLICY"]
+    assert next_contract["requiredApplicabilitiesByCapability"] == {}

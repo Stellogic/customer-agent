@@ -1,0 +1,47 @@
+{
+  "action": {
+    "logicalCalls": 13,
+    "promptVersion": "investigation-action-v5",
+    "providerAttempts": 13,
+    "schemaVersion": "investigation-action-v3"
+  },
+  "customerCommunication": {
+    "estimatedCostMicros": 635,
+    "logicalCalls": 1,
+    "promptVersions": [
+      "customer-communication-v2",
+      "customer-knowledge-communication-v1"
+    ],
+    "providerAttempts": 1,
+    "schemaVersions": [
+      "customer-reply-v1",
+      "customer-reply-v2"
+    ],
+    "tokens": 981,
+    "totalDurationMs": 2128
+  },
+  "estimatedCostMicros": 7145,
+  "failureClassifications": {
+    "FACT_CONFLICT": 1,
+    "SCHEMA_MISMATCH": 1
+  },
+  "generationResults": {
+    "handoffCount": 2,
+    "handoffWithModelCallsCount": 2,
+    "successCount": 0
+  },
+  "judgment": {
+    "logicalCalls": 1,
+    "promptVersion": "investigation-judgment-v1",
+    "providerAttempts": 1,
+    "schemaVersion": "investigation-judgment-v1"
+  },
+  "knowledgeFailures": {},
+  "model": "deepseek-v4-flash",
+  "observedGenerationCount": 2,
+  "schemaVersion": "issue-129-aggregate-provider-metrics-v1",
+  "totalLogicalCalls": 15,
+  "totalProviderAttempts": 15,
+  "totalTokens": 14866,
+  "usageTrusted": true
+}

@@ -1,6 +1,14 @@
 # #174 真实 DeepSeek 发布验收
 
-状态：**第11版 FROZEN_AUTHORIZED_NOT_RUN**。
+状态：**第12版 FROZEN_AUTHORIZED_NOT_RUN**。
+
+延续用户剩余3.22元授权，累计上限16.12元。31笔旧PENDING保留，当前预算基准14元；本轮最多预留1元后15元，剩余1.12元，不是实扣或账户余额。
+
+入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-12`，见[冻结](../delivery/issue-174-live-12-freeze.json)。action v6以currentActionContract显式给出本轮动作集合和当前场景的既有证据要求，替代混合多个场景的提示段落；模型仍自行选择目录引用，Spring权威校验和schema v3保持。没有新增重试或自动补证据。原五场景和首次失败即停规则保持。
+
+离线回归在v5请求上因缺失currentActionContract失败；候选回归与全部Agent检查通过：471 passed / 3 skipped，格式、lint、类型检查通过，不把静态请求验证冒充真实模型修复。真实本轮及最终完整门禁NOT_RUN。以下为历史快照。
+
+状态：**第11版 INCOMPLETE**。见[结果](../delivery/issue-174-live-11-result.md)。
 
 用户将剩余额度提高到3.22元并要求继续。旧预算占用12.9元保留，累计授权16.12元；一次行动诊断预留0.1元后13元，当前30笔PENDING；本轮最多另预留1元后14元，剩余2.12元，不是实扣或账户余额。
 
