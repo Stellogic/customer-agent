@@ -1,12 +1,12 @@
 # #174 真实 DeepSeek 发布验收
 
-状态：**第14版 FROZEN_AUTHORIZED_NOT_RUN**。
+状态：**第14版 INCOMPLETE；按用户要求收尾提交后暂停**。见[第14轮结果](../delivery/issue-174-live-14-result.md)与[暂停交接](../delivery/issue-174-pause-handoff.md)。执行目录已禁用，不启动下一轮或最终门禁。
 
 用户将剩余额度提高到3.14元并继续；旧占用16元保留，总授权19.14元。单次回复诊断另预留0.1元后占用16.1元，当前34笔PENDING；本轮最多另预留1元后17.1元，剩余2.04元，不是实扣或账户余额。
 
 一次独立回复流诊断HTTP200，835 token，55片段共93字与最终正文一致；不发布客户消息，不是五场景验收，不重判旧失败。见[诊断结果](../delivery/issue-174-reply-diagnostic-14-result.json)。
 
-入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-14`，见[冻结](../delivery/issue-174-live-14-freeze.json)。本轮验证已离线红绿通过的“发布后停止纠正重发”修复。action v6、其他模型prompt/schema、原五场景与各限额保持，首次失败即停。观察器新增回复失败行号、异常类型和受控校验分类，不保存原始正文、异常文本、字段值或局部变量。回复观察器已用实际适配器禁网验证成功/schema/网络分支，元数据不含原始文本。真实本轮和最终完整门禁NOT_RUN。以下为历史快照。
+入口 `pwsh ./scripts/issue174-live-acceptance.ps1 -ConfirmProviderSpend -RunId issue174-live-14`，见[冻结](../delivery/issue-174-live-14-freeze.json)。本轮验证已离线红绿通过的“发布后停止纠正重发”修复。action v6、其他模型prompt/schema、原五场景与各限额保持，首次失败即停。观察器新增回复失败行号、异常类型和受控校验分类，不保存原始正文、异常文本、字段值或局部变量。回复观察器已用实际适配器禁网验证成功/schema/网络分支，元数据不含原始文本。本轮已结束并保留整轮预留；最终完整门禁NOT_RUN。以下为历史快照。
 
 状态：**第13版 INCOMPLETE：usage不完整后停止**。见[结果](../delivery/issue-174-live-13-result.md)。当前目录禁用，无待执行付费运行。
 
