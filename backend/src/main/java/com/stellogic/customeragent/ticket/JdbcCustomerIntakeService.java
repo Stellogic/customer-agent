@@ -25,6 +25,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
     private final ClosureService closure;
     private final IntakeAssistanceService assistance;
     private final Clock clock;
+    private final IntakeModelCallAudit callAudit;
 
     JdbcCustomerIntakeService(
             JdbcTemplate jdbc,
@@ -32,13 +33,15 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
             CustomerTicketService tickets,
             ClosureService closure,
             IntakeAssistanceService assistance,
-            Clock clock) {
+            Clock clock,
+            IntakeModelCallAudit callAudit) {
         this.jdbc = jdbc;
         this.agent = agent;
         this.tickets = tickets;
         this.closure = closure;
         this.assistance = assistance;
         this.clock = clock;
+        this.callAudit = callAudit;
     }
 
     @Override
@@ -66,14 +69,21 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
             return snapshot(enrich(row), true);
         }
 
+        UUID intakeId = UUID.randomUUID();
         if (CustomerIntakeSafetyPolicy.isHumanAssistanceRequest(command.message())) {
-            return createAssistedIntake(command, "CUSTOMER_REQUESTED");
+            return createAssistedIntake(command, intakeId, "CUSTOMER_REQUESTED");
         }
         List<CustomerVisibleOrderSummary> orders = visibleOrders(command.customerId());
         IntakeUnderstanding understanding;
         try {
             understanding =
-                    agent.understand(
+                    understand(
+                            command.customerId(),
+                            intakeId,
+                            "START",
+                            command.requestId(),
+                            "START",
+                            value -> requireUnderstanding(value, orders),
                             new IntakeUnderstandingRequest(
                                     command.message(),
                                     orders,
@@ -82,13 +92,11 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                                     List.of(),
                                     List.of(),
                                     List.of()));
-            requireUnderstanding(understanding, orders);
         } catch (IntakeAgentUnavailableException exception) {
             LOG.warn("INTAKE_FAILURE phase=START reason={}", exception.reason());
-            return createAssistedIntake(command, "AGENT_UNAVAILABLE");
+            return createAssistedIntake(command, intakeId, "AGENT_UNAVAILABLE");
         }
         String assistantMessage = CustomerIntakeSafetyPolicy.assistantMessage(understanding);
-        UUID intakeId = UUID.randomUUID();
         CustomerVisibleOrderSummary candidate = candidate(understanding, orders);
         Instant now = clock.instant();
         jdbc.update(
@@ -185,7 +193,22 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
         IntakeUnderstanding understanding;
         try {
             understanding =
-                    agent.understand(
+                    understand(
+                            command.customerId(),
+                            command.intakeId(),
+                            "REPLY",
+                            command.requestId(),
+                            "FOLLOWUP",
+                            value -> {
+                                if ("CONFIRM".equals(value.intent())) {
+                                    if (!CustomerIntakeSafetyPolicy.isExplicitConfirmation(
+                                            command.message())) {
+                                        throw new IntakeAgentUnavailableException();
+                                    }
+                                } else {
+                                    requireUnderstanding(value, orders);
+                                }
+                            },
                             new IntakeUnderstandingRequest(
                                     command.message(),
                                     orders,
@@ -203,13 +226,9 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
         }
         try {
             if ("CONFIRM".equals(understanding.intent())) {
-                if (!CustomerIntakeSafetyPolicy.isExplicitConfirmation(command.message())) {
-                    throw new IntakeAgentUnavailableException();
-                }
                 return confirm(
                         command, current, "已确认，" + current.issues().size() + " 张客服工单已原子创建并开始独立处理。");
             }
-            requireUnderstanding(understanding, orders);
         } catch (IntakeAgentUnavailableException exception) {
             LOG.warn("INTAKE_FAILURE phase=FOLLOWUP reason={}", exception.reason());
             assistance.createForIntake(command.intakeId(), "AGENT_UNAVAILABLE");
@@ -334,7 +353,11 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
         if (!current.duplicateMatches().isEmpty()) return snapshot(current, false);
         if (current.issues().isEmpty()) {
             return completeCurrentOrder(
-                    command.customerId(), command.intakeId(), "已按你的确认继续既有工单，没有创建重复工单。");
+                    command.customerId(),
+                    command.intakeId(),
+                    "RESOLVE_DUPLICATE",
+                    command.requestId(),
+                    "已按你的确认继续既有工单，没有创建重复工单。");
         }
         Instant readyTime = clock.instant();
         jdbc.update(
@@ -448,7 +471,13 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                                 List.of(),
                                 List.of(),
                                 "原订单已不再可见，请补充订单线索。")
-                        : agent.understand(
+                        : understand(
+                                command.customerId(),
+                                command.intakeId(),
+                                "RESTORE",
+                                command.requestId(),
+                                "RESTORE",
+                                value -> requireUnderstanding(value, orders),
                                 new IntakeUnderstandingRequest(
                                         latestCustomerMessage(
                                                 current.id(), current.originalMessage()),
@@ -509,8 +538,7 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
     }
 
     private CustomerIntakeSnapshot createAssistedIntake(
-            StartCustomerIntake command, String reasonCode) {
-        UUID intakeId = UUID.randomUUID();
+            StartCustomerIntake command, UUID intakeId, String reasonCode) {
         Instant now = clock.instant();
         String assistantMessage = "已建立受理协助请求；客服只能协助确认订单与拟建问题，仍需由你确认后才会创建正式工单。";
         jdbc.update(
@@ -548,7 +576,11 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
     }
 
     private CustomerIntakeSnapshot completeCurrentOrder(
-            String customerId, UUID intakeId, String completionMessage) {
+            String customerId,
+            UUID intakeId,
+            String operation,
+            String requestKey,
+            String completionMessage) {
         IntakeRow current = loadForUpdate(customerId, intakeId);
         if (current.pendingOrders().isEmpty()) {
             Instant now = clock.instant();
@@ -575,7 +607,21 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                                                 order.version()))
                         .toList();
         IntakeUnderstanding understanding =
-                agent.understand(
+                understand(
+                        customerId,
+                        intakeId,
+                        operation,
+                        requestKey,
+                        "NEXT_ORDER",
+                        value -> {
+                            requireUnderstanding(value, remainingOrders);
+                            if (!remainingOrders
+                                    .getFirst()
+                                    .reference()
+                                    .equals(value.candidateOrderReference())) {
+                                throw new IntakeAgentUnavailableException();
+                            }
+                        },
                         new IntakeUnderstandingRequest(
                                 current.originalMessage(),
                                 remainingOrders,
@@ -584,13 +630,6 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
                                 List.of(),
                                 List.of(),
                                 List.of()));
-        requireUnderstanding(understanding, remainingOrders);
-        if (!remainingOrders
-                .getFirst()
-                .reference()
-                .equals(understanding.candidateOrderReference())) {
-            throw new IntakeAgentUnavailableException();
-        }
         CustomerVisibleOrderSummary candidate = candidate(understanding, remainingOrders);
         String assistantMessage =
                 completionMessage
@@ -702,7 +741,37 @@ class JdbcCustomerIntakeService implements CustomerIntakeService {
         return completeCurrentOrder(
                 command.customerId(),
                 command.intakeId(),
+                "CONFIRM",
+                command.requestId(),
                 "已确认，当前订单的 " + current.issues().size() + " 张客服工单已原子创建并开始独立处理。");
+    }
+
+    private IntakeUnderstanding understand(
+            String customerId,
+            UUID intakeId,
+            String operation,
+            String requestKey,
+            String phase,
+            java.util.function.Consumer<IntakeUnderstanding> validate,
+            IntakeUnderstandingRequest request) {
+        UUID invocationId = callAudit.begin(customerId, intakeId, operation, requestKey, phase);
+        IntakeUnderstanding understanding;
+        try {
+            understanding = agent.understand(request);
+        } catch (IntakeAgentUnavailableException exception) {
+            callAudit.complete(invocationId, exception.callEvidence(), exception.reason());
+            throw exception;
+        }
+        // Save the response evidence before business validation can reject it and roll back.
+        callAudit.complete(invocationId, understanding.callEvidence(), null);
+        try {
+            validate.accept(understanding);
+        } catch (IntakeAgentUnavailableException exception) {
+            callAudit.complete(invocationId, understanding.callEvidence(), exception.reason());
+            throw new IntakeAgentUnavailableException(
+                    exception.reason(), understanding.callEvidence());
+        }
+        return understanding;
     }
 
     private List<CustomerVisibleOrderSummary> visibleOrders(String customerId) {

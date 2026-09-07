@@ -101,8 +101,22 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
     }
 
     private IntakeUnderstanding parse(String response, IntakeUnderstandingRequest request) {
+        JsonNode evidence = null;
         try {
-            JsonNode value = json.readTree(response).path("intake_understanding");
+            JsonNode result = json.readTree(response);
+            JsonNode receivedEvidence = result.get("intake_call_evidence");
+            if (receivedEvidence != null
+                    && !receivedEvidence.isNull()
+                    && (!receivedEvidence.isObject()
+                            || !"intake-call-evidence-v1"
+                                    .equals(receivedEvidence.path("schemaVersion").asText()))) {
+                throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
+            }
+            evidence = receivedEvidence;
+            if (result.hasNonNull("intake_failure")) {
+                throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
+            }
+            JsonNode value = result.path("intake_understanding");
             String intent = requiredText(value, "intent");
             String status = requiredText(value, "status");
             String orderReference = optionalText(value, "candidate_order_reference");
@@ -148,11 +162,12 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
                     issues,
                     pendingIssueKinds,
                     remainingOrderReferences,
-                    assistantMessage);
+                    assistantMessage,
+                    evidence);
         } catch (IntakeAgentUnavailableException exception) {
-            throw exception;
+            throw new IntakeAgentUnavailableException(exception.reason(), evidence);
         } catch (RuntimeException exception) {
-            throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
+            throw new IntakeAgentUnavailableException(RESPONSE_PARSE, evidence);
         }
     }
 

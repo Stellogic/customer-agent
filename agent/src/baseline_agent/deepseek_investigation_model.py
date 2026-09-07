@@ -14,6 +14,8 @@ from weakref import WeakKeyDictionary
 
 import httpx
 
+from baseline_agent.core_validation_budget import CoreValidationBudget, model_attempt_budget
+
 from baseline_agent.investigation_model import (
     InvestigationJudgment,
     InvestigationJudgmentFailure,
@@ -180,10 +182,12 @@ class DeepSeekResponsesInvestigationModel:
         endpoint: str = _RESPONSES_ENDPOINT,
         transport: httpx.AsyncBaseTransport | None = None,
         audit_sink: ModelCallAuditSink | None = None,
+        budget: CoreValidationBudget | None = None,
     ) -> None:
         self._config = config
         self._endpoint = endpoint
         self._transport = transport
+        self._budget = budget
         self.audit_sink = audit_sink or InMemoryModelCallAuditSink()
 
     async def judge(self, model_input: InvestigationJudgmentInput) -> InvestigationJudgment:
@@ -208,123 +212,135 @@ class DeepSeekResponsesInvestigationModel:
                     raise _model_call_failure()
                 attempt_id = str(uuid.uuid4())
                 attempt_started = time.monotonic()
-                try:
-                    response = await asyncio.wait_for(
-                        client.post(self._endpoint, json=request_body),
-                        timeout=remaining,
-                    )
-                except TimeoutError:
-                    classification = DeepSeekFailureClassification.DEADLINE_EXCEEDED
-                    await self._record_attempt(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        classification,
-                    )
-                    raise _model_call_failure() from None
-                except asyncio.CancelledError:
-                    await self._record_attempt(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        DeepSeekFailureClassification.DEADLINE_EXCEEDED,
-                    )
-                    raise
-                except httpx.TransportError as error:
-                    if isinstance(error, httpx.ConnectTimeout):
-                        classification = DeepSeekFailureClassification.CONNECTION_TIMEOUT
-                    elif isinstance(error, httpx.ReadTimeout):
-                        classification = DeepSeekFailureClassification.READ_TIMEOUT
-                    else:
-                        classification = DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR
-                    await self._record_attempt(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        classification,
-                    )
-                    if await self._can_retry(attempt_number, call_started):
-                        continue
-                    raise _model_call_failure() from None
+                records = (
+                    self.audit_sink.current_task_records()
+                    if isinstance(self.audit_sink, InMemoryModelCallAuditSink)
+                    else []
+                )
+                with model_attempt_budget(
+                    self._budget,
+                    records,
+                    attempt_id=attempt_id,
+                    role="judgment",
+                    request=request_body,
+                ):
+                    try:
+                        response = await asyncio.wait_for(
+                            client.post(self._endpoint, json=request_body),
+                            timeout=remaining,
+                        )
+                    except TimeoutError:
+                        classification = DeepSeekFailureClassification.DEADLINE_EXCEEDED
+                        await self._record_attempt(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            classification,
+                        )
+                        raise _model_call_failure() from None
+                    except asyncio.CancelledError:
+                        await self._record_attempt(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            DeepSeekFailureClassification.DEADLINE_EXCEEDED,
+                        )
+                        raise
+                    except httpx.TransportError as error:
+                        if isinstance(error, httpx.ConnectTimeout):
+                            classification = DeepSeekFailureClassification.CONNECTION_TIMEOUT
+                        elif isinstance(error, httpx.ReadTimeout):
+                            classification = DeepSeekFailureClassification.READ_TIMEOUT
+                        else:
+                            classification = DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR
+                        await self._record_attempt(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            classification,
+                        )
+                        if await self._can_retry(attempt_number, call_started):
+                            continue
+                        raise _model_call_failure() from None
 
-                if response.status_code >= 400:
-                    classification = (
-                        DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR
-                        if response.status_code in _TRANSIENT_HTTP_STATUSES
-                        else DeepSeekFailureClassification.PROVIDER_REQUEST_REJECTED
-                    )
-                    await self._record_attempt(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        classification,
-                        provider_http_status=response.status_code,
-                    )
-                    if response.status_code in _TRANSIENT_HTTP_STATUSES and await self._can_retry(
-                        attempt_number, call_started
-                    ):
-                        continue
-                    raise _model_call_failure()
+                    if response.status_code >= 400:
+                        classification = (
+                            DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR
+                            if response.status_code in _TRANSIENT_HTTP_STATUSES
+                            else DeepSeekFailureClassification.PROVIDER_REQUEST_REJECTED
+                        )
+                        await self._record_attempt(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            classification,
+                            provider_http_status=response.status_code,
+                        )
+                        if response.status_code in _TRANSIENT_HTTP_STATUSES and await self._can_retry(
+                            attempt_number, call_started
+                        ):
+                            continue
+                        raise _model_call_failure()
 
-                try:
-                    payload = response.json()
-                except json.JSONDecodeError:
-                    classification = DeepSeekFailureClassification.INVALID_JSON
-                    await self._record_attempt(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        classification,
-                    )
-                    raise _model_call_failure() from None
+                    try:
+                        payload = response.json()
+                    except json.JSONDecodeError:
+                        classification = DeepSeekFailureClassification.INVALID_JSON
+                        await self._record_attempt(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            classification,
+                        )
+                        raise _model_call_failure() from None
 
-                if not isinstance(payload, dict):
-                    classification = DeepSeekFailureClassification.SCHEMA_MISMATCH
-                    await self._record_attempt(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        classification,
-                    )
-                    raise _model_call_failure()
+                    if not isinstance(payload, dict):
+                        classification = DeepSeekFailureClassification.SCHEMA_MISMATCH
+                        await self._record_attempt(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            classification,
+                        )
+                        raise _model_call_failure()
 
-                try:
-                    judgment = _parse_response(payload)
-                except _DeepSeekResponseFailure as failure:
+                    try:
+                        judgment = _parse_response(payload)
+                    except _DeepSeekResponseFailure as failure:
+                        await self._record_attempt(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            failure.classification,
+                            payload,
+                            provider_http_status=response.status_code,
+                        )
+                        raise _model_call_failure() from None
                     await self._record_attempt(
                         internal_call_id,
                         attempt_id,
                         attempt_number,
                         attempt_started,
                         request_body,
-                        failure.classification,
+                        None,
                         payload,
                         provider_http_status=response.status_code,
                     )
-                    raise _model_call_failure() from None
-                await self._record_attempt(
-                    internal_call_id,
-                    attempt_id,
-                    attempt_number,
-                    attempt_started,
-                    request_body,
-                    None,
-                    payload,
-                    provider_http_status=response.status_code,
-                )
-                return judgment
+                    return judgment
 
         raise AssertionError("attempt budget must produce a result or controlled failure")
 

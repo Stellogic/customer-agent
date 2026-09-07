@@ -10,6 +10,8 @@ from typing import Any
 
 import httpx
 
+from baseline_agent.core_validation_budget import CoreValidationBudget, model_attempt_budget
+
 from baseline_agent.deepseek_investigation_model import (
     DEEPSEEK_FLASH_MODEL,
     DeepSeekFailureClassification,
@@ -80,10 +82,12 @@ class DeepSeekResponsesInvestigationActionModel:
         endpoint: str = _RESPONSES_ENDPOINT,
         transport: httpx.AsyncBaseTransport | None = None,
         audit_sink: ModelCallAuditSink | None = None,
+        budget: CoreValidationBudget | None = None,
     ) -> None:
         self._config = config
         self._endpoint = endpoint
         self._transport = transport
+        self._budget = budget
         self.audit_sink = audit_sink or InMemoryModelCallAuditSink()
 
     async def choose(self, facts: dict) -> ActionDecision:
@@ -109,98 +113,110 @@ class DeepSeekResponsesInvestigationActionModel:
                     raise _failure(attempt_number - 1)
                 attempt_id = str(uuid.uuid4())
                 attempt_started = time.monotonic()
-                try:
-                    response = await asyncio.wait_for(
-                        client.post(self._endpoint, json=request_body), timeout=remaining
-                    )
-                except (TimeoutError, httpx.TransportError):
-                    await self._record_attempt(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR,
-                    )
-                    if await self._can_retry(attempt_number, call_started):
-                        continue
-                    raise _failure(attempt_number) from None
-
-                if response.status_code >= 400:
-                    classification = (
-                        DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR
-                        if response.status_code in _TRANSIENT_HTTP_STATUSES
-                        else DeepSeekFailureClassification.PROVIDER_REQUEST_REJECTED
-                    )
-                    await self._record_attempt(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        classification,
-                        provider_http_status=response.status_code,
-                    )
-                    if response.status_code in _TRANSIENT_HTTP_STATUSES and await self._can_retry(
-                        attempt_number, call_started
-                    ):
-                        continue
-                    raise _failure(attempt_number)
-
-                payload: object | None = None
-                try:
-                    payload = response.json()
-                except ValueError:
-                    classification = DeepSeekFailureClassification.INVALID_JSON
-                    await self._record_attempt(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        classification,
-                        provider_http_status=response.status_code,
-                    )
-                    raise _failure(
-                        attempt_number, failure_classification=classification.value
-                    ) from None
-                try:
-                    decision = _parse_response(
-                        payload,
-                        controlled_facts,
-                        allowed_actions,
-                        attempt_number,
-                    )
-                except _DeepSeekActionResponseFailure as failure:
-                    await self._record_attempt(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        failure.classification,
-                        payload if isinstance(payload, dict) else None,
-                        provider_http_status=response.status_code,
-                    )
-                    tokens, cost_micros = _failure_usage(payload)
-                    raise _failure(
-                        attempt_number,
-                        failure_classification=failure.classification.value,
-                        tokens=tokens,
-                        cost_micros=cost_micros,
-                    ) from None
-                assert isinstance(payload, dict)
-                await self._record_attempt(
-                    internal_call_id,
-                    attempt_id,
-                    attempt_number,
-                    attempt_started,
-                    request_body,
-                    None,
-                    payload,
-                    provider_http_status=response.status_code,
+                records = (
+                    self.audit_sink.current_task_records()
+                    if isinstance(self.audit_sink, InMemoryModelCallAuditSink)
+                    else []
                 )
-                return decision
+                with model_attempt_budget(
+                    self._budget,
+                    records,
+                    attempt_id=attempt_id,
+                    role="action",
+                    request=request_body,
+                ):
+                    try:
+                        response = await asyncio.wait_for(
+                            client.post(self._endpoint, json=request_body), timeout=remaining
+                        )
+                    except (TimeoutError, httpx.TransportError):
+                        await self._record_attempt(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR,
+                        )
+                        if await self._can_retry(attempt_number, call_started):
+                            continue
+                        raise _failure(attempt_number) from None
+
+                    if response.status_code >= 400:
+                        classification = (
+                            DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR
+                            if response.status_code in _TRANSIENT_HTTP_STATUSES
+                            else DeepSeekFailureClassification.PROVIDER_REQUEST_REJECTED
+                        )
+                        await self._record_attempt(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            classification,
+                            provider_http_status=response.status_code,
+                        )
+                        if response.status_code in _TRANSIENT_HTTP_STATUSES and await self._can_retry(
+                            attempt_number, call_started
+                        ):
+                            continue
+                        raise _failure(attempt_number)
+
+                    payload: object | None = None
+                    try:
+                        payload = response.json()
+                    except ValueError:
+                        classification = DeepSeekFailureClassification.INVALID_JSON
+                        await self._record_attempt(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            classification,
+                            provider_http_status=response.status_code,
+                        )
+                        raise _failure(
+                            attempt_number, failure_classification=classification.value
+                        ) from None
+                    try:
+                        decision = _parse_response(
+                            payload,
+                            controlled_facts,
+                            allowed_actions,
+                            attempt_number,
+                        )
+                    except _DeepSeekActionResponseFailure as failure:
+                        await self._record_attempt(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            failure.classification,
+                            payload if isinstance(payload, dict) else None,
+                            provider_http_status=response.status_code,
+                        )
+                        tokens, cost_micros = _failure_usage(payload)
+                        raise _failure(
+                            attempt_number,
+                            failure_classification=failure.classification.value,
+                            tokens=tokens,
+                            cost_micros=cost_micros,
+                        ) from None
+                    assert isinstance(payload, dict)
+                    await self._record_attempt(
+                        internal_call_id,
+                        attempt_id,
+                        attempt_number,
+                        attempt_started,
+                        request_body,
+                        None,
+                        payload,
+                        provider_http_status=response.status_code,
+                    )
+                    return decision
         raise AssertionError("attempt budget must produce a result or controlled failure")
 
     async def _can_retry(self, attempt_number: int, call_started: float) -> bool:

@@ -10,6 +10,8 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.ObjectMapper;
 
 class IntakeFailureClassificationTest {
@@ -80,12 +82,95 @@ class IntakeFailureClassificationTest {
         assertThat(result.status()).isEqualTo("NEEDS_CLARIFICATION");
     }
 
+    @Test
+    void successfulIntakeRetainsCallEvidenceReceivedFromAgentHttpResponse() {
+        ObjectMapper json = new ObjectMapper();
+        var evidence =
+                json.readTree(
+                        """
+                {
+                  "schemaVersion":"intake-call-evidence-v1",
+                  "logicalCalls":1,"providerAttempts":1,
+                  "inputTokens":120,"outputTokens":30,"tokens":150,
+                  "costMicros":8,"currency":"USD","usageComplete":true,
+                  "failureClassification":"",
+                  "attempts":[{
+                    "internalCallId":"intake-call-230","attemptId":"intake-attempt-230",
+                    "attemptNumber":1,"provider":"deepseek",
+                    "providerResponseId":"synthetic-response-230","requestModel":"deepseek-v4-flash",
+                    "responseModel":"deepseek-v4-flash","providerHttpStatus":200,
+                    "inputTokens":120,"outputTokens":30,"totalTokens":150,
+                    "cachedTokens":null,"reasoningTokens":null
+                  }]
+                }
+                """);
+        var response = (tools.jackson.databind.node.ObjectNode) json.readTree(response());
+        response.set("intake_call_evidence", evidence);
+        body = json.writeValueAsString(response);
+
+        IntakeUnderstanding result = gateway.understand(request());
+
+        assertThat(result.status()).isEqualTo("NEEDS_CLARIFICATION");
+        assertThat(result.pendingIssueKinds()).containsExactly("DUPLICATE_CHARGE");
+        assertThat(json.valueToTree(result).path("callEvidence")).isEqualTo(evidence);
+    }
+
     private void assertFailure(IntakeAgentUnavailableException.Reason reason) {
         var failure =
                 catchThrowableOfType(
                         IntakeAgentUnavailableException.class, () -> gateway.understand(request()));
         assertThat(failure).isNotNull();
         assertThat(failure.reason()).isEqualTo(reason);
+        assertThat(failure.getMessage()).isNull();
+        assertThat(failure.getCause()).isNull();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IntakeAgentUnavailableException.Reason.class,
+            names = {"RESPONSE_PARSE", "STATE_CONSISTENCY"})
+    void rejectedIntakeRetainsKnownUsageWithoutRetainingTheRawResponse(
+            IntakeAgentUnavailableException.Reason reason) {
+        ObjectMapper json = new ObjectMapper();
+        var evidence =
+                json.readTree(
+                        """
+                {
+                  "schemaVersion":"intake-call-evidence-v1","currency":"USD",
+                  "logicalCalls":1,"providerAttempts":1,"inputTokens":120,"outputTokens":30,
+                  "tokens":150,"costMicros":8,"usageComplete":true,
+                  "failureClassification":"SCHEMA_MISMATCH",
+                  "attempts":[{"internalCallId":"failed-intake-230","attemptId":"failed-attempt-230",
+                    "attemptNumber":1,"provider":"deepseek","providerHttpStatus":200,
+                    "inputTokens":120,"outputTokens":30,"totalTokens":150}]
+                }
+                """);
+        tools.jackson.databind.node.ObjectNode response;
+        if (reason == IntakeAgentUnavailableException.Reason.RESPONSE_PARSE) {
+            response = json.createObjectNode();
+            response.putObject("intake_failure").put("code", "SCHEMA_MISMATCH");
+        } else {
+            response =
+                    (tools.jackson.databind.node.ObjectNode)
+                            json.readTree(response().replace("[\"DUPLICATE_CHARGE\"]", "[]"));
+            ((tools.jackson.databind.node.ObjectNode) evidence).put("failureClassification", "");
+        }
+        response.set("intake_call_evidence", evidence);
+        response.put("raw_output", "private-response-sentinel");
+        body = json.writeValueAsString(response);
+
+        var failure =
+                catchThrowableOfType(
+                        IntakeAgentUnavailableException.class, () -> gateway.understand(request()));
+
+        assertThat(failure).isNotNull();
+        assertThat(failure.reason()).isEqualTo(reason);
+        assertThat(failure.callEvidence())
+                .isEqualTo(evidence)
+                .satisfies(
+                        value ->
+                                assertThat(json.writeValueAsString(value))
+                                        .doesNotContain("private-response-sentinel"));
         assertThat(failure.getMessage()).isNull();
         assertThat(failure.getCause()).isNull();
     }

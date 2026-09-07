@@ -49,16 +49,26 @@ final class IntakeAgentUnavailableException extends RuntimeException {
     }
 
     private final Reason reason;
+    private final tools.jackson.databind.JsonNode callEvidence;
 
     IntakeAgentUnavailableException() {
         this(Reason.SERVICE_VALIDATION);
     }
 
     IntakeAgentUnavailableException(Reason reason) {
+        this(reason, null);
+    }
+
+    IntakeAgentUnavailableException(Reason reason, tools.jackson.databind.JsonNode callEvidence) {
         this.reason = reason;
+        this.callEvidence = callEvidence;
     }
 
     Reason reason() {
         return reason;
+    }
+
+    tools.jackson.databind.JsonNode callEvidence() {
+        return callEvidence;
     }
 }

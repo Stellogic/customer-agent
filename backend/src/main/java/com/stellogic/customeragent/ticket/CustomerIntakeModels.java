@@ -73,4 +73,24 @@ record IntakeUnderstanding(
         List<ProposedIntakeIssue> issues,
         List<String> pendingIssueKinds,
         List<String> remainingOrderReferences,
-        String assistantMessage) {}
+        String assistantMessage,
+        tools.jackson.databind.JsonNode callEvidence) {
+    IntakeUnderstanding(
+            String intent,
+            String status,
+            String candidateOrderReference,
+            List<ProposedIntakeIssue> issues,
+            List<String> pendingIssueKinds,
+            List<String> remainingOrderReferences,
+            String assistantMessage) {
+        this(
+                intent,
+                status,
+                candidateOrderReference,
+                issues,
+                pendingIssueKinds,
+                remainingOrderReferences,
+                assistantMessage,
+                null);
+    }
+}
