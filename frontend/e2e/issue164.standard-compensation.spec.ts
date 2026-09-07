@@ -60,7 +60,11 @@ test("Issue #164 选择标准补偿并提交审批", async ({ browser }) => {
   await support.getByRole("button", { name: "确认领取" }).click();
   await expect(support.getByRole("heading", { name: "授权工单详情" })).toBeVisible();
   await expect(support.getByRole("heading", { name: "标准补偿" })).toBeVisible();
-  await expect(support.getByText("delay-policy-v1")).toBeVisible();
+  await expect(
+    support
+      .getByRole("region", { name: "标准补偿", exact: true })
+      .getByText("delay-policy-v1", { exact: true }),
+  ).toBeVisible();
   const eligibleAmount = support
     .getByRole("region", { name: "标准补偿", exact: true })
     .locator(".support-compensation-facts > div")

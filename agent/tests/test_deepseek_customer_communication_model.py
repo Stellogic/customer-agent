@@ -127,6 +127,66 @@ def _streamed(payload: dict[str, object], *, split_at: int | None = None) -> htt
 
 
 @pytest.mark.asyncio
+async def test_payment_stream_uses_same_authoritative_contract_and_buffers_publication() -> None:
+    from test_customer_communication_model import _payment_input, _payment_reply
+
+    from baseline_agent.deepseek_investigation_model import InMemoryModelCallAuditSink
+
+    requests: list[dict] = []
+    published: list[str] = []
+    expected = _payment_reply()
+
+    def supplier(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        payload = _completed(expected["body"], expected["intent"])
+        payload["output"][0]["content"][0]["text"] = json.dumps(expected, ensure_ascii=False)
+        return _streamed(payload, split_at=80)
+
+    audit = InMemoryModelCallAuditSink()
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(supplier),
+        audit_sink=audit,
+    )
+    reply = await model.compose(
+        _payment_input(), on_body_delta=lambda delta: _capture(published, delta)
+    )
+
+    assert reply.as_request_value() == expected
+    assert published == []
+    facts = json.loads(requests[0]["input"])["authorizedInvestigation"]
+    assert facts["riskScenario"] == "DUPLICATE_CHARGE"
+    assert facts["paymentFacts"]["paid"] is True
+    assert facts["paymentFacts"]["fullyRefunded"] is False
+    assert facts["evidenceRefs"] == expected["evidenceRefs"]
+    assert "delaySeconds" not in facts
+    assert len(audit.records) == 1
+    assert audit.records[0].total_tokens == 110
+    assert audit.records[0].actual_response_shape_valid
+
+
+@pytest.mark.asyncio
+async def test_payment_stream_rejects_inverted_refund_status_without_publishing_prefix() -> None:
+    from test_customer_communication_model import _payment_input, _payment_reply
+
+    published: list[str] = []
+    reply = _payment_reply()
+    reply["body"] = reply["body"].replace("全额退款状态为未完成", "全额退款状态为已完成")
+    payload = _completed(reply["body"], reply["intent"])
+    payload["output"][0]["content"][0]["text"] = json.dumps(reply, ensure_ascii=False)
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(payload, split_at=80)),
+    )
+
+    with pytest.raises(CustomerCommunicationFailure):
+        await model.compose(
+            _payment_input(), on_body_delta=lambda delta: _capture(published, delta)
+        )
+    assert published == []
+
+
+@pytest.mark.asyncio
 async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context() -> None:
     captured: list[httpx.Request] = []
 

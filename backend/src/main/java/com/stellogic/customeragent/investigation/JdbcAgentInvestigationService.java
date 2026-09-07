@@ -436,8 +436,8 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                 StableParameterDigest.sha256(
                         Boolean.toString(conclusion.compensationRequired()),
                         conclusion.reasonCode().name(),
-                        Integer.toString(conclusion.delayHours()),
-                        Long.toString(conclusion.delaySeconds()),
+                        String.valueOf(conclusion.delayHours()),
+                        String.valueOf(conclusion.delaySeconds()),
                         conclusion.orderReference(),
                         String.join("\n", conclusion.evidenceRefs()),
                         conclusion.sufficiency().riskScenario().name(),
@@ -488,6 +488,20 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         }
 
         ScopedOrder order = currentOrder(ticketId, generationId);
+        String issueKind =
+                jdbc.queryForObject(
+                        "select issue_kind from support_ticket where id = ?",
+                        String.class,
+                        ticketId);
+        boolean payment = "DUPLICATE_CHARGE".equals(issueKind);
+        if (payment
+                        != (conclusion.sufficiency().riskScenario()
+                                == InvestigationRiskScenario.DUPLICATE_CHARGE)
+                || (payment
+                        && (conclusion.reasonCode() != DecisionReasonCode.DUPLICATE_CHARGE
+                                || conclusion.compensationRequired()))) {
+            reject(ticketId, "DETERMINISTIC_REVIEW_FAILED");
+        }
         List<PersistedInvestigationFact> persistedFacts = persistedFacts(ticketId, generationId);
         String evidenceFailure =
                 EvidenceSufficiencyPolicy.validate(conclusion, persistedFacts, clock.instant());
@@ -503,14 +517,20 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         if (!factsStillMatchCurrentOrder(persistedFacts, order)) {
             reject(ticketId, "EVIDENCE_STALE");
         }
-        List<String> expectedEvidence = order.evidenceRefs();
+        List<String> expectedEvidence =
+                payment
+                        ? List.of(
+                                actualEvidence(persistedFacts, "ORDER"),
+                                actualEvidence(persistedFacts, "PAYMENT"))
+                        : order.evidenceRefs();
         boolean factsMatch =
-                conclusion.delayHours() == order.delayHours()
-                        && conclusion.delaySeconds() == order.delaySeconds()
+                (payment
+                                || (conclusion.delayHours() == order.delayHours()
+                                        && conclusion.delaySeconds() == order.delaySeconds()))
                         && conclusion.orderReference().equals(order.orderReference())
                         && conclusion.evidenceRefs().equals(expectedEvidence);
         if (!factsMatch) reject(ticketId, "DETERMINISTIC_REVIEW_FAILED");
-        validateCustomerReply(ticketId, conclusion, order);
+        validateCustomerReply(ticketId, conclusion, order, expectedEvidence);
         CustomerKnowledgeProjection knowledgeProjection =
                 validateKnowledgeReply(generationId, conclusion.customerReply());
 
@@ -562,8 +582,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publishCustomerReply(
-                ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
+        publishCustomerReply(ticketId, generationId, conclusion, knowledgeProjection, now);
         int updated =
                 jdbc.update(
                         "update support_ticket set handling_mode = 'HUMAN',"
@@ -572,6 +591,20 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
                         conclusion.reasonCode().name(),
                         ticketId);
         if (updated != 1) reject(ticketId, "STALE_OR_OUT_OF_SCOPE_GENERATION");
+        int queueInserted =
+                jdbc.update(
+                        "insert into shared_support_queue_entry (ticket_id, reason_code, entered_at) "
+                                + "values (?, ?, ?) on conflict do nothing",
+                        ticketId,
+                        "AGENT_HUMAN_HANDOFF",
+                        databaseTime);
+        if (queueInserted == 1) {
+            jdbc.update(
+                    "insert into audit_event (ticket_id, event_type, actor_id, occurred_at) "
+                            + "values (?, 'SHARED_SUPPORT_QUEUE_ENTERED', 'spring-system', ?)",
+                    ticketId,
+                    databaseTime);
+        }
         publicProjection.appendHandoffMessage(
                 ticketId, generationId, "本次核验结论已给出，此工单已转由客服继续处理。", now);
         jdbc.update(
@@ -615,8 +648,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         }
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publishCustomerReply(
-                ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
+        publishCustomerReply(ticketId, generationId, conclusion, knowledgeProjection, now);
         if ("KNOWLEDGE_CONVERSATION".equals(scenario)
                 || (conclusion.customerReply().knowledge() != null
                         && conclusion.customerReply().knowledge().status()
@@ -789,8 +821,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         Instant now = clock.instant();
         Timestamp databaseTime = Timestamp.from(now);
         completeGeneration(generationId, databaseTime);
-        publishCustomerReply(
-                ticketId, generationId, conclusion.customerReply(), knowledgeProjection, now);
+        publishCustomerReply(ticketId, generationId, conclusion, knowledgeProjection, now);
         jdbc.update(
                 "insert into audit_event (ticket_id, event_type, actor_id, occurred_at,"
                         + " subject_type, subject_id) values (?, ?, 'spring-system', ?,"
@@ -850,13 +881,39 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY, "malformed investigation conclusion");
         }
+        boolean payment =
+                conclusion.sufficiency().riskScenario()
+                        == InvestigationRiskScenario.DUPLICATE_CHARGE;
+        if (payment
+                ? (conclusion.delayHours() != null || conclusion.delaySeconds() != null)
+                : (conclusion.delayHours() == null || conclusion.delaySeconds() == null)) {
+            reject(ticketId, "MALFORMED_CONCLUSION");
+        }
+    }
+
+    private static String actualEvidence(List<PersistedInvestigationFact> facts, String factType) {
+        return facts.stream()
+                .filter(fact -> fact.factType().equals(factType))
+                .findFirst()
+                .orElseThrow()
+                .evidenceReference();
     }
 
     private void validateCustomerReply(
-            UUID ticketId, InvestigationConclusion conclusion, ScopedOrder order) {
+            UUID ticketId,
+            InvestigationConclusion conclusion,
+            ScopedOrder order,
+            List<String> expectedEvidence) {
         String rejection =
                 CustomerReplySafetyPolicy.rejectionReason(
-                        conclusion, order.orderReference(), order.evidenceRefs());
+                        conclusion,
+                        order.orderReference(),
+                        expectedEvidence,
+                        new CustomerReplySafetyPolicy.PaymentFacts(
+                                order.paid(),
+                                order.cancelled(),
+                                order.fullyRefunded(),
+                                order.duplicateChargeSuspected()));
         if (rejection != null) reject(ticketId, rejection);
     }
 
@@ -909,11 +966,19 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
     private void publishCustomerReply(
             UUID ticketId,
             UUID generationId,
-            CustomerReplyEnvelope reply,
+            InvestigationConclusion conclusion,
             CustomerKnowledgeProjection projection,
             Instant now) {
+        CustomerReplyEnvelope reply = conclusion.customerReply();
         if (projection == null) {
-            publicProjection.completeAgentReplyStream(ticketId, generationId, reply.body(), now);
+            if (conclusion.sufficiency().riskScenario()
+                    == InvestigationRiskScenario.DUPLICATE_CHARGE) {
+                publicProjection.completeBufferedAgentReplyStream(
+                        ticketId, generationId, reply.body(), now);
+            } else {
+                publicProjection.completeAgentReplyStream(
+                        ticketId, generationId, reply.body(), now);
+            }
             publicProjection.appendAgentMessage(ticketId, generationId, reply.body(), now, false);
             return;
         }

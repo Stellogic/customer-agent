@@ -563,7 +563,9 @@ def _load_progress(
             or checked_numeric["remainingWallClockMs"] > budget.max_wall_clock_ms
         ):
             raise ValueError
-        policy = checkpoint.get("requiredFacts", required_facts)
+        policy = checkpoint.get("requiredFacts")
+        if policy is None:
+            policy = required_facts
         if policy is not None and not isinstance(policy, dict):
             raise ValueError
         return _ActionLoopProgress(

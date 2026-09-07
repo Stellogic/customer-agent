@@ -163,6 +163,39 @@ class EvidenceSufficiencyPolicyTest {
                 .isNull();
     }
 
+    @Test
+    void duplicateChargeRequiresPaymentButDoesNotBorrowLogisticsPolicy() {
+        var facts =
+                paymentFacts().stream().filter(fact -> !fact.factType().equals("POLICY")).toList();
+        var evidence =
+                paymentEvidence().stream()
+                        .filter(item -> !item.evidenceReference().startsWith("policy:"))
+                        .toList();
+        var duplicate =
+                conclusionFor(
+                        InvestigationRiskScenario.DUPLICATE_CHARGE,
+                        DecisionReasonCode.DUPLICATE_CHARGE,
+                        evidence);
+        assertThat(EvidenceSufficiencyPolicy.validate(duplicate, facts, NOW)).isNull();
+        assertThat(
+                        EvidenceSufficiencyPolicy.validate(
+                                duplicate,
+                                facts.stream()
+                                        .filter(fact -> !fact.factType().equals("PAYMENT"))
+                                        .toList(),
+                                NOW))
+                .isEqualTo("REQUIRED_FACT_MISSING");
+        assertThat(
+                        EvidenceSufficiencyPolicy.validate(
+                                conclusionFor(
+                                        InvestigationRiskScenario.REFUND_STATUS,
+                                        DecisionReasonCode.REFUND_STATUS_EXPLAINED,
+                                        evidence),
+                                facts,
+                                NOW))
+                .isEqualTo("REQUIRED_FACT_MISSING");
+    }
+
     private static List<PersistedInvestigationFact> replace(
             String factType, PersistedInvestigationFact replacement) {
         return sufficientFacts().stream()

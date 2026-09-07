@@ -5163,6 +5163,17 @@ def main() -> None:
         assert workbench_before_handoff["view"] == "SUPPORT_WORKBENCH"
         assert workbench_before_handoff["schema"] == "support-workbench-v2"
         workbench_cursor = workbench_before_handoff["cursor"]
+        prior_queue = client.get(f"{spring_url}/api/support/queue")
+        expect_status(prior_queue, 200)
+        prior_queue_item = next(
+            item for item in prior_queue.json() if item["ticketId"] == ticket_id
+        )
+        # This reused ticket already entered the queue after its grounded Agent reply.
+        # Direct SLA fixture updates do not perform the claim API's queue removal.
+        assert set(prior_queue_item["reasonCodes"]) == {
+            "AGENT_HUMAN_HANDOFF",
+            "SLA_BREACH",
+        }, prior_queue_item["reasonCodes"]
         sla_handoff_request_id = f"sla-handoff-{uuid.uuid4()}"
         sla_handoff = client.post(
             f"{spring_url}/api/customer/v2/tickets/{ticket_id}/human-handoff",
@@ -5180,9 +5191,10 @@ def main() -> None:
             item for item in shared_queue.json() if item["ticketId"] == ticket_id
         )
         assert set(combined_queue_item["reasonCodes"]) == {
+            "AGENT_HUMAN_HANDOFF",
             "SLA_BREACH",
             "CUSTOMER_REQUESTED_HANDOFF",
-        }
+        }, combined_queue_item["reasonCodes"]
         assert combined_queue_item["handlingMode"] == "HUMAN"
         escalations_after_handoff = client.get(
             f"{spring_url}/api/support/escalations",
