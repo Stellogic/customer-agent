@@ -165,8 +165,28 @@ def test_core_metrics_restore_owned_pending_attempt_without_fabricating_known_us
     assert report["pendingReservedMicros"] == 1000
 
 
+@pytest.mark.parametrize(
+    ("source", "role", "classification", "provider_failure"),
+    [
+        (None, "communication", None, ""),
+        ("investigation_run_evidence", "action", "SCHEMA_MISMATCH", "SCHEMA_MISMATCH"),
+        (
+            "customer_communication_evidence",
+            "communication",
+            "INVALID_MODEL_OUTPUT",
+            "PUBLIC_REPLY_PUBLISH_FAILED",
+        ),
+        ("customer_communication_evidence", "communication", "FACT_CONFLICT", ""),
+    ],
+    ids=["normal", "format", "publication-handoff", "evidence-rejected"],
+)
 def test_core_collector_keeps_database_owners_and_reads_current_generation_evidence(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    source: str | None,
+    role: str,
+    classification: str | None,
+    provider_failure: str,
 ) -> None:
     class Rows:
         def __init__(self, rows: list[tuple]) -> None:
@@ -192,6 +212,37 @@ def test_core_collector_keeps_database_owners_and_reads_current_generation_evide
         status_code = 200
 
         def json(self) -> dict:
+            stage_evidence = {
+                "failureClassification": classification,
+                "exception": "不能保存的原文",
+                "body": "不能保存的原文",
+            }
+            if role == "action":
+                stage_evidence.update(
+                    outcome="SAFE_HANDOFF",
+                    modelCalls=[
+                        {
+                            "callNumber": 1,
+                            "selectedAction": "SUBMIT_CONCLUSION",
+                            "prompt": "不能保存的原文",
+                        }
+                    ],
+                )
+            # conclusion 422 实际写入 communication 的 FACT_CONFLICT;不构造 action 失败。
+            extra = (
+                {}
+                if source is None
+                else {
+                    source: stage_evidence,
+                    "investigation_actions": [
+                        {
+                            "actionType": "CONFIRM_ORDER",
+                            "resultCode": "OK",
+                            "evidenceReferences": ["不能保存的原文"],
+                        }
+                    ],
+                }
+            )
             return {
                 "values": {
                     "provider_call_evidence": {
@@ -201,10 +252,13 @@ def test_core_collector_keeps_database_owners_and_reads_current_generation_evide
                                 "internalCallId": "call",
                                 "inputTokens": 10,
                                 "outputTokens": 2,
+                                "role": role,
+                                "failureClassification": provider_failure,
                             }
                         ]
                     },
                     "customer_description": "不应进入计量报告的业务原文",
+                    **extra,
                 }
             }
 
@@ -235,10 +289,31 @@ def test_core_collector_keeps_database_owners_and_reads_current_generation_evide
     assert report["providerAttempts"] == 1
     assert report["estimatedCostMicros"] == 48
     assert report["attempts"][0]["ticketId"] == "ticket"
-    assert report["generationResults"] == [
-        {"generationId": "generation", "ticketId": "ticket", "status": "COMPLETED"}
-    ]
+    generation = report["generationResults"][0]
+    assert {key: generation[key] for key in ("generationId", "ticketId", "status")} == {
+        "generationId": "generation",
+        "ticketId": "ticket",
+        "status": "COMPLETED",
+    }
+    if source:
+        expected = {
+            "source": source,
+            "role": role,
+            "failureClassification": classification,
+            "providerCalls": [{"attemptId": "reply", "internalCallId": "call"}],
+            "capabilityResults": [{"actionType": "CONFIRM_ORDER", "resultCode": "OK"}],
+        }
+        if role == "action":
+            expected.update(
+                modelCalls=[{"callNumber": 1, "selectedAction": "SUBMIT_CONCLUSION"}],
+                outcome="SAFE_HANDOFF",
+            )
+        assert generation["diagnostics"] == [expected]
+        assert report["attempts"][0]["failureClassification"] == provider_failure
+    else:
+        assert "diagnostics" not in generation
     assert "不应进入计量报告" not in str(report)
+    assert "不能保存的原文" not in str(report)
 
 
 def test_core_collector_preserves_partial_cost_and_pending_when_checkpoint_is_missing(

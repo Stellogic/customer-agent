@@ -136,6 +136,36 @@ def aggregate_core_metrics(
     }
 
 
+def _generation_diagnostics(values: dict[str, Any]) -> list[dict[str, Any]]:
+    diagnostics = []
+    for source, role in (
+        ("investigation_run_evidence", "action"),
+        ("investigation_judgment_evidence", "judgment"),
+        ("customer_communication_evidence", "communication"),
+    ):
+        evidence = values.get(source)
+        if not isinstance(evidence, dict) or not evidence.get("failureClassification"):
+            continue
+        diagnostic = {
+            "source": source,
+            "role": role,
+            "failureClassification": evidence["failureClassification"],
+        }
+        if evidence.get("outcome"):
+            diagnostic["outcome"] = evidence["outcome"]
+        if role == "action":
+            diagnostic["modelCalls"] = [
+                {key: call[key] for key in ("callNumber", "selectedAction") if key in call}
+                for call in evidence.get("modelCalls", [])
+            ]
+        diagnostic["capabilityResults"] = [
+            {key: action[key] for key in ("actionType", "resultCode") if key in action}
+            for action in values.get("investigation_actions", [])
+        ]
+        diagnostics.append(diagnostic)
+    return diagnostics
+
+
 def collect_core_metrics(ledger_path: Path) -> dict[str, Any]:
     """读取本轮隔离验收数据库;checkpoint 仅用于计量,不替代产品验收。"""
     ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
@@ -183,11 +213,22 @@ def collect_core_metrics(ledger_path: Path) -> dict[str, Any]:
         if not isinstance(values, dict):
             raise RuntimeError("core checkpoint metrics are incomplete")
         generation["provider_call_evidence"] = values.get("provider_call_evidence")
+        diagnostics = _generation_diagnostics(values)
+        if diagnostics:
+            generation["diagnostics"] = diagnostics
         generations.append(generation)
     report = aggregate_core_metrics(intake_calls, generations, ledger)
     for generation in generations:
         if generation["generationId"] in report["ledgerRecoveredGenerationIds"]:
             generation["providerEvidenceSource"] = "BUDGET_LEDGER_SUPPLEMENT"
+        for diagnostic in generation.get("diagnostics", []):
+            # 同阶段调用标识用于关联,不把 Spring 拒绝改写成供应商失败。
+            diagnostic["providerCalls"] = [
+                {key: attempt.get(key) for key in ("attemptId", "internalCallId")}
+                for attempt in report["attempts"]
+                if attempt.get("generationId") == generation["generationId"]
+                and attempt.get("role") == diagnostic["role"]
+            ]
     report.update(
         authorizationId=ledger["authorizationId"],
         intakeResults=[

@@ -24,12 +24,13 @@ function prepare(caseName: CoreCase, sample: number) {
   const reference = `ORDER-CORE-${caseName.toUpperCase().replaceAll("_", "-")}-${sample}-${crypto.randomUUID()}`;
   const delay = caseName === "no_compensation" ? [6, 12][sample - 1] : [48, 80][sample - 1];
   const refunded = sample === 2 && caseName === "payment_handoff";
+  const suspectedDuplicate = caseName === "payment_handoff" || caseName === "split_recovery";
   executeFixtureSql(`
     INSERT INTO synthetic_order (order_reference, customer_id, paid_amount, currency,
       delay_hours, delay_seconds, paid, cancelled, fully_refunded, existing_compensation,
       policy_version, available_compensation_amount, duplicate_charge_suspected)
     VALUES ('${reference}', 'customer-demo', 99.00, 'CNY', ${delay}, ${delay * 3600},
-      true, false, ${refunded}, false, 'delay-policy-v1', 20.00, true);
+      true, false, ${refunded}, false, 'delay-policy-v1', 20.00, ${suspectedDuplicate});
   `);
   return { reference, refunded };
 }
@@ -83,9 +84,16 @@ async function verifyLogistics(page: Page, ticketId: string, pending: boolean) {
   const response = await page.request.get(`/api/customer/v2/tickets/${ticketId}`);
   expect(response.ok()).toBe(true);
   const snapshot = (await response.json()) as {
+    ticket: { handlingMode: string };
     pendingCompensation: { status: string } | null;
     messages: { author: string; body: string }[];
   };
+  expect(snapshot.ticket.handlingMode).toBe("AGENT");
+  expect(
+    queryFixtureSql(
+      `SELECT count(*) FROM support_ticket WHERE id = '${ticketId}' AND human_handoff_reason_code IS NOT NULL;`,
+    ),
+  ).toBe("0");
   if (pending) expect(snapshot.pendingCompensation?.status).toBe("PENDING_REVIEW");
   else expect(snapshot.pendingCompensation).toBeNull();
   expect(snapshot.messages.some(({ author, body }) => author === "AGENT" && body.length > 0)).toBe(
@@ -267,12 +275,40 @@ for (const caseName of cases.filter((value) => !selectedCase || value === select
               await expect(
                 overview.getByRole("button", { name: `打开工单 ${ticket.id}`, exact: true }),
               ).toBeVisible();
+            const paymentId = tickets.find(({ kind }) => kind === "DUPLICATE_CHARGE")!.id;
+            const supportContext = await newAcceptanceContext(browser);
+            try {
+              const support = await supportContext.newPage();
+              await login(support, "internal", "support-demo");
+              await support
+                .getByRole("table", { name: "待接手工单", exact: true })
+                .getByRole("button", { name: `领取工单 ${paymentId}`, exact: true })
+                .click();
+              await support.getByRole("button", { name: "确认领取", exact: true }).click();
+              await expect(support.getByRole("heading", { name: "人工公开回复" })).toBeVisible();
+              const facts = support.getByRole("region", { name: "调查事实" });
+              await expect(facts.getByText("PAYMENT", { exact: true })).toBeVisible();
+              await expect(facts.getByText("REFUND_STATUS", { exact: true })).toBeVisible();
+              await expect(facts.getByText("NOT_FULLY_REFUNDED", { exact: true })).toBeVisible();
+              await expect(facts.getByText("LOGISTICS_DELAY_HOURS", { exact: true })).toHaveCount(
+                0,
+              );
+              const conversation = support.getByRole("region", { name: "公开沟通" });
+              await expect(
+                conversation.getByText(/不足以确认|尚未确认|无法确认|不能确认/),
+              ).toBeVisible();
+              await support.getByRole("button", { name: "释放领取", exact: true }).click();
+            } finally {
+              await supportContext.close();
+            }
           }
         } else {
           const ticketId = await createSingleTicket(
             page,
             reference,
-            "物流延迟，请核实订单后说明处理方案。",
+            caseName === "no_compensation"
+              ? "请解释物流状态"
+              : "物流延迟，请核实订单后说明处理方案。",
           );
           evidence.ticketId = ticketId;
           if (caseName === "generation_fence")

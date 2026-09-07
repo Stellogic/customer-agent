@@ -102,7 +102,7 @@ try {
         limitMicros = $LimitMicros; currency = 'CNY'; maxAttempts = $MaxAttempts; maxTokens = $MaxTokens
         deadline = $Deadline.ToUniversalTime().ToString('o'); investigationWallClockMs = $InvestigationWallClockMs
         denominator = 10; matrix = $matrix; selectedCase = $Case; selectedSample = $Sample; retries = 0; maxFailures = 1
-        sideEffects = @('创建本轮合成订单与工单', '发布客户公开回复', '创建待审批提案；不批准或执行补偿')
+        sideEffects = @('创建本轮合成订单与工单', '发布客户公开回复', '客服领取并释放本轮支付工单', '创建待审批提案；不批准或执行补偿')
         notes = @('输入预算是程序工程预留，不是供应商数学上界。', '供应商费用未知时保留预留并停止，不换账本重跑。')
     } | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $planPath
     Copy-Item -LiteralPath $planPath -Destination (Join-Path $evidence 'plan.json')
