@@ -311,6 +311,16 @@ for (const caseName of cases.filter((value) => !selectedCase || value === select
               : "物流延迟，请核实订单后说明处理方案。",
           );
           evidence.ticketId = ticketId;
+          expect(
+            queryFixtureSql(`
+            SELECT count(*) FROM intake_model_call
+            WHERE intake_id = (
+              SELECT record.intake_id FROM shared_intake_record record
+              JOIN shared_intake_issue issue ON issue.shared_intake_record_id = record.id
+              WHERE issue.ticket_id = '${ticketId}'
+            );
+          `),
+          ).toBe("1");
           if (caseName === "generation_fence")
             evidence.fence = await fenceDuringRealDelta(page, ticketId, sample, evidence);
           else await complete(ticketId);
