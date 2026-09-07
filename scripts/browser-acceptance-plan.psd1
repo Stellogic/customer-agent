@@ -30,11 +30,13 @@
         'e2e/issue190.hybrid-retrieval.spec.ts'
         'e2e/issue173.full-stack.spec.ts'
         'e2e/issue229.full-stack.spec.ts'
+        'e2e/issue230.full-stack.spec.ts'
         'e2e/issue173.auto-resolution-clock.spec.ts'
         'e2e/issue192.customer-help-docs.spec.ts'
         'e2e/issue193.internal-shell.spec.ts'
     )
     Excluded = @{
+        'e2e/issue230.core-matrix.spec.ts' = '由 issue230-core-browser.ps1 离线验证和 issue230-real-core.ps1 授权冻结运行；真实流窗口与调用计量不由普通固定模型门禁代替。'
         'e2e/issue226.explicit-confirmation.spec.ts' = '仅由 issue226-confirmation-regression.ps1 在受控外部 Agent 的隔离栈中运行；补充故障回归，不代替正常产品链路门禁。'
         'e2e/issue215.intake-diagnostic.spec.ts' = '仅由持锁、冻结预算的诊断入口显式启用，不属于离线完整门禁。'
         'e2e/issue129.flash-customer-communication.spec.ts' = '仅由显式授权的真实模型验收脚本运行，不属于离线完整门禁。'

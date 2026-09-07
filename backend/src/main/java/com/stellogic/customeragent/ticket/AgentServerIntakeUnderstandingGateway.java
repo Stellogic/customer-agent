@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.ticket;
 
+import static com.stellogic.customeragent.ticket.IntakeAgentUnavailableException.Reason.PROVIDER_FAILURE;
 import static com.stellogic.customeragent.ticket.IntakeAgentUnavailableException.Reason.RESPONSE_PARSE;
 import static com.stellogic.customeragent.ticket.IntakeAgentUnavailableException.Reason.STATE_CONSISTENCY;
 import static com.stellogic.customeragent.ticket.IntakeAgentUnavailableException.Reason.TRANSPORT;
@@ -101,8 +102,31 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
     }
 
     private IntakeUnderstanding parse(String response, IntakeUnderstandingRequest request) {
+        JsonNode evidence = null;
         try {
-            JsonNode value = json.readTree(response).path("intake_understanding");
+            JsonNode result = json.readTree(response);
+            JsonNode receivedEvidence = result.get("intake_call_evidence");
+            if (receivedEvidence != null
+                    && !receivedEvidence.isNull()
+                    && (!receivedEvidence.isObject()
+                            || !"intake-call-evidence-v1"
+                                    .equals(receivedEvidence.path("schemaVersion").asText()))) {
+                throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
+            }
+            evidence = receivedEvidence;
+            if (result.hasNonNull("intake_failure")) {
+                var reason =
+                        switch (result.path("intake_failure").path("code").asText()) {
+                            case "CONNECTION_TIMEOUT",
+                                    "READ_TIMEOUT",
+                                    "PROVIDER_REQUEST_REJECTED",
+                                    "TRANSIENT_PROVIDER_ERROR" ->
+                                    PROVIDER_FAILURE;
+                            default -> RESPONSE_PARSE;
+                        };
+                throw new IntakeAgentUnavailableException(reason);
+            }
+            JsonNode value = result.path("intake_understanding");
             String intent = requiredText(value, "intent");
             String status = requiredText(value, "status");
             String orderReference = optionalText(value, "candidate_order_reference");
@@ -148,11 +172,12 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
                     issues,
                     pendingIssueKinds,
                     remainingOrderReferences,
-                    assistantMessage);
+                    assistantMessage,
+                    evidence);
         } catch (IntakeAgentUnavailableException exception) {
-            throw exception;
+            throw new IntakeAgentUnavailableException(exception.reason(), evidence);
         } catch (RuntimeException exception) {
-            throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
+            throw new IntakeAgentUnavailableException(RESPONSE_PARSE, evidence);
         }
     }
 

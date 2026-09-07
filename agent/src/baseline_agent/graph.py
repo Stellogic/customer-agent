@@ -1,12 +1,14 @@
 import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TypedDict, cast
+from functools import wraps
+from typing import Protocol, TypedDict, cast
 
 import httpx
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from baseline_agent.core_validation_budget import provider_owner
 from baseline_agent.customer_communication_model import (
     CustomerCommunicationFailure,
     CustomerCommunicationFailureCode,
@@ -29,6 +31,7 @@ from baseline_agent.deepseek_investigation_model import (
     INVESTIGATION_JUDGMENT_SCHEMA_VERSION,
     DeepSeekResponsesInvestigationModel,
     InMemoryModelCallAuditSink,
+    ModelCallAttemptRecord,
     estimate_flash_cost_micros,
 )
 from baseline_agent.investigation_action_loop import (
@@ -65,6 +68,7 @@ from baseline_agent.knowledge_retrieval import (
     KnowledgeRetrievalResult,
     parse_knowledge_response,
 )
+from baseline_agent.model_call_evidence import model_call_evidence, serialize_model_attempt
 from baseline_agent.shadow_investigation import (
     ShadowCandidate,
     compare_shadow_judgment,
@@ -93,6 +97,7 @@ class BaselineState(TypedDict, total=False):
     investigation_run_evidence: dict[str, object]
     investigation_judgment_evidence: dict[str, object]
     customer_communication_evidence: dict[str, object]
+    provider_call_evidence: dict[str, object]
     investigation_progress: dict[str, object] | None
     knowledge_failure: str
 
@@ -303,6 +308,43 @@ def _valid_sibling_ticket_summary(value: object) -> bool:
     )
 
 
+class _ProviderEvidenceNode(Protocol):
+    def __call__(self, state: BaselineState) -> Awaitable[BaselineState]: ...
+
+
+def _capture_provider_calls(node: _ProviderEvidenceNode) -> _ProviderEvidenceNode:
+    @wraps(node)
+    async def traced(state: BaselineState) -> BaselineState:
+        offsets: list[tuple[str, list[ModelCallAttemptRecord], int]] = []
+        for role, model in (
+            ("action", investigation_action_model),
+            ("judgment", investigation_judgment_model),
+            ("communication", customer_communication_model),
+        ):
+            sink = getattr(model, "audit_sink", None)
+            if isinstance(sink, InMemoryModelCallAuditSink):
+                records = sink.current_task_records()
+                offsets.append((role, records, len(records)))
+        with provider_owner(ticket_id=state["ticket_id"], generation_id=state["generation_id"]):
+            result = await node(state)
+        previous = state.get("provider_call_evidence", {})
+        attempts = list(cast(list[dict[str, object]], previous.get("attempts", [])))
+        for role, records, offset in offsets:
+            attempts.extend(
+                {**serialize_model_attempt(record), "role": role} for record in records[offset:]
+            )
+        if attempts:
+            result["provider_call_evidence"] = {
+                **model_call_evidence(attempts, schema_version="provider-call-evidence-v1"),
+                "ticketId": state["ticket_id"],
+                "generationId": state["generation_id"],
+            }
+        return result
+
+    return traced
+
+
+@_capture_provider_calls
 async def investigate_ticket_step(state: BaselineState) -> BaselineState:
     if state.get("requested_by") != "spring":
         raise ValueError("ticket investigation accepts only Spring-owned runs")
@@ -1662,6 +1704,7 @@ async def _human_handoff(
     return result
 
 
+@_capture_provider_calls
 async def request_clarification(state: BaselineState) -> BaselineState:
     if (
         state.get("requested_by") != "spring"

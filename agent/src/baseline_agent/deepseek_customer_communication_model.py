@@ -11,6 +11,7 @@ from typing import Any
 
 import httpx
 
+from baseline_agent.core_validation_budget import CoreValidationBudget, model_attempt_budget
 from baseline_agent.customer_communication_model import (
     CUSTOMER_KNOWLEDGE_REPLY_SCHEMA_VERSION,
     CUSTOMER_REPLY_SCHEMA_VERSION,
@@ -93,10 +94,12 @@ class DeepSeekResponsesCustomerCommunicationModel:
         endpoint: str = _RESPONSES_ENDPOINT,
         transport: httpx.AsyncBaseTransport | None = None,
         audit_sink: ModelCallAuditSink | None = None,
+        budget: CoreValidationBudget | None = None,
     ) -> None:
         self._config = config
         self._endpoint = endpoint
         self._transport = transport
+        self._budget = budget
         self.audit_sink = audit_sink or InMemoryModelCallAuditSink()
 
     async def compose(
@@ -125,172 +128,188 @@ class DeepSeekResponsesCustomerCommunicationModel:
                     raise _failure()
                 attempt_id = str(uuid.uuid4())
                 attempt_started = time.monotonic()
-                payload: object = None
-                published_length = 0
-                published_body = ""
-                validation_diagnostic: dict[str, object] | None = None
-
-                async def publish(delta: str) -> None:
-                    nonlocal published_body, published_length
-                    if on_body_delta is not None:
-                        try:
-                            await on_body_delta(delta)
-                        except Exception as error:
-                            raise CustomerCommunicationFailure(
-                                CustomerCommunicationFailureCode.PUBLICATION_FAILED
-                            ) from error
-                    published_length += len(delta)
-                    published_body += delta
-
-                try:
-                    streamed = await asyncio.wait_for(
-                        _read_streamed_response(
-                            client,
-                            self._endpoint,
-                            request_body,
-                            model_input,
-                            publish,
-                        ),
-                        timeout=remaining,
-                    )
-                    payload = streamed.payload
-                    if not streamed.output_text_matches:
-                        validation_diagnostic = _diagnostic(
-                            "STREAM_MISMATCH", "$.output_text", "delta_equals_completed", "string"
-                        )
-                        raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
-                except asyncio.CancelledError:
-                    await self._record(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        DeepSeekFailureClassification.DEADLINE_EXCEEDED,
-                    )
-                    raise
-                except TimeoutError:
-                    await self._record(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        DeepSeekFailureClassification.DEADLINE_EXCEEDED,
-                    )
-                    raise _failure() from None
-                except httpx.TransportError as error:
-                    classification = (
-                        DeepSeekFailureClassification.CONNECTION_TIMEOUT
-                        if isinstance(error, httpx.ConnectTimeout)
-                        else DeepSeekFailureClassification.READ_TIMEOUT
-                        if isinstance(error, httpx.ReadTimeout)
-                        else DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR
-                    )
-                    await self._record(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        classification,
-                    )
-                    if published_length == 0 and await self._can_retry(
-                        attempt_number, call_started
-                    ):
-                        continue
-                    raise _failure() from None
-                except httpx.HTTPStatusError as error:
-                    transient = error.response.status_code in _TRANSIENT_HTTP_STATUSES
-                    await self._record(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        (
-                            DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR
-                            if transient
-                            else DeepSeekFailureClassification.PROVIDER_REQUEST_REJECTED
-                        ),
-                        provider_http_status=error.response.status_code,
-                    )
-                    if (
-                        transient
-                        and published_length == 0
-                        and await self._can_retry(attempt_number, call_started)
-                    ):
-                        continue
-                    raise _failure() from error
-                except CustomerCommunicationFailure as error:
-                    await self._record(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        (
-                            DeepSeekFailureClassification.PUBLIC_REPLY_PUBLISH_FAILED
-                            if error.code is CustomerCommunicationFailureCode.PUBLICATION_FAILED
-                            else DeepSeekFailureClassification.SCHEMA_MISMATCH
-                        ),
-                        payload if isinstance(payload, dict) else None,
-                        provider_http_status=200,
-                        validation_diagnostic=validation_diagnostic,
-                    )
-                    raise
-                try:
-                    envelope = _parse_response(payload)
-                    validate_customer_reply_envelope(model_input, envelope)
-                    _validate_public_body(envelope)
-                except (json.JSONDecodeError, CustomerCommunicationFailure):
-                    validation_diagnostic = _response_validation_diagnostic(
-                        payload,
-                        request_body["text"]["format"]["schema"],
-                        model_input,
-                    )
-                    await self._record(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        DeepSeekFailureClassification.SCHEMA_MISMATCH,
-                        payload if isinstance(payload, dict) else None,
-                        provider_http_status=200,
-                        validation_diagnostic=validation_diagnostic,
-                    )
-                    raise _failure() from None
-                if (
-                    model_input.knowledge is None
-                    and model_input.risk_scenario != "DUPLICATE_CHARGE"
-                    and published_body != envelope.body
-                ):
-                    await self._record(
-                        internal_call_id,
-                        attempt_id,
-                        attempt_number,
-                        attempt_started,
-                        request_body,
-                        DeepSeekFailureClassification.SCHEMA_MISMATCH,
-                        payload if isinstance(payload, dict) else None,
-                        provider_http_status=200,
-                        validation_diagnostic=_diagnostic(
-                            "STREAM_MISMATCH", "$.body", "published_equals_completed", "string"
-                        ),
-                    )
-                    raise _failure() from None
-                await self._record(
-                    internal_call_id,
-                    attempt_id,
-                    attempt_number,
-                    attempt_started,
-                    request_body,
-                    None,
-                    payload if isinstance(payload, dict) else None,
-                    provider_http_status=200,
+                records = (
+                    self.audit_sink.current_task_records()
+                    if isinstance(self.audit_sink, InMemoryModelCallAuditSink)
+                    else []
                 )
-                return envelope
+                async with model_attempt_budget(
+                    self._budget,
+                    records,
+                    attempt_id=attempt_id,
+                    internal_call_id=internal_call_id,
+                    role="communication",
+                    request=request_body,
+                ):
+                    payload: object = None
+                    published_length = 0
+                    published_body = ""
+                    validation_diagnostic: dict[str, object] | None = None
+
+                    async def publish(delta: str) -> None:
+                        nonlocal published_body, published_length
+                        if on_body_delta is not None:
+                            try:
+                                await on_body_delta(delta)
+                            except Exception as error:
+                                raise CustomerCommunicationFailure(
+                                    CustomerCommunicationFailureCode.PUBLICATION_FAILED
+                                ) from error
+                        published_length += len(delta)
+                        published_body += delta
+
+                    try:
+                        streamed = await asyncio.wait_for(
+                            _read_streamed_response(
+                                client,
+                                self._endpoint,
+                                request_body,
+                                model_input,
+                                publish,
+                            ),
+                            timeout=remaining,
+                        )
+                        payload = streamed.payload
+                        if not streamed.output_text_matches:
+                            validation_diagnostic = _diagnostic(
+                                "STREAM_MISMATCH",
+                                "$.output_text",
+                                "delta_equals_completed",
+                                "string",
+                            )
+                            raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
+                    except asyncio.CancelledError:
+                        await self._record(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            DeepSeekFailureClassification.DEADLINE_EXCEEDED,
+                        )
+                        raise
+                    except TimeoutError:
+                        await self._record(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            DeepSeekFailureClassification.DEADLINE_EXCEEDED,
+                        )
+                        raise _failure() from None
+                    except httpx.TransportError as error:
+                        classification = (
+                            DeepSeekFailureClassification.CONNECTION_TIMEOUT
+                            if isinstance(error, httpx.ConnectTimeout)
+                            else DeepSeekFailureClassification.READ_TIMEOUT
+                            if isinstance(error, httpx.ReadTimeout)
+                            else DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR
+                        )
+                        await self._record(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            classification,
+                        )
+                        if published_length == 0 and await self._can_retry(
+                            attempt_number, call_started
+                        ):
+                            continue
+                        raise _failure() from None
+                    except httpx.HTTPStatusError as error:
+                        transient = error.response.status_code in _TRANSIENT_HTTP_STATUSES
+                        await self._record(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            (
+                                DeepSeekFailureClassification.TRANSIENT_PROVIDER_ERROR
+                                if transient
+                                else DeepSeekFailureClassification.PROVIDER_REQUEST_REJECTED
+                            ),
+                            provider_http_status=error.response.status_code,
+                        )
+                        if (
+                            transient
+                            and published_length == 0
+                            and await self._can_retry(attempt_number, call_started)
+                        ):
+                            continue
+                        raise _failure() from error
+                    except CustomerCommunicationFailure as error:
+                        await self._record(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            (
+                                DeepSeekFailureClassification.PUBLIC_REPLY_PUBLISH_FAILED
+                                if error.code is CustomerCommunicationFailureCode.PUBLICATION_FAILED
+                                else DeepSeekFailureClassification.SCHEMA_MISMATCH
+                            ),
+                            payload if isinstance(payload, dict) else None,
+                            provider_http_status=200,
+                            validation_diagnostic=validation_diagnostic,
+                        )
+                        raise
+                    try:
+                        envelope = _parse_response(payload)
+                        validate_customer_reply_envelope(model_input, envelope)
+                        _validate_public_body(envelope)
+                    except (json.JSONDecodeError, CustomerCommunicationFailure):
+                        validation_diagnostic = _response_validation_diagnostic(
+                            payload,
+                            request_body["text"]["format"]["schema"],
+                            model_input,
+                        )
+                        await self._record(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            DeepSeekFailureClassification.SCHEMA_MISMATCH,
+                            payload if isinstance(payload, dict) else None,
+                            provider_http_status=200,
+                            validation_diagnostic=validation_diagnostic,
+                        )
+                        raise _failure() from None
+                    if (
+                        model_input.knowledge is None
+                        and model_input.risk_scenario != "DUPLICATE_CHARGE"
+                        and published_body != envelope.body
+                    ):
+                        await self._record(
+                            internal_call_id,
+                            attempt_id,
+                            attempt_number,
+                            attempt_started,
+                            request_body,
+                            DeepSeekFailureClassification.SCHEMA_MISMATCH,
+                            payload if isinstance(payload, dict) else None,
+                            provider_http_status=200,
+                            validation_diagnostic=_diagnostic(
+                                "STREAM_MISMATCH", "$.body", "published_equals_completed", "string"
+                            ),
+                        )
+                        raise _failure() from None
+                    await self._record(
+                        internal_call_id,
+                        attempt_id,
+                        attempt_number,
+                        attempt_started,
+                        request_body,
+                        None,
+                        payload if isinstance(payload, dict) else None,
+                        provider_http_status=200,
+                    )
+                    return envelope
         raise AssertionError("attempt budget must terminate")
 
     async def _can_retry(self, attempt_number: int, call_started: float) -> bool:

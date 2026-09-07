@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import httpx
 
+from baseline_agent.core_validation_budget import configured_core_budget
 from baseline_agent.customer_communication_model import (
     CustomerCommunicationFailure,
     CustomerCommunicationFailureCode,
@@ -46,7 +47,14 @@ def configured_customer_communication_model(
         raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_INPUT)
     config = DeepSeekCustomerCommunicationConfig.from_environment(environment)
     return ConfiguredCustomerCommunicationModel(
-        model=DeepSeekResponsesCustomerCommunicationModel(config, transport=transport),
+        model=DeepSeekResponsesCustomerCommunicationModel(
+            config,
+            transport=transport,
+            budget=configured_core_budget(environment),
+            endpoint=environment.get(
+                "DEEPSEEK_RESPONSES_ENDPOINT", "https://api.deepseek.com/responses"
+            ),
+        ),
         mode="deepseek-v4-flash-customer-communication-formal-v1",
         maximum_attempts=config.max_attempts,
         call_deadline_seconds=round(config.deadline_seconds),
