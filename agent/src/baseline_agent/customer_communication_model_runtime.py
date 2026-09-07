@@ -55,7 +55,7 @@ def configured_customer_communication_model(
                 "DEEPSEEK_RESPONSES_ENDPOINT", "https://api.deepseek.com/responses"
             ),
         ),
-        mode="deepseek-v4-flash-customer-communication-formal-v1",
+        mode=f"{config.model}-customer-communication-formal-v1",
         maximum_attempts=config.max_attempts,
         call_deadline_seconds=round(config.deadline_seconds),
     )

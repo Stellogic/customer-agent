@@ -187,7 +187,10 @@ async def test_payment_stream_rejects_inverted_refund_status_without_publishing_
 
 
 @pytest.mark.asyncio
-async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context() -> None:
+@pytest.mark.parametrize("selected_model", ["deepseek-v4-flash", "deepseek-v4-pro"])
+async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context(
+    selected_model: str,
+) -> None:
     captured: list[httpx.Request] = []
 
     def supplier(request: httpx.Request) -> httpx.Response:
@@ -200,7 +203,7 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
         )
 
     model = DeepSeekResponsesCustomerCommunicationModel(
-        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key", model=selected_model),
         transport=httpx.MockTransport(supplier),
     )
     envelope = await model.compose(_input())
@@ -217,7 +220,7 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
         "stream",
         "text",
     }
-    assert request["model"] == "deepseek-v4-flash"
+    assert request["model"] == selected_model
     assert request["stream"] is True
     assert request["reasoning"] == {"effort": "none"}
     assert "Never return a JSON Schema" in request["instructions"]
@@ -864,3 +867,32 @@ async def test_concurrent_streamed_communication_evidence_stays_with_its_call(
     assert failed["providerAttempts"] == 1
     assert failed["tokens"] == 0
     assert failed["failureClassification"] == "MODEL_CALL_FAILED"
+
+
+@pytest.mark.asyncio
+async def test_pro_usage_does_not_reuse_flash_usd_cost_or_erase_unknown_on_merge(
+    monkeypatch,
+) -> None:
+    import importlib
+
+    from baseline_agent.model_call_evidence import model_call_evidence, serialize_model_attempt
+
+    graph_module = importlib.import_module("baseline_agent.graph")
+    body = "订单 ORDER-C129 的调查已完成，补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key", model="deepseek-v4-pro"),
+        transport=httpx.MockTransport(lambda _: _streamed(_completed(body))),
+    )
+    monkeypatch.setattr(graph_module, "customer_communication_model", model)
+    offset = graph_module._communication_audit_offset()
+    await model.compose(_input())
+    evidence = graph_module._communication_call_evidence(offset, "")
+    assert evidence["providerAttempts"] == 1
+    assert evidence["costMicros"] is None
+    attempts = [serialize_model_attempt(record) for record in model.audit_sink.records]
+    shared = model_call_evidence(attempts, schema_version="provider-call-evidence-v1")
+    assert shared["tokens"] == 110
+    assert shared["costMicros"] is None
+    known = {**evidence, "costMicros": 10}
+    assert graph_module._merge_communication_evidence(evidence, known)["costMicros"] is None
+    assert graph_module._merge_communication_evidence(known, evidence)["costMicros"] is None

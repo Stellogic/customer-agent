@@ -40,7 +40,10 @@ def model_call_evidence(
         "tokens": tokens,
         "costMicros": (
             estimate_flash_cost_micros(input_tokens, output_tokens)
-            if complete and input_tokens is not None and output_tokens is not None
+            if complete
+            and input_tokens is not None
+            and output_tokens is not None
+            and all(attempt.get("requestModel") == "deepseek-v4-flash" for attempt in attempts)
             else None
         ),
         "usageComplete": complete,

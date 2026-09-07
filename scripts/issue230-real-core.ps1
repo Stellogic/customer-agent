@@ -1,5 +1,6 @@
 param(
     [switch]$ConfirmProviderSpend,
+    [ValidateSet("deepseek-v4-flash", "deepseek-v4-pro")][string]$CommunicationModel = "deepseek-v4-flash",
     [Parameter(Mandatory)][string]$TestedHead,
     [Parameter(Mandatory)][string]$ModelPath,
     [Parameter(Mandatory)][string]$LedgerPath,
@@ -55,6 +56,8 @@ if ($ledger.schemaVersion -ne 'issue230-core-budget-v1' -or $ledger.currency -ne
     $ledger.maxTokens -ne $MaxTokens -or [datetimeoffset]$ledger.deadline -ne $Deadline -or $Deadline -le [datetimeoffset]::UtcNow) {
     throw '冻结参数与现有核心账本不一致或已到期；禁止自动建立新账本。'
 }
+$ledgerCommunicationModel = if ($ledger.communicationModel) { $ledger.communicationModel } else { $ledger.model }
+if ($ledgerCommunicationModel -ne $CommunicationModel) { throw "回复模型与冻结账本不一致。" }
 if (@($ledger.entries | Where-Object status -ne 'SETTLED').Count -ne 0) { throw '账本含 PENDING/IN_FLIGHT，必须停止，不能释放预留重跑。' }
 $planPath = Join-Path $ledgerDirectory 'real-core-plan.json'
 if (Test-Path -LiteralPath $planPath) { throw '此授权已冻结执行；禁止通过新 RunId 重跑场景。' }
@@ -98,7 +101,7 @@ try {
     New-Item -ItemType Directory -Path $evidence, (Join-Path $evidence 'artifacts') | Out-Null
     [ordered]@{
         schemaVersion = 'issue230-real-core-plan-v1'; authorizationId = $AuthorizationId
-        runId = $RunId; testedHead = $TestedHead; model = 'deepseek-v4-flash'; providerVersions = $ProviderVersions
+        runId = $RunId; testedHead = $TestedHead; model = 'deepseek-v4-flash'; communicationModel = $CommunicationModel; pricesByModel = $ledger.pricesByModel; providerVersions = $ProviderVersions
         limitMicros = $LimitMicros; currency = 'CNY'; maxAttempts = $MaxAttempts; maxTokens = $MaxTokens
         deadline = $Deadline.ToUniversalTime().ToString('o'); investigationWallClockMs = $InvestigationWallClockMs
         denominator = 10; matrix = $matrix; selectedCase = $Case; selectedSample = $Sample; retries = 0; maxFailures = 1
@@ -140,6 +143,7 @@ services:
       CUSTOMER_COMMUNICATION_MODEL_MODE: deepseek-formal
       DEEPSEEK_API_KEY:
       DEEPSEEK_MODEL: deepseek-v4-flash
+      DEEPSEEK_COMMUNICATION_MODEL: $CommunicationModel
       CORE_VALIDATION_BUDGET_PATH: /core-budget/$ledgerName
       CORE_VALIDATION_AUTHORIZATION_ID: '$AuthorizationId'
   agent-migrate:
@@ -177,6 +181,7 @@ services:
     $config = Invoke-RealCompose @('config', '--format', 'json') | ConvertFrom-Json
     Assert-ComposeResourcesOwned -ProjectName $project -EffectiveConfig $config
     $agentEnvironment = $config.services.'agent-server'.environment
+    if ($agentEnvironment.DEEPSEEK_MODEL -ne "deepseek-v4-flash" -or $agentEnvironment.DEEPSEEK_COMMUNICATION_MODEL -ne $CommunicationModel) { throw "实际角色模型与冻结配置不一致。" }
     if ($agentEnvironment.CORE_VALIDATION_BUDGET_PATH -ne "/core-budget/$ledgerName" -or
         $agentEnvironment.CORE_VALIDATION_AUTHORIZATION_ID -ne $AuthorizationId -or
         $agentEnvironment.DEEPSEEK_API_KEY -ne $env:DEEPSEEK_API_KEY -or

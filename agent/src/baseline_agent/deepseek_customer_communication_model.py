@@ -65,7 +65,7 @@ class DeepSeekCustomerCommunicationConfig:
     def __post_init__(self) -> None:
         if (
             not self.api_key.strip()
-            or self.model != DEEPSEEK_FLASH_MODEL
+            or self.model not in {DEEPSEEK_FLASH_MODEL, "deepseek-v4-pro"}
             or self.connect_timeout_seconds <= 0
             or self.read_timeout_seconds <= 0
             or self.deadline_seconds <= 0
@@ -82,7 +82,10 @@ class DeepSeekCustomerCommunicationConfig:
     ) -> DeepSeekCustomerCommunicationConfig:
         return cls(
             api_key=environment.get("DEEPSEEK_API_KEY", ""),
-            model=environment.get("DEEPSEEK_MODEL", DEEPSEEK_FLASH_MODEL),
+            model=environment.get(
+                "DEEPSEEK_COMMUNICATION_MODEL",
+                environment.get("DEEPSEEK_MODEL", DEEPSEEK_FLASH_MODEL),
+            ),
         )
 
 

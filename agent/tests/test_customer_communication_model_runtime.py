@@ -43,17 +43,21 @@ def test_invalid_formal_customer_communication_configuration_fails_without_fallb
         configured_customer_communication_model(environment)
 
 
-def test_formal_customer_communication_runtime_freezes_bounded_attempts_and_deadline() -> None:
+@pytest.mark.parametrize("model", ["deepseek-v4-flash", "deepseek-v4-pro"])
+def test_formal_customer_communication_runtime_freezes_bounded_attempts_and_deadline(
+    model: str,
+) -> None:
     runtime = configured_customer_communication_model(
         {
             "AGENT_CUSTOMER_COMMUNICATION_MODEL_MODE": "deepseek-formal",
             "DEEPSEEK_API_KEY": "synthetic-test-key",
             "DEEPSEEK_MODEL": "deepseek-v4-flash",
+            "DEEPSEEK_COMMUNICATION_MODEL": model,
         },
         transport=httpx.MockTransport(lambda _: httpx.Response(503)),
     )
 
-    assert runtime.mode == "deepseek-v4-flash-customer-communication-formal-v1"
+    assert runtime.mode == f"{model}-customer-communication-formal-v1"
     assert isinstance(runtime.model, DeepSeekResponsesCustomerCommunicationModel)
     assert runtime.maximum_attempts == 2
     assert runtime.call_deadline_seconds == 15

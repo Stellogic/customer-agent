@@ -1151,7 +1151,11 @@ def _communication_call_evidence(
         "logicalCalls": len({record.internal_call_id for record in records}),
         "providerAttempts": len(records),
         "tokens": sum(record.total_tokens or 0 for record in records),
-        "costMicros": estimate_flash_cost_micros(input_tokens, output_tokens),
+        "costMicros": (
+            estimate_flash_cost_micros(input_tokens, output_tokens)
+            if all(record.request_model == "deepseek-v4-flash" for record in records)
+            else None
+        ),
         "durationMs": sum(record.duration_ms for record in records),
         "failureClassification": failure or (sorted(classifications)[0] if classifications else ""),
     }
@@ -1170,8 +1174,11 @@ def _merge_communication_evidence(
         "providerAttempts": _evidence_int(previous.get("providerAttempts"))
         + _evidence_int(current.get("providerAttempts")),
         "tokens": _evidence_int(previous.get("tokens")) + _evidence_int(current.get("tokens")),
-        "costMicros": _evidence_int(previous.get("costMicros"))
-        + _evidence_int(current.get("costMicros")),
+        "costMicros": (
+            _evidence_int(previous.get("costMicros")) + _evidence_int(current.get("costMicros"))
+            if previous.get("costMicros") is not None and current.get("costMicros") is not None
+            else None
+        ),
         "durationMs": _evidence_int(previous.get("durationMs"))
         + _evidence_int(current.get("durationMs")),
         "failureClassification": failure,
