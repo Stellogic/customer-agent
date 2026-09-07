@@ -5,7 +5,6 @@ from collections.abc import Mapping
 import httpx
 
 from baseline_agent.core_validation_budget import configured_core_budget
-
 from baseline_agent.deepseek_intake_model import INTAKE_PROMPT_VERSION, DeepSeekIntakeModel
 from baseline_agent.intake_model import FixedFakeIntakeModel, IntakeModel
 

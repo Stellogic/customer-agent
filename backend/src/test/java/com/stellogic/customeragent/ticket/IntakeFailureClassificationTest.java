@@ -115,6 +115,41 @@ class IntakeFailureClassificationTest {
         assertThat(json.valueToTree(result).path("callEvidence")).isEqualTo(evidence);
     }
 
+    @Test
+    void providerRejectionIsNotParseFailureAndRetainsUnknownUsageEvidence() {
+        body =
+                """
+                {
+                  "intake_failure":{"code":"PROVIDER_REQUEST_REJECTED"},
+                  "intake_call_evidence":{
+                    "schemaVersion":"intake-call-evidence-v1","currency":"USD",
+                    "logicalCalls":1,"providerAttempts":1,"tokens":null,"costMicros":null,
+                    "usageComplete":false,"failureClassification":"PROVIDER_REQUEST_REJECTED",
+                    "attempts":[{"internalCallId":"rejected-intake-230","attemptId":"rejected-attempt-230",
+                      "attemptNumber":1,"provider":"deepseek","providerHttpStatus":400,
+                      "inputTokens":null,"outputTokens":null,"totalTokens":null}]
+                  }
+                }
+                """;
+
+        var failure =
+                catchThrowableOfType(
+                        IntakeAgentUnavailableException.class, () -> gateway.understand(request()));
+
+        assertThat(failure).isNotNull();
+        assertThat(failure.reason())
+                .isEqualTo(IntakeAgentUnavailableException.Reason.PROVIDER_FAILURE);
+        var evidence = failure.callEvidence();
+        assertThat(evidence.path("failureClassification").asText())
+                .isEqualTo("PROVIDER_REQUEST_REJECTED");
+        assertThat(evidence.path("tokens").isNull()).isTrue();
+        assertThat(evidence.path("costMicros").isNull()).isTrue();
+        assertThat(evidence.path("attempts").get(0).path("providerHttpStatus").asInt())
+                .isEqualTo(400);
+        assertThat(failure.getMessage()).isNull();
+        assertThat(failure.getCause()).isNull();
+    }
+
     private void assertFailure(IntakeAgentUnavailableException.Reason reason) {
         var failure =
                 catchThrowableOfType(

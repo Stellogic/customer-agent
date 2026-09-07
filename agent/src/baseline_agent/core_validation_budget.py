@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import fcntl
 import json
 import os
 import uuid
-from collections.abc import Iterator, Mapping
-from contextlib import contextmanager
+from collections.abc import AsyncIterator, Iterator, Mapping
+from contextlib import asynccontextmanager, contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -19,6 +21,16 @@ _SESSION = str(uuid.uuid4())
 _SCHEMA = "issue230-core-budget-v1"
 _MODEL = "deepseek-v4-flash"
 _ROLES = {"intake", "action", "judgment", "communication"}
+_OWNER: ContextVar[tuple[str, str] | None] = ContextVar("core_provider_owner", default=None)
+
+
+@contextmanager
+def provider_owner(ticket_id: str, generation_id: str) -> Iterator[None]:
+    token = _OWNER.set((ticket_id, generation_id))
+    try:
+        yield
+    finally:
+        _OWNER.reset(token)
 
 
 class CoreBudgetStopped(RuntimeError):
@@ -35,29 +47,62 @@ def configured_core_budget(environment: Mapping[str, str]) -> CoreValidationBudg
     return CoreValidationBudget.open(Path(path), authorization_id=authorization_id)
 
 
-@contextmanager
-def model_attempt_budget(
+@asynccontextmanager
+async def model_attempt_budget(
     budget: CoreValidationBudget | None,
     records: list[ModelCallAttemptRecord],
     *,
     attempt_id: str,
+    internal_call_id: str,
     role: str,
     request: Mapping[str, object],
-) -> Iterator[None]:
+) -> AsyncIterator[None]:
     if budget is None:
         yield
         return
     offset = len(records)
-    budget.reserve(attempt_id, role=role, request=request)
+    reservation = asyncio.create_task(
+        asyncio.to_thread(
+            budget.reserve,
+            attempt_id,
+            internal_call_id=internal_call_id,
+            role=role,
+            request=request,
+        )
+    )
+    try:
+        await asyncio.shield(reservation)
+    except asyncio.CancelledError:
+        # 线程不会随协程取消;先确认预留完成,避免留下无人结算的同进程 IN_FLIGHT。
+        await reservation
+        await _settle_attempt(budget, attempt_id, None)
+        raise
     try:
         yield
     finally:
         record = next((item for item in records[offset:] if item.attempt_id == attempt_id), None)
-        budget.settle(
+        await _settle_attempt(budget, attempt_id, record)
+
+
+async def _settle_attempt(
+    budget: CoreValidationBudget, attempt_id: str, record: ModelCallAttemptRecord | None
+) -> None:
+    from baseline_agent.model_call_evidence import serialize_model_attempt
+
+    settlement = asyncio.create_task(
+        asyncio.to_thread(
+            budget.settle,
             attempt_id,
             input_tokens=record.input_tokens if record is not None else None,
             output_tokens=record.output_tokens if record is not None else None,
+            attempt=serialize_model_attempt(record) if record is not None else None,
         )
+    )
+    try:
+        await asyncio.shield(settlement)
+    except asyncio.CancelledError:
+        await settlement
+        raise
 
 
 class CoreValidationBudget:
@@ -135,7 +180,22 @@ class CoreValidationBudget:
             os.fsync(output.fileno())
         os.replace(temporary, self.path)
 
-    def reserve(self, attempt_id: str, *, role: str, request: Mapping[str, object]) -> None:
+    def stop(self, reason: str) -> None:
+        with self._lock():
+            state = self._read()
+            if not state.get("stopReason"):
+                state["stopReason"] = reason
+                state["stoppedAt"] = datetime.now(UTC).isoformat()
+                self._write(state)
+
+    def reserve(
+        self,
+        attempt_id: str,
+        *,
+        role: str,
+        request: Mapping[str, object],
+        internal_call_id: str | None = None,
+    ) -> None:
         if request.get("model") != _MODEL or role not in _ROLES:
             raise CoreBudgetStopped("CORE_BUDGET_REQUEST_MISMATCH")
         output_tokens = request["max_output_tokens"]
@@ -150,6 +210,8 @@ class CoreValidationBudget:
         with self._lock():
             state = self._read()
             entries = state["entries"]
+            if state.get("stopReason"):
+                raise CoreBudgetStopped("CORE_BUDGET_STOPPED")
             if any(
                 entry["status"] == "PENDING"
                 or (entry["status"] == "IN_FLIGHT" and entry["session"] != _SESSION)
@@ -178,9 +240,13 @@ class CoreValidationBudget:
                 or len(entries) >= state["maxAttempts"]
             ):
                 raise CoreBudgetStopped("CORE_BUDGET_LIMIT")
+            owner = _OWNER.get()
             entries.append(
                 {
                     "attemptId": attempt_id,
+                    "internalCallId": internal_call_id,
+                    "ticketId": owner[0] if owner is not None else None,
+                    "generationId": owner[1] if owner is not None else None,
                     "role": role,
                     "session": _SESSION,
                     "status": "IN_FLIGHT",
@@ -197,7 +263,12 @@ class CoreValidationBudget:
             self._write(state)
 
     def settle(
-        self, attempt_id: str, *, input_tokens: int | None, output_tokens: int | None
+        self,
+        attempt_id: str,
+        *,
+        input_tokens: int | None,
+        output_tokens: int | None,
+        attempt: dict[str, object] | None = None,
     ) -> None:
         with self._lock():
             state = self._read()
@@ -224,6 +295,8 @@ class CoreValidationBudget:
                 status="SETTLED" if known and not overrun else "PENDING",
                 completedAt=datetime.now(UTC).isoformat(),
             )
+            if attempt is not None:
+                entry["attempt"] = attempt
             self._write(state)
             if overrun:
                 raise CoreBudgetStopped("CORE_BUDGET_RESERVATION_EXCEEDED")

@@ -1,7 +1,14 @@
 param(
     [Parameter(Mandatory)][string]$ModelPath,
+    [ValidateSet("normal", "missing_usage", "provider400")][string]$Mode = "normal",
+    [switch]$CoreMatrix,
     [string]$RunId = ('issue230-core-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 )
+
+if ($CoreMatrix -and $Mode -ne 'normal') { throw 'CoreMatrix 只允许 normal 离线模式。' }
+$testFile = if ($CoreMatrix) { 'e2e/issue230.core-matrix.spec.ts' } else { 'e2e/issue230.full-stack.spec.ts' }
+$barrierTimeout = if ($CoreMatrix) { 0 } else { 8 }
+$streamPause = if ($CoreMatrix) { 1 } else { 0 }
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
@@ -25,8 +32,11 @@ $override = Join-Path $evidence 'compose.override.yaml'
 $emptyEnv = Join-Path $evidence 'empty.env'
 $providerFixture = (Join-Path $repo 'agent/tests/support/core_provider_fixture.py').Replace('\', '/')
 $ledgerDirectory = (Join-Path $evidence 'budget').Replace('\', '/')
+$evidenceMount = $evidence.Replace('\', '/')
 $fixtureDirectory = (Join-Path $evidence 'provider').Replace('\', '/')
 $started = $false
+$servicesReady = $false
+$metricsCollected = $false
 $built = $false
 $cleanupPassed = $false
 $outcome = 'NOT_RUN'
@@ -44,6 +54,9 @@ try {
     @"
 services:
   backend:
+    environment:
+      SPRING_TO_AGENT_TOKEN: local-spring-to-agent
+      AGENT_MACHINE_TOKEN: local-agent-machine
     image: customer-agent/backend:$tag
   spring-migrate:
     image: customer-agent/backend:$tag
@@ -58,6 +71,8 @@ services:
         bind:
           create_host_path: false
     environment:
+      SPRING_TO_AGENT_TOKEN: local-spring-to-agent
+      AGENT_MACHINE_TOKEN: local-agent-machine
       AGENT_INVESTIGATION_MODEL_MODE: deepseek-formal
       AGENT_INVESTIGATION_ACTION_MODEL_MODE: deepseek-formal
       AGENT_CUSTOMER_COMMUNICATION_MODEL_MODE: deepseek-formal
@@ -68,6 +83,7 @@ services:
       DEEPSEEK_API_KEY: synthetic-core-fixture-key
       DEEPSEEK_MODEL: deepseek-v4-flash
       DEEPSEEK_RESPONSES_ENDPOINT: http://core-provider:8099/responses
+      no_proxy: '*'
       CORE_VALIDATION_BUDGET_PATH: /core-budget/ledger.json
       CORE_VALIDATION_AUTHORIZATION_ID: offline-$RunId
     depends_on:
@@ -87,7 +103,7 @@ services:
   core-provider:
     image: customer-agent/agent:$tag
     entrypoint: [python, /fixture/core_provider_fixture.py]
-    command: [--mode, normal, --audit-file, /evidence/attempts.json]
+    command: [--mode, $Mode, --audit-file, /evidence/attempts.json, --action-barrier-timeout, "$barrierTimeout", --stream-pause-seconds, "$streamPause"]
     volumes:
       - '${providerFixture}:/fixture/core_provider_fixture.py:ro'
       - '${fixtureDirectory}:/evidence'
@@ -97,6 +113,17 @@ services:
       timeout: 3s
       retries: 15
     networks: [services]
+  core-metrics:
+    image: customer-agent/agent:$tag
+    entrypoint: [python, -m, baseline_agent.core_validation_metrics]
+    command: [--ledger-path, /core-evidence/budget/ledger.json, --report-path, /core-evidence/metrics.json]
+    environment:
+      SPRING_FORMAL_DATABASE_URI: postgresql://spring_app:local-spring-app@postgres:5432/customer_agent
+      AGENT_SERVER_URL: http://agent-server:2024
+      SPRING_TO_AGENT_TOKEN: local-spring-to-agent
+    volumes:
+      - '${evidenceMount}:/core-evidence'
+    networks: [data, services]
   agent-migrate:
     image: customer-agent/agent:$tag
   compensation-executor:
@@ -104,9 +131,12 @@ services:
   browser-frontend:
     image: customer-agent/frontend-browser-server:$tag
   browser-acceptance:
+    environment:
+      ISSUE230_PROVIDER_MODE: $Mode
     image: customer-agent/frontend-browser-test:$tag
     volumes:
       - '${artifacts}:/artifacts'
+      - '${evidenceMount}:/core-evidence:ro'
       - '${frontendPath}/src:/app/src:ro'
       - '${frontendPath}/tsconfig.json:/app/tsconfig.json:ro'
       - '${frontendPath}/vite.config.ts:/app/vite.config.ts:ro'
@@ -130,25 +160,52 @@ networks:
     $built = $true
     Invoke-CoreCompose @('build', 'backend', 'agent-server', 'browser-frontend', 'browser-acceptance')
     $started = $true
-    $testFiles = @('e2e/issue230.full-stack.spec.ts')
+    $testFiles = @($testFile)
     Invoke-CoreCompose (@('run', '--rm', '--no-deps', '--entrypoint', 'npx', 'browser-acceptance', '--no-install', 'prettier', '--check') + $testFiles)
     Invoke-CoreCompose (@('run', '--rm', '--no-deps', '--entrypoint', 'npx', 'browser-acceptance', '--no-install', 'eslint', '--max-warnings', '0') + $testFiles)
     Invoke-CoreCompose @('run', '--rm', '--no-deps', '--entrypoint', 'npx', 'browser-acceptance', '--no-install', 'tsc', '--noEmit')
     Invoke-CoreCompose @('up', '-d', '--no-build', '--wait', 'backend', 'agent-server', 'compensation-executor', 'browser-frontend')
-    Invoke-CoreCompose @('run', '--rm', '--no-deps', 'browser-acceptance', '--workers=1', '--output=/artifacts', 'e2e/issue230.full-stack.spec.ts')
+    $servicesReady = $true
+    Invoke-CoreCompose @('exec', '-T', 'agent-server', 'python', '-c', "import httpx; httpx.get('http://core-provider:8099/health', timeout=5).raise_for_status(); print('CORE_PROVIDER_REACHABLE')")
+    Invoke-CoreCompose @('run', '--rm', '--no-deps', 'browser-acceptance', '--workers=1', '--output=/artifacts', $testFile)
+    Invoke-CoreCompose @('run', '--rm', '--no-deps', 'core-metrics')
+    $metricsCollected = $true
     $ledger = Get-Content -Raw -LiteralPath (Join-Path $ledgerDirectory 'ledger.json') | ConvertFrom-Json
     $provider = Get-Content -Raw -LiteralPath (Join-Path $fixtureDirectory 'attempts.json') | ConvertFrom-Json
     if (@($ledger.entries).Count -ne $provider.attemptCount -or
-        @($ledger.entries | Where-Object status -ne 'SETTLED').Count -ne 0 -or
-        -not $provider.actionBarrierPassed) { throw '供应商实收请求、持久账本或双票并发证据不一致。' }
-    foreach ($role in @('intake', 'action', 'judgment', 'communication')) {
-        if (@($ledger.entries | Where-Object role -eq $role).Count -eq 0) { throw "缺少 $role 的真实适配器请求证据。" }
+        (-not $CoreMatrix -and -not $provider.actionBarrierPassed)) { throw '供应商实收请求、持久账本或双票并发证据不一致。' }
+    $report = Get-Content -Raw -LiteralPath (Join-Path $evidence 'metrics.json') | ConvertFrom-Json
+    if ($report.knownProviderAttempts -ne $provider.attemptCount -or $report.inFlightReservedMicros -ne 0) {
+        throw '实际产品计量与供应商请求数不一致或仍存在未完成调用。'
+    }
+    if ($Mode -eq 'normal') {
+        if (@($ledger.entries | Where-Object status -ne 'SETTLED').Count -ne 0 -or
+            $report.missingEvidenceSources -ne 0 -or $report.unattributedAttemptIds.Count -ne 0) {
+            throw '正常场景存在未结算或缺失的调用证据。'
+        }
+        foreach ($role in @('intake', 'action', 'judgment', 'communication')) {
+            if (@($ledger.entries | Where-Object role -eq $role).Count -eq 0) { throw "缺少 $role 的实际请求证据。" }
+        }
+    } else {
+        $pending = @($ledger.entries | Where-Object status -eq 'PENDING')
+        if ($pending.Count -ne 1 -or $pending[0].role -ne 'communication' -or
+            $null -ne $pending[0].estimatedCostMicros -or $report.pendingReservedMicros -le 0 -or
+            $null -ne $report.tokens -or $null -ne $report.estimatedCostMicros) {
+            throw '故障场景没有保留未知用量与预留，不能作为故障回归通过。'
+        }
     }
     $outcome = 'PASS'
 } catch {
     $outcome = 'FAIL'
     throw
 } finally {
+    # 浏览器失败也先尽力保留实际计量，不能用采集失败跳过资源清理。
+    if ($servicesReady -and -not $metricsCollected) {
+        try {
+            Invoke-CoreCompose @('run', '--rm', '--no-deps', 'core-metrics')
+            $metricsCollected = $true
+        } catch { Write-Warning '本轮计量采集失败，结果保持 FAIL；隔离资源仍按所属 project 清理。' }
+    }
     try {
         if ($started) { Invoke-CoreCompose @('down', '--volumes', '--remove-orphans') }
         if ($built) {
@@ -165,7 +222,7 @@ networks:
     } finally {
         try {
             if (Test-Path -LiteralPath $evidence) {
-                @{ runId = $RunId; head = (git rev-parse HEAD).Trim(); outcome = $outcome; cleanupPassed = $cleanupPassed; paidCalls = 0 } |
+                @{ runId = $RunId; head = (git rev-parse HEAD).Trim(); outcome = $outcome; cleanupPassed = $cleanupPassed; paidCalls = 0; providerMode = $Mode; coreMatrix = [bool]$CoreMatrix; metricsCollected = $metricsCollected; productAcceptance = ($Mode -eq 'normal' -and $outcome -eq 'PASS') } |
                     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'result.json')
             }
         } finally {
@@ -186,5 +243,3 @@ networks:
         }
     }
 }
-
-

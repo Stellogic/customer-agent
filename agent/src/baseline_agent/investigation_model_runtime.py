@@ -6,7 +6,6 @@ from dataclasses import dataclass
 import httpx
 
 from baseline_agent.core_validation_budget import configured_core_budget
-
 from baseline_agent.deepseek_investigation_model import (
     DeepSeekResponsesConfig,
     DeepSeekResponsesInvestigationModel,
@@ -63,7 +62,9 @@ def configured_investigation_model(
             config,
             transport=transport,
             budget=configured_core_budget(environment),
-            endpoint=environment.get("DEEPSEEK_RESPONSES_ENDPOINT", "https://api.deepseek.com/responses"),
+            endpoint=environment.get(
+                "DEEPSEEK_RESPONSES_ENDPOINT", "https://api.deepseek.com/responses"
+            ),
         ),
         mode="deepseek-v4-flash-formal-v1",
         maximum_provider_attempts=config.max_attempts,

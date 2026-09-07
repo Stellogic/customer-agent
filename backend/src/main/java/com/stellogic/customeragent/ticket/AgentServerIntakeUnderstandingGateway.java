@@ -1,5 +1,6 @@
 package com.stellogic.customeragent.ticket;
 
+import static com.stellogic.customeragent.ticket.IntakeAgentUnavailableException.Reason.PROVIDER_FAILURE;
 import static com.stellogic.customeragent.ticket.IntakeAgentUnavailableException.Reason.RESPONSE_PARSE;
 import static com.stellogic.customeragent.ticket.IntakeAgentUnavailableException.Reason.STATE_CONSISTENCY;
 import static com.stellogic.customeragent.ticket.IntakeAgentUnavailableException.Reason.TRANSPORT;
@@ -114,7 +115,16 @@ final class AgentServerIntakeUnderstandingGateway implements IntakeUnderstanding
             }
             evidence = receivedEvidence;
             if (result.hasNonNull("intake_failure")) {
-                throw new IntakeAgentUnavailableException(RESPONSE_PARSE);
+                var reason =
+                        switch (result.path("intake_failure").path("code").asText()) {
+                            case "CONNECTION_TIMEOUT",
+                                    "READ_TIMEOUT",
+                                    "PROVIDER_REQUEST_REJECTED",
+                                    "TRANSIENT_PROVIDER_ERROR" ->
+                                    PROVIDER_FAILURE;
+                            default -> RESPONSE_PARSE;
+                        };
+                throw new IntakeAgentUnavailableException(reason);
             }
             JsonNode value = result.path("intake_understanding");
             String intent = requiredText(value, "intent");

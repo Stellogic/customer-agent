@@ -1,16 +1,25 @@
 import asyncio
 import importlib
 import json
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import httpx
 import pytest
 from test_customer_communication_model import _payment_reply
 from test_deepseek_customer_communication_model import _completed, _streamed
+from test_deepseek_investigation_action_model import _completed_action
 from test_graph import _capability_catalog, _capability_result, _with_facts
 
+from baseline_agent.core_validation_budget import CoreValidationBudget
+from baseline_agent.core_validation_metrics import aggregate_core_metrics
 from baseline_agent.deepseek_customer_communication_model import (
     DeepSeekCustomerCommunicationConfig,
     DeepSeekResponsesCustomerCommunicationModel,
+)
+from baseline_agent.deepseek_investigation_action_model import (
+    DeepSeekActionConfig,
+    DeepSeekResponsesInvestigationActionModel,
 )
 from baseline_agent.deepseek_investigation_model import InMemoryModelCallAuditSink
 from baseline_agent.investigation_action_loop import DeterministicActionModel
@@ -153,3 +162,78 @@ async def test_concurrent_graph_runs_keep_actual_provider_attempts_and_unknown_u
         assert attempt["inputTokens"] is None
         assert attempt["outputTokens"] is None
         assert attempt["totalTokens"] is None
+
+
+@pytest.mark.asyncio
+async def test_cancelled_node_keeps_provider_ownership_without_a_returned_checkpoint(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    graph_module = importlib.import_module("baseline_agent.graph")
+    ledger_path = tmp_path / "ledger.json"
+    budget = CoreValidationBudget.create(
+        ledger_path,
+        authorization_id="synthetic-generation-ownership",
+        limit_micros=3_000_000,
+        max_attempts=4,
+        max_tokens=100_000,
+        deadline=datetime.now(UTC) + timedelta(minutes=5),
+    )
+    model = DeepSeekResponsesInvestigationActionModel(
+        DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
+        transport=httpx.MockTransport(
+            lambda _: httpx.Response(200, json=_completed_action("CONFIRM_ORDER"))
+        ),
+        budget=budget,
+    )
+    monkeypatch.setattr(graph_module, "investigation_action_model", model)
+    old_call_finished = asyncio.Event()
+    never_return = asyncio.Event()
+
+    async def node(state):
+        await model.choose({})
+        if state["generation_id"] == "old-generation":
+            old_call_finished.set()
+            await never_return.wait()
+        return {}
+
+    traced = graph_module._capture_provider_calls(node)
+    old = asyncio.create_task(traced({"ticket_id": "ticket", "generation_id": "old-generation"}))
+    async with asyncio.timeout(5):
+        await old_call_finished.wait()
+        current = await traced({"ticket_id": "ticket", "generation_id": "new-generation"})
+        old.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await old
+
+    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    assert len(ledger["entries"]) == 2
+    assert {entry["generationId"] for entry in ledger["entries"]} == {
+        "old-generation",
+        "new-generation",
+    }
+    assert all(
+        entry["ticketId"] == "ticket" and entry["status"] == "SETTLED"
+        for entry in ledger["entries"]
+    )
+    assert all(entry["internalCallId"] for entry in ledger["entries"])
+    report = aggregate_core_metrics(
+        [],
+        [
+            {
+                "ticketId": "ticket",
+                "generationId": "old-generation",
+                "provider_call_evidence": None,
+            },
+            {"ticketId": "ticket", "generationId": "new-generation", **current},
+        ],
+        ledger,
+    )
+    assert report["missingEvidenceSources"] == 0
+    assert report["unattributedAttemptIds"] == []
+    assert report["providerAttempts"] == report["logicalCalls"] == 2
+    assert report["tokens"] is not None
+    assert report["ledgerRecoveredGenerationIds"] == ["old-generation"]
+    assert {attempt["generationId"] for attempt in report["attempts"]} == {
+        "old-generation",
+        "new-generation",
+    }

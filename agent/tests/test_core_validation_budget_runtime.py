@@ -8,7 +8,9 @@ from test_deepseek_intake_model import _clarifying_intake_input
 from test_deepseek_investigation_model import MODEL_INPUT
 
 from baseline_agent.core_validation_budget import CoreBudgetStopped, CoreValidationBudget
-from baseline_agent.customer_communication_model_runtime import configured_customer_communication_model
+from baseline_agent.customer_communication_model_runtime import (
+    configured_customer_communication_model,
+)
 from baseline_agent.intake_model_runtime import configured_intake_model
 from baseline_agent.investigation_action_model_runtime import configured_investigation_action_model
 from baseline_agent.investigation_model_runtime import configured_investigation_model
@@ -56,6 +58,8 @@ async def test_formal_runtime_uses_existing_shared_budget_before_sending(
             judgment = configured_investigation_model(environment, transport=transport)
             await judgment.model.judge(MODEL_INPUT)
         else:
-            communication = configured_customer_communication_model(environment, transport=transport)
+            communication = configured_customer_communication_model(
+                environment, transport=transport
+            )
             await communication.model.compose(communication_input())
     assert requests == []

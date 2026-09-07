@@ -6,6 +6,7 @@ from typing import TypedDict
 import httpx
 from langgraph.graph import END, START, StateGraph
 
+from baseline_agent.core_validation_budget import CoreBudgetStopped
 from baseline_agent.deepseek_intake_model import DeepSeekIntakeModel
 from baseline_agent.deepseek_investigation_model import (
     InMemoryModelCallAuditSink,
@@ -62,6 +63,20 @@ async def understand_intake(state: IntakeState) -> IntakeState:
     )
     try:
         result = await intake_model.understand(model_input)
+    except CoreBudgetStopped as error:
+        records = task_records[offset:]
+        evidence = _intake_call_evidence(records)
+        if not records:
+            # 本地预算在发送前拒绝;这里明确知道没有供应商调用,不能把缺失 usage 当零。
+            evidence.update(
+                inputTokens=0, outputTokens=0, tokens=0, costMicros=0, usageComplete=True
+            )
+        evidence["failureClassification"] = str(error)
+        return {
+            "model_mode": intake_model_mode,
+            "intake_failure": {"code": str(error)},
+            "intake_call_evidence": evidence,
+        }
     except (ValueError, KeyError, TypeError, httpx.HTTPError):
         records = task_records[offset:]
         failure = next(

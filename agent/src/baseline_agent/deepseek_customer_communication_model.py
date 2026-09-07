@@ -12,7 +12,6 @@ from typing import Any
 import httpx
 
 from baseline_agent.core_validation_budget import CoreValidationBudget, model_attempt_budget
-
 from baseline_agent.customer_communication_model import (
     CUSTOMER_KNOWLEDGE_REPLY_SCHEMA_VERSION,
     CUSTOMER_REPLY_SCHEMA_VERSION,
@@ -134,10 +133,11 @@ class DeepSeekResponsesCustomerCommunicationModel:
                     if isinstance(self.audit_sink, InMemoryModelCallAuditSink)
                     else []
                 )
-                with model_attempt_budget(
+                async with model_attempt_budget(
                     self._budget,
                     records,
                     attempt_id=attempt_id,
+                    internal_call_id=internal_call_id,
                     role="communication",
                     request=request_body,
                 ):
@@ -172,7 +172,10 @@ class DeepSeekResponsesCustomerCommunicationModel:
                         payload = streamed.payload
                         if not streamed.output_text_matches:
                             validation_diagnostic = _diagnostic(
-                                "STREAM_MISMATCH", "$.output_text", "delta_equals_completed", "string"
+                                "STREAM_MISMATCH",
+                                "$.output_text",
+                                "delta_equals_completed",
+                                "string",
                             )
                             raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
                     except asyncio.CancelledError:

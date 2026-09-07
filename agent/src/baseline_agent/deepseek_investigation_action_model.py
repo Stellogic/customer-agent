@@ -11,7 +11,6 @@ from typing import Any
 import httpx
 
 from baseline_agent.core_validation_budget import CoreValidationBudget, model_attempt_budget
-
 from baseline_agent.deepseek_investigation_model import (
     DEEPSEEK_FLASH_MODEL,
     DeepSeekFailureClassification,
@@ -118,10 +117,11 @@ class DeepSeekResponsesInvestigationActionModel:
                     if isinstance(self.audit_sink, InMemoryModelCallAuditSink)
                     else []
                 )
-                with model_attempt_budget(
+                async with model_attempt_budget(
                     self._budget,
                     records,
                     attempt_id=attempt_id,
+                    internal_call_id=internal_call_id,
                     role="action",
                     request=request_body,
                 ):
@@ -157,8 +157,9 @@ class DeepSeekResponsesInvestigationActionModel:
                             classification,
                             provider_http_status=response.status_code,
                         )
-                        if response.status_code in _TRANSIENT_HTTP_STATUSES and await self._can_retry(
-                            attempt_number, call_started
+                        if (
+                            response.status_code in _TRANSIENT_HTTP_STATUSES
+                            and await self._can_retry(attempt_number, call_started)
                         ):
                             continue
                         raise _failure(attempt_number)

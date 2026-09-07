@@ -9,7 +9,6 @@ from typing import Any
 import httpx
 
 from baseline_agent.core_validation_budget import CoreValidationBudget, model_attempt_budget
-
 from baseline_agent.deepseek_investigation_model import (
     DEEPSEEK_FLASH_MODEL,
     DeepSeekFailureClassification,
@@ -194,8 +193,13 @@ class DeepSeekIntakeModel:
             if isinstance(self.audit_sink, InMemoryModelCallAuditSink)
             else []
         )
-        with model_attempt_budget(
-            self._budget, records, attempt_id=attempt_id, role="intake", request=request
+        async with model_attempt_budget(
+            self._budget,
+            records,
+            attempt_id=attempt_id,
+            internal_call_id=internal_call_id,
+            role="intake",
+            request=request,
         ):
             response: httpx.Response | None = None
             try:

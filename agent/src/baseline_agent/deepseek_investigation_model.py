@@ -15,7 +15,6 @@ from weakref import WeakKeyDictionary
 import httpx
 
 from baseline_agent.core_validation_budget import CoreValidationBudget, model_attempt_budget
-
 from baseline_agent.investigation_model import (
     InvestigationJudgment,
     InvestigationJudgmentFailure,
@@ -217,10 +216,11 @@ class DeepSeekResponsesInvestigationModel:
                     if isinstance(self.audit_sink, InMemoryModelCallAuditSink)
                     else []
                 )
-                with model_attempt_budget(
+                async with model_attempt_budget(
                     self._budget,
                     records,
                     attempt_id=attempt_id,
+                    internal_call_id=internal_call_id,
                     role="judgment",
                     request=request_body,
                 ):
@@ -284,8 +284,9 @@ class DeepSeekResponsesInvestigationModel:
                             classification,
                             provider_http_status=response.status_code,
                         )
-                        if response.status_code in _TRANSIENT_HTTP_STATUSES and await self._can_retry(
-                            attempt_number, call_started
+                        if (
+                            response.status_code in _TRANSIENT_HTTP_STATUSES
+                            and await self._can_retry(attempt_number, call_started)
                         ):
                             continue
                         raise _model_call_failure()

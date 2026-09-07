@@ -43,6 +43,7 @@ final class IntakeVersionConflictException extends RuntimeException {}
 final class IntakeAgentUnavailableException extends RuntimeException {
     enum Reason {
         TRANSPORT,
+        PROVIDER_FAILURE,
         RESPONSE_PARSE,
         STATE_CONSISTENCY,
         SERVICE_VALIDATION

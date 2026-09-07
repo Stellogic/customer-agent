@@ -1,11 +1,14 @@
 import asyncio
 import importlib
 import json
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import httpx
 import pytest
-from test_deepseek_intake_model import _completed_intake_response
+from test_deepseek_intake_model import _clarifying_intake_input, _completed_intake_response
 
+from baseline_agent.core_validation_budget import CoreValidationBudget
 from baseline_agent.deepseek_intake_model import DeepSeekIntakeModel
 from baseline_agent.deepseek_investigation_model import InMemoryModelCallAuditSink
 
@@ -194,3 +197,63 @@ async def test_intake_graph_does_not_turn_unaudited_http_failure_into_provider_e
     monkeypatch.setattr(intake, "intake_model", UnavailableIntakeModel())
     with pytest.raises(httpx.ReadTimeout):
         await intake.graph.ainvoke({"requested_by": "spring", "customer_message": "核实订单"})
+
+
+@pytest.mark.asyncio
+async def test_budget_stopped_intake_graph_reports_zero_calls_without_reusing_prior_attempt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    intake = importlib.import_module("baseline_agent.intake_graph")
+    ledger_path = tmp_path / "budget.json"
+    budget = CoreValidationBudget.create(
+        ledger_path,
+        authorization_id="synthetic-intake-stop",
+        limit_micros=3_000_000,
+        max_attempts=10,
+        max_tokens=1_000_000,
+        deadline=datetime.now(UTC) + timedelta(minutes=5),
+    )
+    requests: list[httpx.Request] = []
+
+    def provider(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        payload = _completed_intake_response()
+        payload.pop("usage")
+        return httpx.Response(200, json=payload)
+
+    model = DeepSeekIntakeModel(
+        "synthetic-test-key", transport=httpx.MockTransport(provider), budget=budget
+    )
+    await model.understand(_clarifying_intake_input())
+    saved = json.loads(ledger_path.read_text(encoding="utf-8"))
+    assert len(requests) == 1
+    assert saved["entries"][0]["status"] == "PENDING"
+    monkeypatch.setattr(intake, "intake_model", model)
+
+    result = await intake.graph.ainvoke(
+        {
+            "requested_by": "spring",
+            "customer_message": "再次核实扣款问题",
+            "visible_orders": [{"reference": "ORDER-230", "summary": "合成订单"}],
+            "current_order_reference": "ORDER-230",
+            "current_pending_issue_kinds": ["DUPLICATE_CHARGE"],
+        }
+    )
+
+    assert len(requests) == 1
+    assert result["intake_failure"] == {"code": "CORE_BUDGET_UNSETTLED"}
+    assert "intake_understanding" not in result
+    assert result["intake_call_evidence"] == {
+        "schemaVersion": "intake-call-evidence-v1",
+        "currency": "USD",
+        "logicalCalls": 0,
+        "providerAttempts": 0,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "tokens": 0,
+        "costMicros": 0,
+        "usageComplete": True,
+        "failureClassification": "CORE_BUDGET_UNSETTLED",
+        "attempts": [],
+    }
+    assert json.loads(ledger_path.read_text(encoding="utf-8")) == saved

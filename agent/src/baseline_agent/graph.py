@@ -8,6 +8,7 @@ import httpx
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from baseline_agent.core_validation_budget import provider_owner
 from baseline_agent.customer_communication_model import (
     CustomerCommunicationFailure,
     CustomerCommunicationFailureCode,
@@ -324,7 +325,8 @@ def _capture_provider_calls(node: _ProviderEvidenceNode) -> _ProviderEvidenceNod
             if isinstance(sink, InMemoryModelCallAuditSink):
                 records = sink.current_task_records()
                 offsets.append((role, records, len(records)))
-        result = await node(state)
+        with provider_owner(ticket_id=state["ticket_id"], generation_id=state["generation_id"]):
+            result = await node(state)
         previous = state.get("provider_call_evidence", {})
         attempts = list(cast(list[dict[str, object]], previous.get("attempts", [])))
         for role, records, offset in offsets:

@@ -19,6 +19,8 @@ def aggregate_core_metrics(
 ) -> dict[str, Any]:
     attempts: dict[str, dict[str, Any]] = {}
     missing_evidence = 0
+    entries = {entry["attemptId"]: entry for entry in ledger["entries"]}
+    recovered_generations: list[str] = []
 
     def include(evidence: object, owner: dict[str, Any]) -> None:
         nonlocal missing_evidence
@@ -28,7 +30,9 @@ def aggregate_core_metrics(
         for attempt in evidence["attempts"]:
             attempt_id = attempt["attemptId"]
             previous = attempts.get(attempt_id)
-            if previous is not None and any(previous.get(key) != value for key, value in owner.items()):
+            if previous is not None and any(
+                previous.get(key) != value for key, value in owner.items()
+            ):
                 raise ValueError("provider attempt has conflicting business ownership")
             attempts[attempt_id] = {**attempt, **owner}
 
@@ -39,16 +43,41 @@ def aggregate_core_metrics(
             {"invocationId": call["invocationId"], "intakeId": call.get("intakeId")},
         )
     for generation in generations:
+        evidence = generation.get("provider_call_evidence")
+        checkpoint_attempts = evidence.get("attempts") if isinstance(evidence, dict) else None
+        owned_entries = [
+            entry
+            for entry in entries.values()
+            if entry.get("ticketId") == generation["ticketId"]
+            and entry.get("generationId") == generation["generationId"]
+        ]
+        # 取消可发生在 node 返回之前;请求前已持久化的归属不依赖 checkpoint 提交。
+        if owned_entries:
+            combined = {attempt["attemptId"]: attempt for attempt in (checkpoint_attempts or [])}
+            if any(entry["attemptId"] not in combined for entry in owned_entries):
+                recovered_generations.append(generation["generationId"])
+            for entry in owned_entries:
+                attempt = {
+                    **(entry.get("attempt") or {}),
+                    "attemptId": entry["attemptId"],
+                    "internalCallId": entry.get("internalCallId"),
+                    "role": entry["role"],
+                    "inputTokens": entry.get("inputTokens"),
+                    "outputTokens": entry.get("outputTokens"),
+                }
+                combined.setdefault(entry["attemptId"], attempt)
+            evidence = {"attempts": list(combined.values())}
         include(
-            generation.get("provider_call_evidence"),
+            evidence,
             {"ticketId": generation["ticketId"], "generationId": generation["generationId"]},
         )
 
     # 只采用新人民币账本的金额;checkpoint 的历史 USD costMicros 不参与相加。
-    entries = {entry["attemptId"]: entry for entry in ledger["entries"]}
     unattributed = sorted(set(entries) - set(attempts))
     for attempt_id, entry in entries.items():
-        attempt = attempts.setdefault(attempt_id, {"attemptId": attempt_id, "role": entry.get("role")})
+        attempt = attempts.setdefault(
+            attempt_id, {"attemptId": attempt_id, "role": entry.get("role")}
+        )
         attempt.update(
             budgetStatus=entry["status"],
             estimatedCostMicros=entry.get("estimatedCostMicros"),
@@ -91,7 +120,7 @@ def aggregate_core_metrics(
         "estimatedCostMicros": known_cost if not missing_evidence and None not in costs else None,
         "knownEstimatedCostMicros": known_cost,
         "supplierChargeMicros": (
-            sum(supplier_charges)
+            sum(value for value in supplier_charges if value is not None)
             if supplier_charges and not missing_evidence and None not in supplier_charges
             else None
         ),
@@ -102,6 +131,7 @@ def aggregate_core_metrics(
             entry["reservedMicros"] for entry in entries.values() if entry["status"] == "IN_FLIGHT"
         ),
         "unattributedAttemptIds": unattributed,
+        "ledgerRecoveredGenerationIds": recovered_generations,
         "attempts": values,
     }
 
@@ -132,28 +162,38 @@ def collect_core_metrics(ledger_path: Path) -> dict[str, Any]:
     ]
     generations = []
     for generation_id, ticket_id, thread_id, status in generation_rows:
+        generation = {
+            "generationId": str(generation_id),
+            "ticketId": str(ticket_id),
+            "status": status,
+            "provider_call_evidence": None,
+        }
         response = httpx.get(
             f"{os.environ['AGENT_SERVER_URL']}/threads/{thread_id}/state",
             headers={"Authorization": f"Bearer {os.environ['SPRING_TO_AGENT_TOKEN']}"},
             timeout=20,
         )
+        if response.status_code == 404:
+            generation["checkpointDiagnostic"] = "CHECKPOINT_NOT_FOUND"
+            generations.append(generation)
+            continue
         if response.status_code != 200:
             raise RuntimeError("core checkpoint metrics are incomplete")
         values = response.json().get("values")
         if not isinstance(values, dict):
             raise RuntimeError("core checkpoint metrics are incomplete")
-        generations.append(
-            {
-                "generationId": str(generation_id),
-                "ticketId": str(ticket_id),
-                "status": status,
-                "provider_call_evidence": values.get("provider_call_evidence"),
-            }
-        )
+        generation["provider_call_evidence"] = values.get("provider_call_evidence")
+        generations.append(generation)
     report = aggregate_core_metrics(intake_calls, generations, ledger)
+    for generation in generations:
+        if generation["generationId"] in report["ledgerRecoveredGenerationIds"]:
+            generation["providerEvidenceSource"] = "BUDGET_LEDGER_SUPPLEMENT"
     report.update(
         authorizationId=ledger["authorizationId"],
-        intakeResults=[{key: value for key, value in call.items() if key != "evidence"} for call in intake_calls],
+        intakeResults=[
+            {key: value for key, value in call.items() if key != "evidence"}
+            for call in intake_calls
+        ],
         generationResults=[
             {key: value for key, value in generation.items() if key != "provider_call_evidence"}
             for generation in generations

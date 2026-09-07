@@ -1,7 +1,7 @@
-"""#230 同订单双票的 HTTP 供应商夹具；正式 Agent 工厂通过 endpoint 接入。
+"""#230 同订单双票的 HTTP 供应商夹具;正式 Agent 工厂通过 endpoint 接入。
 
 运行: python tests/support/core_provider_fixture.py --port 8099 --mode normal
-GET /evidence 仅返回受控计量元数据，GET /health 用于 runner 就绪检查。
+GET /evidence 仅返回受控计量元数据,GET /health 用于 runner 就绪检查。
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import json
 import threading
+import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -50,7 +51,7 @@ ISSUE_LABELS = {
 
 async def _intake(schema: str, value: dict[str, Any]) -> dict[str, Any]:
     if schema == "customer_intake_clarification":
-        # 正式请求在澄清阶段仅携带问题与客户回答，不携带订单。
+        # 正式请求在澄清阶段仅携带问题与客户回答,不携带订单。
         kind = next(kind for kind, label in ISSUE_LABELS.items() if label in value["question"])
         answer = (
             "AFFIRMED"
@@ -83,7 +84,9 @@ async def _intake(schema: str, value: dict[str, Any]) -> dict[str, Any]:
                     else "ASSERTED"
                     if kind in issues
                     else "NOT_MENTIONED",
-                    "summary": issues.get(kind, label if kind in result.pending_issue_kinds else ""),
+                    "summary": issues.get(
+                        kind, label if kind in result.pending_issue_kinds else ""
+                    ),
                 }
                 for kind, label in ISSUE_LABELS.items()
             },
@@ -119,7 +122,7 @@ async def _content(schema: str, value: dict[str, Any], output_schema: dict) -> d
             result["knowledgeQuery"] = None
         return result
     if schema == "customer_agent_investigation_judgment":
-        # 供应商实际只收到 delaySeconds，不能为调用 FixedFake judge 而捏造订单/refs。
+        # 供应商实际只收到 delaySeconds,不能为调用 FixedFake judge 而捏造订单/refs。
         review = value["syntheticInvestigationFacts"]["delaySeconds"] >= 86400
         return {
             "compensationReviewRequired": review,
@@ -164,7 +167,9 @@ def _completed(content: dict, response_id: str, model: str, usage: dict | None) 
                 "type": "message",
                 "status": "completed",
                 "role": "assistant",
-                "content": [{"type": "output_text", "text": json.dumps(content, ensure_ascii=False)}],
+                "content": [
+                    {"type": "output_text", "text": json.dumps(content, ensure_ascii=False)}
+                ],
             }
         ],
         **({"usage": usage} if usage is not None else {}),
@@ -180,13 +185,22 @@ def _streamed(payload: dict) -> bytes:
         {"type": "response.completed", "sequence_number": 2, "response": payload},
     ]
     return "".join(
-        f"event: {event['type']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n" for event in events
+        f"event: {event['type']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+        for event in events
     ).encode()
 
 
 class CoreProviderFixture:
-    def __init__(self, mode: str, *, barrier_timeout: float = 8, audit_file: Path | None = None):
+    def __init__(
+        self,
+        mode: str,
+        *,
+        barrier_timeout: float = 8,
+        audit_file: Path | None = None,
+        stream_pause_seconds: float = 0,
+    ):
         self.mode = mode
+        self.stream_pause_seconds = stream_pause_seconds
         self.barrier_timeout = barrier_timeout
         self.audit_file = audit_file
         self.condition = threading.Condition()
@@ -254,9 +268,13 @@ class CoreProviderFixture:
                 else ("application/json", json.dumps(payload, ensure_ascii=False).encode())
             )
         with self.condition:
-            record.update(httpStatus=status, usage=usage, responseId=response_id if status == 200 else None)
+            record.update(
+                httpStatus=status, usage=usage, responseId=response_id if status == 200 else None
+            )
             if self.audit_file is not None:
-                self.audit_file.write_text(json.dumps(self.snapshot(), ensure_ascii=False), encoding="utf-8")
+                self.audit_file.write_text(
+                    json.dumps(self.snapshot(), ensure_ascii=False), encoding="utf-8"
+                )
         return status, content_type, body
 
 
@@ -268,11 +286,11 @@ def make_server(host: str, port: int, fixture: CoreProviderFixture) -> Threading
             elif self.path == "/evidence":
                 self._send(200, "application/json", json.dumps(fixture.snapshot()).encode())
             else:
-                self._send(404, "application/json", b'{}')
+                self._send(404, "application/json", b"{}")
 
         def do_POST(self) -> None:
             if self.path not in {"/responses", "/v1/responses"}:
-                self._send(404, "application/json", b'{}')
+                self._send(404, "application/json", b"{}")
                 return
             try:
                 request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -288,7 +306,15 @@ def make_server(host: str, port: int, fixture: CoreProviderFixture) -> Threading
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(body)
+            if content_type == "text/event-stream" and fixture.stream_pause_seconds > 0:
+                # 只延迟离线夹具的真实网络流,首个 SSE 事件先交给正式适配器;浏览器另行验证公开持久化。
+                first, remaining = body.split(b"\n\n", 1)
+                self.wfile.write(first + b"\n\n")
+                self.wfile.flush()
+                time.sleep(fixture.stream_pause_seconds)
+                self.wfile.write(remaining)
+            else:
+                self.wfile.write(body)
 
         def log_message(self, format: str, *args: object) -> None:
             pass
@@ -300,11 +326,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8099)
-    parser.add_argument("--mode", choices=("normal", "missing_usage", "provider400"), default="normal")
+    parser.add_argument(
+        "--mode", choices=("normal", "missing_usage", "provider400"), default="normal"
+    )
     parser.add_argument("--action-barrier-timeout", type=float, default=8)
+    parser.add_argument("--stream-pause-seconds", type=float, default=0)
     parser.add_argument("--audit-file", type=Path)
     args = parser.parse_args()
-    fixture = CoreProviderFixture(args.mode, barrier_timeout=args.action_barrier_timeout, audit_file=args.audit_file)
+    fixture = CoreProviderFixture(
+        args.mode,
+        barrier_timeout=args.action_barrier_timeout,
+        audit_file=args.audit_file,
+        stream_pause_seconds=args.stream_pause_seconds,
+    )
     with make_server(args.host, args.port, fixture) as server:
         server.serve_forever()
 
