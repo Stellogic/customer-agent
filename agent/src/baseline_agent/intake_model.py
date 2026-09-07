@@ -88,7 +88,7 @@ class FixedFakeIntakeModel:
             if model_input.current_order_reference
             else tuple(
                 order.reference
-                for order in _mentioned_orders(message, model_input.visible_orders)
+                for order in mentioned_orders(message, model_input.visible_orders)
                 if candidate is None or order.reference != candidate.reference
             )
         )
@@ -205,7 +205,7 @@ def _merge_issues(
 
 
 def _candidate_order(message: str, orders: tuple[VisibleOrder, ...]) -> VisibleOrder | None:
-    mentioned = _mentioned_orders(message, orders)
+    mentioned = mentioned_orders(message, orders)
     if mentioned:
         return mentioned[0]
     if len(orders) == 1:
@@ -213,7 +213,7 @@ def _candidate_order(message: str, orders: tuple[VisibleOrder, ...]) -> VisibleO
     return None
 
 
-def _mentioned_orders(message: str, orders: tuple[VisibleOrder, ...]) -> tuple[VisibleOrder, ...]:
+def mentioned_orders(message: str, orders: tuple[VisibleOrder, ...]) -> tuple[VisibleOrder, ...]:
     lowered = message.lower()
     mentioned = [
         (lowered.index(order.reference.lower()), -len(order.reference), order)
@@ -235,7 +235,7 @@ def _message_for_candidate(
 ) -> str:
     if candidate is None:
         return message
-    mentioned = _mentioned_orders(message, orders)
+    mentioned = mentioned_orders(message, orders)
     if len(mentioned) <= 1:
         return message
     lowered = message.lower()

@@ -76,7 +76,12 @@ async def _intake(schema: str, value: dict[str, Any]) -> dict[str, Any]:
         issues = {issue.kind: issue.summary for issue in result.issues}
         return {
             "candidateOrderReference": result.candidate_order_reference,
-            "remainingOrderReferences": list(result.remaining_order_references),
+            # 故意把请求中的其余候选都排队,覆盖显式订单范围回归。
+            "remainingOrderReferences": [
+                order["reference"]
+                for order in value["visibleOrders"]
+                if order["reference"] != result.candidate_order_reference
+            ],
             "issueAssessments": {
                 kind: {
                     "assessment": "UNCERTAIN"

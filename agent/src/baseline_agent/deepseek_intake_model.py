@@ -4,6 +4,7 @@ import json
 import time
 import uuid
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 import httpx
@@ -20,10 +21,11 @@ from baseline_agent.intake_model import (
     IntakeIssue,
     IntakeModelInput,
     IntakeUnderstanding,
+    mentioned_orders,
 )
 
 _RESPONSES_ENDPOINT = "https://api.deepseek.com/v1/responses"
-INTAKE_PROMPT_VERSION = "intake-v3"
+INTAKE_PROMPT_VERSION = "intake-v4"
 _ISSUE_LABELS = {
     "LOGISTICS_DELAY": "物流延迟",
     "PACKAGE_NOT_RECEIVED": "包裹未收到",
@@ -73,6 +75,12 @@ class DeepSeekIntakeModel:
         )
 
     async def understand(self, model_input: IntakeModelInput) -> IntakeUnderstanding:
+        if model_input.current_order_reference is None:
+            explicit_orders = mentioned_orders(
+                model_input.customer_message, model_input.visible_orders
+            )
+            if explicit_orders:
+                model_input = replace(model_input, visible_orders=explicit_orders)
         references = [order.reference for order in model_input.visible_orders]
         schema = _schema(references)
         clarifying = bool(

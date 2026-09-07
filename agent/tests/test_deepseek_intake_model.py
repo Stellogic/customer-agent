@@ -119,7 +119,7 @@ async def test_successful_intake_preserves_actual_provider_attempt_usage_and_cac
     assert attempt.provider_http_status == 200
     assert attempt.request_model == "deepseek-v4-flash"
     assert attempt.response_model == "deepseek-v4-flash"
-    assert attempt.prompt_version == "intake-v3"
+    assert attempt.prompt_version == "intake-v4"
     assert attempt.schema_version == "customer_intake_clarification"
     assert (attempt.input_tokens, attempt.output_tokens, attempt.total_tokens) == (80, 20, 100)
     assert attempt.cached_tokens == 16
@@ -303,3 +303,116 @@ async def test_order_only_intake_keeps_selected_order_when_customer_describes_is
     assert result.candidate_order_reference == "ORDER-215"
     assert result.status == "READY_TO_CONFIRM"
     assert result.issues == (IntakeIssue("PACKAGE_NOT_RECEIVED", "包裹未收到"),)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("message", "expected_order", "expected_remaining"),
+    [
+        ("ORDER-230-17 请解释物流状态", "ORDER-230-17", ()),
+        ("order-230-17 物流延迟；ORDER-230-2 也延迟", "ORDER-230-17", ("ORDER-230-2",)),
+    ],
+)
+async def test_explicit_order_intake_does_not_queue_unmentioned_visible_orders(
+    message: str, expected_order: str, expected_remaining: tuple[str, ...]
+) -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        # 模拟供应商把输入中的其余可选订单全部放入队列,但始终遵守枚举。
+        body = json.loads(request.content)
+        references = [item["reference"] for item in json.loads(body["input"])["visibleOrders"]]
+        selected = expected_order
+        value = {
+            "candidateOrderReference": selected,
+            "remainingOrderReferences": [item for item in references if item != selected],
+            "issueAssessments": {
+                "LOGISTICS_DELAY": {"assessment": "ASSERTED", "summary": "物流延迟"},
+                "PACKAGE_NOT_RECEIVED": {"assessment": "NOT_MENTIONED", "summary": ""},
+                "DUPLICATE_CHARGE": {"assessment": "NOT_MENTIONED", "summary": ""},
+            },
+        }
+        return httpx.Response(
+            200,
+            json={
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": json.dumps(value)}],
+                    }
+                ],
+            },
+        )
+
+    result = await DeepSeekIntakeModel(
+        "synthetic-test-key", transport=httpx.MockTransport(respond)
+    ).understand(
+        IntakeModelInput(
+            customer_message=message,
+            visible_orders=tuple(
+                VisibleOrder(f"ORDER-230-{number}", "合成订单") for number in range(30)
+            ),
+        )
+    )
+    assert result.status == "READY_TO_CONFIRM"
+    assert result.candidate_order_reference == expected_order
+    assert result.remaining_order_references == expected_remaining
+
+
+@pytest.mark.asyncio
+async def test_intake_without_explicit_reference_preserves_semantic_candidates() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        assert json.loads(body["input"])["visibleOrders"] == [
+            {"reference": "ORDER-1", "summary": "昨天购买"},
+            {"reference": "ORDER-2", "summary": "上周购买"},
+        ]
+        return httpx.Response(
+            200,
+            json={
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": json.dumps(
+                                    {
+                                        "candidateOrderReference": "ORDER-1",
+                                        "remainingOrderReferences": [],
+                                        "issueAssessments": {
+                                            "LOGISTICS_DELAY": {
+                                                "assessment": "ASSERTED",
+                                                "summary": "物流延迟",
+                                            },
+                                            "PACKAGE_NOT_RECEIVED": {
+                                                "assessment": "NOT_MENTIONED",
+                                                "summary": "",
+                                            },
+                                            "DUPLICATE_CHARGE": {
+                                                "assessment": "NOT_MENTIONED",
+                                                "summary": "",
+                                            },
+                                        },
+                                    }
+                                ),
+                            }
+                        ],
+                    }
+                ],
+            },
+        )
+
+    result = await DeepSeekIntakeModel(
+        "synthetic-test-key", transport=httpx.MockTransport(respond)
+    ).understand(
+        IntakeModelInput(
+            customer_message="昨天买的订单物流延迟",
+            visible_orders=(
+                VisibleOrder("ORDER-1", "昨天购买"),
+                VisibleOrder("ORDER-2", "上周购买"),
+            ),
+        )
+    )
+    assert result.candidate_order_reference == "ORDER-1"
+    assert result.remaining_order_references == ()
