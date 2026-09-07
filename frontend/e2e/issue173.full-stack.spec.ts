@@ -425,7 +425,7 @@ test("Issue #173 B：真实调查流、并发追加消息、旧代次隔离与�
       });
     }
     for (const message of messages)
-      await expect(page.getByText(message, { exact: true })).toBeVisible();
+      await expect(page.getByRole("log").getByText(message, { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "发送新消息" })).toBeEnabled();
 
     await expect
@@ -472,13 +472,13 @@ test("Issue #173 B：真实调查流、并发追加消息、旧代次隔离与�
     await page.reload();
     await expect(page.getByRole("heading", { name: "正在重新同步工单" })).toBeVisible();
     for (const message of messages) {
-      await expect(page.getByText(message, { exact: true })).toHaveCount(0);
+      await expect(page.getByRole("log").getByText(message, { exact: true })).toHaveCount(0);
     }
     disconnected = false;
     await page.getByRole("button", { name: "立即重试同步" }).click();
     for (const message of messages) {
-      await expect(page.getByText(message, { exact: true })).toBeVisible();
-      await expect(page.getByText(message, { exact: true })).toHaveCount(1);
+      await expect(page.getByRole("log").getByText(message, { exact: true })).toBeVisible();
+      await expect(page.getByRole("log").getByText(message, { exact: true })).toHaveCount(1);
     }
     await expect(page.getByRole("heading", { name: "正在重新同步工单" })).toHaveCount(0);
     await expect(
