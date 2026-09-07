@@ -124,12 +124,15 @@ class CoreValidationBudget:
         max_attempts: int,
         max_tokens: int,
         deadline: datetime,
-        communication_model: str = _MODEL,
+        model: str = _MODEL,
+        communication_model: str | None = None,
     ) -> CoreValidationBudget:
         if not 0 < limit_micros <= 3_000_000 or max_attempts < 1 or max_tokens < 1:
             raise ValueError("invalid frozen core budget")
-        if communication_model not in _PRICES:
-            raise ValueError("unsupported core communication model")
+        if communication_model is None:
+            communication_model = model
+        if model not in _PRICES or communication_model not in _PRICES:
+            raise ValueError("unsupported core model")
         path.parent.mkdir(parents=True, exist_ok=True)
         budget = cls(path, authorization_id)
         with budget._lock():
@@ -140,15 +143,15 @@ class CoreValidationBudget:
                     "schemaVersion": _SCHEMA,
                     "authorizationId": authorization_id,
                     "currency": "CNY",
-                    "model": _MODEL,
+                    "model": model,
                     "communicationModel": communication_model,
                     "limitMicros": limit_micros,
                     "maxAttempts": max_attempts,
                     "maxTokens": max_tokens,
                     "deadline": deadline.astimezone(UTC).isoformat(),
-                    "price": _PRICES[_MODEL],
+                    "price": _PRICES[model],
                     "pricesByModel": {
-                        _MODEL: _PRICES[_MODEL],
+                        model: _PRICES[model],
                         communication_model: _PRICES[communication_model],
                     },
                     "entries": [],
@@ -179,7 +182,7 @@ class CoreValidationBudget:
             state["schemaVersion"] != _SCHEMA
             or state["authorizationId"] != self.authorization_id
             or state["currency"] != "CNY"
-            or state["model"] != _MODEL
+            or state["model"] not in _PRICES
         ):
             raise CoreBudgetStopped("CORE_BUDGET_IDENTITY_MISMATCH")
         return state
@@ -220,10 +223,14 @@ class CoreValidationBudget:
         reserved_tokens = input_tokens + output_tokens
         with self._lock():
             state = self._read()
-            model = state.get("communicationModel", _MODEL) if role == "communication" else _MODEL
+            model = (
+                state.get("communicationModel", state["model"])
+                if role == "communication"
+                else state["model"]
+            )
             if request.get("model") != model:
                 raise CoreBudgetStopped("CORE_BUDGET_REQUEST_MISMATCH")
-            price = state.get("pricesByModel", {_MODEL: state["price"]})[model]
+            price = state.get("pricesByModel", {state["model"]: state["price"]})[model]
             reserved_micros = (
                 input_tokens * price["inputMicrosPerToken"]
                 + output_tokens * price["outputMicrosPerToken"]

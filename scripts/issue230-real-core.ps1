@@ -1,6 +1,7 @@
 param(
     [switch]$ConfirmProviderSpend,
-    [ValidateSet("deepseek-v4-flash", "deepseek-v4-pro")][string]$CommunicationModel = "deepseek-v4-flash",
+    [ValidateSet("deepseek-v4-flash", "deepseek-v4-pro")][string]$Model = "deepseek-v4-pro",
+    [ValidateSet("deepseek-v4-flash", "deepseek-v4-pro")][string]$CommunicationModel,
     [Parameter(Mandatory)][string]$TestedHead,
     [Parameter(Mandatory)][string]$ModelPath,
     [Parameter(Mandatory)][string]$LedgerPath,
@@ -18,6 +19,7 @@ param(
 # 先离线验证并审查冻结参数，再显式执行；本脚本不创建或重置授权账本。
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+if (-not $CommunicationModel) { $CommunicationModel = $Model }
 $repo = Split-Path -Parent $PSScriptRoot
 . "$repo/scripts/test-gate-lock.ps1"
 . "$repo/scripts/gate-resources.ps1"
@@ -51,7 +53,7 @@ $ledgerName = Split-Path -Leaf $ledgerPath
 $modelPath = (Resolve-Path -LiteralPath $ModelPath).Path.Replace('\', '/')
 $ledger = Get-Content -Raw -LiteralPath $ledgerPath | ConvertFrom-Json
 if ($ledger.schemaVersion -ne 'issue230-core-budget-v1' -or $ledger.currency -ne 'CNY' -or
-    $ledger.model -ne 'deepseek-v4-flash' -or $ledger.authorizationId -ne $AuthorizationId -or
+    $ledger.model -ne $Model -or $ledger.authorizationId -ne $AuthorizationId -or
     $ledger.limitMicros -ne $LimitMicros -or $ledger.maxAttempts -ne $MaxAttempts -or
     $ledger.maxTokens -ne $MaxTokens -or [datetimeoffset]$ledger.deadline -ne $Deadline -or $Deadline -le [datetimeoffset]::UtcNow) {
     throw '冻结参数与现有核心账本不一致或已到期；禁止自动建立新账本。'
@@ -101,7 +103,7 @@ try {
     New-Item -ItemType Directory -Path $evidence, (Join-Path $evidence 'artifacts') | Out-Null
     [ordered]@{
         schemaVersion = 'issue230-real-core-plan-v1'; authorizationId = $AuthorizationId
-        runId = $RunId; testedHead = $TestedHead; model = 'deepseek-v4-flash'; communicationModel = $CommunicationModel; pricesByModel = $ledger.pricesByModel; providerVersions = $ProviderVersions
+        runId = $RunId; testedHead = $TestedHead; model = $Model; communicationModel = $CommunicationModel; pricesByModel = $ledger.pricesByModel; providerVersions = $ProviderVersions
         limitMicros = $LimitMicros; currency = 'CNY'; maxAttempts = $MaxAttempts; maxTokens = $MaxTokens
         deadline = $Deadline.ToUniversalTime().ToString('o'); investigationWallClockMs = $InvestigationWallClockMs
         denominator = 10; matrix = $matrix; selectedCase = $Case; selectedSample = $Sample; retries = 0; maxFailures = 1
@@ -142,7 +144,7 @@ services:
       INVESTIGATION_ACTION_MODEL_MODE: deepseek-formal
       CUSTOMER_COMMUNICATION_MODEL_MODE: deepseek-formal
       DEEPSEEK_API_KEY:
-      DEEPSEEK_MODEL: deepseek-v4-flash
+      DEEPSEEK_MODEL: $Model
       DEEPSEEK_COMMUNICATION_MODEL: $CommunicationModel
       CORE_VALIDATION_BUDGET_PATH: /core-budget/$ledgerName
       CORE_VALIDATION_AUTHORIZATION_ID: '$AuthorizationId'
@@ -181,7 +183,7 @@ services:
     $config = Invoke-RealCompose @('config', '--format', 'json') | ConvertFrom-Json
     Assert-ComposeResourcesOwned -ProjectName $project -EffectiveConfig $config
     $agentEnvironment = $config.services.'agent-server'.environment
-    if ($agentEnvironment.DEEPSEEK_MODEL -ne "deepseek-v4-flash" -or $agentEnvironment.DEEPSEEK_COMMUNICATION_MODEL -ne $CommunicationModel) { throw "实际角色模型与冻结配置不一致。" }
+    if ($agentEnvironment.DEEPSEEK_MODEL -ne $Model -or $agentEnvironment.DEEPSEEK_COMMUNICATION_MODEL -ne $CommunicationModel) { throw "实际角色模型与冻结配置不一致。" }
     if ($agentEnvironment.CORE_VALIDATION_BUDGET_PATH -ne "/core-budget/$ledgerName" -or
         $agentEnvironment.CORE_VALIDATION_AUTHORIZATION_ID -ne $AuthorizationId -or
         $agentEnvironment.DEEPSEEK_API_KEY -ne $env:DEEPSEEK_API_KEY -or

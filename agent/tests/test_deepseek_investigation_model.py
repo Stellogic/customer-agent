@@ -410,7 +410,7 @@ def test_deepseek_configuration_fails_explicitly_without_key_or_for_unsupported_
     with pytest.raises(InvestigationJudgmentFailure) as unsupported:
         DeepSeekResponsesConfig(
             api_key="secret",
-            model="deepseek-v4-pro",
+            model="unsupported-model",
         )
 
     assert unsupported.value.code is InvestigationJudgmentFailureCode.CONFIGURATION_ERROR
@@ -484,3 +484,31 @@ async def test_concurrent_judgment_evidence_does_not_include_another_call_failur
     assert successful["providerAttempts"] == 1
     assert successful["failureClassification"] == ""
     assert successful["tokens"] == 27
+
+
+@pytest.mark.asyncio
+async def test_formal_pro_judgment_preserves_requested_model_and_dated_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import importlib
+
+    graph_module = importlib.import_module("baseline_agent.graph")
+
+    def supplier(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["model"] == "deepseek-v4-pro"
+        return httpx.Response(200, json={**_response(), "model": "deepseek-v4-pro-0813"})
+
+    audit = InMemoryModelCallAuditSink()
+    model = DeepSeekResponsesInvestigationModel(
+        DeepSeekResponsesConfig(api_key="synthetic-test-key", model="deepseek-v4-pro"),
+        transport=httpx.MockTransport(supplier),
+        audit_sink=audit,
+    )
+    monkeypatch.setattr(graph_module, "investigation_judgment_model", model)
+    offset = graph_module._judgment_audit_offset()
+    judgment = await model.judge(MODEL_INPUT)
+    assert graph_module._judgment_call_evidence(offset, "")["costMicros"] is None
+    assert judgment.compensation_review_required is True
+    assert audit.records[0].request_model == "deepseek-v4-pro"
+    assert audit.records[0].response_model == "deepseek-v4-pro-0813"
+    assert audit.records[0].actual_response_shape_valid is True

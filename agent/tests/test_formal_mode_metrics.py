@@ -6,11 +6,13 @@ from baseline_agent.formal_mode_metrics import (
 )
 
 
-def test_aggregates_only_formal_customer_communication_checkpoints_without_identifiers() -> None:
+@pytest.mark.parametrize("model", ["deepseek-v4-flash", "deepseek-v4-pro"])
+def test_aggregates_only_formal_customer_communication_checkpoints_without_identifiers(
+    model: str,
+) -> None:
     formal = {
         "model_mode": (
-            "deepseek-v4-flash-action-formal-v1+deepseek-v4-flash-formal-v1+"
-            "deepseek-v4-flash-customer-communication-formal-v1"
+            f"{model}-action-formal-v1+{model}-formal-v1+{model}-customer-communication-formal-v1"
         ),
         "investigation_run_evidence": {
             "modelCalls": [{"callNumber": 1}, {"callNumber": 2}],
@@ -37,6 +39,8 @@ def test_aggregates_only_formal_customer_communication_checkpoints_without_ident
     )
 
     assert report["observedGenerationCount"] == 1
+    assert report["model"] == model
+    assert report["models"] == [model]
     assert report["totalLogicalCalls"] == 5
     assert report["totalProviderAttempts"] == 5
     assert report["estimatedCostMicros"] == 70
@@ -52,6 +56,49 @@ def test_aggregates_only_formal_customer_communication_checkpoints_without_ident
         "handoffWithModelCallsCount": 0,
     }
     assert "thread" not in str(report).lower()
+
+
+def test_mixed_model_metrics_preserve_unknown_usage_instead_of_reporting_zero() -> None:
+    report = aggregate_checkpoint_metrics(
+        [
+            {
+                "model_mode": "deepseek-v4-flash-action-formal-v1+deepseek-v4-pro-customer-communication-formal-v1",
+                "investigation_run_evidence": {
+                    "modelCalls": [],
+                    "providerAttempts": 0,
+                    "costMicros": 0,
+                },
+                "investigation_judgment_evidence": {
+                    "logicalCalls": 0,
+                    "providerAttempts": 0,
+                    "costMicros": 0,
+                },
+                "customer_communication_evidence": {
+                    "logicalCalls": 1,
+                    "providerAttempts": 1,
+                    "costMicros": None,
+                    "durationMs": 20,
+                },
+            }
+        ],
+        ["HANDED_OFF"],
+    )
+    assert report["model"] is None
+    assert report["models"] == ["deepseek-v4-flash", "deepseek-v4-pro"]
+    assert report["totalLogicalCalls"] == 1
+    assert report["totalProviderAttempts"] == 1
+    assert report["estimatedCostMicros"] is None
+    assert report["customerCommunication"]["estimatedCostMicros"] is None
+
+
+def test_missing_formal_evidence_preserves_unknown_cost_and_legacy_call_counts() -> None:
+    report = aggregate_checkpoint_metrics(
+        [{"model_mode": "deepseek-v4-pro-customer-communication-formal-v1"}],
+        ["HANDED_OFF"],
+    )
+    assert report["totalLogicalCalls"] == 0
+    assert report["totalProviderAttempts"] == 0
+    assert report["estimatedCostMicros"] is None
 
 
 def test_formal_metrics_fail_closed_when_checkpoint_values_are_missing(

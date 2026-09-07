@@ -60,17 +60,11 @@ class DeepSeekResponsesConfig:
     max_attempts: int = 3
     retry_base_delay_seconds: float = 0.2
     max_output_tokens: int = 128
-    _model_comparison_candidate: bool = field(default=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if (
             not self.api_key.strip()
-            or self.model
-            not in (
-                {DEEPSEEK_FLASH_MODEL, DEEPSEEK_PRO_MODEL}
-                if self._model_comparison_candidate
-                else {DEEPSEEK_FLASH_MODEL}
-            )
+            or self.model not in {DEEPSEEK_FLASH_MODEL, DEEPSEEK_PRO_MODEL}
             or self.connect_timeout_seconds <= 0
             or self.read_timeout_seconds <= 0
             or self.deadline_seconds <= 0
@@ -102,7 +96,6 @@ class DeepSeekResponsesConfig:
             max_attempts=max_attempts,
             retry_base_delay_seconds=retry_base_delay_seconds,
             max_output_tokens=max_output_tokens,
-            _model_comparison_candidate=True,
         )
 
     @classmethod
@@ -171,6 +164,19 @@ def estimate_flash_cost_micros(input_tokens: int, output_tokens: int) -> int:
         input_tokens * _FLASH_INPUT_USD_PER_MILLION_TOKENS
         + output_tokens * _FLASH_OUTPUT_USD_PER_MILLION_TOKENS
     )
+
+
+def estimate_model_cost_micros(model: str, input_tokens: int, output_tokens: int) -> int:
+    # 峰时非缓存美元程序估算;人民币授权账本独立结算。
+    prices = {
+        DEEPSEEK_FLASH_MODEL: (
+            _FLASH_INPUT_USD_PER_MILLION_TOKENS,
+            _FLASH_OUTPUT_USD_PER_MILLION_TOKENS,
+        ),
+        DEEPSEEK_PRO_MODEL: (1.32, 3.96),
+    }
+    input_price, output_price = prices[model]
+    return math.ceil(input_tokens * input_price + output_tokens * output_price)
 
 
 class DeepSeekResponsesInvestigationModel:

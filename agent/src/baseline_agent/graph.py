@@ -1105,7 +1105,11 @@ def _judgment_call_evidence(offset: int | None, failure: str) -> dict[str, objec
         "logicalCalls": 1 if records else 0,
         "providerAttempts": len(records),
         "tokens": sum(record.total_tokens or 0 for record in records),
-        "costMicros": estimate_flash_cost_micros(input_tokens, output_tokens),
+        "costMicros": (
+            estimate_flash_cost_micros(input_tokens, output_tokens)
+            if all(record.request_model == DEEPSEEK_FLASH_MODEL for record in records)
+            else None
+        ),
         "failureClassification": failure or (sorted(classifications)[0] if classifications else ""),
     }
 

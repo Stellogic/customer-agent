@@ -13,11 +13,12 @@ import httpx
 from baseline_agent.core_validation_budget import CoreValidationBudget, model_attempt_budget
 from baseline_agent.deepseek_investigation_model import (
     DEEPSEEK_FLASH_MODEL,
+    DEEPSEEK_PRO_MODEL,
     DeepSeekFailureClassification,
     InMemoryModelCallAuditSink,
     ModelCallAttemptRecord,
     ModelCallAuditSink,
-    estimate_flash_cost_micros,
+    estimate_model_cost_micros,
 )
 from baseline_agent.investigation_action_loop import (
     CAPABILITY_PARAMETER_NAMES,
@@ -53,7 +54,7 @@ class DeepSeekActionConfig:
     def __post_init__(self) -> None:
         if (
             not self.api_key.strip()
-            or self.model != DEEPSEEK_FLASH_MODEL
+            or self.model not in {DEEPSEEK_FLASH_MODEL, DEEPSEEK_PRO_MODEL}
             or self.connect_timeout_seconds <= 0
             or self.read_timeout_seconds <= 0
             or self.deadline_seconds <= 0
@@ -187,6 +188,7 @@ class DeepSeekResponsesInvestigationActionModel:
                             controlled_facts,
                             allowed_actions,
                             attempt_number,
+                            self._config.model,
                         )
                     except _DeepSeekActionResponseFailure as failure:
                         await self._record_attempt(
@@ -199,7 +201,7 @@ class DeepSeekResponsesInvestigationActionModel:
                             payload if isinstance(payload, dict) else None,
                             provider_http_status=response.status_code,
                         )
-                        tokens, cost_micros = _failure_usage(payload)
+                        tokens, cost_micros = _failure_usage(payload, self._config.model)
                         raise _failure(
                             attempt_number,
                             failure_classification=failure.classification.value,
@@ -586,6 +588,7 @@ def _parse_response(
     facts: dict[str, object],
     allowed_actions: tuple[str, ...],
     attempts: int,
+    request_model: str,
 ) -> ActionDecision:
     if not isinstance(payload, dict):
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
@@ -604,7 +607,9 @@ def _parse_response(
     if status != "completed":
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.PROVIDER_INCOMPLETE)
     response_model = payload.get("model")
-    if not isinstance(response_model, str) or not response_model.startswith(DEEPSEEK_FLASH_MODEL):
+    if not isinstance(response_model, str) or not (
+        response_model == request_model or response_model.startswith(request_model + "-")
+    ):
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     output = payload.get("output")
     if not isinstance(output, list):
@@ -710,7 +715,7 @@ def _parse_response(
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     if total_tokens < input_tokens + output_tokens:
         raise _DeepSeekActionResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
-    cost_micros = estimate_flash_cost_micros(input_tokens, output_tokens)
+    cost_micros = estimate_model_cost_micros(request_model, input_tokens, output_tokens)
     selected_action = capability if capability is not None else terminal
     assert selected_action is not None
     return ActionDecision.from_values(
@@ -756,7 +761,7 @@ class _DeepSeekActionResponseFailure(Exception):
         super().__init__(classification.value)
 
 
-def _failure_usage(payload: object) -> tuple[int, int]:
+def _failure_usage(payload: object, request_model: str) -> tuple[int, int]:
     if not isinstance(payload, dict) or not isinstance(payload.get("usage"), dict):
         return 0, 0
     usage = payload["usage"]
@@ -765,7 +770,7 @@ def _failure_usage(payload: object) -> tuple[int, int]:
     total_tokens = _optional_int(usage.get("total_tokens"))
     if input_tokens is None or output_tokens is None or total_tokens is None:
         return 0, 0
-    return total_tokens, estimate_flash_cost_micros(input_tokens, output_tokens)
+    return total_tokens, estimate_model_cost_micros(request_model, input_tokens, output_tokens)
 
 
 def _failure(
