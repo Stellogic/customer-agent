@@ -80,7 +80,12 @@ async function complete(ticketId: string, generation = 1) {
     .toBe("COMPLETED");
 }
 
-async function verifyLogistics(page: Page, ticketId: string, pending: boolean) {
+async function verifyLogistics(
+  page: Page,
+  ticketId: string,
+  pending: boolean,
+  clarifiedNoCompensation = false,
+) {
   const response = await page.request.get(`/api/customer/v2/tickets/${ticketId}`);
   expect(response.ok()).toBe(true);
   const snapshot = (await response.json()) as {
@@ -88,12 +93,25 @@ async function verifyLogistics(page: Page, ticketId: string, pending: boolean) {
     pendingCompensation: { status: string } | null;
     messages: { author: string; body: string }[];
   };
-  expect(snapshot.ticket.handlingMode).toBe("AGENT");
+  expect(snapshot.ticket.handlingMode).toBe(clarifiedNoCompensation ? "HUMAN" : "AGENT");
   expect(
     queryFixtureSql(
-      `SELECT count(*) FROM support_ticket WHERE id = '${ticketId}' AND human_handoff_reason_code IS NOT NULL;`,
+      `SELECT coalesce(human_handoff_reason_code, '') FROM support_ticket WHERE id = '${ticketId}';`,
     ),
-  ).toBe("0");
+  ).toBe(clarifiedNoCompensation ? "DELAY_UNDER_24_HOURS" : "");
+  if (clarifiedNoCompensation) {
+    expect(pending).toBe(false);
+    expect(
+      queryFixtureSql(
+        `SELECT count(*) FROM audit_event WHERE ticket_id = '${ticketId}' AND event_type = 'AGENT_CONCLUSION_ACCEPTED';`,
+      ),
+    ).toBe("1");
+    expect(
+      snapshot.messages.some(
+        ({ author, body }) => author === "CUSTOMER" && body === "确实延迟，请核实物流状态。",
+      ),
+    ).toBe(true);
+  }
   if (pending) expect(snapshot.pendingCompensation?.status).toBe("PENDING_REVIEW");
   else expect(snapshot.pendingCompensation).toBeNull();
   expect(snapshot.messages.some(({ author, body }) => author === "AGENT" && body.length > 0)).toBe(
@@ -312,20 +330,29 @@ for (const caseName of cases.filter((value) => !selectedCase || value === select
             true,
           );
           evidence.ticketId = ticketId;
-          expect(
-            queryFixtureSql(`
+          const intakePhases = queryFixtureSql(`
             SELECT string_agg(phase, ',' ORDER BY started_at) FROM intake_model_call
             WHERE intake_id = (
               SELECT record.intake_id FROM shared_intake_record record
               JOIN shared_intake_issue issue ON issue.shared_intake_record_id = record.id
               WHERE issue.ticket_id = '${ticketId}'
             );
-          `),
-          ).toMatch(/^START(?:,FOLLOWUP)?$/);
+          `);
+          expect(intakePhases).toMatch(/^START(?:,FOLLOWUP)?$/);
+          const clarifiedNoCompensation =
+            caseName === "no_compensation" && intakePhases === "START,FOLLOWUP";
+          evidence.logisticsEndpoint = clarifiedNoCompensation
+            ? "GROUNDED_NO_COMPENSATION_THEN_HUMAN"
+            : "AGENT";
           if (caseName === "generation_fence")
             evidence.fence = await fenceDuringRealDelta(page, ticketId, sample, evidence);
           else await complete(ticketId);
-          await verifyLogistics(page, ticketId, caseName !== "no_compensation");
+          await verifyLogistics(
+            page,
+            ticketId,
+            caseName !== "no_compensation",
+            clarifiedNoCompensation,
+          );
         }
       } finally {
         await testInfo.attach("core-matrix-case", {
