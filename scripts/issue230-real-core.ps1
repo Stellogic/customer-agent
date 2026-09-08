@@ -1,5 +1,6 @@
 param(
     [switch]$ConfirmProviderSpend,
+    [switch]$ContinueOnCaseFailure,
     [ValidateSet("deepseek-v4-flash", "deepseek-v4-pro")][string]$Model = "deepseek-v4-pro",
     [ValidateSet("deepseek-v4-flash", "deepseek-v4-pro")][string]$CommunicationModel,
     [Parameter(Mandatory)][string]$TestedHead,
@@ -20,6 +21,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 if (-not $CommunicationModel) { $CommunicationModel = $Model }
+$maximumCaseFailures = if ($ContinueOnCaseFailure) { 0 } else { 1 }
+$continueCaseFailures = $ContinueOnCaseFailure.IsPresent.ToString().ToLowerInvariant()
 $repo = Split-Path -Parent $PSScriptRoot
 . "$repo/scripts/test-gate-lock.ps1"
 . "$repo/scripts/gate-resources.ps1"
@@ -106,7 +109,7 @@ try {
         runId = $RunId; testedHead = $TestedHead; model = $Model; communicationModel = $CommunicationModel; pricesByModel = $ledger.pricesByModel; providerVersions = $ProviderVersions
         limitMicros = $LimitMicros; currency = 'CNY'; maxAttempts = $MaxAttempts; maxTokens = $MaxTokens
         deadline = $Deadline.ToUniversalTime().ToString('o'); investigationWallClockMs = $InvestigationWallClockMs
-        denominator = 10; matrix = $matrix; selectedCase = $Case; selectedSample = $Sample; retries = 0; maxFailures = 1
+        denominator = 10; matrix = $matrix; selectedCase = $Case; selectedSample = $Sample; retries = 0; maxFailures = $maximumCaseFailures; continueOnCaseFailure = $ContinueOnCaseFailure.IsPresent; workers = 1
         sideEffects = @('创建本轮合成订单与工单', '发布客户公开回复', '客服领取并释放本轮支付工单', '创建待审批提案；不批准或执行补偿')
         notes = @('输入预算是程序工程预留，不是供应商数学上界。', '供应商费用未知时保留预留并停止，不换账本重跑。')
     } | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $planPath
@@ -176,13 +179,23 @@ services:
     environment:
       ISSUE230_CORE_CASE: '$Case'
       ISSUE230_CORE_SAMPLE: '$Sample'
+      ISSUE230_CONTINUE_ON_CASE_FAILURE: '$continueCaseFailures'
+      ISSUE230_CORE_BUDGET_PATH: '/core-budget/$ledgerName'
       PLAYWRIGHT_JSON_OUTPUT_FILE: /artifacts/playwright.json
     volumes:
       - '${mount}/artifacts:/artifacts'
+      - '${ledgerDirectory}:/core-budget:ro'
 "@ | Set-Content -LiteralPath $override
     $config = Invoke-RealCompose @('config', '--format', 'json') | ConvertFrom-Json
     Assert-ComposeResourcesOwned -ProjectName $project -EffectiveConfig $config
     $agentEnvironment = $config.services.'agent-server'.environment
+    $browserEnvironment = $config.services.'browser-acceptance'.environment
+    $browserBudgetMount = @($config.services.'browser-acceptance'.volumes | Where-Object target -eq '/core-budget')
+    if ($browserEnvironment.ISSUE230_CONTINUE_ON_CASE_FAILURE -ne $continueCaseFailures -or
+        $browserEnvironment.ISSUE230_CORE_BUDGET_PATH -ne "/core-budget/$ledgerName" -or
+        $browserBudgetMount.Count -ne 1 -or -not $browserBudgetMount[0].read_only) {
+        throw '实际浏览器配置与冻结的继续模式或只读预算挂载不一致。'
+    }
     if ($agentEnvironment.DEEPSEEK_MODEL -ne $Model -or $agentEnvironment.DEEPSEEK_COMMUNICATION_MODEL -ne $CommunicationModel) { throw "实际角色模型与冻结配置不一致。" }
     if ($agentEnvironment.CORE_VALIDATION_BUDGET_PATH -ne "/core-budget/$ledgerName" -or
         $agentEnvironment.CORE_VALIDATION_AUTHORIZATION_ID -ne $AuthorizationId -or
@@ -208,7 +221,7 @@ services:
     Invoke-RealCompose @('up', '-d', '--no-build', '--wait', 'backend', 'agent-server', 'browser-frontend')
     $servicesReady = $true
     # 不启动 compensation-executor，场景也不执行审批或赔付操作。
-    Invoke-RealCompose @('run', '--rm', '--no-deps', 'browser-acceptance', '--workers=1', '--retries=0', '--max-failures=1', '--reporter=json', '--output=/artifacts', 'e2e/issue230.core-matrix.spec.ts')
+    Invoke-RealCompose @('run', '--rm', '--no-deps', 'browser-acceptance', '--workers=1', '--retries=0', "--max-failures=$maximumCaseFailures", '--reporter=json', '--output=/artifacts', 'e2e/issue230.core-matrix.spec.ts')
     $outcome = 'BROWSER_PASS'
 } catch {
     $outcome = 'FAIL'

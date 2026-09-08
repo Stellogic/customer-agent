@@ -96,6 +96,26 @@ def test_known_usage_releases_reservation_but_overrun_stops_further_requests(
         budget.reserve("after-overrun", role="action", request=request)
 
 
+def test_reservation_limit_stops_later_smaller_requests_after_reopening(tmp_path: Path) -> None:
+    budget = CoreValidationBudget.create(
+        tmp_path / "budget.json",
+        authorization_id="synthetic-limit-stop",
+        limit_micros=6_000,
+        max_attempts=10,
+        max_tokens=20_000,
+        deadline=datetime.now(UTC) + timedelta(minutes=5),
+    )
+    request = {"model": "deepseek-v4-flash", "input": "synthetic", "max_output_tokens": 128}
+    with pytest.raises(CoreBudgetStopped, match="CORE_BUDGET_LIMIT"):
+        budget.reserve("too-large", role="action", request={**request, "max_output_tokens": 2000})
+    reopened = CoreValidationBudget.open(budget.path, authorization_id="synthetic-limit-stop")
+    with pytest.raises(CoreBudgetStopped, match="CORE_BUDGET_STOPPED"):
+        reopened.reserve("smaller-next-case", role="action", request=request)
+    saved = json.loads(budget.path.read_text(encoding="utf-8"))
+    assert saved["stopReason"] == "CORE_BUDGET_LIMIT"
+    assert saved["entries"] == []
+
+
 def test_stop_survives_reopening_and_allows_inflight_usage_to_settle(tmp_path: Path) -> None:
     budget = CoreValidationBudget.create(
         tmp_path / "budget.json",

@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
 import { executeFixtureSql, queryFixtureSql } from "./support/database";
 import { createSingleTicket, intakeReply } from "./support/issue173-intake";
+import { coreCaseBudgetStopReason, type CoreCaseBudget } from "../src/test-support/issue230-case-budget";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -18,7 +20,25 @@ const selectedCase = process.env.ISSUE230_CORE_CASE;
 const selectedSample = process.env.ISSUE230_CORE_SAMPLE;
 if (selectedCase && !cases.includes(selectedCase as CoreCase)) throw new Error("未知核心场景");
 if (selectedSample && !["1", "2"].includes(selectedSample)) throw new Error("核心样本只能为1或2");
-test.describe.configure({ mode: "serial", retries: 0 });
+const continueOnCaseFailure = process.env.ISSUE230_CONTINUE_ON_CASE_FAILURE === "true";
+const caseBudgetPath = process.env.ISSUE230_CORE_BUDGET_PATH;
+if (continueOnCaseFailure && !caseBudgetPath) throw new Error("整批收集模式需要只读预算账本");
+test.describe.configure({ mode: continueOnCaseFailure ? "default" : "serial", retries: 0 });
+
+let stoppedBeforeCase: string | null = null;
+test.beforeEach(() => {
+  if (!continueOnCaseFailure) return;
+  if (!stoppedBeforeCase) {
+    try {
+      const ledger = JSON.parse(readFileSync(caseBudgetPath!, "utf8")) as CoreCaseBudget;
+      stoppedBeforeCase = coreCaseBudgetStopReason(ledger, Date.now());
+    } catch {
+      stoppedBeforeCase = "CORE_BUDGET_UNREADABLE";
+    }
+  }
+  // 一旦预算检查停止,其余用例保留未运行;不改写账本或等待预留自动释放。
+  test.skip(stoppedBeforeCase !== null, stoppedBeforeCase ?? "");
+});
 
 function prepare(caseName: CoreCase, sample: number) {
   const reference = `ORDER-CORE-${caseName.toUpperCase().replaceAll("_", "-")}-${sample}-${crypto.randomUUID()}`;

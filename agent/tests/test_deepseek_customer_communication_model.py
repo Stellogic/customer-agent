@@ -225,6 +225,8 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
     assert request["reasoning"] == {"effort": "none"}
     assert "Never return a JSON Schema" in request["instructions"]
     assert "frame them as 您反馈" in request["instructions"]
+    assert "补偿建议正在等待人工审批" in request["instructions"]
+    assert "审批完成前不会执行补偿或退款" in request["instructions"]
     assert "Do not infer any of them from delaySeconds" in request["instructions"]
     assert set(request["text"]["format"]) == {"type", "name", "schema"}
     assert request["text"]["format"]["type"] == "json_schema"

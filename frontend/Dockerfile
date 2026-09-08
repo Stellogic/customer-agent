@@ -36,6 +36,7 @@ COPY playwright.config.ts ./
 COPY e2e ./e2e
 COPY src/sensitive-content-patterns.json ./src/sensitive-content-patterns.json
 COPY src/test-support/issue215-intake-diagnostic.ts ./src/test-support/issue215-intake-diagnostic.ts
+COPY src/test-support/issue230-case-budget.ts ./src/test-support/issue230-case-budget.ts
 ENTRYPOINT ["npm", "run", "test:browser", "--"]
 
 FROM nginx:1.29.4-alpine AS browser-server

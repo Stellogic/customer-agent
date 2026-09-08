@@ -265,6 +265,9 @@ class CoreValidationBudget:
                 or consumed_tokens + reserved_tokens > state["maxTokens"]
                 or len(entries) >= state["maxAttempts"]
             ):
+                state["stopReason"] = "CORE_BUDGET_LIMIT"
+                state["stoppedAt"] = datetime.now(UTC).isoformat()
+                self._write(state)
                 raise CoreBudgetStopped("CORE_BUDGET_LIMIT")
             owner = _OWNER.get()
             entries.append(
