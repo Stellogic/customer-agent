@@ -51,3 +51,13 @@ issue230-core-clarification07：十个浏览器样本全部通过，包括直接
 本轮 Standards / Spec 双轴审查均通过。该结果只证明当前离线测试路径通过，不证明真实 Pro 矩阵稳定，也不替代最终完整规范化门禁。#230保持未完成，#174继续暂停。
 
 规范化组件检查 issue230-clarification-frontend08 与 issue230-clarification-agent08 均退出0；Agent为579通过、3跳过。前端格式、静态及类型预检和4项针对性夹具测试已通过。此处保存开发提交，不作为合并或关票依据。
+
+## 真实 Pro 矩阵第四轮
+
+issue230-real-allpro-matrix04 在提交 077218e472e4200cf9ecb5b6672f0d4f4304218a 上执行，结果2通过、1失败、7未运行。两个无补偿样本通过；待审批样本1在判断角色返回后技术转人工，浏览器期望 COMPLETED、实际 HANDED_OFF。首败即停，未追加真实调用。
+
+失败尝试的供应商 HTTP 为200、状态 completed，输入183 token、输出24 token；分类 INVALID_JSON。此前加入的诊断记录 stage=OUTPUT_TEXT、framing=CODE_FENCE、offset=0、line=1、column=1、textLength=81，确认输出以代码围栏开头而未通过严格 JSON 解析。请求已声明 strict JSON schema；strictSchemaRequested 只表示请求参数，不证明供应商实际遵守。未保存输出正文，不能断言围栏内部对象是否符合字段或业务契约。
+
+本轮11次调用、12465 token，全部结算，程序估算0.136125元；历史累计估算0.420168元，原3元预算估算余额2.579832元。供应商实际账单未知，无未完成预留、无缺失或无法归属的调用证据。资源清理通过，测试锁回读 FREE。
+
+本轮没有修改生产代码或解析规则。后续应核对供应商结构化输出契约及适配方式，先构造离线回归再决定最小修改；当前证据不足以要求业务架构重构，也不证明更换 Pro 已解决格式稳定性。#230仍未完成，#174继续暂停。
