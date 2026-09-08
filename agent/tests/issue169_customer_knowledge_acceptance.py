@@ -320,7 +320,11 @@ def main() -> None:
             forged_reply["knowledge"]["citations"][0]["quote"] = "不存在于本次片段的伪造引文999元"
             rejected = submit(forged_case, forged_reply)
             check("forged-quote-not-published", rejected.status_code, 422)
-            check("forged-quote-rejection-code", rejected.json()["code"], "INVALID_KNOWLEDGE_CITATION")
+            check(
+                "forged-quote-rejection-code",
+                rejected.json()["code"],
+                "INVALID_KNOWLEDGE_CITATION",
+            )
             with psycopg.connect(DATABASE) as db:
                 check(
                     "forged-quote-no-public-message",
