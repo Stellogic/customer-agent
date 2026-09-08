@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -203,6 +204,19 @@ def test_core_collector_keeps_database_owners_and_reads_current_generation_evide
             pass
 
         def execute(self, sql: str) -> Rows:
+            if "from audit_event" in sql:
+                assert "starts_with(event_type, 'AGENT_COMMAND_REJECTED_')" in sql
+                return Rows(
+                    [
+                        (
+                            "ticket",
+                            "AGENT_COMMAND_REJECTED_DETERMINISTIC_REVIEW_FAILED",
+                            datetime(2026, 9, 8, tzinfo=UTC),
+                        )
+                    ]
+                    if classification == "FACT_CONFLICT"
+                    else []
+                )
             if "from intake_model_call" in sql:
                 return Rows([("invocation", "intake", "SUCCEEDED", None, {"attempts": []})])
             assert "from agent_processing_generation" in sql
@@ -286,6 +300,17 @@ def test_core_collector_keeps_database_owners_and_reads_current_generation_evide
 
     assert urls == ["http://agent/threads/thread/state"]
     assert report["authorizationId"] == "core-230"
+    assert report["springRejections"] == (
+        [
+            {
+                "ticketId": "ticket",
+                "code": "DETERMINISTIC_REVIEW_FAILED",
+                "occurredAt": "2026-09-08T00:00:00+00:00",
+            }
+        ]
+        if classification == "FACT_CONFLICT"
+        else []
+    )
     assert report["providerAttempts"] == 1
     assert report["estimatedCostMicros"] == 48
     assert report["attempts"][0]["ticketId"] == "ticket"
@@ -334,6 +359,8 @@ def test_core_collector_preserves_partial_cost_and_pending_when_checkpoint_is_mi
             pass
 
         def execute(self, sql: str) -> Rows:
+            if "from audit_event" in sql:
+                return Rows([])
             if "from intake_model_call" in sql:
                 evidence = {
                     "attempts": [
