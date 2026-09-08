@@ -845,7 +845,7 @@ def main() -> None:
             (
                 ({"type": "STREAM_STARTED"}, 202),
                 ({"type": "CONTENT_DELTA", "chunkIndex": 0, "delta": first_fragment}, 202),
-                ({"type": "CONTENT_DELTA", "chunkIndex": 1, "delta": ""}, 422),
+                ({"type": "CONTENT_DELTA", "chunkIndex": 1, "delta": ""}, 400),
                 ({"type": "CONTENT_DELTA", "chunkIndex": 1, "delta": "WRONG"}, 202),
                 ({"type": "CONTENT_DELTA", "chunkIndex": 2, "delta": last_fragment}, 202),
             )
