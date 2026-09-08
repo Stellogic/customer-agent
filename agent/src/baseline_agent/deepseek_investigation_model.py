@@ -299,7 +299,7 @@ class DeepSeekResponsesInvestigationModel:
 
                     try:
                         payload = response.json()
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as error:
                         classification = DeepSeekFailureClassification.INVALID_JSON
                         await self._record_attempt(
                             internal_call_id,
@@ -308,6 +308,8 @@ class DeepSeekResponsesInvestigationModel:
                             attempt_started,
                             request_body,
                             classification,
+                            provider_http_status=response.status_code,
+                            validation_diagnostic=_json_failure_diagnostic(error, "HTTP_RESPONSE"),
                         )
                         raise _model_call_failure() from None
 
@@ -335,6 +337,7 @@ class DeepSeekResponsesInvestigationModel:
                             failure.classification,
                             payload,
                             provider_http_status=response.status_code,
+                            validation_diagnostic=failure.diagnostic,
                         )
                         raise _model_call_failure() from None
                     await self._record_attempt(
@@ -373,6 +376,7 @@ class DeepSeekResponsesInvestigationModel:
         payload: dict[str, Any] | None = None,
         *,
         provider_http_status: int | None = None,
+        validation_diagnostic: dict[str, object] | None = None,
     ) -> None:
         usage = payload.get("usage") if payload else None
         usage = usage if isinstance(usage, dict) else {}
@@ -435,6 +439,7 @@ class DeepSeekResponsesInvestigationModel:
                     "cached_tokens" in input_details and cached_tokens is not None
                 ),
                 reasoning_tokens=reasoning_tokens,
+                validation_diagnostic=validation_diagnostic,
             )
         )
 
@@ -527,8 +532,11 @@ def _parse_response(payload: dict[str, Any]) -> InvestigationJudgment:
         raise _DeepSeekResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     try:
         structured = json.loads(output_texts[0])
-    except json.JSONDecodeError:
-        raise _DeepSeekResponseFailure(DeepSeekFailureClassification.INVALID_JSON) from None
+    except json.JSONDecodeError as error:
+        raise _DeepSeekResponseFailure(
+            DeepSeekFailureClassification.INVALID_JSON,
+            _json_failure_diagnostic(error, "OUTPUT_TEXT"),
+        ) from None
     if not isinstance(structured, dict) or set(structured) != {
         "compensationReviewRequired",
         "reasonCode",
@@ -653,9 +661,31 @@ def _strict_schema_requested(request_body: dict[str, Any]) -> bool:
     )
 
 
+def _json_failure_diagnostic(error: json.JSONDecodeError, stage: str) -> dict[str, object]:
+    text = error.doc.lstrip()
+    return {
+        "category": "INVALID_JSON",
+        "stage": stage,
+        "offset": error.pos,
+        "line": error.lineno,
+        "column": error.colno,
+        "textLength": len(error.doc),
+        "framing": "CODE_FENCE"
+        if text.startswith("```")
+        else "JSON_CONTAINER"
+        if text.startswith(("{", "["))
+        else "OTHER",
+    }
+
+
 class _DeepSeekResponseFailure(Exception):
-    def __init__(self, classification: DeepSeekFailureClassification) -> None:
+    def __init__(
+        self,
+        classification: DeepSeekFailureClassification,
+        diagnostic: dict[str, object] | None = None,
+    ) -> None:
         self.classification = classification
+        self.diagnostic = diagnostic
         super().__init__(classification.value)
 
 

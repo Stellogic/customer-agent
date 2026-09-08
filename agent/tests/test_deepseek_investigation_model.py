@@ -19,12 +19,51 @@ from baseline_agent.investigation_model import (
     InvestigationJudgmentInput,
     InvestigationReasonCode,
 )
+from baseline_agent.model_call_evidence import serialize_model_attempt
 
 MODEL_INPUT = InvestigationJudgmentInput(
     order_reference="ORDER-DELAY-001",
     delay_seconds=80 * 60 * 60,
     evidence_refs=("order:ORDER-DELAY-001", "logistics:ORDER-DELAY-001"),
 )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "outer,text,framing",
+    [
+        (False, '```json\n{"private":"SYNTHETIC_SECRET"}\n```', "CODE_FENCE"),
+        (False, '{"private":"SYNTHETIC_SECRET"', "JSON_CONTAINER"),
+        (True, "SYNTHETIC_SECRET gateway response", "OTHER"),
+    ],
+)
+async def test_json_failure_diagnostic_preserves_location_without_output(
+    outer: bool, text: str, framing: str
+) -> None:
+    audit = InMemoryModelCallAuditSink()
+    response = (
+        httpx.Response(200, text=text) if outer else httpx.Response(200, json=_response(text=text))
+    )
+    model = DeepSeekResponsesInvestigationModel(
+        DeepSeekResponsesConfig(api_key="synthetic-test-key", max_attempts=1),
+        transport=httpx.MockTransport(lambda _: response),
+        audit_sink=audit,
+    )
+    with pytest.raises(InvestigationJudgmentFailure):
+        await model.judge(MODEL_INPUT)
+    assert len(audit.records) == 1
+    record = audit.records[0]
+    assert record.failure_classification is DeepSeekFailureClassification.INVALID_JSON
+    diagnostic = serialize_model_attempt(record)["validationDiagnostic"]
+    assert isinstance(diagnostic, dict)
+    assert diagnostic["stage"] == ("HTTP_RESPONSE" if outer else "OUTPUT_TEXT")
+    assert diagnostic["framing"] == framing
+    assert diagnostic["textLength"] == len(text)
+    assert isinstance(diagnostic["offset"], int)
+    assert isinstance(diagnostic["line"], int)
+    assert isinstance(diagnostic["column"], int)
+    assert "SYNTHETIC_SECRET" not in json.dumps(serialize_model_attempt(record))
+    assert record.total_tokens == (None if outer else 27)
 
 
 def _response(
