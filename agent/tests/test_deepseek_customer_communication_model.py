@@ -169,7 +169,9 @@ async def test_payment_stream_uses_same_authoritative_contract_and_buffers_publi
 
 
 @pytest.mark.asyncio
-async def test_payment_stream_rejects_inverted_refund_status_without_publishing_prefix() -> None:
+async def test_free_body_payment_stream_preserves_inverted_claim_without_semantic_rejection() -> (
+    None
+):
     from test_customer_communication_model import _payment_input, _payment_reply
 
     published: list[str] = []
@@ -182,16 +184,16 @@ async def test_payment_stream_rejects_inverted_refund_status_without_publishing_
         transport=httpx.MockTransport(lambda _: _streamed(payload, split_at=80)),
     )
 
-    with pytest.raises(CustomerCommunicationFailure):
-        await model.compose(
-            _payment_input(), on_body_delta=lambda delta: _capture(published, delta)
-        )
+    result = await model.compose(
+        _payment_input(), on_body_delta=lambda delta: _capture(published, delta)
+    )
+    assert result.body == reply["body"]
     assert published == []
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("selected_model", ["deepseek-v4-flash", "deepseek-v4-pro"])
-async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context(
+async def test_selected_model_composes_structured_reply_from_minimum_partitioned_context(
     selected_model: str,
 ) -> None:
     captured: list[httpx.Request] = []
@@ -227,10 +229,6 @@ async def test_flash_composes_strict_safe_reply_from_minimum_partitioned_context
     assert request["stream"] is True
     assert request["reasoning"] == {"effort": "none"}
     assert "Never return a JSON Schema" in request["instructions"]
-    assert "frame them as 您反馈" in request["instructions"]
-    assert "补偿建议正在等待人工审批" in request["instructions"]
-    assert "审批完成前不会执行补偿或退款" in request["instructions"]
-    assert "Do not infer any of them from delaySeconds" in request["instructions"]
     assert set(request["text"]["format"]) == {"type", "name", "schema"}
     assert request["text"]["format"]["type"] == "json_schema"
     body_schema = request["text"]["format"]["schema"]["properties"]["body"]
@@ -281,12 +279,10 @@ async def test_valid_reply_survives_body_and_order_stream_boundaries(boundary: s
     assert "".join(published) == body
     assert all(published)
     assert len(published) == (1 if boundary == "body_start" else 2)
-    if boundary != "body_start":
-        assert published[0] == "经核验，订单 "
 
 
 @pytest.mark.asyncio
-async def test_split_closing_quote_does_not_publish_partial_order() -> None:
+async def test_free_body_split_closing_quote_preserves_partial_order_words() -> None:
     body = "订单 ORDER-C1"
     payload = _completed(body)
     text = payload["output"][0]["content"][0]["text"]
@@ -301,14 +297,14 @@ async def test_split_closing_quote_does_not_publish_partial_order() -> None:
             lambda _: _streamed(payload, split_at=text.index(body) + len(body))
         ),
     )
-    with pytest.raises(CustomerCommunicationFailure):
-        await model.compose(_input(), publish)
-    assert published == ["订单 "]
+    result = await model.compose(_input(), publish)
+    assert result.body == body
+    assert "".join(published) == body
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("prefix", ["ORD", "ORDER", "ORDER-"])
-async def test_closed_short_order_prefix_is_not_published(prefix: str) -> None:
+async def test_free_body_short_order_prefix_is_published_verbatim(prefix: str) -> None:
     published: list[str] = []
 
     async def publish(delta: str) -> None:
@@ -318,13 +314,13 @@ async def test_closed_short_order_prefix_is_not_published(prefix: str) -> None:
         DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
         transport=httpx.MockTransport(lambda _: _streamed(_completed(f"订单 {prefix}"))),
     )
-    with pytest.raises(CustomerCommunicationFailure):
-        await model.compose(_input(), publish)
-    assert published == []
+    result = await model.compose(_input(), publish)
+    assert result.body == f"订单 {prefix}"
+    assert "".join(published) == result.body
 
 
 @pytest.mark.asyncio
-async def test_closed_body_with_partial_order_is_rejected_before_publishing() -> None:
+async def test_free_body_partial_order_does_not_replace_structured_order_scope() -> None:
     published: list[str] = []
 
     async def publish(delta: str) -> None:
@@ -335,9 +331,10 @@ async def test_closed_body_with_partial_order_is_rejected_before_publishing() ->
         transport=httpx.MockTransport(lambda _: _streamed(_completed("订单 ORDER-C1"))),
     )
 
-    with pytest.raises(CustomerCommunicationFailure):
-        await model.compose(_input(), publish)
-    assert published == []
+    result = await model.compose(_input(), publish)
+    assert result.body == "订单 ORDER-C1"
+    assert result.referenced_order == "ORDER-C129"
+    assert "".join(published) == result.body
 
 
 @pytest.mark.asyncio
@@ -352,8 +349,32 @@ async def test_completed_empty_body_is_still_rejected_after_waiting_for_stream_c
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "body",
+    [
+        "已退款 999 元，补偿已经执行，工单已关闭。",
+        "订单 ORDER-OTHER 支付状态为未支付。",
+        "Bearer synthetic-secret Authorization: 仅用于合成测试的错误陈述。",
+    ],
+)
+async def test_free_body_stream_keeps_text_verbatim_and_structured_scope(body: str) -> None:
+    published: list[str] = []
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(lambda _: _streamed(_completed(body))),
+    )
+    result = await model.compose(_input(), lambda delta: _capture(published, delta))
+    assert result.body == body
+    assert "".join(published) == body
+    assert result.referenced_order == "ORDER-C129"
+    assert result.intent is CustomerReplyIntent.COMPENSATION_REVIEW_PENDING
+    assert len(model.audit_sink.records) == 1
+    assert model.audit_sink.records[0].failure_classification is None
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("premature_resolution", [False, True])
-async def test_flash_no_compensation_reply_preserves_spring_ticket_authority(
+async def test_free_body_no_compensation_reply_does_not_enforce_ticket_status_wording(
     premature_resolution: bool,
 ) -> None:
     body = "经核验，订单 ORDER-C129 的本次物流延迟不足 24 小时，当前不符合补偿条件。" + (
@@ -372,15 +393,10 @@ async def test_flash_no_compensation_reply_preserves_spring_ticket_authority(
         transport=httpx.MockTransport(supplier),
     )
     model_input = replace(_input(review_required=False), delay_seconds=23 * 60 * 60)
-    if premature_resolution:
-        with pytest.raises(CustomerCommunicationFailure):
-            await model.compose(model_input)
-    else:
-        envelope = await model.compose(model_input)
-        assert envelope.body == body
-        assert envelope.intent is CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
-    assert "Only Spring decides" in captured[0]["instructions"]
-    assert "not a resolved or closed ticket" in captured[0]["instructions"]
+    envelope = await model.compose(model_input)
+    assert envelope.body == body
+    assert envelope.intent is CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
+    assert len(captured) == 1
 
 
 @pytest.mark.asyncio
@@ -413,12 +429,11 @@ async def test_clarification_schema_does_not_allow_unrequested_human_handoff() -
 @pytest.mark.parametrize(
     "payload",
     [
-        _completed("已退款 999 元。"),
         _completed("等待审批。", "NO_COMPENSATION_RESOLUTION"),
         {"status": "completed", "output": []},
     ],
 )
-async def test_unsafe_or_invalid_output_fails_closed(payload: dict[str, object]) -> None:
+async def test_structured_intent_or_invalid_output_fails_closed(payload: dict[str, object]) -> None:
     model = DeepSeekResponsesCustomerCommunicationModel(
         DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
         transport=httpx.MockTransport(lambda _: _streamed(payload)),
@@ -535,7 +550,6 @@ async def test_schema_failure_diagnostic_is_bounded_and_field_specific(
     [
         ("citations", "DOMAIN_KNOWLEDGE_CITATIONS", "$.knowledge.citations"),
         ("evidence", "DOMAIN_EVIDENCE_REFS", "$.evidenceRefs"),
-        ("body", "DOMAIN_BODY_SENSITIVE_LEAK", "$.body"),
     ],
 )
 async def test_domain_failure_diagnostic_uses_fixed_code_without_reply_values(
@@ -562,18 +576,9 @@ async def test_domain_failure_diagnostic_uses_fixed_code_without_reply_values(
             ],
         }
         model_input = _input_with_knowledge()
-    elif fault == "evidence":
+    else:
         raw["evidenceRefs"] = []
         model_input = _input()
-    else:
-        raw["body"] = "Bearer sk-secret Authorization: copied text"
-        raw["schemaVersion"] = "customer-reply-v2"
-        raw["knowledge"] = {
-            "status": "INSUFFICIENT_INFORMATION",
-            "answer": "请补充公开信息。",
-            "citations": [],
-        }
-        model_input = _input_with_knowledge()
     part["text"] = json.dumps(raw, ensure_ascii=False)
     model = DeepSeekResponsesCustomerCommunicationModel(
         DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
@@ -588,7 +593,7 @@ async def test_domain_failure_diagnostic_uses_fixed_code_without_reply_values(
         "category": expected_category,
         "path": expected_path,
         "expected": "customer_reply_policy",
-        "actual_type": "array" if fault in {"citations", "evidence"} else "string",
+        "actual_type": "array",
     }
     assert "do-not-record" not in repr(diagnostic)
     assert "sk-secret" not in repr(diagnostic)

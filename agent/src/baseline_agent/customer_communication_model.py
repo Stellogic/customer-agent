@@ -258,32 +258,6 @@ def validate_customer_communication_input(model_input: CustomerCommunicationInpu
         raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_INPUT)
 
 
-_MONEY_PATTERN = re.compile(
-    r"(?:[¥￥$]|USD|CNY|RMB)\s*(?:\d+(?:\.\d+)?|[零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬]+)"
-    r"|(?:\d+(?:\.\d+)?|[零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬]+)\s*"
-    r"(?:元|块钱|美元|人民币|USD|CNY|RMB)",
-    re.IGNORECASE,
-)
-_RESPONSE_TIME_PROMISE_PATTERN = re.compile(
-    r"(?:\d+(?:\.\d+)?|[零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬]+)\s*"
-    r"(?:秒|分钟|小时|天|工作日)(?:之内|以内|内).{0,8}(?:回复|联系|处理|解决)"
-)
-_ORDER_REFERENCE_PATTERN = re.compile(r"ORDER-[A-Z0-9-]+", re.IGNORECASE)
-_SENSITIVE_LEAK_PATTERN = re.compile(
-    r"(系统提示词|prompt|reasoning|checkpoint|thread_id|api[_\s-]?key|bearer\s+[a-z0-9._-]+)",
-    re.IGNORECASE,
-)
-_PERSON_NAME_CLAIM_PATTERN = re.compile(r"(?:由|被)\s*[\u4e00-\u9fff]{2,4}\s*签收")
-_PREMATURE_TICKET_STATUS_PATTERN = re.compile(
-    r"工单(?:已经|已)(?:自动)?(?:解决|关闭|结案)|已自动(?:解决|关闭|结案)|关闭等待期"
-    r"|(?:五|5)\s*分钟(?:后|内).{0,8}(?:解决|关闭|结案)"
-)
-_DIRECT_COMPENSATION_PROMISE_PATTERN = re.compile(
-    r"(?<!不)(?:已|已经|将|会|承诺|同意)(?:为您)?(?:办理|执行|发放)?(?:补偿|退款)"
-    r"|可以获得(?:补偿|退款)|(?:补偿|退款)(?:已完成|将执行|已发放)"
-)
-
-
 def is_authorized_body_prefix(body: str, order_reference: str, *, complete: bool) -> bool:
     return customer_reply_body_policy_violation(body, order_reference, complete=complete) is None
 
@@ -291,40 +265,9 @@ def is_authorized_body_prefix(body: str, order_reference: str, *, complete: bool
 def customer_reply_body_policy_violation(
     body: str, order_reference: str, *, complete: bool
 ) -> str | None:
-    """Return a fixed body-policy code without exposing the rejected body."""
-    if not body or not order_reference or len(body) > 1_000:
+    """Validate transport bounds only; free text is not business authority."""
+    if not body or (complete and not body.strip()) or len(body) > 1_000:
         return "REQUIRED_OR_LENGTH"
-    if _MONEY_PATTERN.search(body) is not None:
-        return "MONEY"
-    if _RESPONSE_TIME_PROMISE_PATTERN.search(body) is not None:
-        return "RESPONSE_TIME_PROMISE"
-    if _SENSITIVE_LEAK_PATTERN.search(body) is not None:
-        return "SENSITIVE_LEAK"
-    if _PERSON_NAME_CLAIM_PATTERN.search(body) is not None:
-        return "PERSON_NAME_CLAIM"
-    if _PREMATURE_TICKET_STATUS_PATTERN.search(body) is not None:
-        return "PREMATURE_TICKET_STATUS"
-    for match in _ORDER_REFERENCE_PATTERN.finditer(body):
-        if match.group(0).upper() != order_reference.upper():
-            if (
-                not complete
-                and match.end() == len(body)
-                and order_reference.upper().startswith(match.group(0).upper())
-            ):
-                continue
-            return "ORDER_REFERENCE_SCOPE"
-    if complete:
-        upper_body = body.upper()
-        upper_order = order_reference.upper()
-        for size in range(3, len(upper_order)):
-            if upper_body.endswith(upper_order[:size]):
-                start = len(upper_body) - size
-                if start == 0 or not upper_body[start - 1].isalnum():
-                    return "ORDER_REFERENCE_SCOPE"
-        if not _has_only_allowed_compensation_language(
-            body, _infer_intent_from_compensation_language(body)
-        ):
-            return "COMPENSATION_LANGUAGE"
     return None
 
 
@@ -374,7 +317,7 @@ def customer_reply_policy_violation(
         return ("ENVELOPE_TYPE", "$")
     if envelope.schema_version != expected_schema:
         return ("SCHEMA_VERSION", "$.schemaVersion")
-    if not envelope.body:
+    if not envelope.body.strip():
         return ("BODY_REQUIRED", "$.body")
     if len(envelope.body) > 1_000:
         return ("BODY_LENGTH", "$.body")
@@ -400,54 +343,7 @@ def customer_reply_policy_violation(
         ):
             return ("BODY_TEMPLATE", "$.body")
         return None
-    body_violation = customer_reply_body_policy_violation(
-        envelope.body, model_input.order_reference, complete=True
-    )
-    if body_violation is not None:
-        return (f"BODY_{body_violation}", "$.body")
-    if not _has_grounded_investigation_narrative(model_input, envelope.body):
-        return ("GROUNDED_NARRATIVE", "$.body")
     return None
-
-
-def _infer_intent_from_compensation_language(body: str) -> CustomerReplyIntent:
-    if "补偿建议正在等待人工审批" in body:
-        return CustomerReplyIntent.COMPENSATION_REVIEW_PENDING
-    return CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
-
-
-def _has_only_allowed_compensation_language(body: str, intent: CustomerReplyIntent) -> bool:
-    remaining = body
-    if intent is CustomerReplyIntent.COMPENSATION_REVIEW_PENDING:
-        pending = "补偿建议正在等待人工审批"
-        no_execution = "审批完成前不会执行补偿或退款"
-        if pending not in remaining or no_execution not in remaining:
-            return False
-        remaining = remaining.replace(pending, "").replace(no_execution, "")
-        return "补偿" not in remaining and "退款" not in remaining
-    if intent is CustomerReplyIntent.NO_COMPENSATION_RESOLUTION:
-        # Intent and Spring facts carry the decision. Keep natural denial wording while
-        # rejecting concrete compensation/refund actions and positive promises.
-        return _DIRECT_COMPENSATION_PROMISE_PATTERN.search(remaining) is None
-    return False
-
-
-def _has_grounded_investigation_narrative(
-    model_input: CustomerCommunicationInput, body: str
-) -> bool:
-    if _PERSON_NAME_CLAIM_PATTERN.search(body) is not None:
-        return False
-    if model_input.risk_scenario == "DUPLICATE_CHARGE":
-        return _has_grounded_payment_narrative(model_input, body)
-    if model_input.delay_seconds is not None:
-        claimed_hours = [int(match.group(1)) for match in re.finditer(r"(\d+)\s*小时", body)]
-        authority_hours = model_input.delay_seconds // 3600
-        for hours in claimed_hours:
-            matches_authority = hours == authority_hours
-            mentions_threshold = authority_hours < 24 and hours == 24
-            if not matches_authority and not mentions_threshold:
-                return False
-    return True
 
 
 def _payment_status_statements(payment: PaymentCommunicationFacts) -> tuple[str, str]:
@@ -464,31 +360,6 @@ def _default_payment_reply_body(model_input: CustomerCommunicationInput) -> str:
     return (
         f"订单 {model_input.order_reference} 的记录显示{paid}，{refunded}。"
         "现有信息不足以确认是否发生重复扣款或查明原因，需要人工核查。本次调查未执行退款。"
-    )
-
-
-def _has_grounded_payment_narrative(model_input: CustomerCommunicationInput, body: str) -> bool:
-    payment = model_input.payment_facts
-    if payment is None:
-        return False
-    statements = _payment_status_statements(payment)
-    if not all(statement in body for statement in statements):
-        return False
-    if "人工核查" not in body or "未执行退款" not in body:
-        return False
-    if not any(word in body for word in ("不足以确认", "尚未确认", "无法确认")):
-        return False
-    remainder = body
-    for statement in statements:
-        remainder = remainder.replace(statement, "")
-    # 聚合状态不是逐笔流水;仅阻止明确与本合同矛盾的事实/原因断言。
-    return (
-        re.search(
-            r"(?:已|已经|未|尚未)(?:支付|付款|退款|退回)|支付成功|退款成功|从未退款|"
-            r"原因(?:是|为)|已确认(?:发生)?重复扣款|(?:两|2)笔|物流|延迟|小时",
-            remainder,
-        )
-        is None
     )
 
 

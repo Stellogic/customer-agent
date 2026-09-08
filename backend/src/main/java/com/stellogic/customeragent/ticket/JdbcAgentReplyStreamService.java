@@ -100,11 +100,10 @@ class JdbcAgentReplyStreamService implements AgentReplyStreamService {
                     throw new ResponseStatusException(
                             HttpStatus.UNPROCESSABLE_ENTITY, "public reply exceeds safe limit");
                 }
-                if (!CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(
-                        body, authority.orderReference(), false)) {
+                if (body.isEmpty()) {
                     throw new ResponseStatusException(
                             HttpStatus.UNPROCESSABLE_ENTITY,
-                            "public reply is outside the Spring-authorized narrative");
+                            "public reply must contain text within the length limit");
                 }
                 upsert(
                         command,
@@ -118,8 +117,7 @@ class JdbcAgentReplyStreamService implements AgentReplyStreamService {
             case COMPLETED -> {
                 if (state == null
                         || !"STREAMING".equals(state.status())
-                        || !CustomerReplySafetyPolicy.isAuthorizedBodyPrefix(
-                                state.body(), authority.orderReference(), true)) {
+                        || !CustomerReplySafetyPolicy.isValidBody(state.body())) {
                     rejectTransition();
                 }
                 upsert(
@@ -168,12 +166,12 @@ class JdbcAgentReplyStreamService implements AgentReplyStreamService {
     private GenerationAuthority requireCurrentGeneration(AgentReplyStreamCommand command) {
         List<GenerationAuthority> rows =
                 jdbc.query(
-                        "select g.generation_number, t.order_reference from agent_processing_generation g "
+                        "select g.generation_number from agent_processing_generation g "
                                 + "join support_ticket t on t.id = g.ticket_id "
                                 + "where g.id = ? and g.ticket_id = ? and g.status = ? "
                                 + "and g.generation_number = (select max(g2.generation_number) from agent_processing_generation g2 where g2.ticket_id = g.ticket_id) "
                                 + "and t.handling_mode = 'AGENT' and not t.customer_human_preference",
-                        (rs, row) -> new GenerationAuthority(rs.getLong(1), rs.getString(2)),
+                        (rs, row) -> new GenerationAuthority(rs.getLong(1)),
                         command.generationId(),
                         command.ticketId(),
                         command.type() == AgentReplyStreamEventType.COMPLETED
@@ -268,7 +266,7 @@ class JdbcAgentReplyStreamService implements AgentReplyStreamService {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "invalid public reply transition");
     }
 
-    private record GenerationAuthority(long generationNumber, String orderReference) {}
+    private record GenerationAuthority(long generationNumber) {}
 
     private record CurrentState(
             String status, String body, int nextChunkIndex, String progressStage) {}
