@@ -8,7 +8,8 @@ param(
 if ($CoreMatrix -and $Mode -ne 'normal') { throw 'CoreMatrix 只允许 normal 离线模式。' }
 $testFile = if ($CoreMatrix) { 'e2e/issue230.core-matrix.spec.ts' } else { 'e2e/issue230.full-stack.spec.ts' }
 $barrierTimeout = if ($CoreMatrix) { 0 } else { 8 }
-$streamPause = if ($CoreMatrix) { 1 } else { 0 }
+# 仅离线夹具留出数据库观测和页面发送的时间；真实供应商入口不注入此延时。
+$streamPause = if ($CoreMatrix) { 5 } else { 0 }
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true

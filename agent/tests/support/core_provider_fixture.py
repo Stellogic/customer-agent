@@ -77,6 +77,9 @@ async def _intake(schema: str, value: dict[str, Any]) -> dict[str, Any]:
         issues = {issue.kind: issue.summary for issue in result.issues}
         pending = set(result.pending_issue_kinds)
         if (result.candidate_order_reference or "").startswith("ORDER-CORE-NO-COMPENSATION-2-"):
+            issues.pop("LOGISTICS_DELAY", None)
+            pending.discard("LOGISTICS_DELAY")
+        if (result.candidate_order_reference or "").startswith("ORDER-CORE-PENDING-APPROVAL-2-"):
             pending.add("LOGISTICS_DELAY")
         return {
             "candidateOrderReference": result.candidate_order_reference,

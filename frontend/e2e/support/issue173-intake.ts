@@ -4,6 +4,7 @@ import { executeFixtureSql } from "./database";
 
 type LogisticsIntakeSnapshot = {
   status: string;
+  assistantMessage: string;
   candidateOrder: { reference: string };
   remainingOrderCount: number;
   ticketIds: string[];
@@ -58,9 +59,11 @@ export async function createSingleTicket(
     expect(snapshot.remainingOrderCount).toBe(0);
     expect(snapshot.ticketIds).toEqual([]);
     if (snapshot.status === "NEEDS_CLARIFICATION") {
-      await expect(
-        page.getByText("请确认物流是否已经超过预期时间仍无进展。", { exact: true }),
-      ).toBeVisible();
+      expect([
+        "请确认物流是否已经超过预期时间仍无进展。",
+        `你说的是不是订单 ${reference} 的物流延迟问题？也可以直接纠正我的理解。`,
+      ]).toContain(snapshot.assistantMessage);
+      await expect(page.getByText(snapshot.assistantMessage, { exact: true })).toBeVisible();
       expect(snapshot.issues).toEqual([]);
       const clarified = intakeReply(page);
       await page.getByLabel("补充受理信息").fill("确实延迟，请核实物流状态。");

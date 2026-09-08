@@ -3,11 +3,18 @@ from support.core_provider_fixture import _intake
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sample,assessment", [(1, "ASSERTED"), (2, "UNCERTAIN")])
-async def test_no_compensation_sample_two_requires_logistics_clarification(
-    sample: int, assessment: str
+@pytest.mark.parametrize(
+    "case,assessment",
+    [
+        ("NO-COMPENSATION-1", "ASSERTED"),
+        ("NO-COMPENSATION-2", "NOT_MENTIONED"),
+        ("PENDING-APPROVAL-2", "UNCERTAIN"),
+    ],
+)
+async def test_logistics_fixture_covers_direct_and_both_clarification_paths(
+    case: str, assessment: str
 ) -> None:
-    reference = f"ORDER-CORE-NO-COMPENSATION-{sample}-FIXTURE"
+    reference = f"ORDER-CORE-{case}-FIXTURE"
     result = await _intake(
         "customer_intake_issue_assessments",
         {
