@@ -1,5 +1,8 @@
 param(
     [switch]$ConfirmProviderSpend,
+    [switch]$ContinueOnCaseFailure,
+    [ValidateSet("deepseek-v4-flash", "deepseek-v4-pro")][string]$Model = "deepseek-v4-pro",
+    [ValidateSet("deepseek-v4-flash", "deepseek-v4-pro")][string]$CommunicationModel,
     [Parameter(Mandatory)][string]$TestedHead,
     [Parameter(Mandatory)][string]$ModelPath,
     [Parameter(Mandatory)][string]$LedgerPath,
@@ -17,6 +20,9 @@ param(
 # 先离线验证并审查冻结参数，再显式执行；本脚本不创建或重置授权账本。
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
+if (-not $CommunicationModel) { $CommunicationModel = $Model }
+$maximumCaseFailures = if ($ContinueOnCaseFailure) { 0 } else { 1 }
+$continueCaseFailures = $ContinueOnCaseFailure.IsPresent.ToString().ToLowerInvariant()
 $repo = Split-Path -Parent $PSScriptRoot
 . "$repo/scripts/test-gate-lock.ps1"
 . "$repo/scripts/gate-resources.ps1"
@@ -50,11 +56,13 @@ $ledgerName = Split-Path -Leaf $ledgerPath
 $modelPath = (Resolve-Path -LiteralPath $ModelPath).Path.Replace('\', '/')
 $ledger = Get-Content -Raw -LiteralPath $ledgerPath | ConvertFrom-Json
 if ($ledger.schemaVersion -ne 'issue230-core-budget-v1' -or $ledger.currency -ne 'CNY' -or
-    $ledger.model -ne 'deepseek-v4-flash' -or $ledger.authorizationId -ne $AuthorizationId -or
+    $ledger.model -ne $Model -or $ledger.authorizationId -ne $AuthorizationId -or
     $ledger.limitMicros -ne $LimitMicros -or $ledger.maxAttempts -ne $MaxAttempts -or
     $ledger.maxTokens -ne $MaxTokens -or [datetimeoffset]$ledger.deadline -ne $Deadline -or $Deadline -le [datetimeoffset]::UtcNow) {
     throw '冻结参数与现有核心账本不一致或已到期；禁止自动建立新账本。'
 }
+$ledgerCommunicationModel = if ($ledger.communicationModel) { $ledger.communicationModel } else { $ledger.model }
+if ($ledgerCommunicationModel -ne $CommunicationModel) { throw "回复模型与冻结账本不一致。" }
 if (@($ledger.entries | Where-Object status -ne 'SETTLED').Count -ne 0) { throw '账本含 PENDING/IN_FLIGHT，必须停止，不能释放预留重跑。' }
 $planPath = Join-Path $ledgerDirectory 'real-core-plan.json'
 if (Test-Path -LiteralPath $planPath) { throw '此授权已冻结执行；禁止通过新 RunId 重跑场景。' }
@@ -98,10 +106,10 @@ try {
     New-Item -ItemType Directory -Path $evidence, (Join-Path $evidence 'artifacts') | Out-Null
     [ordered]@{
         schemaVersion = 'issue230-real-core-plan-v1'; authorizationId = $AuthorizationId
-        runId = $RunId; testedHead = $TestedHead; model = 'deepseek-v4-flash'; providerVersions = $ProviderVersions
+        runId = $RunId; testedHead = $TestedHead; model = $Model; communicationModel = $CommunicationModel; pricesByModel = $ledger.pricesByModel; providerVersions = $ProviderVersions
         limitMicros = $LimitMicros; currency = 'CNY'; maxAttempts = $MaxAttempts; maxTokens = $MaxTokens
         deadline = $Deadline.ToUniversalTime().ToString('o'); investigationWallClockMs = $InvestigationWallClockMs
-        denominator = 10; matrix = $matrix; selectedCase = $Case; selectedSample = $Sample; retries = 0; maxFailures = 1
+        denominator = 10; matrix = $matrix; selectedCase = $Case; selectedSample = $Sample; retries = 0; maxFailures = $maximumCaseFailures; continueOnCaseFailure = $ContinueOnCaseFailure.IsPresent; workers = 1
         sideEffects = @('创建本轮合成订单与工单', '发布客户公开回复', '客服领取并释放本轮支付工单', '创建待审批提案；不批准或执行补偿')
         notes = @('输入预算是程序工程预留，不是供应商数学上界。', '供应商费用未知时保留预留并停止，不换账本重跑。')
     } | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $planPath
@@ -139,7 +147,8 @@ services:
       INVESTIGATION_ACTION_MODEL_MODE: deepseek-formal
       CUSTOMER_COMMUNICATION_MODEL_MODE: deepseek-formal
       DEEPSEEK_API_KEY:
-      DEEPSEEK_MODEL: deepseek-v4-flash
+      DEEPSEEK_MODEL: $Model
+      DEEPSEEK_COMMUNICATION_MODEL: $CommunicationModel
       CORE_VALIDATION_BUDGET_PATH: /core-budget/$ledgerName
       CORE_VALIDATION_AUTHORIZATION_ID: '$AuthorizationId'
   agent-migrate:
@@ -170,13 +179,24 @@ services:
     environment:
       ISSUE230_CORE_CASE: '$Case'
       ISSUE230_CORE_SAMPLE: '$Sample'
+      ISSUE230_CONTINUE_ON_CASE_FAILURE: '$continueCaseFailures'
+      ISSUE230_CORE_BUDGET_PATH: '/core-budget/$ledgerName'
       PLAYWRIGHT_JSON_OUTPUT_FILE: /artifacts/playwright.json
     volumes:
       - '${mount}/artifacts:/artifacts'
+      - '${ledgerDirectory}:/core-budget:ro'
 "@ | Set-Content -LiteralPath $override
     $config = Invoke-RealCompose @('config', '--format', 'json') | ConvertFrom-Json
     Assert-ComposeResourcesOwned -ProjectName $project -EffectiveConfig $config
     $agentEnvironment = $config.services.'agent-server'.environment
+    $browserEnvironment = $config.services.'browser-acceptance'.environment
+    $browserBudgetMount = @($config.services.'browser-acceptance'.volumes | Where-Object target -eq '/core-budget')
+    if ($browserEnvironment.ISSUE230_CONTINUE_ON_CASE_FAILURE -ne $continueCaseFailures -or
+        $browserEnvironment.ISSUE230_CORE_BUDGET_PATH -ne "/core-budget/$ledgerName" -or
+        $browserBudgetMount.Count -ne 1 -or -not $browserBudgetMount[0].read_only) {
+        throw '实际浏览器配置与冻结的继续模式或只读预算挂载不一致。'
+    }
+    if ($agentEnvironment.DEEPSEEK_MODEL -ne $Model -or $agentEnvironment.DEEPSEEK_COMMUNICATION_MODEL -ne $CommunicationModel) { throw "实际角色模型与冻结配置不一致。" }
     if ($agentEnvironment.CORE_VALIDATION_BUDGET_PATH -ne "/core-budget/$ledgerName" -or
         $agentEnvironment.CORE_VALIDATION_AUTHORIZATION_ID -ne $AuthorizationId -or
         $agentEnvironment.DEEPSEEK_API_KEY -ne $env:DEEPSEEK_API_KEY -or
@@ -201,7 +221,7 @@ services:
     Invoke-RealCompose @('up', '-d', '--no-build', '--wait', 'backend', 'agent-server', 'browser-frontend')
     $servicesReady = $true
     # 不启动 compensation-executor，场景也不执行审批或赔付操作。
-    Invoke-RealCompose @('run', '--rm', '--no-deps', 'browser-acceptance', '--workers=1', '--retries=0', '--max-failures=1', '--reporter=json', '--output=/artifacts', 'e2e/issue230.core-matrix.spec.ts')
+    Invoke-RealCompose @('run', '--rm', '--no-deps', 'browser-acceptance', '--workers=1', '--retries=0', "--max-failures=$maximumCaseFailures", '--reporter=json', '--output=/artifacts', 'e2e/issue230.core-matrix.spec.ts')
     $outcome = 'BROWSER_PASS'
 } catch {
     $outcome = 'FAIL'

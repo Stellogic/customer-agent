@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { login } from "./support/auth";
 import { newAcceptanceContext } from "./support/browser-context";
 import { executeFixtureSql, queryFixtureSql } from "./support/database";
 import { createSingleTicket, intakeReply } from "./support/issue173-intake";
+import { coreCaseBudgetStopReason, type CoreCaseBudget } from "../src/test-support/issue230-case-budget";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -18,7 +20,25 @@ const selectedCase = process.env.ISSUE230_CORE_CASE;
 const selectedSample = process.env.ISSUE230_CORE_SAMPLE;
 if (selectedCase && !cases.includes(selectedCase as CoreCase)) throw new Error("未知核心场景");
 if (selectedSample && !["1", "2"].includes(selectedSample)) throw new Error("核心样本只能为1或2");
-test.describe.configure({ mode: "serial", retries: 0 });
+const continueOnCaseFailure = process.env.ISSUE230_CONTINUE_ON_CASE_FAILURE === "true";
+const caseBudgetPath = process.env.ISSUE230_CORE_BUDGET_PATH;
+if (continueOnCaseFailure && !caseBudgetPath) throw new Error("整批收集模式需要只读预算账本");
+test.describe.configure({ mode: continueOnCaseFailure ? "default" : "serial", retries: 0 });
+
+let stoppedBeforeCase: string | null = null;
+test.beforeEach(() => {
+  if (!continueOnCaseFailure) return;
+  if (!stoppedBeforeCase) {
+    try {
+      const ledger = JSON.parse(readFileSync(caseBudgetPath!, "utf8")) as CoreCaseBudget;
+      stoppedBeforeCase = coreCaseBudgetStopReason(ledger, Date.now());
+    } catch {
+      stoppedBeforeCase = "CORE_BUDGET_UNREADABLE";
+    }
+  }
+  // 一旦预算检查停止,其余用例保留未运行;不改写账本或等待预留自动释放。
+  test.skip(stoppedBeforeCase !== null, stoppedBeforeCase ?? "");
+});
 
 function prepare(caseName: CoreCase, sample: number) {
   const reference = `ORDER-CORE-${caseName.toUpperCase().replaceAll("_", "-")}-${sample}-${crypto.randomUUID()}`;
@@ -80,7 +100,12 @@ async function complete(ticketId: string, generation = 1) {
     .toBe("COMPLETED");
 }
 
-async function verifyLogistics(page: Page, ticketId: string, pending: boolean) {
+async function verifyLogistics(
+  page: Page,
+  ticketId: string,
+  pending: boolean,
+  clarifiedNoCompensation = false,
+) {
   const response = await page.request.get(`/api/customer/v2/tickets/${ticketId}`);
   expect(response.ok()).toBe(true);
   const snapshot = (await response.json()) as {
@@ -88,12 +113,25 @@ async function verifyLogistics(page: Page, ticketId: string, pending: boolean) {
     pendingCompensation: { status: string } | null;
     messages: { author: string; body: string }[];
   };
-  expect(snapshot.ticket.handlingMode).toBe("AGENT");
+  expect(snapshot.ticket.handlingMode).toBe(clarifiedNoCompensation ? "HUMAN" : "AGENT");
   expect(
     queryFixtureSql(
-      `SELECT count(*) FROM support_ticket WHERE id = '${ticketId}' AND human_handoff_reason_code IS NOT NULL;`,
+      `SELECT coalesce(human_handoff_reason_code, '') FROM support_ticket WHERE id = '${ticketId}';`,
     ),
-  ).toBe("0");
+  ).toBe(clarifiedNoCompensation ? "DELAY_UNDER_24_HOURS" : "");
+  if (clarifiedNoCompensation) {
+    expect(pending).toBe(false);
+    expect(
+      queryFixtureSql(
+        `SELECT count(*) FROM audit_event WHERE ticket_id = '${ticketId}' AND event_type = 'AGENT_CONCLUSION_ACCEPTED';`,
+      ),
+    ).toBe("1");
+    expect(
+      snapshot.messages.some(
+        ({ author, body }) => author === "CUSTOMER" && body === "确实延迟，请核实物流状态。",
+      ),
+    ).toBe(true);
+  }
   if (pending) expect(snapshot.pendingCompensation?.status).toBe("PENDING_REVIEW");
   else expect(snapshot.pendingCompensation).toBeNull();
   expect(snapshot.messages.some(({ author, body }) => author === "AGENT" && body.length > 0)).toBe(
@@ -309,22 +347,32 @@ for (const caseName of cases.filter((value) => !selectedCase || value === select
             caseName === "no_compensation"
               ? "请解释物流状态"
               : "物流延迟，请核实订单后说明处理方案。",
+            true,
           );
           evidence.ticketId = ticketId;
-          expect(
-            queryFixtureSql(`
-            SELECT count(*) FROM intake_model_call
+          const intakePhases = queryFixtureSql(`
+            SELECT string_agg(phase, ',' ORDER BY started_at) FROM intake_model_call
             WHERE intake_id = (
               SELECT record.intake_id FROM shared_intake_record record
               JOIN shared_intake_issue issue ON issue.shared_intake_record_id = record.id
               WHERE issue.ticket_id = '${ticketId}'
             );
-          `),
-          ).toBe("1");
+          `);
+          expect(intakePhases).toMatch(/^START(?:,FOLLOWUP)?$/);
+          const clarifiedNoCompensation =
+            caseName === "no_compensation" && intakePhases === "START,FOLLOWUP";
+          evidence.logisticsEndpoint = clarifiedNoCompensation
+            ? "GROUNDED_NO_COMPENSATION_THEN_HUMAN"
+            : "AGENT";
           if (caseName === "generation_fence")
             evidence.fence = await fenceDuringRealDelta(page, ticketId, sample, evidence);
           else await complete(ticketId);
-          await verifyLogistics(page, ticketId, caseName !== "no_compensation");
+          await verifyLogistics(
+            page,
+            ticketId,
+            caseName !== "no_compensation",
+            clarifiedNoCompensation,
+          );
         }
       } finally {
         await testInfo.attach("core-matrix-case", {

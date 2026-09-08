@@ -43,7 +43,7 @@ def test_shadow_and_formal_flash_are_mutually_exclusive() -> None:
         {
             "AGENT_INVESTIGATION_MODEL_MODE": "deepseek-formal",
             "DEEPSEEK_API_KEY": "synthetic-test-key",
-            "DEEPSEEK_MODEL": "deepseek-v4-pro",
+            "DEEPSEEK_MODEL": "unsupported-model",
         },
         {"AGENT_INVESTIGATION_MODEL_MODE": "unknown"},
     ],
@@ -57,18 +57,19 @@ def test_invalid_formal_configuration_fails_instead_of_falling_back_to_fake(
     assert captured.value.code is InvestigationJudgmentFailureCode.CONFIGURATION_ERROR
 
 
-def test_formal_flash_freezes_bounded_provider_attempts_and_deadline() -> None:
+@pytest.mark.parametrize("model", ["deepseek-v4-flash", "deepseek-v4-pro"])
+def test_formal_flash_freezes_bounded_provider_attempts_and_deadline(model: str) -> None:
     runtime = configured_investigation_model(
         {
             "AGENT_INVESTIGATION_MODEL_MODE": "deepseek-formal",
             "AGENT_INVESTIGATION_SHADOW_MODE": "disabled",
             "DEEPSEEK_API_KEY": "synthetic-test-key",
-            "DEEPSEEK_MODEL": "deepseek-v4-flash",
+            "DEEPSEEK_MODEL": model,
         },
         transport=httpx.MockTransport(lambda _: httpx.Response(503)),
     )
 
-    assert runtime.mode == "deepseek-v4-flash-formal-v1"
+    assert runtime.mode == f"{model}-formal-v1"
     assert isinstance(runtime.model, DeepSeekResponsesInvestigationModel)
     assert runtime.maximum_provider_attempts == 1
     assert runtime.call_deadline_seconds == 20

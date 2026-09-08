@@ -633,3 +633,45 @@ async def test_optional_read_reserves_an_action_and_provider_attempt_for_submiss
     assert "SUBMIT_CONCLUSION" in offered
     assert "HANDOFF" in offered
     assert len(audit.records) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("malformed", [False, True])
+async def test_pro_action_prices_known_usage_on_success_and_parse_failure(malformed: bool) -> None:
+    def supplier(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["model"] == "deepseek-v4-pro"
+        payload = {**_completed_action("CONFIRM_ORDER"), "model": "deepseek-v4-pro-0813"}
+        if malformed:
+            payload["output"] = []
+        return httpx.Response(200, json=payload)
+
+    model = DeepSeekResponsesInvestigationActionModel(
+        DeepSeekActionConfig(api_key="synthetic-test-key", model="deepseek-v4-pro"),
+        transport=httpx.MockTransport(supplier),
+    )
+    if malformed:
+        with pytest.raises(ActionLoopFailure) as failure:
+            await model.choose({})
+        assert failure.value.tokens == 40
+        assert failure.value.cost_micros == 80
+    else:
+        decision = await model.choose({})
+        assert decision.action.kind is InvestigationCapability.CONFIRM_ORDER
+        assert decision.usage.tokens == 40
+        assert decision.usage.cost_micros == 80
+    record = model.audit_sink.records[0]
+    assert record.request_model == "deepseek-v4-pro"
+    assert record.response_model == "deepseek-v4-pro-0813"
+
+
+@pytest.mark.asyncio
+async def test_pro_action_rejects_flash_response_instead_of_misidentifying_model() -> None:
+    model = DeepSeekResponsesInvestigationActionModel(
+        DeepSeekActionConfig(api_key="synthetic-test-key", model="deepseek-v4-pro"),
+        transport=httpx.MockTransport(
+            lambda _: httpx.Response(200, json=_completed_action("CONFIRM_ORDER"))
+        ),
+    )
+    with pytest.raises(ActionLoopFailure) as failure:
+        await model.choose({})
+    assert failure.value.failure_classification == "SCHEMA_MISMATCH"

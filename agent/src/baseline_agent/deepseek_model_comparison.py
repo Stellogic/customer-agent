@@ -12,6 +12,8 @@ from typing import Any
 import httpx
 
 from baseline_agent.deepseek_investigation_model import (
+    INVESTIGATION_JUDGMENT_PROMPT_VERSION,
+    INVESTIGATION_JUDGMENT_SCHEMA_VERSION,
     DeepSeekResponsesConfig,
     DeepSeekResponsesInvestigationModel,
     InMemoryModelCallAuditSink,
@@ -401,8 +403,8 @@ def _comparison_report(
         "fixedCandidates": list(_CANDIDATE_MODELS),
         "automaticModelSwitching": False,
         "sharedContract": {
-            "promptVersion": "investigation-judgment-v1",
-            "schemaVersion": "investigation-judgment-v1",
+            "promptVersion": INVESTIGATION_JUDGMENT_PROMPT_VERSION,
+            "schemaVersion": INVESTIGATION_JUDGMENT_SCHEMA_VERSION,
             "thinking": "disabled",
             "strictJsonSchema": True,
             "maximumAttemptsPerScenario": _MAX_ATTEMPTS_PER_SCENARIO,

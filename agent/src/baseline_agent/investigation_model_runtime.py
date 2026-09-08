@@ -66,7 +66,7 @@ def configured_investigation_model(
                 "DEEPSEEK_RESPONSES_ENDPOINT", "https://api.deepseek.com/responses"
             ),
         ),
-        mode="deepseek-v4-flash-formal-v1",
+        mode=f"{config.model}-formal-v1",
         maximum_provider_attempts=config.max_attempts,
         call_deadline_seconds=int(config.deadline_seconds),
     )

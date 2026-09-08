@@ -10,7 +10,6 @@ from baseline_agent.deepseek_investigation_action_model import (
     DeepSeekActionConfig,
     DeepSeekResponsesInvestigationActionModel,
 )
-from baseline_agent.deepseek_investigation_model import DEEPSEEK_FLASH_MODEL
 from baseline_agent.investigation_action_loop import (
     ActionLoopFailure,
     ActionLoopFailureCode,
@@ -43,7 +42,7 @@ def configured_investigation_action_model(
             maximum_attempts_per_action=1,
             call_deadline_seconds=0,
         )
-    if mode != _FORMAL_MODE or environment.get("DEEPSEEK_MODEL") != DEEPSEEK_FLASH_MODEL:
+    if mode != _FORMAL_MODE:
         raise ActionLoopFailure(ActionLoopFailureCode.MODEL_CALL_FAILED)
     config = DeepSeekActionConfig.from_environment(environment)
     return ConfiguredInvestigationActionModel(
@@ -55,7 +54,7 @@ def configured_investigation_action_model(
                 "DEEPSEEK_RESPONSES_ENDPOINT", "https://api.deepseek.com/responses"
             ),
         ),
-        mode="deepseek-v4-flash-action-formal-v1",
+        mode=f"{config.model}-action-formal-v1",
         maximum_attempts_per_action=config.max_attempts,
         call_deadline_seconds=round(config.deadline_seconds),
     )

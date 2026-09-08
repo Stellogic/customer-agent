@@ -27,7 +27,7 @@ from baseline_agent.investigation_model import (
 _RESPONSES_ENDPOINT = "https://api.deepseek.com/responses"
 DEEPSEEK_FLASH_MODEL = "deepseek-v4-flash"
 DEEPSEEK_PRO_MODEL = "deepseek-v4-pro"
-INVESTIGATION_JUDGMENT_PROMPT_VERSION = "investigation-judgment-v1"
+INVESTIGATION_JUDGMENT_PROMPT_VERSION = "investigation-judgment-v2"
 INVESTIGATION_JUDGMENT_SCHEMA_VERSION = "investigation-judgment-v1"
 _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 503})
 _FLASH_INPUT_USD_PER_MILLION_TOKENS = 0.44
@@ -60,17 +60,11 @@ class DeepSeekResponsesConfig:
     max_attempts: int = 3
     retry_base_delay_seconds: float = 0.2
     max_output_tokens: int = 128
-    _model_comparison_candidate: bool = field(default=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if (
             not self.api_key.strip()
-            or self.model
-            not in (
-                {DEEPSEEK_FLASH_MODEL, DEEPSEEK_PRO_MODEL}
-                if self._model_comparison_candidate
-                else {DEEPSEEK_FLASH_MODEL}
-            )
+            or self.model not in {DEEPSEEK_FLASH_MODEL, DEEPSEEK_PRO_MODEL}
             or self.connect_timeout_seconds <= 0
             or self.read_timeout_seconds <= 0
             or self.deadline_seconds <= 0
@@ -102,7 +96,6 @@ class DeepSeekResponsesConfig:
             max_attempts=max_attempts,
             retry_base_delay_seconds=retry_base_delay_seconds,
             max_output_tokens=max_output_tokens,
-            _model_comparison_candidate=True,
         )
 
     @classmethod
@@ -171,6 +164,19 @@ def estimate_flash_cost_micros(input_tokens: int, output_tokens: int) -> int:
         input_tokens * _FLASH_INPUT_USD_PER_MILLION_TOKENS
         + output_tokens * _FLASH_OUTPUT_USD_PER_MILLION_TOKENS
     )
+
+
+def estimate_model_cost_micros(model: str, input_tokens: int, output_tokens: int) -> int:
+    # 峰时非缓存美元程序估算;人民币授权账本独立结算。
+    prices = {
+        DEEPSEEK_FLASH_MODEL: (
+            _FLASH_INPUT_USD_PER_MILLION_TOKENS,
+            _FLASH_OUTPUT_USD_PER_MILLION_TOKENS,
+        ),
+        DEEPSEEK_PRO_MODEL: (1.32, 3.96),
+    }
+    input_price, output_price = prices[model]
+    return math.ceil(input_tokens * input_price + output_tokens * output_price)
 
 
 class DeepSeekResponsesInvestigationModel:
@@ -293,7 +299,7 @@ class DeepSeekResponsesInvestigationModel:
 
                     try:
                         payload = response.json()
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as error:
                         classification = DeepSeekFailureClassification.INVALID_JSON
                         await self._record_attempt(
                             internal_call_id,
@@ -302,6 +308,8 @@ class DeepSeekResponsesInvestigationModel:
                             attempt_started,
                             request_body,
                             classification,
+                            provider_http_status=response.status_code,
+                            validation_diagnostic=_json_failure_diagnostic(error, "HTTP_RESPONSE"),
                         )
                         raise _model_call_failure() from None
 
@@ -329,6 +337,7 @@ class DeepSeekResponsesInvestigationModel:
                             failure.classification,
                             payload,
                             provider_http_status=response.status_code,
+                            validation_diagnostic=failure.diagnostic,
                         )
                         raise _model_call_failure() from None
                     await self._record_attempt(
@@ -367,6 +376,7 @@ class DeepSeekResponsesInvestigationModel:
         payload: dict[str, Any] | None = None,
         *,
         provider_http_status: int | None = None,
+        validation_diagnostic: dict[str, object] | None = None,
     ) -> None:
         usage = payload.get("usage") if payload else None
         usage = usage if isinstance(usage, dict) else {}
@@ -429,6 +439,7 @@ class DeepSeekResponsesInvestigationModel:
                     "cached_tokens" in input_details and cached_tokens is not None
                 ),
                 reasoning_tokens=reasoning_tokens,
+                validation_diagnostic=validation_diagnostic,
             )
         )
 
@@ -458,8 +469,14 @@ def _build_request(
             "Judge only whether the supplied synthetic logistics delay requires Spring "
             "compensation review. A delay of at least 86400 seconds requires review. "
             "Return LOGISTICS_DELAY when review is required, otherwise return "
-            "DELAY_UNDER_24_HOURS. Return only the strict JSON schema; do not include "
-            "orders, evidence, amounts, methods, raw data, credentials, or reasoning."
+            "DELAY_UNDER_24_HOURS. Return exactly one JSON object matching the schema, "
+            "not the schema itself. Do not use Markdown, code fences, or surrounding text. "
+            "For a delay of 86400 seconds, output: "
+            '{"compensationReviewRequired":true,"reasonCode":"LOGISTICS_DELAY"}. '
+            "For a delay of 86399 seconds, output: "
+            '{"compensationReviewRequired":false,"reasonCode":"DELAY_UNDER_24_HOURS"}. '
+            "Do not include orders, evidence, amounts, methods, raw data, credentials, "
+            "or reasoning."
         ),
         "input": json.dumps(
             {"syntheticInvestigationFacts": {"delaySeconds": model_input.delay_seconds}},
@@ -521,8 +538,11 @@ def _parse_response(payload: dict[str, Any]) -> InvestigationJudgment:
         raise _DeepSeekResponseFailure(DeepSeekFailureClassification.SCHEMA_MISMATCH)
     try:
         structured = json.loads(output_texts[0])
-    except json.JSONDecodeError:
-        raise _DeepSeekResponseFailure(DeepSeekFailureClassification.INVALID_JSON) from None
+    except json.JSONDecodeError as error:
+        raise _DeepSeekResponseFailure(
+            DeepSeekFailureClassification.INVALID_JSON,
+            _json_failure_diagnostic(error, "OUTPUT_TEXT"),
+        ) from None
     if not isinstance(structured, dict) or set(structured) != {
         "compensationReviewRequired",
         "reasonCode",
@@ -647,9 +667,31 @@ def _strict_schema_requested(request_body: dict[str, Any]) -> bool:
     )
 
 
+def _json_failure_diagnostic(error: json.JSONDecodeError, stage: str) -> dict[str, object]:
+    text = error.doc.lstrip()
+    return {
+        "category": "INVALID_JSON",
+        "stage": stage,
+        "offset": error.pos,
+        "line": error.lineno,
+        "column": error.colno,
+        "textLength": len(error.doc),
+        "framing": "CODE_FENCE"
+        if text.startswith("```")
+        else "JSON_CONTAINER"
+        if text.startswith(("{", "["))
+        else "OTHER",
+    }
+
+
 class _DeepSeekResponseFailure(Exception):
-    def __init__(self, classification: DeepSeekFailureClassification) -> None:
+    def __init__(
+        self,
+        classification: DeepSeekFailureClassification,
+        diagnostic: dict[str, object] | None = None,
+    ) -> None:
         self.classification = classification
+        self.diagnostic = diagnostic
         super().__init__(classification.value)
 
 

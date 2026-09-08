@@ -845,8 +845,9 @@ def main() -> None:
             (
                 ({"type": "STREAM_STARTED"}, 202),
                 ({"type": "CONTENT_DELTA", "chunkIndex": 0, "delta": first_fragment}, 202),
-                ({"type": "CONTENT_DELTA", "chunkIndex": 1, "delta": "WRONG"}, 422),
-                ({"type": "CONTENT_DELTA", "chunkIndex": 1, "delta": last_fragment}, 202),
+                ({"type": "CONTENT_DELTA", "chunkIndex": 1, "delta": ""}, 400),
+                ({"type": "CONTENT_DELTA", "chunkIndex": 1, "delta": "WRONG"}, 202),
+                ({"type": "CONTENT_DELTA", "chunkIndex": 2, "delta": last_fragment}, 202),
             )
         ):
             response = client.post(
@@ -863,12 +864,12 @@ def main() -> None:
         assert connection.execute(
             "select body, next_chunk_index from agent_public_reply_stream where generation_id = %s",
             (stream_generation,),
-        ).fetchone() == (first_fragment + last_fragment, 2)
+        ).fetchone() == (first_fragment + "WRONG" + last_fragment, 3)
         assert connection.execute(
             "select count(*) from customer_public_event where ticket_id = %s "
             "and event_type = 'AGENT_REPLY_CONTENT_DELTA'",
             (stream_ticket,),
-        ).fetchone() == (2,)
+        ).fetchone() == (3,)
 
     def old_tool_action(
         client: httpx.Client, ticket_id: uuid.UUID, generation_id: uuid.UUID
@@ -1205,7 +1206,7 @@ def main() -> None:
             "ticket_id": resolved_ticket_id,
             "generation_id": generation_id,
             "model": "deepseek-v4-flash",
-            "prompt_version": "investigation-judgment-v1",
+            "prompt_version": "investigation-judgment-v2",
             "schema_version": "investigation-judgment-v1",
             "outcome": "MATCH",
             "failure_classification": "",

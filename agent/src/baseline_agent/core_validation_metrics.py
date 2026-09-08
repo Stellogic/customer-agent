@@ -144,7 +144,12 @@ def _generation_diagnostics(values: dict[str, Any]) -> list[dict[str, Any]]:
         ("customer_communication_evidence", "communication"),
     ):
         evidence = values.get(source)
-        if not isinstance(evidence, dict) or not evidence.get("failureClassification"):
+        if not isinstance(evidence, dict):
+            continue
+        if (
+            not evidence.get("failureClassification")
+            and evidence.get("outcome") != "HANDOFF_SELECTED"
+        ):
             continue
         diagnostic = {
             "source": source,
@@ -179,6 +184,11 @@ def collect_core_metrics(ledger_path: Path) -> dict[str, Any]:
         generation_rows = connection.execute(
             "select id, ticket_id, thread_id, status "
             "from agent_processing_generation order by created_at, id"
+        ).fetchall()
+        rejection_rows = connection.execute(
+            "select ticket_id, event_type, occurred_at from audit_event "
+            "where starts_with(event_type, 'AGENT_COMMAND_REJECTED_') "
+            "order by occurred_at, id"
         ).fetchall()
     intake_calls = [
         {
@@ -231,6 +241,14 @@ def collect_core_metrics(ledger_path: Path) -> dict[str, Any]:
             ]
     report.update(
         authorizationId=ledger["authorizationId"],
+        springRejections=[
+            {
+                "ticketId": str(ticket_id),
+                "code": event_type.removeprefix("AGENT_COMMAND_REJECTED_"),
+                "occurredAt": occurred_at.isoformat(),
+            }
+            for ticket_id, event_type, occurred_at in rejection_rows
+        ],
         intakeResults=[
             {key: value for key, value in call.items() if key != "evidence"}
             for call in intake_calls
@@ -244,6 +262,7 @@ def collect_core_metrics(ledger_path: Path) -> dict[str, Any]:
             "金额单位为微元人民币;程序估算、供应商结算及未完成预留分别列示。",
             "null 表示证据未知;known 字段仅统计已知部分,不能代替总量。",
             "checkpoint 只提供调用计量证据,不能代替浏览器产品路径验收。",
+            "springRejections 来自本轮隔离数据库的工单审计,不推断对应代次或供应商调用。",
         ],
     )
     return report

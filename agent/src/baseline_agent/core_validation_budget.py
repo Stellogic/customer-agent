@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 _SESSION = str(uuid.uuid4())
 _SCHEMA = "issue230-core-budget-v1"
 _MODEL = "deepseek-v4-flash"
+_PRICES = {
+    _MODEL: {"inputMicrosPerToken": 3, "outputMicrosPerToken": 9},
+    "deepseek-v4-pro": {"inputMicrosPerToken": 9, "outputMicrosPerToken": 27},
+}
 _ROLES = {"intake", "action", "judgment", "communication"}
 _OWNER: ContextVar[tuple[str, str] | None] = ContextVar("core_provider_owner", default=None)
 
@@ -120,9 +124,15 @@ class CoreValidationBudget:
         max_attempts: int,
         max_tokens: int,
         deadline: datetime,
+        model: str = _MODEL,
+        communication_model: str | None = None,
     ) -> CoreValidationBudget:
         if not 0 < limit_micros <= 3_000_000 or max_attempts < 1 or max_tokens < 1:
             raise ValueError("invalid frozen core budget")
+        if communication_model is None:
+            communication_model = model
+        if model not in _PRICES or communication_model not in _PRICES:
+            raise ValueError("unsupported core model")
         path.parent.mkdir(parents=True, exist_ok=True)
         budget = cls(path, authorization_id)
         with budget._lock():
@@ -133,12 +143,17 @@ class CoreValidationBudget:
                     "schemaVersion": _SCHEMA,
                     "authorizationId": authorization_id,
                     "currency": "CNY",
-                    "model": _MODEL,
+                    "model": model,
+                    "communicationModel": communication_model,
                     "limitMicros": limit_micros,
                     "maxAttempts": max_attempts,
                     "maxTokens": max_tokens,
                     "deadline": deadline.astimezone(UTC).isoformat(),
-                    "price": {"inputMicrosPerToken": 3, "outputMicrosPerToken": 9},
+                    "price": _PRICES[model],
+                    "pricesByModel": {
+                        model: _PRICES[model],
+                        communication_model: _PRICES[communication_model],
+                    },
                     "entries": [],
                 }
             )
@@ -167,7 +182,7 @@ class CoreValidationBudget:
             state["schemaVersion"] != _SCHEMA
             or state["authorizationId"] != self.authorization_id
             or state["currency"] != "CNY"
-            or state["model"] != _MODEL
+            or state["model"] not in _PRICES
         ):
             raise CoreBudgetStopped("CORE_BUDGET_IDENTITY_MISMATCH")
         return state
@@ -196,7 +211,7 @@ class CoreValidationBudget:
         request: Mapping[str, object],
         internal_call_id: str | None = None,
     ) -> None:
-        if request.get("model") != _MODEL or role not in _ROLES:
+        if role not in _ROLES:
             raise CoreBudgetStopped("CORE_BUDGET_REQUEST_MISMATCH")
         output_tokens = request["max_output_tokens"]
         if not isinstance(request.get("input"), str) or type(output_tokens) is not int:
@@ -206,9 +221,20 @@ class CoreValidationBudget:
         # 仅是保守工程预留,不是供应商内部组装的精确 tokenizer 或数学上界。
         input_tokens = 2 * len(json.dumps(dict(request), ensure_ascii=False).encode("utf-8")) + 1024
         reserved_tokens = input_tokens + output_tokens
-        reserved_micros = input_tokens * 3 + output_tokens * 9
         with self._lock():
             state = self._read()
+            model = (
+                state.get("communicationModel", state["model"])
+                if role == "communication"
+                else state["model"]
+            )
+            if request.get("model") != model:
+                raise CoreBudgetStopped("CORE_BUDGET_REQUEST_MISMATCH")
+            price = state.get("pricesByModel", {state["model"]: state["price"]})[model]
+            reserved_micros = (
+                input_tokens * price["inputMicrosPerToken"]
+                + output_tokens * price["outputMicrosPerToken"]
+            )
             entries = state["entries"]
             if state.get("stopReason"):
                 raise CoreBudgetStopped("CORE_BUDGET_STOPPED")
@@ -239,6 +265,9 @@ class CoreValidationBudget:
                 or consumed_tokens + reserved_tokens > state["maxTokens"]
                 or len(entries) >= state["maxAttempts"]
             ):
+                state["stopReason"] = "CORE_BUDGET_LIMIT"
+                state["stoppedAt"] = datetime.now(UTC).isoformat()
+                self._write(state)
                 raise CoreBudgetStopped("CORE_BUDGET_LIMIT")
             owner = _OWNER.get()
             entries.append(
@@ -248,6 +277,8 @@ class CoreValidationBudget:
                     "ticketId": owner[0] if owner is not None else None,
                     "generationId": owner[1] if owner is not None else None,
                     "role": role,
+                    "model": model,
+                    "price": price,
                     "session": _SESSION,
                     "status": "IN_FLIGHT",
                     "startedAt": datetime.now(UTC).isoformat(),
@@ -273,6 +304,7 @@ class CoreValidationBudget:
         with self._lock():
             state = self._read()
             entry = next(entry for entry in state["entries"] if entry["attemptId"] == attempt_id)
+            price = entry.get("price", state["price"])
             if entry["status"] != "IN_FLIGHT":
                 raise CoreBudgetStopped("CORE_BUDGET_ALREADY_RECORDED")
             known = input_tokens is not None and output_tokens is not None
@@ -288,7 +320,8 @@ class CoreValidationBudget:
                 inputTokens=input_tokens,
                 outputTokens=output_tokens,
                 estimatedCostMicros=(
-                    input_tokens * 3 + output_tokens * 9
+                    input_tokens * price["inputMicrosPerToken"]
+                    + output_tokens * price["outputMicrosPerToken"]
                     if input_tokens is not None and output_tokens is not None
                     else None
                 ),

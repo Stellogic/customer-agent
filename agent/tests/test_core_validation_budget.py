@@ -86,12 +86,34 @@ def test_known_usage_releases_reservation_but_overrun_stops_further_requests(
     known, overrun = saved["entries"]
     assert known["status"] == "SETTLED"
     assert known["estimatedCostMicros"] == 390
+    assert known["model"] == "deepseek-v4-flash"
+    assert known["price"] == {"inputMicrosPerToken": 3, "outputMicrosPerToken": 9}
     assert known["supplierChargeMicros"] is None
     assert overrun["status"] == "PENDING"
     assert overrun["estimatedCostMicros"] == 9_090
     assert overrun["supplierChargeMicros"] is None
     with pytest.raises(CoreBudgetStopped):
         budget.reserve("after-overrun", role="action", request=request)
+
+
+def test_reservation_limit_stops_later_smaller_requests_after_reopening(tmp_path: Path) -> None:
+    budget = CoreValidationBudget.create(
+        tmp_path / "budget.json",
+        authorization_id="synthetic-limit-stop",
+        limit_micros=6_000,
+        max_attempts=10,
+        max_tokens=20_000,
+        deadline=datetime.now(UTC) + timedelta(minutes=5),
+    )
+    request = {"model": "deepseek-v4-flash", "input": "synthetic", "max_output_tokens": 128}
+    with pytest.raises(CoreBudgetStopped, match="CORE_BUDGET_LIMIT"):
+        budget.reserve("too-large", role="action", request={**request, "max_output_tokens": 2000})
+    reopened = CoreValidationBudget.open(budget.path, authorization_id="synthetic-limit-stop")
+    with pytest.raises(CoreBudgetStopped, match="CORE_BUDGET_STOPPED"):
+        reopened.reserve("smaller-next-case", role="action", request=request)
+    saved = json.loads(budget.path.read_text(encoding="utf-8"))
+    assert saved["stopReason"] == "CORE_BUDGET_LIMIT"
+    assert saved["entries"] == []
 
 
 def test_stop_survives_reopening_and_allows_inflight_usage_to_settle(tmp_path: Path) -> None:
@@ -116,3 +138,95 @@ def test_stop_survives_reopening_and_allows_inflight_usage_to_settle(tmp_path: P
     assert len(saved["entries"]) == 1
     assert saved["entries"][0]["status"] == "SETTLED"
     assert saved["entries"][0]["estimatedCostMicros"] == 390
+
+
+def test_pro_communication_uses_its_frozen_price_and_rejects_pro_action(tmp_path: Path) -> None:
+    budget = CoreValidationBudget.create(
+        tmp_path / "budget.json",
+        authorization_id="synthetic-pro",
+        limit_micros=3_000_000,
+        max_attempts=10,
+        max_tokens=100_000,
+        deadline=datetime.now(UTC) + timedelta(minutes=5),
+        communication_model="deepseek-v4-pro",
+    )
+    request = {"model": "deepseek-v4-pro", "input": "synthetic", "max_output_tokens": 128}
+    with pytest.raises(CoreBudgetStopped, match="CORE_BUDGET_REQUEST_MISMATCH"):
+        budget.reserve("pro-action", role="action", request=request)
+    budget.reserve("pro-reply", role="communication", request=request)
+    saved = json.loads(budget.path.read_text(encoding="utf-8"))
+    assert saved["communicationModel"] == "deepseek-v4-pro"
+    entry = saved["entries"][0]
+    assert entry["model"] == "deepseek-v4-pro"
+    assert entry["price"] == {"inputMicrosPerToken": 9, "outputMicrosPerToken": 27}
+    assert entry["reservedMicros"] == (
+        entry["reservedInputTokens"] * 9 + entry["reservedOutputTokens"] * 27
+    )
+    reopened = CoreValidationBudget.open(budget.path, authorization_id="synthetic-pro")
+    reopened.settle("pro-reply", input_tokens=100, output_tokens=10)
+    reopened.reserve(
+        "flash-action", role="action", request={**request, "model": "deepseek-v4-flash"}
+    )
+    reopened.settle("flash-action", input_tokens=100, output_tokens=10)
+    saved = json.loads(budget.path.read_text(encoding="utf-8"))
+    assert [entry["estimatedCostMicros"] for entry in saved["entries"]] == [1170, 390]
+
+
+@pytest.mark.parametrize("role", ["intake", "action", "judgment", "communication"])
+def test_global_pro_model_applies_its_frozen_price_to_every_role(tmp_path: Path, role: str) -> None:
+    budget = CoreValidationBudget.create(
+        tmp_path / "budget.json",
+        authorization_id="synthetic-all-pro",
+        limit_micros=3_000_000,
+        max_attempts=10,
+        max_tokens=100_000,
+        deadline=datetime.now(UTC) + timedelta(minutes=5),
+        model="deepseek-v4-pro",
+    )
+    reopened = CoreValidationBudget.open(budget.path, authorization_id="synthetic-all-pro")
+    request = {"model": "deepseek-v4-pro", "input": "synthetic", "max_output_tokens": 128}
+    with pytest.raises(CoreBudgetStopped, match="CORE_BUDGET_REQUEST_MISMATCH"):
+        reopened.reserve(
+            "wrong-model", role=role, request={**request, "model": "deepseek-v4-flash"}
+        )
+    reopened.reserve("pro-attempt", role=role, request=request)
+    reopened.settle("pro-attempt", input_tokens=100, output_tokens=10)
+    saved = json.loads(budget.path.read_text(encoding="utf-8"))
+    assert saved["model"] == saved["communicationModel"] == "deepseek-v4-pro"
+    entry = saved["entries"][0]
+    assert entry["model"] == "deepseek-v4-pro"
+    assert entry["reservedMicros"] == (
+        entry["reservedInputTokens"] * 9 + entry["reservedOutputTokens"] * 27
+    )
+    assert entry["estimatedCostMicros"] == 1170
+
+
+def test_legacy_flash_ledger_settles_and_reopens_without_reinitializing(tmp_path: Path) -> None:
+    budget = CoreValidationBudget.create(
+        tmp_path / "budget.json",
+        authorization_id="synthetic-legacy",
+        limit_micros=3_000_000,
+        max_attempts=10,
+        max_tokens=100_000,
+        deadline=datetime.now(UTC) + timedelta(minutes=5),
+    )
+    request = {"model": "deepseek-v4-flash", "input": "synthetic", "max_output_tokens": 128}
+    budget.reserve("old-inflight", role="communication", request=request)
+    saved = json.loads(budget.path.read_text(encoding="utf-8"))
+    del saved["communicationModel"], saved["pricesByModel"]
+    del saved["entries"][0]["model"], saved["entries"][0]["price"]
+    budget.path.write_text(json.dumps(saved), encoding="utf-8")
+
+    reopened = CoreValidationBudget.open(budget.path, authorization_id="synthetic-legacy")
+    assert json.loads(budget.path.read_text(encoding="utf-8")) == saved
+    reopened.settle("old-inflight", input_tokens=100, output_tokens=10)
+    with pytest.raises(CoreBudgetStopped, match="CORE_BUDGET_REQUEST_MISMATCH"):
+        reopened.reserve(
+            "unauthorized-pro",
+            role="communication",
+            request={**request, "model": "deepseek-v4-pro"},
+        )
+    reopened.reserve("new-flash", role="communication", request=request)
+    saved = json.loads(budget.path.read_text(encoding="utf-8"))
+    assert saved["entries"][0]["estimatedCostMicros"] == 390
+    assert saved["entries"][1]["model"] == "deepseek-v4-flash"

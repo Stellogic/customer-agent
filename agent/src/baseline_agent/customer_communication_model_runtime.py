@@ -16,7 +16,10 @@ from baseline_agent.deepseek_customer_communication_model import (
     DeepSeekCustomerCommunicationConfig,
     DeepSeekResponsesCustomerCommunicationModel,
 )
-from baseline_agent.deepseek_investigation_model import DEEPSEEK_FLASH_MODEL
+from baseline_agent.deepseek_investigation_model import (
+    DEEPSEEK_FLASH_MODEL,
+    DEEPSEEK_PRO_MODEL,
+)
 
 _FIXED_FAKE_MODE = "fixed-fake"
 _FORMAL_MODE = "deepseek-formal"
@@ -43,7 +46,10 @@ def configured_customer_communication_model(
             maximum_attempts=0,
             call_deadline_seconds=0,
         )
-    if mode != _FORMAL_MODE or environment.get("DEEPSEEK_MODEL") != DEEPSEEK_FLASH_MODEL:
+    if mode != _FORMAL_MODE or environment.get("DEEPSEEK_MODEL") not in {
+        DEEPSEEK_FLASH_MODEL,
+        DEEPSEEK_PRO_MODEL,
+    }:
         raise CustomerCommunicationFailure(CustomerCommunicationFailureCode.INVALID_INPUT)
     config = DeepSeekCustomerCommunicationConfig.from_environment(environment)
     return ConfiguredCustomerCommunicationModel(
@@ -55,7 +61,7 @@ def configured_customer_communication_model(
                 "DEEPSEEK_RESPONSES_ENDPOINT", "https://api.deepseek.com/responses"
             ),
         ),
-        mode="deepseek-v4-flash-customer-communication-formal-v1",
+        mode=f"{config.model}-customer-communication-formal-v1",
         maximum_attempts=config.max_attempts,
         call_deadline_seconds=round(config.deadline_seconds),
     )

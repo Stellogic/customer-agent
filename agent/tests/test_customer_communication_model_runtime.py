@@ -31,7 +31,7 @@ def test_default_customer_communication_runtime_is_fixed_fake_without_credential
         {
             "AGENT_CUSTOMER_COMMUNICATION_MODEL_MODE": "deepseek-formal",
             "DEEPSEEK_API_KEY": "synthetic-test-key",
-            "DEEPSEEK_MODEL": "deepseek-v4-pro",
+            "DEEPSEEK_MODEL": "unsupported-model",
         },
         {"AGENT_CUSTOMER_COMMUNICATION_MODEL_MODE": "unknown"},
     ],
@@ -43,17 +43,32 @@ def test_invalid_formal_customer_communication_configuration_fails_without_fallb
         configured_customer_communication_model(environment)
 
 
-def test_formal_customer_communication_runtime_freezes_bounded_attempts_and_deadline() -> None:
+@pytest.mark.parametrize(
+    ("base_model", "override"),
+    [
+        ("deepseek-v4-flash", None),
+        ("deepseek-v4-pro", None),
+        ("deepseek-v4-flash", "deepseek-v4-pro"),
+        ("deepseek-v4-pro", "deepseek-v4-flash"),
+    ],
+)
+def test_formal_customer_communication_runtime_freezes_bounded_attempts_and_deadline(
+    base_model: str,
+    override: str | None,
+) -> None:
+    environment = {
+        "AGENT_CUSTOMER_COMMUNICATION_MODEL_MODE": "deepseek-formal",
+        "DEEPSEEK_API_KEY": "synthetic-test-key",
+        "DEEPSEEK_MODEL": base_model,
+    }
+    if override is not None:
+        environment["DEEPSEEK_COMMUNICATION_MODEL"] = override
     runtime = configured_customer_communication_model(
-        {
-            "AGENT_CUSTOMER_COMMUNICATION_MODEL_MODE": "deepseek-formal",
-            "DEEPSEEK_API_KEY": "synthetic-test-key",
-            "DEEPSEEK_MODEL": "deepseek-v4-flash",
-        },
+        environment,
         transport=httpx.MockTransport(lambda _: httpx.Response(503)),
     )
 
-    assert runtime.mode == "deepseek-v4-flash-customer-communication-formal-v1"
+    assert runtime.mode == f"{override or base_model}-customer-communication-formal-v1"
     assert isinstance(runtime.model, DeepSeekResponsesCustomerCommunicationModel)
     assert runtime.maximum_attempts == 2
     assert runtime.call_deadline_seconds == 15

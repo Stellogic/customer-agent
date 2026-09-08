@@ -22,6 +22,7 @@ from baseline_agent.customer_communication_model import (
     FixedFakeCustomerCommunicationModel,
     PaymentCommunicationFacts,
 )
+from baseline_agent.deepseek_intake_model import _QUESTIONS
 from baseline_agent.intake_model import (
     FixedFakeIntakeModel,
     IntakeIssue,
@@ -52,7 +53,7 @@ ISSUE_LABELS = {
 async def _intake(schema: str, value: dict[str, Any]) -> dict[str, Any]:
     if schema == "customer_intake_clarification":
         # 正式请求在澄清阶段仅携带问题与客户回答,不携带订单。
-        kind = next(kind for kind, label in ISSUE_LABELS.items() if label in value["question"])
+        kind = next(kind for kind, question in _QUESTIONS.items() if question == value["question"])
         answer = (
             "AFFIRMED"
             if _confirms_pending_issue(kind, value["customerText"])
@@ -74,6 +75,12 @@ async def _intake(schema: str, value: dict[str, Any]) -> dict[str, Any]:
     )
     if schema == "customer_intake_issue_assessments":
         issues = {issue.kind: issue.summary for issue in result.issues}
+        pending = set(result.pending_issue_kinds)
+        if (result.candidate_order_reference or "").startswith("ORDER-CORE-NO-COMPENSATION-2-"):
+            issues.pop("LOGISTICS_DELAY", None)
+            pending.discard("LOGISTICS_DELAY")
+        if (result.candidate_order_reference or "").startswith("ORDER-CORE-PENDING-APPROVAL-2-"):
+            pending.add("LOGISTICS_DELAY")
         return {
             "candidateOrderReference": result.candidate_order_reference,
             # 故意把请求中的其余候选都排队,覆盖显式订单范围回归。
@@ -85,13 +92,11 @@ async def _intake(schema: str, value: dict[str, Any]) -> dict[str, Any]:
             "issueAssessments": {
                 kind: {
                     "assessment": "UNCERTAIN"
-                    if kind in result.pending_issue_kinds
+                    if kind in pending
                     else "ASSERTED"
                     if kind in issues
                     else "NOT_MENTIONED",
-                    "summary": issues.get(
-                        kind, label if kind in result.pending_issue_kinds else ""
-                    ),
+                    "summary": issues.get(kind, label if kind in pending else ""),
                 }
                 for kind, label in ISSUE_LABELS.items()
             },

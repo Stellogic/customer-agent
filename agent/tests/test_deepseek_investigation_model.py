@@ -19,12 +19,51 @@ from baseline_agent.investigation_model import (
     InvestigationJudgmentInput,
     InvestigationReasonCode,
 )
+from baseline_agent.model_call_evidence import serialize_model_attempt
 
 MODEL_INPUT = InvestigationJudgmentInput(
     order_reference="ORDER-DELAY-001",
     delay_seconds=80 * 60 * 60,
     evidence_refs=("order:ORDER-DELAY-001", "logistics:ORDER-DELAY-001"),
 )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "outer,text,framing",
+    [
+        (False, '```json\n{"private":"SYNTHETIC_SECRET"}\n```', "CODE_FENCE"),
+        (False, '{"private":"SYNTHETIC_SECRET"', "JSON_CONTAINER"),
+        (True, "SYNTHETIC_SECRET gateway response", "OTHER"),
+    ],
+)
+async def test_json_failure_diagnostic_preserves_location_without_output(
+    outer: bool, text: str, framing: str
+) -> None:
+    audit = InMemoryModelCallAuditSink()
+    response = (
+        httpx.Response(200, text=text) if outer else httpx.Response(200, json=_response(text=text))
+    )
+    model = DeepSeekResponsesInvestigationModel(
+        DeepSeekResponsesConfig(api_key="synthetic-test-key", max_attempts=1),
+        transport=httpx.MockTransport(lambda _: response),
+        audit_sink=audit,
+    )
+    with pytest.raises(InvestigationJudgmentFailure):
+        await model.judge(MODEL_INPUT)
+    assert len(audit.records) == 1
+    record = audit.records[0]
+    assert record.failure_classification is DeepSeekFailureClassification.INVALID_JSON
+    diagnostic = serialize_model_attempt(record)["validationDiagnostic"]
+    assert isinstance(diagnostic, dict)
+    assert diagnostic["stage"] == ("HTTP_RESPONSE" if outer else "OUTPUT_TEXT")
+    assert diagnostic["framing"] == framing
+    assert diagnostic["textLength"] == len(text)
+    assert isinstance(diagnostic["offset"], int)
+    assert isinstance(diagnostic["line"], int)
+    assert isinstance(diagnostic["column"], int)
+    assert "SYNTHETIC_SECRET" not in json.dumps(serialize_model_attempt(record))
+    assert record.total_tokens == (None if outer else 27)
 
 
 def _response(
@@ -149,7 +188,7 @@ async def test_deepseek_adapter_records_minimal_metadata_without_raw_material() 
     assert record.request_model == "deepseek-v4-flash"
     assert record.response_model == "deepseek-v4-flash-202608"
     assert record.backend_fingerprint == "fp_202608"
-    assert record.prompt_version == "investigation-judgment-v1"
+    assert record.prompt_version == "investigation-judgment-v2"
     assert record.schema_version == "investigation-judgment-v1"
     assert record.input_tokens == 19
     assert record.output_tokens == 8
@@ -410,7 +449,7 @@ def test_deepseek_configuration_fails_explicitly_without_key_or_for_unsupported_
     with pytest.raises(InvestigationJudgmentFailure) as unsupported:
         DeepSeekResponsesConfig(
             api_key="secret",
-            model="deepseek-v4-pro",
+            model="unsupported-model",
         )
 
     assert unsupported.value.code is InvestigationJudgmentFailureCode.CONFIGURATION_ERROR
@@ -484,3 +523,31 @@ async def test_concurrent_judgment_evidence_does_not_include_another_call_failur
     assert successful["providerAttempts"] == 1
     assert successful["failureClassification"] == ""
     assert successful["tokens"] == 27
+
+
+@pytest.mark.asyncio
+async def test_formal_pro_judgment_preserves_requested_model_and_dated_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import importlib
+
+    graph_module = importlib.import_module("baseline_agent.graph")
+
+    def supplier(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["model"] == "deepseek-v4-pro"
+        return httpx.Response(200, json={**_response(), "model": "deepseek-v4-pro-0813"})
+
+    audit = InMemoryModelCallAuditSink()
+    model = DeepSeekResponsesInvestigationModel(
+        DeepSeekResponsesConfig(api_key="synthetic-test-key", model="deepseek-v4-pro"),
+        transport=httpx.MockTransport(supplier),
+        audit_sink=audit,
+    )
+    monkeypatch.setattr(graph_module, "investigation_judgment_model", model)
+    offset = graph_module._judgment_audit_offset()
+    judgment = await model.judge(MODEL_INPUT)
+    assert graph_module._judgment_call_evidence(offset, "")["costMicros"] is None
+    assert judgment.compensation_review_required is True
+    assert audit.records[0].request_model == "deepseek-v4-pro"
+    assert audit.records[0].response_model == "deepseek-v4-pro-0813"
+    assert audit.records[0].actual_response_shape_valid is True

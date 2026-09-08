@@ -50,6 +50,45 @@ def _payment_reply() -> dict:
 
 
 @pytest.mark.asyncio
+async def test_free_body_preserves_text_without_treating_claims_as_business_authority() -> None:
+    body = "订单 ORDER-OTHER 已退款 999 元，工单已关闭。Bearer synthetic-secret。支付状态为未支付。"
+
+    class Provider:
+        async def generate(self, _: dict) -> dict:
+            return {**_payment_reply(), "body": body}
+
+    reply = await StructuredCustomerCommunicationModel(Provider()).compose(_payment_input())
+    assert reply.body == body
+    assert reply.referenced_order == "ORDER-C129"
+    assert reply.evidence_refs == ("order:ORDER-C129", "payment:ORDER-C129")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("schemaVersion", "unknown"),
+        ("referencedOrder", "ORDER-OTHER"),
+        ("evidenceRefs", ["order:ORDER-OTHER", "payment:ORDER-OTHER"]),
+        ("intent", "COMPENSATION_REVIEW_PENDING"),
+        ("body", ""),
+        ("body", "   "),
+        ("body", "正文" * 501),
+    ],
+)
+async def test_free_body_keeps_structured_scope_intent_schema_and_length_checks(
+    field, value
+) -> None:
+    class Provider:
+        async def generate(self, _: dict) -> dict:
+            return {**_payment_reply(), field: value}
+
+    with pytest.raises(CustomerCommunicationFailure) as failure:
+        await StructuredCustomerCommunicationModel(Provider()).compose(_payment_input())
+    assert failure.value.code is CustomerCommunicationFailureCode.INVALID_OUTPUT
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("structured", [False, True])
 async def test_payment_reply_uses_known_status_without_logistics_or_refund_action(
     structured,
@@ -128,16 +167,16 @@ async def test_payment_requires_actual_payment_input_and_scoped_evidence(missing
     "wrong_claim",
     ["已退款 100 元。", "已确认发生重复扣款，原因是系统重试。", "从未退款。"],
 )
-async def test_payment_rejects_invented_refund_cause_and_never_refunded_claim(wrong_claim) -> None:
+async def test_free_body_payment_claims_do_not_override_structured_contract(wrong_claim) -> None:
     class Provider:
         async def generate(self, _: dict) -> dict:
             result = _payment_reply()
             result["body"] += wrong_claim
             return result
 
-    with pytest.raises(CustomerCommunicationFailure) as failure:
-        await StructuredCustomerCommunicationModel(Provider()).compose(_payment_input())
-    assert failure.value.code is CustomerCommunicationFailureCode.INVALID_OUTPUT
+    reply = await StructuredCustomerCommunicationModel(Provider()).compose(_payment_input())
+    assert reply.body == _payment_reply()["body"] + wrong_claim
+    assert reply.intent is CustomerReplyIntent.NO_COMPENSATION_RESOLUTION
 
 
 @pytest.mark.asyncio
@@ -151,6 +190,52 @@ async def test_fixed_fake_has_an_independent_deterministic_evaluation_boundary()
     assert report.schema_success_count == 6
     assert report.safe_reply_count == 6
     assert report.failure_count == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        ("支付状态为已支付", "支付状态：已支付"),
+        ("全额退款状态为未完成", "全额退款状态: 未完成"),
+        ("人工核查", "人工核实"),
+        ("未执行退款", "未进行退款"),
+        ("不足以确认", "尚不能确认"),
+        ("不足以确认是否发生重复扣款或查明原因", "无法确认是否存在两笔扣款"),
+    ],
+)
+async def test_payment_accepts_equivalent_wording_without_changing_facts(before, after) -> None:
+    result = _payment_reply()
+    result["body"] = result["body"].replace(before, after)
+
+    class Provider:
+        async def generate(self, _: dict) -> dict:
+            return result
+
+    reply = await StructuredCustomerCommunicationModel(Provider()).compose(_payment_input())
+    assert reply.body == result["body"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "支付状态：未支付。",
+        "全额退款状态：已完成。",
+        "已全额退款。",
+        "已确认存在两笔扣款。",
+        "原因是系统重复提交。",
+    ],
+)
+async def test_free_body_contradictory_payment_claims_are_not_semantically_rejected(claim) -> None:
+    class Provider:
+        async def generate(self, _: dict) -> dict:
+            result = _payment_reply()
+            result["body"] += "无法确认是否存在两笔扣款。" + claim
+            return result
+
+    reply = await StructuredCustomerCommunicationModel(Provider()).compose(_payment_input())
+    assert reply.body == _payment_reply()["body"] + "无法确认是否存在两笔扣款。" + claim
 
 
 @pytest.mark.asyncio
@@ -196,11 +281,11 @@ async def test_no_compensation_conclusion_does_not_claim_ticket_resolution() -> 
     "promise",
     ["工单已解决", "工单已经关闭", "已自动解决", "关闭等待期", "五分钟后自动解决"],
 )
-def test_public_reply_rejects_premature_ticket_state_even_during_streaming(promise: str) -> None:
+def test_free_body_ticket_state_words_are_not_authoritative_state_changes(promise: str) -> None:
     body = f"订单 ORDER-162 当前不符合补偿条件，{promise}。"
 
-    assert not is_authorized_body_prefix(body, "ORDER-162", complete=False)
-    assert not is_authorized_body_prefix(body, "ORDER-162", complete=True)
+    assert is_authorized_body_prefix(body, "ORDER-162", complete=False)
+    assert is_authorized_body_prefix(body, "ORDER-162", complete=True)
 
 
 def test_no_compensation_reply_allows_natural_denial_wording() -> None:
@@ -222,9 +307,9 @@ def test_reply_may_omit_redundant_order_reference() -> None:
 
 
 @pytest.mark.parametrize("body", ["订单 ORDER-16。", "订单 ORDER-163"])
-def test_stream_order_prefix_does_not_allow_terminated_or_diverging_order(body: str) -> None:
-    assert not is_authorized_body_prefix(body, "ORDER-162", complete=False)
-    assert not is_authorized_body_prefix(body, "ORDER-162", complete=True)
+def test_free_body_order_words_do_not_define_structured_order_scope(body: str) -> None:
+    assert is_authorized_body_prefix(body, "ORDER-162", complete=False)
+    assert is_authorized_body_prefix(body, "ORDER-162", complete=True)
 
 
 @pytest.mark.parametrize(
@@ -243,10 +328,10 @@ def test_stream_order_prefix_does_not_allow_terminated_or_diverging_order(body: 
         "同意退款",
     ],
 )
-def test_no_compensation_reply_still_rejects_positive_actions(promise: str) -> None:
+def test_free_body_action_promises_do_not_execute_business_actions(promise: str) -> None:
     body = f"订单 ORDER-162 的核验已完成，我们{promise}。"
 
-    assert not is_authorized_body_prefix(body, "ORDER-162", complete=True)
+    assert is_authorized_body_prefix(body, "ORDER-162", complete=True)
 
 
 @pytest.mark.parametrize("denial", ["不会为您退款", "无法提供补偿", "未达到补偿条件"])

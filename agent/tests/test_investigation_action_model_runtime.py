@@ -31,7 +31,7 @@ def test_default_action_runtime_is_deterministic_without_reading_provider_creden
         {
             "AGENT_INVESTIGATION_ACTION_MODEL_MODE": "deepseek-formal",
             "DEEPSEEK_API_KEY": "synthetic-test-key",
-            "DEEPSEEK_MODEL": "deepseek-v4-pro",
+            "DEEPSEEK_MODEL": "unsupported-model",
         },
         {"AGENT_INVESTIGATION_ACTION_MODEL_MODE": "unknown"},
     ],
@@ -43,17 +43,18 @@ def test_invalid_formal_action_configuration_fails_without_fallback(
         configured_investigation_action_model(environment)
 
 
-def test_formal_action_runtime_freezes_one_model_attempt_and_deadline() -> None:
+@pytest.mark.parametrize("model", ["deepseek-v4-flash", "deepseek-v4-pro"])
+def test_formal_action_runtime_freezes_one_model_attempt_and_deadline(model: str) -> None:
     runtime = configured_investigation_action_model(
         {
             "AGENT_INVESTIGATION_ACTION_MODEL_MODE": "deepseek-formal",
             "DEEPSEEK_API_KEY": "synthetic-test-key",
-            "DEEPSEEK_MODEL": "deepseek-v4-flash",
+            "DEEPSEEK_MODEL": model,
         },
         transport=httpx.MockTransport(lambda _: httpx.Response(503)),
     )
 
-    assert runtime.mode == "deepseek-v4-flash-action-formal-v1"
+    assert runtime.mode == f"{model}-action-formal-v1"
     assert isinstance(runtime.model, DeepSeekResponsesInvestigationActionModel)
     assert runtime.maximum_attempts_per_action == 1
     assert runtime.call_deadline_seconds == 12

@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -177,8 +178,9 @@ def test_core_metrics_restore_owned_pending_attempt_without_fabricating_known_us
             "PUBLIC_REPLY_PUBLISH_FAILED",
         ),
         ("customer_communication_evidence", "communication", "FACT_CONFLICT", ""),
+        ("investigation_run_evidence", "action", "", ""),
     ],
-    ids=["normal", "format", "publication-handoff", "evidence-rejected"],
+    ids=["normal", "format", "publication-handoff", "evidence-rejected", "selected-handoff"],
 )
 def test_core_collector_keeps_database_owners_and_reads_current_generation_evidence(
     monkeypatch: pytest.MonkeyPatch,
@@ -203,6 +205,19 @@ def test_core_collector_keeps_database_owners_and_reads_current_generation_evide
             pass
 
         def execute(self, sql: str) -> Rows:
+            if "from audit_event" in sql:
+                assert "starts_with(event_type, 'AGENT_COMMAND_REJECTED_')" in sql
+                return Rows(
+                    [
+                        (
+                            "ticket",
+                            "AGENT_COMMAND_REJECTED_DETERMINISTIC_REVIEW_FAILED",
+                            datetime(2026, 9, 8, tzinfo=UTC),
+                        )
+                    ]
+                    if classification == "FACT_CONFLICT"
+                    else []
+                )
             if "from intake_model_call" in sql:
                 return Rows([("invocation", "intake", "SUCCEEDED", None, {"attempts": []})])
             assert "from agent_processing_generation" in sql
@@ -219,11 +234,13 @@ def test_core_collector_keeps_database_owners_and_reads_current_generation_evide
             }
             if role == "action":
                 stage_evidence.update(
-                    outcome="SAFE_HANDOFF",
+                    outcome="HANDOFF_SELECTED" if classification == "" else "SAFE_HANDOFF",
                     modelCalls=[
                         {
                             "callNumber": 1,
-                            "selectedAction": "SUBMIT_CONCLUSION",
+                            "selectedAction": "HANDOFF"
+                            if classification == ""
+                            else "SUBMIT_CONCLUSION",
                             "prompt": "不能保存的原文",
                         }
                     ],
@@ -286,6 +303,17 @@ def test_core_collector_keeps_database_owners_and_reads_current_generation_evide
 
     assert urls == ["http://agent/threads/thread/state"]
     assert report["authorizationId"] == "core-230"
+    assert report["springRejections"] == (
+        [
+            {
+                "ticketId": "ticket",
+                "code": "DETERMINISTIC_REVIEW_FAILED",
+                "occurredAt": "2026-09-08T00:00:00+00:00",
+            }
+        ]
+        if classification == "FACT_CONFLICT"
+        else []
+    )
     assert report["providerAttempts"] == 1
     assert report["estimatedCostMicros"] == 48
     assert report["attempts"][0]["ticketId"] == "ticket"
@@ -305,8 +333,15 @@ def test_core_collector_keeps_database_owners_and_reads_current_generation_evide
         }
         if role == "action":
             expected.update(
-                modelCalls=[{"callNumber": 1, "selectedAction": "SUBMIT_CONCLUSION"}],
-                outcome="SAFE_HANDOFF",
+                modelCalls=[
+                    {
+                        "callNumber": 1,
+                        "selectedAction": "HANDOFF"
+                        if classification == ""
+                        else "SUBMIT_CONCLUSION",
+                    }
+                ],
+                outcome="HANDOFF_SELECTED" if classification == "" else "SAFE_HANDOFF",
             )
         assert generation["diagnostics"] == [expected]
         assert report["attempts"][0]["failureClassification"] == provider_failure
@@ -334,6 +369,8 @@ def test_core_collector_preserves_partial_cost_and_pending_when_checkpoint_is_mi
             pass
 
         def execute(self, sql: str) -> Rows:
+            if "from audit_event" in sql:
+                return Rows([])
             if "from intake_model_call" in sql:
                 evidence = {
                     "attempts": [

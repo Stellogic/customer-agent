@@ -8,7 +8,7 @@ from pathlib import Path
 import httpx
 import psycopg
 
-_FORMAL_COMMUNICATION_MODE = "deepseek-v4-flash-customer-communication-formal-v1"
+_MODELS = ("deepseek-v4-flash", "deepseek-v4-pro")
 
 
 def aggregate_checkpoint_metrics(
@@ -16,17 +16,22 @@ def aggregate_checkpoint_metrics(
 ) -> dict[str, object]:
     logical_calls = 0
     provider_attempts = 0
-    estimated_cost_micros = 0
+    estimated_cost_micros: list[object] = []
     communication_calls = 0
     communication_attempts = 0
-    communication_cost_micros = 0
+    communication_cost_micros: list[object] = []
     communication_duration_ms = 0
+    models: set[str] = set()
     failures: dict[str, int] = {}
     included_states: list[str] = []
     handoff_with_model_calls = 0
     for values, terminal_state in zip(checkpoints, terminal_states, strict=True):
-        if _FORMAL_COMMUNICATION_MODE not in str(values.get("model_mode", "")):
+        modes = str(values.get("model_mode", "")).split("+")
+        if not any(f"{model}-customer-communication-formal-v1" in modes for model in _MODELS):
             continue
+        models.update(
+            model for model in _MODELS if any(mode.startswith(model + "-") for mode in modes)
+        )
         run = values.get("investigation_run_evidence")
         judgment = values.get("investigation_judgment_evidence")
         communication = values.get("customer_communication_evidence")
@@ -45,14 +50,12 @@ def aggregate_checkpoint_metrics(
             + _integer(judgment.get("providerAttempts"))
             + _integer(communication.get("providerAttempts"))
         )
-        estimated_cost_micros += (
-            _integer(run.get("costMicros"))
-            + _integer(judgment.get("costMicros"))
-            + _integer(communication.get("costMicros"))
+        estimated_cost_micros.extend(
+            evidence.get("costMicros") for evidence in (run, judgment, communication)
         )
         communication_calls += _integer(communication.get("logicalCalls"))
         communication_attempts += _integer(communication.get("providerAttempts"))
-        communication_cost_micros += _integer(communication.get("costMicros"))
+        communication_cost_micros.append(communication.get("costMicros"))
         communication_duration_ms += _integer(communication.get("durationMs"))
         for evidence in (run, judgment, communication):
             classification = evidence.get("failureClassification")
@@ -63,15 +66,16 @@ def aggregate_checkpoint_metrics(
             handoff_with_model_calls += 1
     return {
         "schemaVersion": "issue-129-aggregate-provider-metrics-v1",
-        "model": "deepseek-v4-flash",
+        "model": next(iter(models)) if len(models) == 1 else None,
+        "models": sorted(models),
         "observedGenerationCount": len(included_states),
         "totalLogicalCalls": logical_calls,
         "totalProviderAttempts": provider_attempts,
-        "estimatedCostMicros": estimated_cost_micros,
+        "estimatedCostMicros": _total(estimated_cost_micros),
         "customerCommunication": {
             "logicalCalls": communication_calls,
             "providerAttempts": communication_attempts,
-            "estimatedCostMicros": communication_cost_micros,
+            "estimatedCostMicros": _total(communication_cost_micros),
             "totalDurationMs": communication_duration_ms,
         },
         "generationResults": {
@@ -110,6 +114,15 @@ def collect_formal_metrics() -> dict[str, object]:
 
 def _integer(value: object) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+
+
+def _total(values: list[object]) -> int | None:
+    total = 0
+    for value in values:
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            return None
+        total += value
+    return total
 
 
 def _main() -> None:

@@ -5,18 +5,11 @@ import com.stellogic.customeragent.ticket.CustomerKnowledgeProjection;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 /** 接受边界校验；引文真实不等于语义充分，后者仍须真实回答质量验收。 */
 final class CustomerKnowledgeReplyPolicy {
-    private static final Pattern INSTRUCTION =
-            Pattern.compile(
-                    "(?i)(忽略.{0,12}(指令|规则|提示)|泄露.{0,12}(系统提示词|指令|规则|prompt)|系统提示词|developer message|system"
-                            + " message|ignore.{0,30}(instruction|rule|prompt)|api[_"
-                            + " -]?key|bearer\\s|<\\|.*?\\|>)");
-
     private CustomerKnowledgeReplyPolicy() {}
 
     static CustomerKnowledgeProjection validate(
@@ -32,11 +25,6 @@ final class CustomerKnowledgeReplyPolicy {
                         != !reply.citations().isEmpty()) {
             throw invalid("INVALID_KNOWLEDGE_CITATION");
         }
-        if (INSTRUCTION.matcher(reply.answer()).find()
-                || CustomerReplySafetyPolicy.unsafeKnowledgeBody(reply.answer())) {
-            throw invalid("UNSAFE_KNOWLEDGE");
-        }
-        validatePublicText(reply.answer(), receipt);
         var projected = new ArrayList<CustomerKnowledgeProjection.Source>();
         Set<String> seen = new HashSet<>();
         for (CustomerKnowledgeCitation citation : reply.citations()) {
@@ -56,24 +44,10 @@ final class CustomerKnowledgeReplyPolicy {
                     || !seen.add(source.chunkId())) {
                 throw invalid("INVALID_KNOWLEDGE_CITATION");
             }
-            if (INSTRUCTION.matcher(source.snippet()).find()
-                    || INSTRUCTION.matcher(source.title()).find()) {
-                throw invalid("UNSAFE_KNOWLEDGE");
-            }
             var value = new CustomerKnowledgeProjection.Source(source.title(), source.updatedAt());
             if (!projected.contains(value)) projected.add(value);
         }
         return new CustomerKnowledgeProjection(reply.status().name(), projected);
-    }
-
-    static void validatePublicText(String text, AgentKnowledgeResult receipt) {
-        if (receipt.results().stream()
-                .anyMatch(
-                        source ->
-                                text.contains(source.chunkId())
-                                        || text.contains(source.articleId()))) {
-            throw invalid("UNSAFE_KNOWLEDGE");
-        }
     }
 
     private static ResponseStatusException invalid(String code) {

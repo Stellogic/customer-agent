@@ -906,14 +906,7 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
             List<String> expectedEvidence) {
         String rejection =
                 CustomerReplySafetyPolicy.rejectionReason(
-                        conclusion,
-                        order.orderReference(),
-                        expectedEvidence,
-                        new CustomerReplySafetyPolicy.PaymentFacts(
-                                order.paid(),
-                                order.cancelled(),
-                                order.fullyRefunded(),
-                                order.duplicateChargeSuspected()));
+                        conclusion, order.orderReference(), expectedEvidence);
         if (rejection != null) reject(ticketId, rejection);
     }
 
@@ -959,7 +952,6 @@ class JdbcAgentInvestigationService implements AgentInvestigationService {
         }
         AgentKnowledgeResult receipt =
                 knowledge.revalidateCustomerForPublication(receipts.getFirst());
-        CustomerKnowledgeReplyPolicy.validatePublicText(reply.publicBody(), receipt);
         return CustomerKnowledgeReplyPolicy.validate(reply.knowledge(), receipt);
     }
 
