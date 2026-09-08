@@ -144,7 +144,12 @@ def _generation_diagnostics(values: dict[str, Any]) -> list[dict[str, Any]]:
         ("customer_communication_evidence", "communication"),
     ):
         evidence = values.get(source)
-        if not isinstance(evidence, dict) or not evidence.get("failureClassification"):
+        if not isinstance(evidence, dict):
+            continue
+        if (
+            not evidence.get("failureClassification")
+            and evidence.get("outcome") != "HANDOFF_SELECTED"
+        ):
             continue
         diagnostic = {
             "source": source,

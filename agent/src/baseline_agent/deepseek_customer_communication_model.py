@@ -147,19 +147,21 @@ class DeepSeekResponsesCustomerCommunicationModel:
                     payload: object = None
                     published_length = 0
                     published_body = ""
+                    publication_failed = False
                     validation_diagnostic: dict[str, object] | None = None
 
-                    async def publish(delta: str) -> None:
-                        nonlocal published_body, published_length
+                    async def publish(delta: str) -> bool:
+                        nonlocal published_body, published_length, publication_failed
                         if on_body_delta is not None:
                             try:
                                 await on_body_delta(delta)
-                            except Exception as error:
-                                raise CustomerCommunicationFailure(
-                                    CustomerCommunicationFailureCode.PUBLICATION_FAILED
-                                ) from error
+                            except Exception:
+                                # 发布拒绝不终止同一供应商响应的计量读取;后续正文不再发布。
+                                publication_failed = True
+                                return False
                         published_length += len(delta)
                         published_body += delta
+                        return True
 
                     try:
                         streamed = await asyncio.wait_for(
@@ -173,6 +175,8 @@ class DeepSeekResponsesCustomerCommunicationModel:
                             timeout=remaining,
                         )
                         payload = streamed.payload
+                        if publication_failed:
+                            raise _failure(CustomerCommunicationFailureCode.PUBLICATION_FAILED)
                         if not streamed.output_text_matches:
                             validation_diagnostic = _diagnostic(
                                 "STREAM_MISMATCH",
@@ -188,7 +192,10 @@ class DeepSeekResponsesCustomerCommunicationModel:
                             attempt_number,
                             attempt_started,
                             request_body,
-                            DeepSeekFailureClassification.DEADLINE_EXCEEDED,
+                            DeepSeekFailureClassification.PUBLIC_REPLY_PUBLISH_FAILED
+                            if publication_failed
+                            else DeepSeekFailureClassification.DEADLINE_EXCEEDED,
+                            provider_http_status=200 if publication_failed else None,
                         )
                         raise
                     except TimeoutError:
@@ -198,8 +205,15 @@ class DeepSeekResponsesCustomerCommunicationModel:
                             attempt_number,
                             attempt_started,
                             request_body,
-                            DeepSeekFailureClassification.DEADLINE_EXCEEDED,
+                            DeepSeekFailureClassification.PUBLIC_REPLY_PUBLISH_FAILED
+                            if publication_failed
+                            else DeepSeekFailureClassification.DEADLINE_EXCEEDED,
+                            provider_http_status=200 if publication_failed else None,
                         )
+                        if publication_failed:
+                            raise _failure(
+                                CustomerCommunicationFailureCode.PUBLICATION_FAILED
+                            ) from None
                         raise _failure() from None
                     except httpx.TransportError as error:
                         classification = (
@@ -215,8 +229,15 @@ class DeepSeekResponsesCustomerCommunicationModel:
                             attempt_number,
                             attempt_started,
                             request_body,
-                            classification,
+                            DeepSeekFailureClassification.PUBLIC_REPLY_PUBLISH_FAILED
+                            if publication_failed
+                            else classification,
+                            provider_http_status=200 if publication_failed else None,
                         )
+                        if publication_failed:
+                            raise _failure(
+                                CustomerCommunicationFailureCode.PUBLICATION_FAILED
+                            ) from None
                         if published_length == 0 and await self._can_retry(
                             attempt_number, call_started
                         ):
@@ -253,13 +274,18 @@ class DeepSeekResponsesCustomerCommunicationModel:
                             request_body,
                             (
                                 DeepSeekFailureClassification.PUBLIC_REPLY_PUBLISH_FAILED
-                                if error.code is CustomerCommunicationFailureCode.PUBLICATION_FAILED
+                                if publication_failed
+                                or error.code is CustomerCommunicationFailureCode.PUBLICATION_FAILED
                                 else DeepSeekFailureClassification.SCHEMA_MISMATCH
                             ),
                             payload if isinstance(payload, dict) else None,
                             provider_http_status=200,
                             validation_diagnostic=validation_diagnostic,
                         )
+                        if publication_failed:
+                            raise _failure(
+                                CustomerCommunicationFailureCode.PUBLICATION_FAILED
+                            ) from None
                         raise
                     try:
                         envelope = _parse_response(payload)
@@ -402,7 +428,7 @@ async def _read_streamed_response(
     endpoint: str,
     request_body: dict[str, Any],
     model_input: CustomerCommunicationInput,
-    publish: Callable[[str], Awaitable[None]],
+    publish: Callable[[str], Awaitable[bool]],
 ) -> _StreamedResponse:
     expected_intent = (
         CustomerReplyIntent.CLARIFICATION_REQUIRED
@@ -414,6 +440,7 @@ async def _read_streamed_response(
     del expected_intent  # intent is enforced after streaming by envelope validation
     output_text = ""
     published_body = ""
+    publication_stopped = False
     final_response: dict[str, Any] | None = None
     last_sequence = -1
     async with client.stream("POST", endpoint, json=request_body) as response:
@@ -442,10 +469,11 @@ async def _read_streamed_response(
                     raise _failure()
                 output_text += delta
                 if (
-                    model_input.knowledge is not None
+                    publication_stopped
+                    or model_input.knowledge is not None
                     or model_input.risk_scenario == "DUPLICATE_CHARGE"
                 ):
-                    # 支付状态和知识均完整缓冲,由 Spring 校验结论后发布。
+                    # 发布已被拒绝时只读取终态计量;支付和知识仍由 Spring 校验后发布。
                     continue
                 body_field = _partial_json_string_field(output_text, "body")
                 if body_field is None:
@@ -466,14 +494,21 @@ async def _read_streamed_response(
                             break
                 new_delta = body_prefix[len(published_body) :]
                 if new_delta:
-                    await publish(new_delta)
-                    published_body = body_prefix
+                    if await publish(new_delta):
+                        published_body = body_prefix
+                    else:
+                        publication_stopped = True
             elif event_type == "response.completed":
                 candidate = event.get("response")
                 if not isinstance(candidate, dict):
                     raise _failure()
                 final_response = candidate
+                break
             elif event_type in {"response.incomplete", "response.failed"}:
+                candidate = event.get("response")
+                if publication_stopped and isinstance(candidate, dict):
+                    final_response = candidate
+                    break
                 raise _failure()
     if final_response is None:
         raise _failure()

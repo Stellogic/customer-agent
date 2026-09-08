@@ -1,11 +1,14 @@
 import asyncio
 import json
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
 
+from baseline_agent.core_validation_budget import CoreValidationBudget
 from baseline_agent.customer_communication_model import (
     CustomerCommunicationFailure,
     CustomerCommunicationInput,
@@ -898,3 +901,87 @@ async def test_pro_usage_does_not_reuse_flash_usd_cost_or_erase_unknown_on_merge
     known = {**evidence, "costMicros": 10}
     assert graph_module._merge_communication_evidence(evidence, known)["costMicros"] is None
     assert graph_module._merge_communication_evidence(known, evidence)["costMicros"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "ending", ["completed", "incomplete", "failed", "missing_usage", "disconnect", "deadline"]
+)
+async def test_publication_rejection_drains_same_stream_usage_without_publishing_or_retrying(
+    tmp_path: Path,
+    ending: str,
+) -> None:
+    body = (
+        "调查结果显示，订单 ORDER-C129 的物流出现延迟。"
+        "补偿建议正在等待人工审批；审批完成前不会执行补偿或退款。"
+    )
+    payload = _completed(body)
+    if ending == "missing_usage":
+        del payload["usage"]
+    text = payload["output"][0]["content"][0]["text"]
+    if ending in {"incomplete", "failed"}:
+        payload["status"] = ending
+    content = _streamed(payload, split_at=text.index("补偿建议")).content
+    if ending in {"incomplete", "failed"}:
+        content = content.replace(b"response.completed", f"response.{ending}".encode())
+    chunks = content.split(b"\n\n")
+    known_usage = ending in {"completed", "incomplete", "failed"}
+    terminal_received = known_usage or ending == "missing_usage"
+    consumed: list[int] = []
+    requests: list[str] = []
+    publications: list[str] = []
+
+    class TrackedStream(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            for index, chunk in enumerate(chunks):
+                if index == 1 and ending == "disconnect":
+                    raise httpx.ReadError("synthetic disconnect after rejected publication")
+                if index == 1 and ending == "deadline":
+                    await asyncio.Event().wait()
+                if chunk:
+                    consumed.append(index)
+                    yield chunk + b"\n\n"
+
+    def supplier(request: httpx.Request) -> httpx.Response:
+        requests.append(request.url.path)
+        return httpx.Response(
+            200, headers={"Content-Type": "text/event-stream"}, stream=TrackedStream()
+        )
+
+    async def reject_publish(delta: str) -> None:
+        publications.append(delta)
+        httpx.Response(
+            422, request=httpx.Request("POST", "http://backend/public-reply-events")
+        ).raise_for_status()
+
+    budget = CoreValidationBudget.create(
+        tmp_path / "publication-budget.json",
+        authorization_id="synthetic-publication-drain",
+        limit_micros=3_000_000,
+        max_attempts=2,
+        max_tokens=100_000,
+        deadline=datetime.now(UTC) + timedelta(minutes=1),
+    )
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(
+            api_key="synthetic-test-key", deadline_seconds=0.2 if ending == "deadline" else 15
+        ),
+        transport=httpx.MockTransport(supplier),
+        budget=budget,
+    )
+    with pytest.raises(CustomerCommunicationFailure) as failure:
+        await model.compose(_input(), on_body_delta=reject_publish)
+    assert failure.value.code.value == "PUBLICATION_FAILED"
+    assert len(requests) == len(publications) == 1
+    record = model.audit_sink.records[0]
+    assert record.failure_classification.value == "PUBLIC_REPLY_PUBLISH_FAILED"
+    assert record.provider_http_status == 200
+    assert record.provider_response_id == ("response-c129" if terminal_received else None)
+    assert (record.input_tokens, record.output_tokens, record.total_tokens) == (
+        (80, 30, 110) if known_usage else (None, None, None)
+    )
+    assert consumed == ([0, 1, 2] if terminal_received else [0])
+    entry = json.loads(budget.path.read_text(encoding="utf-8"))["entries"][0]
+    assert entry["status"] == ("SETTLED" if known_usage else "PENDING")
+    assert entry["estimatedCostMicros"] == (510 if known_usage else None)
+    assert entry["reservedMicros"] > 0

@@ -178,8 +178,9 @@ def test_core_metrics_restore_owned_pending_attempt_without_fabricating_known_us
             "PUBLIC_REPLY_PUBLISH_FAILED",
         ),
         ("customer_communication_evidence", "communication", "FACT_CONFLICT", ""),
+        ("investigation_run_evidence", "action", "", ""),
     ],
-    ids=["normal", "format", "publication-handoff", "evidence-rejected"],
+    ids=["normal", "format", "publication-handoff", "evidence-rejected", "selected-handoff"],
 )
 def test_core_collector_keeps_database_owners_and_reads_current_generation_evidence(
     monkeypatch: pytest.MonkeyPatch,
@@ -233,11 +234,13 @@ def test_core_collector_keeps_database_owners_and_reads_current_generation_evide
             }
             if role == "action":
                 stage_evidence.update(
-                    outcome="SAFE_HANDOFF",
+                    outcome="HANDOFF_SELECTED" if classification == "" else "SAFE_HANDOFF",
                     modelCalls=[
                         {
                             "callNumber": 1,
-                            "selectedAction": "SUBMIT_CONCLUSION",
+                            "selectedAction": "HANDOFF"
+                            if classification == ""
+                            else "SUBMIT_CONCLUSION",
                             "prompt": "不能保存的原文",
                         }
                     ],
@@ -330,8 +333,15 @@ def test_core_collector_keeps_database_owners_and_reads_current_generation_evide
         }
         if role == "action":
             expected.update(
-                modelCalls=[{"callNumber": 1, "selectedAction": "SUBMIT_CONCLUSION"}],
-                outcome="SAFE_HANDOFF",
+                modelCalls=[
+                    {
+                        "callNumber": 1,
+                        "selectedAction": "HANDOFF"
+                        if classification == ""
+                        else "SUBMIT_CONCLUSION",
+                    }
+                ],
+                outcome="HANDOFF_SELECTED" if classification == "" else "SAFE_HANDOFF",
             )
         assert generation["diagnostics"] == [expected]
         assert report["attempts"][0]["failureClassification"] == provider_failure
