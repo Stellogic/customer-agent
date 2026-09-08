@@ -1206,7 +1206,7 @@ def main() -> None:
             "ticket_id": resolved_ticket_id,
             "generation_id": generation_id,
             "model": "deepseek-v4-flash",
-            "prompt_version": "investigation-judgment-v1",
+            "prompt_version": "investigation-judgment-v2",
             "schema_version": "investigation-judgment-v1",
             "outcome": "MATCH",
             "failure_classification": "",

@@ -101,7 +101,7 @@ async def test_comparison_uses_identical_full_dataset_and_redacted_aggregate_rep
         "identicalForAllCandidates": True,
     }
     assert report["sharedContract"] == {
-        "promptVersion": "investigation-judgment-v1",
+        "promptVersion": "investigation-judgment-v2",
         "schemaVersion": "investigation-judgment-v1",
         "thinking": "disabled",
         "strictJsonSchema": True,
