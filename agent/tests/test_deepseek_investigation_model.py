@@ -188,7 +188,7 @@ async def test_deepseek_adapter_records_minimal_metadata_without_raw_material() 
     assert record.request_model == "deepseek-v4-flash"
     assert record.response_model == "deepseek-v4-flash-202608"
     assert record.backend_fingerprint == "fp_202608"
-    assert record.prompt_version == "investigation-judgment-v1"
+    assert record.prompt_version == "investigation-judgment-v2"
     assert record.schema_version == "investigation-judgment-v1"
     assert record.input_tokens == 19
     assert record.output_tokens == 8

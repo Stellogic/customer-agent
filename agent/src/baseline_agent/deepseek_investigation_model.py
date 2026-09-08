@@ -27,7 +27,7 @@ from baseline_agent.investigation_model import (
 _RESPONSES_ENDPOINT = "https://api.deepseek.com/responses"
 DEEPSEEK_FLASH_MODEL = "deepseek-v4-flash"
 DEEPSEEK_PRO_MODEL = "deepseek-v4-pro"
-INVESTIGATION_JUDGMENT_PROMPT_VERSION = "investigation-judgment-v1"
+INVESTIGATION_JUDGMENT_PROMPT_VERSION = "investigation-judgment-v2"
 INVESTIGATION_JUDGMENT_SCHEMA_VERSION = "investigation-judgment-v1"
 _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 503})
 _FLASH_INPUT_USD_PER_MILLION_TOKENS = 0.44
@@ -469,8 +469,14 @@ def _build_request(
             "Judge only whether the supplied synthetic logistics delay requires Spring "
             "compensation review. A delay of at least 86400 seconds requires review. "
             "Return LOGISTICS_DELAY when review is required, otherwise return "
-            "DELAY_UNDER_24_HOURS. Return only the strict JSON schema; do not include "
-            "orders, evidence, amounts, methods, raw data, credentials, or reasoning."
+            "DELAY_UNDER_24_HOURS. Return exactly one JSON object matching the schema, "
+            "not the schema itself. Do not use Markdown, code fences, or surrounding text. "
+            "For a delay of 86400 seconds, output: "
+            '{"compensationReviewRequired":true,"reasonCode":"LOGISTICS_DELAY"}. '
+            "For a delay of 86399 seconds, output: "
+            '{"compensationReviewRequired":false,"reasonCode":"DELAY_UNDER_24_HOURS"}. '
+            "Do not include orders, evidence, amounts, methods, raw data, credentials, "
+            "or reasoning."
         ),
         "input": json.dumps(
             {"syntheticInvestigationFacts": {"delaySeconds": model_input.delay_seconds}},

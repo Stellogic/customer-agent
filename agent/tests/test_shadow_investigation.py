@@ -70,7 +70,7 @@ def test_enabled_shadow_requires_the_explicit_supported_mode_and_configuration()
     assert candidate is not None
     assert candidate.model_name == "deepseek-v4-flash"
     assert candidate.maximum_provider_attempts == 1
-    assert candidate.prompt_version == "investigation-judgment-v1"
+    assert candidate.prompt_version == "investigation-judgment-v2"
     assert candidate.schema_version == "investigation-judgment-v1"
 
     offline = configured_shadow_candidate({"AGENT_INVESTIGATION_SHADOW_MODE": "offline"})
@@ -215,7 +215,7 @@ async def test_real_shadow_checkpoint_reports_safe_attempt_metrics_and_never_ret
         "ticket_id": "ticket-126",
         "generation_id": "generation-126",
         "model": "deepseek-v4-flash",
-        "prompt_version": "investigation-judgment-v1",
+        "prompt_version": "investigation-judgment-v2",
         "schema_version": "investigation-judgment-v1",
         "outcome": "FAILED",
         "failure_classification": "TRANSIENT_PROVIDER_ERROR",
