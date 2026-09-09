@@ -7,5 +7,7 @@
 frontend/dist/
 .env
 .local/
+/.scratch/
+/.worktrees/
 **/model.safetensors
 **/pytorch_model.bin
