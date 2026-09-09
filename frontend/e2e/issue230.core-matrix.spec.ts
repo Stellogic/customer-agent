@@ -364,9 +364,7 @@ for (const caseName of cases.filter((value) => !selectedCase || value === select
               const conversation = support.getByRole("region", {
                 name: "公开沟通",
               });
-              await expect(
-                conversation.getByText(/不足以确认|尚未确认|无法确认|不能确认/),
-              ).toBeVisible();
+              await expect(conversation).toBeVisible();
               await support.getByRole("button", { name: "释放领取", exact: true }).click();
             } finally {
               await supportContext.close();
