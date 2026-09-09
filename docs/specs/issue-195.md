@@ -1,10 +1,10 @@
 # [规格] 为并行任务增加跨 worktree 测试门禁锁
 
 > 来源：[https://github.com/Stellogic/customer-agent/issues/195](https://github.com/Stellogic/customer-agent/issues/195)
-> Issue 状态：OPEN
+> Issue 状态：CLOSED
 > 创建时间：2026-08-29T15:47:53Z
-> 最后更新时间：2026-08-29T15:50:14Z
-> 同步日期：2026-08-29
+> 最后更新时间：2026-08-29T22:35:45Z
+> 同步日期：2026-09-09
 > 说明：本文件是 GitHub Issue 正文的只读镜像；项目仍以 GitHub Issue 为规格事实源。
 
 ## Problem Statement
