@@ -6,33 +6,15 @@
 
 前置条件为 Docker Desktop、Docker Compose、PowerShell 7，以及首次准备模型所需的 [uv](https://docs.astral.sh/uv/getting-started/installation/) 和 Hugging Face 网络访问。首次启动会构建 React、Spring Boot 和私有 Agent Server，并在同一 PostgreSQL 实例中创建相互隔离的业务数据库与 Agent checkpoint 数据库。
 
-先准备固定 BGE 模型（此脚本自行持有共享锁，BUSY 时停止，不重试）：
+在仓库根目录执行一条命令：
 
 ```powershell
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-pwsh -File scripts/prepare-knowledge-model.ps1
+pwsh -File scripts/start.ps1
 ```
 
-脚本用 `uv run --frozen` 准备 Python 依赖，并下载、校验冻结 revision `7999e1d3359715c523056ef9478215996d62a620` 到 `.local/models/bge-small-zh-v1.5`。已经完成同一协议完整校验的目录可复用，不必重复下载。也可在 `.env` 中设置 `KNOWLEDGE_MODEL_HOST_PATH` 指向已准备目录。该目录不提交 Git；运行时只读本地文件，不下载、不换模型，缺失或校验失败会明确停止。模型准备不调用 DeepSeek。
+`start.ps1` 会在缺少 `.env` 时自动从 `.env.example` 创建，在默认模型目录不存在时下载并校验固定 BGE 模型，然后获取测试门禁锁、准备 PostgreSQL `vector` 扩展并构建启动全部服务。模型准备使用冻结 revision `7999e1d3359715c523056ef9478215996d62a620`，默认保存到 `.local/models/bge-small-zh-v1.5`；也可在 `.env` 中通过 `KNOWLEDGE_MODEL_HOST_PATH` 指向其他目录。已存在的模型目录会直接复用，运行时仍会校验模型；模型准备不调用 DeepSeek。门禁为 `BUSY` 或 `RECOVERY_REQUIRED` 时脚本会按项目规则立即停止。
 
-随后在仓库根目录同一个 PowerShell 7 进程内启动：
-
-```powershell
-. ./scripts/test-gate-lock.ps1
-$startupLock = Enter-TestGateLock -Issue manual -CommandType local-start
-try {
-    docker compose up --detach --wait postgres
-    if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL 启动失败' }
-    docker compose exec -T postgres psql -U postgres -d customer_agent -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/002-knowledge-vector.sql
-    if ($LASTEXITCODE -ne 0) { throw 'vector 扩展准备失败；保留数据并停止' }
-    docker compose up --detach --build --wait
-    if ($LASTEXITCODE -ne 0) { throw '应用启动失败' }
-} finally {
-    Exit-TestGateLock $startupLock
-}
-```
-
-**从旧版本升级已有数据卷也使用以上顺序，不删除卷。** PostgreSQL 官方镜像只在空数据目录执行初始化脚本；换成 pgvector 镜像仅提供扩展文件，已有业务库仍需先以管理员运行上述幂等 `CREATE EXTENSION IF NOT EXISTS vector`，随后才启动 Flyway/应用。新库重复执行同样安全；没有提升 `spring_app`/`spring_migrator` 权限，也不修改已应用迁移。此步骤针对本项目既有 PostgreSQL 18 数据卷，不是跨主版本升级方案。依据：[PostgreSQL 镜像初始化约定](https://github.com/docker-library/docs/blob/master/postgres/README.md#initialization-scripts)、[pgvector 按数据库启用扩展](https://github.com/pgvector/pgvector#getting-started)。
+**从旧版本升级已有数据卷也直接使用 `start.ps1`，不要删除卷。** 脚本会先以管理员幂等启用 `vector`，随后才启动 Flyway/应用；不会提升 `spring_app`/`spring_migrator` 权限，也不会修改已应用迁移。此步骤针对本项目既有 PostgreSQL 18 数据卷，不是跨主版本升级方案。依据：[PostgreSQL 镜像初始化约定](https://github.com/docker-library/docs/blob/master/postgres/README.md#initialization-scripts)、[pgvector 按数据库启用扩展](https://github.com/pgvector/pgvector#getting-started)。
 
 打开 <http://127.0.0.1:4180>。客户从 `/help/login`、客服与审批人从 `/internal/login` 使用本地演示账号完成真实密码校验，浏览器人工身份只由 Spring Security `HttpOnly` Session 表达。客户页面读取 `CUSTOMER_PUBLIC` 权威快照并从同一视图的 `epoch:sequence` 游标请求 SSE 增量；客服与审批工作区分别使用独立的 `SUPPORT_WORKBENCH` 与 `APPROVAL_VIEW` 快照、游标和事件流。旧 `/support` 与 `/approver` 仅保留到正式内部路由的弃用重定向，不建立身份、不重新领取责任，也不包含第二套页面。浏览器只请求同源的 Spring `/api`；Agent Server 和 PostgreSQL 均未发布主机端口。
 
