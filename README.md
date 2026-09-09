@@ -12,7 +12,7 @@
 pwsh -File scripts/start.ps1
 ```
 
-`start.ps1` 会在缺少 `.env` 时自动从 `.env.example` 创建，在默认模型目录不存在时下载并校验固定 BGE 模型，然后获取测试门禁锁、准备 PostgreSQL `vector` 扩展并构建启动全部服务。模型准备使用冻结 revision `7999e1d3359715c523056ef9478215996d62a620`，默认保存到 `.local/models/bge-small-zh-v1.5`；也可在 `.env` 中通过 `KNOWLEDGE_MODEL_HOST_PATH` 指向其他目录。已存在的模型目录会直接复用，运行时仍会校验模型；模型准备不调用 DeepSeek。门禁为 `BUSY` 或 `RECOVERY_REQUIRED` 时脚本会按项目规则立即停止。
+`start.ps1` 会在缺少 `.env` 时自动从 `.env.example` 创建，校验本地固定 BGE 模型并只在缺失或校验失败时重新准备，然后获取测试门禁锁、准备 PostgreSQL `vector` 扩展并构建启动全部服务。模型使用冻结 revision `7999e1d3359715c523056ef9478215996d62a620`，默认保存到 `.local/models/bge-small-zh-v1.5`；也可在 `.env` 中通过 `KNOWLEDGE_MODEL_HOST_PATH` 指向其他目录。模型准备不调用 DeepSeek。门禁为 `BUSY` 或 `RECOVERY_REQUIRED` 时脚本会按项目规则立即停止。
 
 **从旧版本升级已有数据卷也直接使用 `start.ps1`，不要删除卷。** 脚本会先以管理员幂等启用 `vector`，随后才启动 Flyway/应用；不会提升 `spring_app`/`spring_migrator` 权限，也不会修改已应用迁移。此步骤针对本项目既有 PostgreSQL 18 数据卷，不是跨主版本升级方案。依据：[PostgreSQL 镜像初始化约定](https://github.com/docker-library/docs/blob/master/postgres/README.md#initialization-scripts)、[pgvector 按数据库启用扩展](https://github.com/pgvector/pgvector#getting-started)。
 

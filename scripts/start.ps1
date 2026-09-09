@@ -27,14 +27,23 @@ try {
         $modelPath = Join-Path $repoRoot $modelPath
     }
 
-    if (-not (Test-Path -LiteralPath $modelPath -PathType Container)) {
+    $modelReady = $false
+    if (Test-Path -LiteralPath $modelPath -PathType Container) {
+        try {
+            & "$PSScriptRoot/prepare-knowledge-model.ps1" -ModelDirectory $modelPath -VerifyOnly
+            $modelReady = $true
+        } catch {
+            Write-Host '现有模型目录未通过校验，将重新准备。'
+        }
+    }
+    if (-not $modelReady) {
         Write-Host '首次启动：正在准备本地知识检索模型。'
         & "$PSScriptRoot/prepare-knowledge-model.ps1" -ModelDirectory $modelPath
         if ($LASTEXITCODE -ne 0) { throw '本地知识检索模型准备失败。' }
     }
 
     . "$PSScriptRoot/test-gate-lock.ps1"
-    $startupLock = Enter-TestGateLock -Issue manual -CommandType local-start
+    $startupLock = Enter-TestGateLock -Issue manual -CommandType local-start -ComposeProject 'customer-agent-baseline'
     try {
         docker compose up --detach --wait postgres
         if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL 启动失败。' }
