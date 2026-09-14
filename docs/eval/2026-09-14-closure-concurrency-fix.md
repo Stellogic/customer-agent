@@ -57,3 +57,22 @@ Spring 的默认线程池调度器只有一个线程，见[官方调度文档](h
 ## 断电前保存检查点
 
 用户要求电脑低电量时优先保存提交。本次完整门禁 `manual-payment-closure-final-20260914` 已通过 Agent 测试（611 passed、3 skipped）与广域集成测试；保存时后续浏览器验收尚未全部结束，因此完整门禁仍未确认通过，不作为合并或正式交付依据。修复代码、已有评测数据与诊断文档一并提交，后续从此检查点继续。
+
+## 充电后续跑：环境恢复检查（2026-09-14）
+
+- 续跑标识：`manual-payment-closure-resume-20260914`；日志：`.local/audit-20260914/payment-closure-resume.log`。
+- 退出码 1，失败于 `test-test-gate-lock.ps1:398`：Docker Desktop 未运行，无法连接 `dockerDesktopLinuxEngine` 管道并创建锁协议测试的容器。本次未执行产品测试，不计为产品回归失败。
+- 已启动 Docker Desktop，宿主机 `docker info` 确认引擎版本 29.7.2。
+- 上次 `manual-payment-closure-final-20260914` 日志停止于 smoke 的日志扫描之后；没有该 Run ID 的最终通过凭据，原运行进程已不存在。因此上次状态为中断、完整结果未知，不能以已完成部分推定完整通过。
+- 当前锁查询显示 FREE，但按旧 Compose 项目标签独立查询，仍有下列精确归属资源。FREE 不代表本次旧运行的资源已全部清理；未删除状态文件，也未清理残留。
+
+旧 Compose 项目：`customer-agent-gate-manual-payment-closure-final-20260914`。
+
+| 资源 | 只读核实结果 |
+| --- | --- |
+| 容器 | backend、spring-migrate、compensation-executor、frontend、agent-server、agent-migrate、postgres，共 7 个；compensation-executor 随 Docker 启动，其他已退出 |
+| 数据卷 | 项目名加 `_postgres-data`，1 个，隔离测试数据库 |
+| 网络 | 项目名加 `_data`、`_edge`、`_provider-egress`、`_services`，4 个 |
+| 旧运行镜像标签 | 精确标签 `gate-manual-payment-closure-final-20260914` 查询无结果 |
+
+按照仓库中断恢复要求，暂停新的重资源验证，待确认后仅清理上述旧项目容器、测试卷和网络，再回读为空并运行完整门禁。普通开发数据、真实模型历史账本和其他项目资源不在清理范围。本次真实 LLM 调用为 0。
