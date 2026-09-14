@@ -5731,14 +5731,27 @@ def main() -> None:
         ),
     )
     lock_connection.commit()
+
+    def waiting_authority_writers() -> int:
+        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as observation:
+            return observation.execute(
+                "select count(*) from pg_locks where locktype = 'advisory' and not granted "
+                "and %s = any(pg_blocking_pids(pid))",
+                (lock_connection.info.backend_pid,),
+            ).fetchone()[0]
+
+    # 先让调度侧进入目标锁等待,再启动会持有工单行锁的客户续接请求。
+    # 否则 SLA 调度可先被该行锁阻塞,同一调度线程无法继续执行关闭任务。
+    for _ in range(40):
+        if waiting_authority_writers() >= 1:
+            break
+        time.sleep(0.25)
+    assert waiting_authority_writers() >= 1, "scheduled authority writer did not reach target lock"
     boundary_pool = ThreadPoolExecutor(max_workers=1)
     boundary_future = boundary_pool.submit(reply_at_boundary, 0)
     blocked_authority_writers = 0
     for _ in range(40):
-        with psycopg.connect(os.environ["SPRING_DATABASE_URI"]) as observation:
-            blocked_authority_writers = observation.execute(
-                "select count(*) from pg_locks where locktype = 'advisory' and not granted"
-            ).fetchone()[0]
+        blocked_authority_writers = waiting_authority_writers()
         if blocked_authority_writers >= 2:
             break
         time.sleep(0.25)

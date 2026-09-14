@@ -1,0 +1,177 @@
+{
+  "externalModelCalls": 0,
+  "minimalProbe": {
+    "ticketId": "f1be6dc7-62c8-4a8a-8745-ed6e8735e4bc",
+    "observations": [
+      {
+        "blocked": [],
+        "replyDone": false
+      },
+      {
+        "blocked": [],
+        "replyDone": false
+      },
+      {
+        "blocked": [],
+        "replyDone": false
+      },
+      {
+        "blocked": [
+          [
+            155,
+            "advisory",
+            "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+            2
+          ],
+          [
+            157,
+            "advisory",
+            "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+            1
+          ]
+        ],
+        "replyDone": false
+      }
+    ],
+    "responseStatus": 201,
+    "response": {
+      "schema": "customer-intake-v4",
+      "intakeId": "b9c1a003-70f2-4221-af42-15471715dfc2",
+      "status": "CONFIRMED",
+      "candidateOrder": {
+        "reference": "ORDER-DELAY-UNDER-24",
+        "summary": "配送中的合成订单"
+      },
+      "issues": [],
+      "assistantMessage": "已按你的确认继续既有工单，没有创建重复工单。",
+      "ticketIds": [],
+      "sharedIntakeRecordId": null,
+      "duplicateMatches": [],
+      "routedTicketIds": [
+        "88046cc3-14f7-4d38-8df2-b80a059d755b"
+      ],
+      "remainingOrderCount": 0,
+      "completedOrderCount": 1,
+      "expectedTicketCount": 0,
+      "confirmed": true,
+      "version": 3,
+      "replayed": false,
+      "ticketId": "88046cc3-14f7-4d38-8df2-b80a059d755b",
+      "accepted": true
+    },
+    "states": [
+      [
+        "f1be6dc7-62c8-4a8a-8745-ed6e8735e4bc",
+        "CLOSED",
+        null
+      ],
+      [
+        "88046cc3-14f7-4d38-8df2-b80a059d755b",
+        "INVESTIGATING",
+        "f1be6dc7-62c8-4a8a-8745-ed6e8735e4bc"
+      ]
+    ]
+  },
+  "broadDiagnosticPreparation": {
+    "result": "NOT_REACHED",
+    "reason": "missing offline shadow configuration"
+  },
+  "broadDiagnosticBeforeFix": {
+    "waiters": [
+      [
+        181,
+        "advisory",
+        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [
+          944
+        ]
+      ],
+      [
+        183,
+        "transactionid",
+        "select created_at, first_responded_at, resolution_elapsed_seconds, resolution_running_since, lifecycle_state from support_ticket where id = $1 for update",
+        [
+          181
+        ]
+      ]
+    ],
+    "responseStatus": 201,
+    "ticketId": "4d9b154f-5aca-4a99-a646-d3ec64223d5d"
+  },
+  "broadRegressionAfterFix": {
+    "status": "UP",
+    "thread_id": "01a09ece-3372-71b1-9ca5-9bdaa22a4357",
+    "checkpoint_count": 350,
+    "ticket_id": "d1964431-b6e9-40a7-9b16-d65c4a1e4632",
+    "resolved_ticket_id": "62cb6c72-425e-4d9f-9b13-c2211c679f64",
+    "proposal_ticket_id": "5835459c-dc7f-4627-b036-b0a12ef852d7",
+    "proposal_revision_count": 2,
+    "rejected_proposal_count": 6,
+    "concurrent_reservation_results": [
+      "compensation_reservation_capacity",
+      "accepted"
+    ],
+    "concurrent_clarification_reply_statuses": [
+      202,
+      409
+    ],
+    "human_handoff_ticket_id": "d63331bf-49c9-4f26-818f-10fa5d935e03",
+    "agent_handoff_ticket_id": "a8371769-ee71-45d9-86b1-fc92f5025542",
+    "concurrent_agent_handoff_statuses": [
+      403,
+      202
+    ],
+    "handoff_reply_race_statuses": [
+      202,
+      409
+    ],
+    "clarification_resume_status": "SUBMITTED",
+    "sla_fact_count": 4,
+    "sla_resume_immediate": true,
+    "concurrent_replays": 7,
+    "approval_claim_statuses": [
+      201,
+      409
+    ],
+    "approval_lease_versions": [
+      1,
+      2,
+      3
+    ],
+    "approval_replacement_revoked": true,
+    "approval_rejection_ticket_id": "c7fda539-769b-4953-a848-2f3854f02a0d",
+    "approval_rejection_replayed": true,
+    "concurrent_rejection_statuses": [
+      200,
+      200
+    ],
+    "approval_execution_id": "9e7b1c71-4326-3f05-bad7-7e681e5217e6",
+    "execution_claim_statuses": [
+      201,
+      409
+    ],
+    "execution_success_replayed": true,
+    "coupon_10_execution_id": "588acbf2-4e58-3f4a-8980-8005ce6439a8",
+    "coupon_10_ticket_id": "ddcc84a6-5aaf-458b-af24-e26738dce18f",
+    "coupon_20_execution_id": "654f51fb-ecf3-3ab3-a15e-4f6c5538d561",
+    "coupon_20_ticket_id": "b8aa2f67-d5c2-4c4f-8a64-5e3b21677c61",
+    "partial_refund_ticket_id": "eae51183-9e0a-4cf8-bbe9-8af8c4371196",
+    "automatic_executor_execution_id": "f6eb28f1-df18-31c2-896d-e3dcffc1e167",
+    "automatic_executor_ticket_id": "849f88a5-2c55-439c-831a-064a5a2a14f4",
+    "approval_fact_drift_invalidated": "9bb8f8f2-df15-490b-9444-85b920e4122b",
+    "concurrent_proposal_intent_results": [
+      "accepted",
+      "accepted"
+    ],
+    "approve_reject_statuses": [
+      200,
+      409
+    ],
+    "approve_reject_winner": "REJECTED"
+  },
+  "staticChecks": {
+    "ruff": "PASS",
+    "pyrightErrors": 0,
+    "pyrightWarnings": 0
+  }
+}

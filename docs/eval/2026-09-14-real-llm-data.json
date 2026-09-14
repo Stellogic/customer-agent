@@ -1,0 +1,1292 @@
+{
+  "runId": "issue230-real-audit-20260914",
+  "result": {
+    "runId": "issue230-real-audit-20260914",
+    "head": "3ab5fc06a2371a64ecfc545274e104c939564480",
+    "authorizationId": "user-project-audit-20260914-one-batch",
+    "outcome": "FAIL",
+    "denominator": 10,
+    "matrix": [
+      {
+        "case": "no_compensation",
+        "sample": 1,
+        "status": "PASS"
+      },
+      {
+        "case": "no_compensation",
+        "sample": 2,
+        "status": "PASS"
+      },
+      {
+        "case": "pending_approval",
+        "sample": 1,
+        "status": "PASS"
+      },
+      {
+        "case": "pending_approval",
+        "sample": 2,
+        "status": "PASS"
+      },
+      {
+        "case": "payment_handoff",
+        "sample": 1,
+        "status": "FAIL"
+      },
+      {
+        "case": "payment_handoff",
+        "sample": 2,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "split_recovery",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "split_recovery",
+        "sample": 2,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "generation_fence",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "generation_fence",
+        "sample": 2,
+        "status": "NOT_RUN"
+      }
+    ],
+    "metricsCollected": true,
+    "cleanupPassed": true,
+    "productAcceptance": false
+  },
+  "plan": {
+    "schemaVersion": "issue230-real-core-plan-v1",
+    "authorizationId": "user-project-audit-20260914-one-batch",
+    "runId": "issue230-real-audit-20260914",
+    "testedHead": "3ab5fc06a2371a64ecfc545274e104c939564480",
+    "model": "deepseek-v4-pro",
+    "communicationModel": "deepseek-v4-pro",
+    "pricesByModel": {
+      "deepseek-v4-pro": {
+        "inputMicrosPerToken": 9,
+        "outputMicrosPerToken": 27
+      }
+    },
+    "providerVersions": {
+      "intake": {
+        "schema": [
+          "customer_intake_clarification",
+          "customer_intake_issue_assessments",
+          "customer_intake_understanding"
+        ],
+        "prompt": "intake-v4"
+      },
+      "action": {
+        "schema": "investigation-action-v4",
+        "prompt": "investigation-action-v7"
+      },
+      "judgment": {
+        "schema": "investigation-judgment-v1",
+        "prompt": "investigation-judgment-v2"
+      },
+      "communication": {
+        "schema": "customer-reply-v1",
+        "prompt": "customer-communication-v5"
+      }
+    },
+    "limitMicros": 1500000,
+    "currency": "CNY",
+    "maxAttempts": 80,
+    "maxTokens": 160000,
+    "deadline": "2026-09-14T15:02:07.00005+08:00",
+    "investigationWallClockMs": 30000,
+    "denominator": 10,
+    "matrix": [
+      {
+        "case": "no_compensation",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "no_compensation",
+        "sample": 2,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "pending_approval",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "pending_approval",
+        "sample": 2,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "payment_handoff",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "payment_handoff",
+        "sample": 2,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "split_recovery",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "split_recovery",
+        "sample": 2,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "generation_fence",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "generation_fence",
+        "sample": 2,
+        "status": "NOT_RUN"
+      }
+    ],
+    "selectedCase": "",
+    "selectedSample": "",
+    "retries": 0,
+    "maxFailures": 0,
+    "continueOnCaseFailure": true,
+    "workers": 1,
+    "sideEffects": [
+      "创建本轮合成订单与工单",
+      "发布客户公开回复",
+      "客服领取并释放本轮支付工单",
+      "创建待审批提案；不批准或执行补偿"
+    ],
+    "notes": [
+      "输入预算是程序工程预留，不是供应商数学上界。",
+      "供应商费用未知时保留预留并停止，不换账本重跑。"
+    ],
+    "effectiveInvestigationLimits": {
+      "AGENT_INVESTIGATION_MAX_ACTIONS": "8",
+      "AGENT_INVESTIGATION_MAX_WALL_CLOCK_MS": "30000",
+      "AGENT_INVESTIGATION_MAX_TOKENS": "4000",
+      "AGENT_INVESTIGATION_MAX_COST_MICROS": "100000",
+      "AGENT_INVESTIGATION_MAX_PROVIDER_ATTEMPTS": "8",
+      "AGENT_INVESTIGATION_MAX_REPEATED_ACTIONS": "0"
+    }
+  },
+  "browserStats": {
+    "startTime": "2026-09-14T06:22:54.377Z",
+    "duration": 210758.70799999998,
+    "expected": 4,
+    "skipped": 5,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "caseLatency": {
+    "n": 5,
+    "meanMs": 40294.2,
+    "p50Ms": 17830,
+    "p90Ms": 129961,
+    "minMs": 15142,
+    "maxMs": 129961
+  },
+  "passedCaseLatency": {
+    "n": 4,
+    "meanMs": 17877.5,
+    "p50Ms": 16916.0,
+    "p90Ms": 22536,
+    "minMs": 15142,
+    "maxMs": 22536
+  },
+  "roleLatency": {
+    "action": {
+      "n": 5,
+      "meanMs": 1520.6,
+      "p50Ms": 1408,
+      "p90Ms": 2275,
+      "minMs": 1187,
+      "maxMs": 2275
+    },
+    "communication": {
+      "n": 5,
+      "meanMs": 4851.2,
+      "p50Ms": 4313,
+      "p90Ms": 7431,
+      "minMs": 3788,
+      "maxMs": 7431
+    },
+    "intake": {
+      "n": 7,
+      "meanMs": 2875.86,
+      "p50Ms": 2768,
+      "p90Ms": 4553,
+      "minMs": 1278,
+      "maxMs": 4553
+    },
+    "judgment": {
+      "n": 4,
+      "meanMs": 1400.5,
+      "p50Ms": 1348.0,
+      "p90Ms": 2073,
+      "minMs": 833,
+      "maxMs": 2073
+    }
+  },
+  "attempts": [
+    {
+      "number": 1,
+      "role": "intake",
+      "status": "SETTLED",
+      "ticketId": null,
+      "generationId": null,
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 4099,
+      "inputTokens": 812,
+      "outputTokens": 202,
+      "cachedTokens": 0,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 12762
+    },
+    {
+      "number": 2,
+      "role": "intake",
+      "status": "SETTLED",
+      "ticketId": null,
+      "generationId": null,
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 1615,
+      "inputTokens": 186,
+      "outputTokens": 9,
+      "cachedTokens": 0,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 1917
+    },
+    {
+      "number": 3,
+      "role": "action",
+      "status": "SETTLED",
+      "ticketId": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506",
+      "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 1408,
+      "inputTokens": 1909,
+      "outputTokens": 26,
+      "cachedTokens": null,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 17883
+    },
+    {
+      "number": 4,
+      "role": "judgment",
+      "status": "SETTLED",
+      "ticketId": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506",
+      "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 2073,
+      "inputTokens": 267,
+      "outputTokens": 22,
+      "cachedTokens": 0,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 2997
+    },
+    {
+      "number": 5,
+      "role": "communication",
+      "status": "SETTLED",
+      "ticketId": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506",
+      "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 4313,
+      "inputTokens": 804,
+      "outputTokens": 292,
+      "cachedTokens": null,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 15120
+    },
+    {
+      "number": 6,
+      "role": "intake",
+      "status": "SETTLED",
+      "ticketId": null,
+      "generationId": null,
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 2768,
+      "inputTokens": 808,
+      "outputTokens": 182,
+      "cachedTokens": 0,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 12186
+    },
+    {
+      "number": 7,
+      "role": "action",
+      "status": "SETTLED",
+      "ticketId": "043c08df-496b-4dc9-b3e3-1177fa89ba2c",
+      "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 1321,
+      "inputTokens": 1948,
+      "outputTokens": 26,
+      "cachedTokens": null,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 18234
+    },
+    {
+      "number": 8,
+      "role": "judgment",
+      "status": "SETTLED",
+      "ticketId": "043c08df-496b-4dc9-b3e3-1177fa89ba2c",
+      "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 833,
+      "inputTokens": 267,
+      "outputTokens": 22,
+      "cachedTokens": 256,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 2997
+    },
+    {
+      "number": 9,
+      "role": "communication",
+      "status": "SETTLED",
+      "ticketId": "043c08df-496b-4dc9-b3e3-1177fa89ba2c",
+      "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 4524,
+      "inputTokens": 781,
+      "outputTokens": 264,
+      "cachedTokens": null,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 14157
+    },
+    {
+      "number": 10,
+      "role": "intake",
+      "status": "SETTLED",
+      "ticketId": null,
+      "generationId": null,
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 4553,
+      "inputTokens": 803,
+      "outputTokens": 183,
+      "cachedTokens": 0,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 12168
+    },
+    {
+      "number": 11,
+      "role": "action",
+      "status": "SETTLED",
+      "ticketId": "c526de7f-a845-4cfd-9a72-7595c26e660b",
+      "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 1412,
+      "inputTokens": 1951,
+      "outputTokens": 26,
+      "cachedTokens": null,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 18261
+    },
+    {
+      "number": 12,
+      "role": "judgment",
+      "status": "SETTLED",
+      "ticketId": "c526de7f-a845-4cfd-9a72-7595c26e660b",
+      "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 1432,
+      "inputTokens": 267,
+      "outputTokens": 18,
+      "cachedTokens": 256,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 2889
+    },
+    {
+      "number": 13,
+      "role": "communication",
+      "status": "SETTLED",
+      "ticketId": "c526de7f-a845-4cfd-9a72-7595c26e660b",
+      "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 3788,
+      "inputTokens": 805,
+      "outputTokens": 268,
+      "cachedTokens": null,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 14481
+    },
+    {
+      "number": 14,
+      "role": "intake",
+      "status": "SETTLED",
+      "ticketId": null,
+      "generationId": null,
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 2701,
+      "inputTokens": 803,
+      "outputTokens": 180,
+      "cachedTokens": 0,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 12087
+    },
+    {
+      "number": 15,
+      "role": "action",
+      "status": "SETTLED",
+      "ticketId": "4d8e53e8-a5c8-4a85-8e92-0b547f484bab",
+      "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 1187,
+      "inputTokens": 1951,
+      "outputTokens": 26,
+      "cachedTokens": null,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 18261
+    },
+    {
+      "number": 16,
+      "role": "judgment",
+      "status": "SETTLED",
+      "ticketId": "4d8e53e8-a5c8-4a85-8e92-0b547f484bab",
+      "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 1264,
+      "inputTokens": 267,
+      "outputTokens": 18,
+      "cachedTokens": 256,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 2889
+    },
+    {
+      "number": 17,
+      "role": "communication",
+      "status": "SETTLED",
+      "ticketId": "4d8e53e8-a5c8-4a85-8e92-0b547f484bab",
+      "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 4200,
+      "inputTokens": 805,
+      "outputTokens": 282,
+      "cachedTokens": null,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 14859
+    },
+    {
+      "number": 18,
+      "role": "intake",
+      "status": "SETTLED",
+      "ticketId": null,
+      "generationId": null,
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 3117,
+      "inputTokens": 797,
+      "outputTokens": 174,
+      "cachedTokens": 0,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 11871
+    },
+    {
+      "number": 19,
+      "role": "intake",
+      "status": "SETTLED",
+      "ticketId": null,
+      "generationId": null,
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 1278,
+      "inputTokens": 195,
+      "outputTokens": 9,
+      "cachedTokens": 128,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 1998
+    },
+    {
+      "number": 20,
+      "role": "action",
+      "status": "SETTLED",
+      "ticketId": "7ff6e85e-b79c-43c2-9642-235836d97a78",
+      "generationId": "af619679-429b-4fbd-b94c-f36b30a0254d",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": "deepseek-v4-pro",
+      "durationMs": 2275,
+      "inputTokens": 1607,
+      "outputTokens": 26,
+      "cachedTokens": null,
+      "httpStatus": 200,
+      "failureClassification": null,
+      "estimatedCostMicros": 15165
+    },
+    {
+      "number": 21,
+      "role": "communication",
+      "status": "PENDING",
+      "ticketId": "7ff6e85e-b79c-43c2-9642-235836d97a78",
+      "generationId": "af619679-429b-4fbd-b94c-f36b30a0254d",
+      "requestModel": "deepseek-v4-pro",
+      "responseModel": null,
+      "durationMs": 7431,
+      "inputTokens": null,
+      "outputTokens": null,
+      "cachedTokens": null,
+      "httpStatus": 200,
+      "failureClassification": "SCHEMA_MISMATCH",
+      "estimatedCostMicros": null
+    }
+  ],
+  "cases": [
+    {
+      "title": "Issue #230 core no_compensation sample 1",
+      "status": "passed",
+      "durationMs": 22536,
+      "startTime": "2026-09-14T06:23:00.535Z",
+      "evidence": {
+        "caseName": "no_compensation",
+        "sample": 1,
+        "reference": "ORDER-CORE-NO-COMPENSATION-1-b2095c1b-3859-4c35-8cec-8dc7d0d4b44a",
+        "ticketId": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506",
+        "logisticsEndpoint": "GROUNDED_NO_COMPENSATION_THEN_HUMAN"
+      },
+      "errors": []
+    },
+    {
+      "title": "Issue #230 core no_compensation sample 2",
+      "status": "passed",
+      "durationMs": 16002,
+      "startTime": "2026-09-14T06:23:23.728Z",
+      "evidence": {
+        "caseName": "no_compensation",
+        "sample": 2,
+        "reference": "ORDER-CORE-NO-COMPENSATION-2-a3b2d8c8-bf1c-4ec9-9af9-14f8faede557",
+        "ticketId": "043c08df-496b-4dc9-b3e3-1177fa89ba2c",
+        "logisticsEndpoint": "AGENT"
+      },
+      "errors": []
+    },
+    {
+      "title": "Issue #230 core pending_approval sample 1",
+      "status": "passed",
+      "durationMs": 17830,
+      "startTime": "2026-09-14T06:23:39.748Z",
+      "evidence": {
+        "caseName": "pending_approval",
+        "sample": 1,
+        "reference": "ORDER-CORE-PENDING-APPROVAL-1-0cbb0c4a-2359-461e-bcab-5904d28aefed",
+        "ticketId": "c526de7f-a845-4cfd-9a72-7595c26e660b",
+        "logisticsEndpoint": "AGENT"
+      },
+      "errors": []
+    },
+    {
+      "title": "Issue #230 core pending_approval sample 2",
+      "status": "passed",
+      "durationMs": 15142,
+      "startTime": "2026-09-14T06:23:57.594Z",
+      "evidence": {
+        "caseName": "pending_approval",
+        "sample": 2,
+        "reference": "ORDER-CORE-PENDING-APPROVAL-2-37cc9f29-7f19-40be-aa32-621b77baea9e",
+        "ticketId": "4d8e53e8-a5c8-4a85-8e92-0b547f484bab",
+        "logisticsEndpoint": "AGENT"
+      },
+      "errors": []
+    },
+    {
+      "title": "Issue #230 core payment_handoff sample 1",
+      "status": "failed",
+      "durationMs": 129961,
+      "startTime": "2026-09-14T06:24:12.754Z",
+      "evidence": {
+        "caseName": "payment_handoff",
+        "sample": 1,
+        "reference": "ORDER-CORE-PAYMENT-HANDOFF-1-10b889d3-5b19-432f-a3cc-9ba6d4de658a",
+        "schema": "customer-intake-v4",
+        "intakeId": "3d1e93db-ce6e-4f08-b8f4-c117e8c3f30b",
+        "status": "CONFIRMED",
+        "candidateOrder": {
+          "reference": "ORDER-CORE-PAYMENT-HANDOFF-1-10b889d3-5b19-432f-a3cc-9ba6d4de658a",
+          "summary": "配送中的合成订单"
+        },
+        "issues": [
+          {
+            "kind": "DUPLICATE_CHARGE",
+            "summary": "重复扣款"
+          }
+        ],
+        "assistantMessage": "已确认，当前订单的 1 张客服工单已原子创建并开始独立处理。",
+        "ticketIds": [
+          "7ff6e85e-b79c-43c2-9642-235836d97a78"
+        ],
+        "sharedIntakeRecordId": "b550981b-c192-43ed-a4ba-d3a59808d089",
+        "duplicateMatches": [],
+        "routedTicketIds": [],
+        "remainingOrderCount": 0,
+        "completedOrderCount": 1,
+        "expectedTicketCount": 1,
+        "confirmed": true,
+        "version": 4,
+        "replayed": false
+      },
+      "errors": [
+        "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"COMPLETED\"\u001b[39m\nReceived: \u001b[31m\"HANDED_OFF\"\u001b[39m\n\nCall Log:\n- Timeout 120000ms exceeded while waiting on the predicate\n\n  106 |       { timeout: 120_000 },\n  107 |     )\n> 108 |     .toBe(\"COMPLETED\");\n      |      ^\n  109 | }\n  110 |\n  111 | async function verifyLogistics(\n    at complete (/app/e2e/issue230.core-matrix.spec.ts:108:6)\n    at /app/e2e/issue230.core-matrix.spec.ts:314:52"
+      ]
+    },
+    {
+      "title": "Issue #230 core payment_handoff sample 2",
+      "status": "skipped",
+      "durationMs": 6,
+      "startTime": "2026-09-14T06:26:24.987Z",
+      "evidence": {},
+      "errors": []
+    },
+    {
+      "title": "Issue #230 core split_recovery sample 1",
+      "status": "skipped",
+      "durationMs": 1,
+      "startTime": "2026-09-14T06:26:25.027Z",
+      "evidence": {},
+      "errors": []
+    },
+    {
+      "title": "Issue #230 core split_recovery sample 2",
+      "status": "skipped",
+      "durationMs": 1,
+      "startTime": "2026-09-14T06:26:25.043Z",
+      "evidence": {},
+      "errors": []
+    },
+    {
+      "title": "Issue #230 core generation_fence sample 1",
+      "status": "skipped",
+      "durationMs": 1,
+      "startTime": "2026-09-14T06:26:25.056Z",
+      "evidence": {},
+      "errors": []
+    },
+    {
+      "title": "Issue #230 core generation_fence sample 2",
+      "status": "skipped",
+      "durationMs": 1,
+      "startTime": "2026-09-14T06:26:25.070Z",
+      "evidence": {},
+      "errors": []
+    }
+  ],
+  "businessSnapshot": {
+    "capturedAt": "2026-09-14T06:26:30.443439+00:00",
+    "tickets": [
+      {
+        "id": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506",
+        "orderReference": "ORDER-CORE-NO-COMPENSATION-1-b2095c1b-3859-4c35-8cec-8dc7d0d4b44a",
+        "issueKind": "LOGISTICS_DELAY",
+        "handlingMode": "HUMAN",
+        "lifecycleState": "INVESTIGATING",
+        "handoffReason": "DELAY_UNDER_24_HOURS"
+      },
+      {
+        "id": "043c08df-496b-4dc9-b3e3-1177fa89ba2c",
+        "orderReference": "ORDER-CORE-NO-COMPENSATION-2-a3b2d8c8-bf1c-4ec9-9af9-14f8faede557",
+        "issueKind": "LOGISTICS_DELAY",
+        "handlingMode": "AGENT",
+        "lifecycleState": "INVESTIGATING",
+        "handoffReason": null
+      },
+      {
+        "id": "c526de7f-a845-4cfd-9a72-7595c26e660b",
+        "orderReference": "ORDER-CORE-PENDING-APPROVAL-1-0cbb0c4a-2359-461e-bcab-5904d28aefed",
+        "issueKind": "LOGISTICS_DELAY",
+        "handlingMode": "AGENT",
+        "lifecycleState": "INVESTIGATING",
+        "handoffReason": null
+      },
+      {
+        "id": "4d8e53e8-a5c8-4a85-8e92-0b547f484bab",
+        "orderReference": "ORDER-CORE-PENDING-APPROVAL-2-37cc9f29-7f19-40be-aa32-621b77baea9e",
+        "issueKind": "LOGISTICS_DELAY",
+        "handlingMode": "AGENT",
+        "lifecycleState": "INVESTIGATING",
+        "handoffReason": null
+      },
+      {
+        "id": "7ff6e85e-b79c-43c2-9642-235836d97a78",
+        "orderReference": "ORDER-CORE-PAYMENT-HANDOFF-1-10b889d3-5b19-432f-a3cc-9ba6d4de658a",
+        "issueKind": "DUPLICATE_CHARGE",
+        "handlingMode": "HUMAN",
+        "lifecycleState": "INVESTIGATING",
+        "handoffReason": "INVALID_MODEL_OUTPUT"
+      }
+    ],
+    "messages": [
+      {
+        "ticketId": "043c08df-496b-4dc9-b3e3-1177fa89ba2c",
+        "sequence": 1,
+        "author": "CUSTOMER",
+        "body": "订单 ORDER-CORE-NO-COMPENSATION-2-a3b2d8c8-bf1c-4ec9-9af9-14f8faede557 的物流延迟问题：请解释物流状态"
+      },
+      {
+        "ticketId": "043c08df-496b-4dc9-b3e3-1177fa89ba2c",
+        "sequence": 2,
+        "author": "SUPPORT",
+        "body": "您的问题已受理，我们会在此公开沟通中更新进展。"
+      },
+      {
+        "ticketId": "043c08df-496b-4dc9-b3e3-1177fa89ba2c",
+        "sequence": 3,
+        "author": "AGENT",
+        "body": "关于订单 ORDER-CORE-NO-COMPENSATION-2-a3b2d8c8-bf1c-4ec9-9af9-14f8faede557 的物流延迟问题，经核查，该订单无需进行补偿审核。我们已将调查结论提供给您，后续处理将按照页面状态进行。如有其他问题，欢迎继续回复。"
+      },
+      {
+        "ticketId": "4d8e53e8-a5c8-4a85-8e92-0b547f484bab",
+        "sequence": 1,
+        "author": "CUSTOMER",
+        "body": "订单 ORDER-CORE-PENDING-APPROVAL-2-37cc9f29-7f19-40be-aa32-621b77baea9e 的物流延迟问题：物流延迟，请核实订单后说明处理方案。"
+      },
+      {
+        "ticketId": "4d8e53e8-a5c8-4a85-8e92-0b547f484bab",
+        "sequence": 2,
+        "author": "SUPPORT",
+        "body": "您的问题已受理，我们会在此公开沟通中更新进展。"
+      },
+      {
+        "ticketId": "4d8e53e8-a5c8-4a85-8e92-0b547f484bab",
+        "sequence": 3,
+        "author": "AGENT",
+        "body": "我们已核实您反馈的订单 ORDER-CORE-PENDING-APPROVAL-2-37cc9f29-7f19-40be-aa32-621b77baea9e 物流延迟情况。当前调查结论为：该订单已启动补偿审核流程，相关方案正在等待人工审批。需要说明的是，本次调查尚未执行任何赔偿或退款。后续处理将依据页面状态推进，如有进一步更新我们会在此沟通中同步；期间您可继续留言，我们会跟进。"
+      },
+      {
+        "ticketId": "7ff6e85e-b79c-43c2-9642-235836d97a78",
+        "sequence": 1,
+        "author": "CUSTOMER",
+        "body": "ORDER-CORE-PAYMENT-HANDOFF-1-10b889d3-5b19-432f-a3cc-9ba6d4de658a 疑似重复扣款，请核查"
+      },
+      {
+        "ticketId": "7ff6e85e-b79c-43c2-9642-235836d97a78",
+        "sequence": 2,
+        "author": "CUSTOMER",
+        "body": "我看到扣了两次，请继续核查"
+      },
+      {
+        "ticketId": "7ff6e85e-b79c-43c2-9642-235836d97a78",
+        "sequence": 3,
+        "author": "SUPPORT",
+        "body": "您的问题已受理，我们会在此公开沟通中更新进展。"
+      },
+      {
+        "ticketId": "7ff6e85e-b79c-43c2-9642-235836d97a78",
+        "sequence": 4,
+        "author": "SUPPORT",
+        "body": "为确保处理安全，此工单已转由客服继续调查。客服将在此工单中与您联系。"
+      },
+      {
+        "ticketId": "c526de7f-a845-4cfd-9a72-7595c26e660b",
+        "sequence": 1,
+        "author": "CUSTOMER",
+        "body": "订单 ORDER-CORE-PENDING-APPROVAL-1-0cbb0c4a-2359-461e-bcab-5904d28aefed 的物流延迟问题：物流延迟，请核实订单后说明处理方案。"
+      },
+      {
+        "ticketId": "c526de7f-a845-4cfd-9a72-7595c26e660b",
+        "sequence": 2,
+        "author": "SUPPORT",
+        "body": "您的问题已受理，我们会在此公开沟通中更新进展。"
+      },
+      {
+        "ticketId": "c526de7f-a845-4cfd-9a72-7595c26e660b",
+        "sequence": 3,
+        "author": "AGENT",
+        "body": "关于订单 ORDER-CORE-PENDING-APPROVAL-1-0cbb0c4a-2359-461e-bcab-5904d28aefed 的物流延迟问题，我们已完成初步核实，目前仍待人工审批确认。在本次调查范围内，尚无任何补偿或退款已经执行。待批准通过后，我们会按页面状态说明后续处理方式。如您还有其他疑问，欢迎继续在此反馈。"
+      },
+      {
+        "ticketId": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506",
+        "sequence": 1,
+        "author": "CUSTOMER",
+        "body": "订单 ORDER-CORE-NO-COMPENSATION-1-b2095c1b-3859-4c35-8cec-8dc7d0d4b44a 的物流延迟问题：请解释物流状态"
+      },
+      {
+        "ticketId": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506",
+        "sequence": 2,
+        "author": "CUSTOMER",
+        "body": "确实延迟，请核实物流状态。"
+      },
+      {
+        "ticketId": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506",
+        "sequence": 3,
+        "author": "SUPPORT",
+        "body": "您的问题已受理，我们会在此公开沟通中更新进展。"
+      },
+      {
+        "ticketId": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506",
+        "sequence": 4,
+        "author": "AGENT",
+        "body": "关于订单 ORDER-CORE-NO-COMPENSATION-1-b2095c1b-3859-4c35-8cec-8dc7d0d4b44a，您反馈订单出现物流延迟，并要求核实物流状态。我们已对该订单的物流记录进行了授权范围内的核查，现向您说明结论：本次核查未认定需要启动补偿审核。该结论已经提供，后续处理将按照页面状态进行；如您还有其他疑问，欢迎继续在此回复。"
+      },
+      {
+        "ticketId": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506",
+        "sequence": 5,
+        "author": "SUPPORT",
+        "body": "本次核验结论已给出，此工单已转由客服继续处理。"
+      }
+    ],
+    "generations": [
+      {
+        "id": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "ticketId": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506",
+        "number": 1,
+        "status": "COMPLETED"
+      },
+      {
+        "id": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "ticketId": "043c08df-496b-4dc9-b3e3-1177fa89ba2c",
+        "number": 1,
+        "status": "COMPLETED"
+      },
+      {
+        "id": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "ticketId": "c526de7f-a845-4cfd-9a72-7595c26e660b",
+        "number": 1,
+        "status": "COMPLETED"
+      },
+      {
+        "id": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "ticketId": "4d8e53e8-a5c8-4a85-8e92-0b547f484bab",
+        "number": 1,
+        "status": "COMPLETED"
+      },
+      {
+        "id": "af619679-429b-4fbd-b94c-f36b30a0254d",
+        "ticketId": "7ff6e85e-b79c-43c2-9642-235836d97a78",
+        "number": 1,
+        "status": "HANDED_OFF"
+      }
+    ],
+    "facts": [
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "type": "ORDER",
+        "value": "ORDER-CORE-NO-COMPENSATION-1-b2095c1b-3859-4c35-8cec-8dc7d0d4b44a"
+      },
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "type": "EXISTING_COMPENSATION",
+        "value": "false"
+      },
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "type": "PENDING_ACTION_COUNT",
+        "value": "0"
+      },
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "type": "LOGISTICS_DELAY_HOURS",
+        "value": "6"
+      },
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "type": "LOGISTICS_DELAY_SECONDS",
+        "value": "21600"
+      },
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "type": "LOGISTICS_STATUS",
+        "value": "IN_TRANSIT"
+      },
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "type": "PAYMENT",
+        "value": "PAID"
+      },
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "type": "ORDER_CANCELLATION",
+        "value": "NOT_CANCELLED"
+      },
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "type": "REFUND_STATUS",
+        "value": "NOT_FULLY_REFUNDED"
+      },
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "type": "DUPLICATE_CHARGE_SUSPECTED",
+        "value": "false"
+      },
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "type": "POLICY",
+        "value": "delay-policy-v1"
+      },
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "type": "ORDER",
+        "value": "ORDER-CORE-NO-COMPENSATION-2-a3b2d8c8-bf1c-4ec9-9af9-14f8faede557"
+      },
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "type": "EXISTING_COMPENSATION",
+        "value": "false"
+      },
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "type": "PENDING_ACTION_COUNT",
+        "value": "0"
+      },
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "type": "LOGISTICS_DELAY_HOURS",
+        "value": "12"
+      },
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "type": "LOGISTICS_DELAY_SECONDS",
+        "value": "43200"
+      },
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "type": "LOGISTICS_STATUS",
+        "value": "IN_TRANSIT"
+      },
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "type": "PAYMENT",
+        "value": "PAID"
+      },
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "type": "ORDER_CANCELLATION",
+        "value": "NOT_CANCELLED"
+      },
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "type": "REFUND_STATUS",
+        "value": "NOT_FULLY_REFUNDED"
+      },
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "type": "DUPLICATE_CHARGE_SUSPECTED",
+        "value": "false"
+      },
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "type": "POLICY",
+        "value": "delay-policy-v1"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "type": "ORDER",
+        "value": "ORDER-CORE-PENDING-APPROVAL-1-0cbb0c4a-2359-461e-bcab-5904d28aefed"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "type": "EXISTING_COMPENSATION",
+        "value": "false"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "type": "PENDING_ACTION_COUNT",
+        "value": "0"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "type": "LOGISTICS_DELAY_HOURS",
+        "value": "48"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "type": "LOGISTICS_DELAY_SECONDS",
+        "value": "172800"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "type": "LOGISTICS_STATUS",
+        "value": "IN_TRANSIT"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "type": "PAYMENT",
+        "value": "PAID"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "type": "ORDER_CANCELLATION",
+        "value": "NOT_CANCELLED"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "type": "REFUND_STATUS",
+        "value": "NOT_FULLY_REFUNDED"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "type": "DUPLICATE_CHARGE_SUSPECTED",
+        "value": "false"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "type": "POLICY",
+        "value": "delay-policy-v1"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "type": "ORDER",
+        "value": "ORDER-CORE-PENDING-APPROVAL-2-37cc9f29-7f19-40be-aa32-621b77baea9e"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "type": "EXISTING_COMPENSATION",
+        "value": "false"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "type": "PENDING_ACTION_COUNT",
+        "value": "0"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "type": "LOGISTICS_DELAY_HOURS",
+        "value": "80"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "type": "LOGISTICS_DELAY_SECONDS",
+        "value": "288000"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "type": "LOGISTICS_STATUS",
+        "value": "IN_TRANSIT"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "type": "PAYMENT",
+        "value": "PAID"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "type": "ORDER_CANCELLATION",
+        "value": "NOT_CANCELLED"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "type": "REFUND_STATUS",
+        "value": "NOT_FULLY_REFUNDED"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "type": "DUPLICATE_CHARGE_SUSPECTED",
+        "value": "false"
+      },
+      {
+        "generationId": "af619679-429b-4fbd-b94c-f36b30a0254d",
+        "type": "PAYMENT",
+        "value": "PAID"
+      },
+      {
+        "generationId": "af619679-429b-4fbd-b94c-f36b30a0254d",
+        "type": "ORDER_CANCELLATION",
+        "value": "NOT_CANCELLED"
+      },
+      {
+        "generationId": "af619679-429b-4fbd-b94c-f36b30a0254d",
+        "type": "REFUND_STATUS",
+        "value": "NOT_FULLY_REFUNDED"
+      },
+      {
+        "generationId": "af619679-429b-4fbd-b94c-f36b30a0254d",
+        "type": "DUPLICATE_CHARGE_SUSPECTED",
+        "value": "true"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "type": "POLICY",
+        "value": "delay-policy-v1"
+      },
+      {
+        "generationId": "af619679-429b-4fbd-b94c-f36b30a0254d",
+        "type": "EXISTING_COMPENSATION",
+        "value": "false"
+      },
+      {
+        "generationId": "af619679-429b-4fbd-b94c-f36b30a0254d",
+        "type": "PENDING_ACTION_COUNT",
+        "value": "0"
+      },
+      {
+        "generationId": "af619679-429b-4fbd-b94c-f36b30a0254d",
+        "type": "ORDER",
+        "value": "ORDER-CORE-PAYMENT-HANDOFF-1-10b889d3-5b19-432f-a3cc-9ba6d4de658a"
+      }
+    ]
+  },
+  "metrics": {
+    "authorizationId": "user-project-audit-20260914-one-batch",
+    "currency": "CNY",
+    "estimatedCostMicros": null,
+    "generationResults": [
+      {
+        "generationId": "4026a36b-7b5d-46a8-ac43-cba8e8581e55",
+        "status": "COMPLETED",
+        "ticketId": "043c08df-496b-4dc9-b3e3-1177fa89ba2c"
+      },
+      {
+        "diagnostics": [
+          {
+            "capabilityResults": [
+              {
+                "actionType": "CONFIRM_ORDER",
+                "resultCode": "PROGRESSED"
+              },
+              {
+                "actionType": "READ_COMPENSATION_AND_PENDING_ACTIONS",
+                "resultCode": "PROGRESSED"
+              },
+              {
+                "actionType": "READ_PAYMENT_AND_REFUNDS",
+                "resultCode": "PROGRESSED"
+              },
+              {
+                "actionType": "SUBMIT_CONCLUSION",
+                "resultCode": "SELECTED"
+              }
+            ],
+            "failureClassification": "INVALID_MODEL_OUTPUT",
+            "providerCalls": [
+              {
+                "attemptId": "53bf1c98-a75b-4334-9055-9c4fd439496a",
+                "internalCallId": "b6a4d912-e747-4099-839d-22dcc34a0d5a"
+              }
+            ],
+            "role": "communication",
+            "source": "customer_communication_evidence"
+          }
+        ],
+        "generationId": "af619679-429b-4fbd-b94c-f36b30a0254d",
+        "status": "HANDED_OFF",
+        "ticketId": "7ff6e85e-b79c-43c2-9642-235836d97a78"
+      },
+      {
+        "generationId": "b6284a30-f44c-486d-85f7-9c749e536bc9",
+        "status": "COMPLETED",
+        "ticketId": "4d8e53e8-a5c8-4a85-8e92-0b547f484bab"
+      },
+      {
+        "generationId": "c33b537c-fedd-434d-bba8-2024fcf9e97e",
+        "status": "COMPLETED",
+        "ticketId": "c526de7f-a845-4cfd-9a72-7595c26e660b"
+      },
+      {
+        "generationId": "d7693f74-90f8-4ea4-a20a-74b2a4101d58",
+        "status": "COMPLETED",
+        "ticketId": "fd9ca1f8-c206-4c9c-afba-f7ba37c48506"
+      }
+    ],
+    "inFlightReservedMicros": 0,
+    "intakeInvocations": 7,
+    "intakeResults": [
+      {
+        "intakeId": "9b8d3ba0-31b3-4ed5-9e0e-b5c99bd0f18f",
+        "invocationId": "119a6521-7357-45fb-945f-73fec6b2272d",
+        "springFailureReason": null,
+        "status": "SUCCEEDED"
+      },
+      {
+        "intakeId": "3d1e93db-ce6e-4f08-b8f4-c117e8c3f30b",
+        "invocationId": "331144a8-e4a5-4012-a5ce-168d007b7f10",
+        "springFailureReason": null,
+        "status": "SUCCEEDED"
+      },
+      {
+        "intakeId": "59bb64dc-8784-496f-bef2-52f83705f845",
+        "invocationId": "4f033aca-116e-46bc-a13b-383a35ebcc23",
+        "springFailureReason": null,
+        "status": "SUCCEEDED"
+      },
+      {
+        "intakeId": "3b90dae8-60d5-4c1e-bbb6-314a6ec74f79",
+        "invocationId": "7fa3eaad-ebfa-48c2-a14b-60c4b7c19ea4",
+        "springFailureReason": null,
+        "status": "SUCCEEDED"
+      },
+      {
+        "intakeId": "d93e6db5-57de-45e0-b1db-a73a99b8041c",
+        "invocationId": "91f139e8-9c30-4a9e-877b-39c56b744687",
+        "springFailureReason": null,
+        "status": "SUCCEEDED"
+      },
+      {
+        "intakeId": "3b90dae8-60d5-4c1e-bbb6-314a6ec74f79",
+        "invocationId": "ed59de7e-a854-42b9-8f25-4051e483f1e3",
+        "springFailureReason": null,
+        "status": "SUCCEEDED"
+      },
+      {
+        "intakeId": "3d1e93db-ce6e-4f08-b8f4-c117e8c3f30b",
+        "invocationId": "f6182e74-8449-41b4-84f5-d76bd66cb3db",
+        "springFailureReason": null,
+        "status": "SUCCEEDED"
+      }
+    ],
+    "knownEstimatedCostMicros": 223182,
+    "knownProviderAttempts": 21,
+    "knownTokens": 20288,
+    "ledgerRecoveredGenerationIds": [],
+    "logicalCalls": 21,
+    "missingEvidenceSources": 0,
+    "notes": [
+      "范围为本轮专属隔离验收数据库的全部入单调用和调查代次。",
+      "金额单位为微元人民币;程序估算、供应商结算及未完成预留分别列示。",
+      "null 表示证据未知;known 字段仅统计已知部分,不能代替总量。",
+      "checkpoint 只提供调用计量证据,不能代替浏览器产品路径验收。",
+      "springRejections 来自本轮隔离数据库的工单审计,不推断对应代次或供应商调用。"
+    ],
+    "pendingReservedMicros": 94320,
+    "providerAttempts": 21,
+    "schemaVersion": "issue230-core-metrics-v1",
+    "springRejections": [],
+    "supplierChargeMicros": null,
+    "tokens": null,
+    "unattributedAttemptIds": [],
+    "unknownUsageAttempts": 1
+  }
+}

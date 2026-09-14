@@ -48,6 +48,7 @@ _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 503})
 class _StreamedResponse:
     payload: dict[str, Any]
     output_text_matches: bool
+    terminal_event: str
 
 
 @dataclass(frozen=True)
@@ -175,8 +176,17 @@ class DeepSeekResponsesCustomerCommunicationModel:
                             timeout=remaining,
                         )
                         payload = streamed.payload
+                        if streamed.terminal_event != "response.completed":
+                            validation_diagnostic = _diagnostic(
+                                "PROVIDER_TERMINAL",
+                                "$.type",
+                                "response.completed",
+                                streamed.terminal_event,
+                            )
                         if publication_failed:
                             raise _failure(CustomerCommunicationFailureCode.PUBLICATION_FAILED)
+                        if streamed.terminal_event != "response.completed":
+                            raise _failure(CustomerCommunicationFailureCode.INVALID_OUTPUT)
                         if not streamed.output_text_matches:
                             validation_diagnostic = _diagnostic(
                                 "STREAM_MISMATCH",
@@ -441,6 +451,7 @@ async def _read_streamed_response(
     published_body = ""
     publication_stopped = False
     final_response: dict[str, Any] | None = None
+    terminal_event = ""
     last_sequence = -1
     async with client.stream("POST", endpoint, json=request_body) as response:
         response.raise_for_status()
@@ -490,25 +501,21 @@ async def _read_streamed_response(
                         published_body = body_prefix
                     else:
                         publication_stopped = True
-            elif event_type == "response.completed":
+            elif event_type in {"response.completed", "response.incomplete", "response.failed"}:
                 candidate = event.get("response")
                 if not isinstance(candidate, dict):
                     raise _failure()
+                # 终态用量独立于业务成功;失败响应仍由调用方拒绝,不发布为有效回复。
                 final_response = candidate
+                terminal_event = event_type
                 break
-            elif event_type in {"response.incomplete", "response.failed"}:
-                candidate = event.get("response")
-                if publication_stopped and isinstance(candidate, dict):
-                    final_response = candidate
-                    break
-                raise _failure()
     if final_response is None:
         raise _failure()
     try:
         output_text_matches = output_text == _response_output_text(final_response)
     except CustomerCommunicationFailure:
         output_text_matches = False
-    return _StreamedResponse(final_response, output_text_matches)
+    return _StreamedResponse(final_response, output_text_matches, terminal_event)
 
 
 def _partial_json_string_field(value: str, field: str) -> tuple[str, bool] | None:
