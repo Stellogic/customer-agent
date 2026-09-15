@@ -1,5 +1,7 @@
 import { ApprovalWorkbench } from "../ApprovalWorkbench";
+import { CurrentSessionContext } from "../session";
 
 export default function ApprovalWorkspace() {
-  return <ApprovalWorkbench />;
+  const session = CurrentSessionContext.use();
+  return <ApprovalWorkbench approverId={session.id} />;
 }

@@ -13,13 +13,14 @@ describe("审批视图授权撤销", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    globalThis.sessionStorage.clear();
     globalThis.history.replaceState(null, "", "/");
   });
 
   it("状态图形不混入审批队列的权威可见文案", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json([]));
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/^待审批队列已刷新$/));
   });
@@ -76,7 +77,7 @@ describe("审批视图授权撤销", () => {
         ]),
       );
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
 
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
     expect(await screen.findByText("order:ORDER-DELAY-001")).toBeInTheDocument();
@@ -150,7 +151,7 @@ describe("审批视图授权撤销", () => {
       .mockResolvedValueOnce(Response.json({ ...approvalSnapshot(), cursor: "approval-view-v1:2" }))
       .mockResolvedValueOnce(openStream());
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
 
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
     expect(await screen.findByText("order:ORDER-DELAY-001")).toBeInTheDocument();
@@ -176,13 +177,87 @@ describe("审批视图授权撤销", () => {
     globalThis.history.replaceState(null, "", `/internal/approvals?revision=${REVISION_ID}`);
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json([]));
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
 
     expect(
       await screen.findByRole("heading", { level: 1, name: "待审批补偿" }),
     ).toBeInTheDocument();
     expect(globalThis.location.search).toBe("");
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("领取后刷新审批页面仍可恢复当前租约并释放审批责任", async () => {
+    let claimRequestId: string | null = null;
+    let activeLease = false;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const path = String(input);
+      const headers = new Headers(init?.headers);
+      if (path === "/api/approver/compensation-proposals") {
+        return Response.json(
+          activeLease
+            ? []
+            : [
+                {
+                  proposalRevisionId: REVISION_ID,
+                  compensationMethod: "COUPON",
+                  amount: 20,
+                  submittedAt: "2026-08-11T03:00:00Z",
+                  expiresAt: "2099-08-12T03:00:00Z",
+                },
+              ],
+        );
+      }
+      if (path.endsWith("/claims")) {
+        const requestId = headers.get("Idempotency-Key");
+        if (!requestId || (activeLease && requestId !== claimRequestId)) {
+          return new Response(null, { status: 409 });
+        }
+        const replayed = requestId === claimRequestId;
+        claimRequestId = requestId;
+        activeLease = true;
+        return Response.json(
+          {
+            proposalRevisionId: REVISION_ID,
+            leaseToken: LEASE_TOKEN,
+            leaseVersion: 1,
+            expiresAt: "2099-08-11T03:15:00Z",
+            replayed,
+          },
+          { status: replayed ? 200 : 201 },
+        );
+      }
+      if (
+        !activeLease ||
+        headers.get("X-Approval-Lease-Token") !== LEASE_TOKEN ||
+        headers.get("X-Approval-Lease-Version") !== "1"
+      ) {
+        return new Response(null, { status: 403 });
+      }
+      if (path.endsWith("/approval-view")) {
+        return Response.json({ ...approvalSnapshot(), leaseExpiresAt: "2099-08-11T03:15:00Z" });
+      }
+      if (path.endsWith("/approval-view/events")) return openStream();
+      if (path.endsWith("/release")) {
+        activeLease = false;
+        return Response.json({ proposalRevisionId: REVISION_ID, released: true, replayed: false });
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const firstPage = render(<ApprovalWorkbench approverId="approver-demo" />);
+    fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
+    expect(await screen.findByRole("heading", { name: "ORDER-DELAY-001" })).toBeInTheDocument();
+
+    firstPage.unmount();
+    render(<ApprovalWorkbench approverId="approver-demo" />);
+
+    expect(
+      await screen.findByRole("heading", { name: "ORDER-DELAY-001" }, { timeout: 2_000 }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "释放审批" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认释放审批责任" }));
+    expect(await screen.findByText("审批责任已释放，已返回队列。")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "领取审批" })).toBeInTheDocument();
   });
 
   it("领取前只读取队列，领取后才展示真实审批投影", async () => {
@@ -212,7 +287,7 @@ describe("审批视图授权撤销", () => {
       )
       .mockResolvedValueOnce(openStream());
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
 
     expect(await screen.findByText("27000000…0001")).toBeInTheDocument();
     expect(screen.queryByText("ORDER-DELAY-001")).not.toBeInTheDocument();
@@ -248,7 +323,7 @@ describe("审批视图授权撤销", () => {
       ]),
     );
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
 
     expect(await screen.findByRole("columnheader", { name: "提案 UUID" })).toBeInTheDocument();
     expect(screen.getAllByRole("cell")).toHaveLength(5);
@@ -275,7 +350,7 @@ describe("审批视图授权撤销", () => {
       .mockResolvedValueOnce(Response.json(approvalSnapshot()))
       .mockResolvedValueOnce(openStream());
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
 
     const claim = await screen.findByRole("button", { name: "领取审批" });
     fireEvent.click(claim);
@@ -309,7 +384,7 @@ describe("审批视图授权撤销", () => {
       return undefined;
     });
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
     fireEvent.click(await screen.findByRole("button", { name: "批准补偿" }));
 
@@ -339,7 +414,7 @@ describe("审批视图授权撤销", () => {
   it("确认对话框接管焦点、约束键盘遍历并在取消后恢复触发点", async () => {
     mockClaimFlow(async () => undefined);
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
     const trigger = await screen.findByRole("button", { name: "批准补偿" });
     trigger.focus();
@@ -368,7 +443,7 @@ describe("审批视图授权撤销", () => {
       return undefined;
     });
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
     fireEvent.click(await screen.findByRole("button", { name: "驳回并转人工" }));
 
@@ -411,7 +486,7 @@ describe("审批视图授权撤销", () => {
       return undefined;
     });
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
     fireEvent.click(await screen.findByRole("button", { name: "批准补偿" }));
     fireEvent.click(screen.getByRole("button", { name: "确认批准" }));
@@ -461,7 +536,7 @@ describe("审批视图授权撤销", () => {
       throw new Error(`unexpected request: ${path}`);
     });
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
     fireEvent.click(await screen.findByRole("button", { name: "释放审批" }));
     fireEvent.click(screen.getByRole("button", { name: "确认释放审批责任" }));
@@ -518,7 +593,7 @@ describe("审批视图授权撤销", () => {
       .mockResolvedValueOnce(Response.json({ ...approvalSnapshot(), cursor: "approval-view-v1:4" }))
       .mockResolvedValueOnce(openStream());
 
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
     fireEvent.click(await screen.findByRole("button", { name: "领取审批" }));
 
     await waitFor(() =>

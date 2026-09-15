@@ -73,3 +73,32 @@ test("Issue #100 真实登录、租约内审批视图、决定确认与撤权清
   });
   await context.close();
 });
+
+test("审批领取后刷新仍能恢复有效租约并释放责任", async ({ browser }) => {
+  resetApprovalFixture();
+  const context = await newAcceptanceContext(browser);
+  const page = await context.newPage();
+  try {
+    await login(page, "internal", "approver-demo");
+    const row = page.locator(".approval-table-row", { hasText: "80000000…0008" });
+    await row.getByRole("button", { name: "领取审批" }).click();
+    await expect(page.getByRole("heading", { name: "ORDER-DELAY-001" })).toBeVisible();
+
+    await page.reload();
+
+    await expect(page.getByRole("heading", { name: "ORDER-DELAY-001" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "批准补偿" })).toBeEnabled();
+    await page.getByRole("button", { name: "释放审批" }).click();
+    const released = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname.endsWith(`/${revisionId}/release`),
+    );
+    await page.getByRole("button", { name: "确认释放审批责任" }).click();
+    expect((await released).ok()).toBe(true);
+    await expect(page.getByText("审批责任已释放，已返回队列。", { exact: true })).toBeVisible();
+    await expect(row.getByRole("button", { name: "领取审批" })).toBeEnabled();
+  } finally {
+    await context.close();
+  }
+});

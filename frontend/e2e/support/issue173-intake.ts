@@ -12,7 +12,11 @@ type LogisticsIntakeSnapshot = {
 };
 
 // #173 只准备独有订单；工单、回复、代次和结果均由真实 UI → Spring/LangGraph 产生。
-export function prepareOrder({ delayHours = 80, allowance = 268 } = {}) {
+export function prepareOrder({
+  delayHours = 80,
+  delaySeconds = delayHours * 3600,
+  allowance = 268,
+}: { delayHours?: number; delaySeconds?: number; allowance?: number } = {}) {
   const reference = `ORDER-ISSUE-173-${crypto.randomUUID()}`;
   executeFixtureSql(`
     INSERT INTO synthetic_order (
@@ -20,7 +24,7 @@ export function prepareOrder({ delayHours = 80, allowance = 268 } = {}) {
       paid, cancelled, fully_refunded, existing_compensation, policy_version,
       available_compensation_amount
     ) VALUES (
-      '${reference}', 'customer-demo', 268.00, 'CNY', ${delayHours}, ${delayHours * 3600},
+      '${reference}', 'customer-demo', 268.00, 'CNY', ${delayHours}, ${delaySeconds},
       true, false, false, false, 'delay-policy-v1', ${allowance}
     );
   `);

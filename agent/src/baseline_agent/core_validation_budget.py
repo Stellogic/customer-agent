@@ -127,7 +127,7 @@ class CoreValidationBudget:
         model: str = _MODEL,
         communication_model: str | None = None,
     ) -> CoreValidationBudget:
-        if not 0 < limit_micros <= 3_000_000 or max_attempts < 1 or max_tokens < 1:
+        if not 0 < limit_micros <= 10_000_000 or max_attempts < 1 or max_tokens < 1:
             raise ValueError("invalid frozen core budget")
         if communication_model is None:
             communication_model = model

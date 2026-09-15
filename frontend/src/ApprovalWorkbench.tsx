@@ -5,6 +5,12 @@ import { focusContextTarget } from "./components/internal/focusContextTarget";
 import { loadCsrfToken } from "./csrf";
 import { humanSessionFetch } from "./humanSessionLifecycle";
 import {
+  clearApprovalClaim,
+  readApprovalClaim,
+  storeApprovalClaim,
+  type ApprovalClaim,
+} from "./approvalClaimStorage";
+import {
   consumeSseEvents,
   hasOnlyKeys,
   isRecord,
@@ -63,7 +69,7 @@ type Status = { message: string; tone: Tone };
 type Action = "approve" | "reject" | "release" | null;
 const status = (message: string, tone: Tone): Status => ({ message, tone });
 
-export function ApprovalWorkbench() {
+export function ApprovalWorkbench({ approverId }: { approverId: string }) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [notice, setNotice] = useState(status("正在读取待审批队列…", "busy"));
@@ -76,12 +82,20 @@ export function ApprovalWorkbench() {
   const reconnectRef = useRef<number | null>(null);
   const claimAttemptRef = useRef(0);
   const activeClaimRef = useRef<number | null>(null);
+  const claimRecoveryRef = useRef<ApprovalClaim | null>(null);
 
   useEffect(() => {
     globalThis.history.replaceState(null, "", "/internal/approvals");
-    void loadQueue();
-    return clearTimers;
-  }, []);
+    const saved = readApprovalClaim(approverId);
+    if (saved) void claim(saved.proposalRevisionId, saved);
+    else void loadQueue();
+    return () => {
+      claimAttemptRef.current += 1;
+      activeClaimRef.current = null;
+      leaseRef.current = null;
+      clearTimers();
+    };
+  }, [approverId]);
 
   async function loadQueue() {
     try {
@@ -98,8 +112,15 @@ export function ApprovalWorkbench() {
     }
   }
 
-  async function claim(id: string) {
+  async function claim(id: string, saved?: ApprovalClaim) {
     if (activeClaimRef.current !== null) return;
+    const previous = saved ?? readApprovalClaim(approverId);
+    const recovery =
+      previous?.proposalRevisionId === id
+        ? previous
+        : { proposalRevisionId: id, requestId: crypto.randomUUID(), requestedLeaseSeconds: 900 };
+    claimRecoveryRef.current = recovery;
+    storeApprovalClaim(approverId, recovery);
     const attempt = ++claimAttemptRef.current;
     activeClaimRef.current = attempt;
     setClaimingId(id);
@@ -110,6 +131,7 @@ export function ApprovalWorkbench() {
     setNotice(status("正在领取审批责任…", "busy"));
     try {
       const csrf = await loadCsrfToken();
+      if (activeClaimRef.current !== attempt) return;
       const response = await humanSessionFetch(
         `/api/approver/compensation-proposals/${id}/claims`,
         {
@@ -118,12 +140,19 @@ export function ApprovalWorkbench() {
           headers: {
             [csrf.headerName]: csrf.token,
             "Content-Type": "application/json",
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": recovery.requestId,
           },
-          body: JSON.stringify({ requestedLeaseSeconds: 900 }),
+          body: JSON.stringify({ requestedLeaseSeconds: recovery.requestedLeaseSeconds }),
         },
       );
-      const lease = response.ok ? ((await response.json()) as unknown) : null;
+      if (activeClaimRef.current !== attempt) return;
+      if (!response.ok && response.status < 500) {
+        revoke(status("审批责任不可用，已返回队列。", "danger"));
+        await loadQueue();
+        return;
+      }
+      if (!response.ok) throw new Error();
+      const lease = (await response.json()) as unknown;
       if (activeClaimRef.current !== attempt) return;
       if (!isLease(lease)) throw new Error();
       leaseRef.current = lease;
@@ -131,7 +160,7 @@ export function ApprovalWorkbench() {
       await loadView(lease);
     } catch {
       if (activeClaimRef.current === attempt)
-        revoke(status("审批责任不可用，已返回队列。", "danger"));
+        setNotice(status("领取结果尚未确认，请刷新页面恢复原领取请求。", "warning"));
     } finally {
       if (activeClaimRef.current === attempt) {
         activeClaimRef.current = null;
@@ -141,6 +170,7 @@ export function ApprovalWorkbench() {
   }
 
   async function loadView(lease: Lease) {
+    if (leaseRef.current !== lease) return;
     try {
       const response = await humanSessionFetch(
         `/api/approver/compensation-proposals/${lease.proposalRevisionId}/approval-view`,
@@ -150,12 +180,15 @@ export function ApprovalWorkbench() {
           headers: leaseHeaders(lease),
         },
       );
-      if (!response.ok) {
+      if (leaseRef.current !== lease) return;
+      if (!response.ok && response.status < 500) {
         revoke(status("审批责任已结束，证据和操作已移除。", "warning"));
         await loadQueue();
         return;
       }
+      if (!response.ok) throw new Error();
       const value = (await response.json()) as unknown;
+      if (leaseRef.current !== lease) return;
       if (
         !isSnapshot(value) ||
         value.leaseToken !== lease.leaseToken ||
@@ -184,6 +217,7 @@ export function ApprovalWorkbench() {
           headers: { ...leaseHeaders(lease), "Last-Event-ID": cursor, Accept: "text/event-stream" },
         },
       );
+      if (controller.signal.aborted || leaseRef.current !== lease) return;
       if ([401, 403, 404, 410].includes(response.status)) {
         revoke(status("审批责任已结束，证据和操作已移除。", "warning"));
         return;
@@ -199,6 +233,7 @@ export function ApprovalWorkbench() {
         cursor = event.id;
         return true;
       });
+      if (controller.signal.aborted || leaseRef.current !== lease) return;
       if (!compatible) {
         controller.abort();
         setSnapshot(null);
@@ -212,14 +247,14 @@ export function ApprovalWorkbench() {
   }
 
   function recover(lease: Lease) {
-    if (leaseRef.current?.leaseToken !== lease.leaseToken || reconnectRef.current !== null) return;
+    if (leaseRef.current !== lease || reconnectRef.current !== null) return;
     setSnapshot(null);
     setAction(null);
     history.replaceState(null, "", "/internal/approvals");
     setNotice(status("审批连接已断开；正在按当前租约重新校验权威快照…", "warning"));
     reconnectRef.current = window.setTimeout(() => {
       reconnectRef.current = null;
-      if (leaseRef.current?.leaseToken === lease.leaseToken) void loadView(lease);
+      if (leaseRef.current === lease) void loadView(lease);
     }, 250);
   }
 
@@ -251,15 +286,18 @@ export function ApprovalWorkbench() {
           }),
         },
       );
-      if (!response.ok) {
+      if (leaseRef.current !== lease) return;
+      if (!response.ok && response.status < 500) {
         revoke(status("审批责任已失效，证据和操作已移除。", "danger"));
         await loadQueue();
         return;
       }
+      if (!response.ok) throw new Error();
       revoke(status("审批责任已结束，已返回队列。", "success"));
       await loadQueue();
       setNotice(status("审批责任已结束，已返回队列。", "success"));
     } catch {
+      if (leaseRef.current !== lease) return;
       setNotice(status("结果尚未确认，正在恢复 Spring 权威状态…", "warning"));
       await loadView(lease);
     }
@@ -284,15 +322,18 @@ export function ApprovalWorkbench() {
           },
         },
       );
-      if (!response.ok) {
+      if (leaseRef.current !== lease) return;
+      if (!response.ok && response.status < 500) {
         revoke(status("审批责任已失效，证据和操作已移除。", "danger"));
         await loadQueue();
         return;
       }
+      if (!response.ok) throw new Error();
       revoke(status("审批责任已释放，已返回队列。", "success"));
       await loadQueue();
       setNotice(status("审批责任已释放，已返回队列。", "success"));
     } catch {
+      if (leaseRef.current !== lease) return;
       setNotice(status("结果尚未确认，正在恢复 Spring 权威状态…", "warning"));
       await loadView(lease);
     }
@@ -305,6 +346,10 @@ export function ApprovalWorkbench() {
     reconnectRef.current = null;
   }
   function revoke(next: Status, resetPath = true) {
+    if (claimRecoveryRef.current) {
+      clearApprovalClaim(approverId, claimRecoveryRef.current.requestId);
+      claimRecoveryRef.current = null;
+    }
     claimAttemptRef.current += 1;
     activeClaimRef.current = null;
     setClaimingId(null);

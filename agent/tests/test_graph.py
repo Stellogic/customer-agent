@@ -32,6 +32,7 @@ from baseline_agent.investigation_action_loop import (
     TerminalAction,
 )
 from baseline_agent.investigation_model import (
+    FixedFakeInvestigationModel,
     InvestigationJudgment,
     InvestigationJudgmentFailure,
     InvestigationJudgmentFailureCode,
@@ -933,6 +934,82 @@ def _capability_result(url: str, facts: dict) -> dict:
         **{field: facts.get(field) for field in fields},
         "evidenceRefs": evidence_refs,
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("delay_hours", "delay_seconds", "accepted"),
+    [(23, 86_399, True), (72, 259_201, True), (71, 259_201, False)],
+)
+async def test_graph_preserves_second_precision_with_derived_display_hours(
+    monkeypatch: pytest.MonkeyPatch,
+    delay_hours: int,
+    delay_seconds: int,
+    accepted: bool,
+) -> None:
+    facts = _with_facts(delayHours=delay_hours, delaySeconds=delay_seconds)
+    calls: list[tuple[str, dict]] = []
+    native_client = httpx.AsyncClient
+
+    def spring(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if request.method == "GET":
+            payload = _catalog_or_customer_context(path)
+        else:
+            body = json.loads(request.content)
+            calls.append((path, body))
+            if "/capabilities/" in path:
+                payload = _capability_result(path, facts)
+            elif path.endswith("/human-handoff"):
+                payload = {"handlingMode": "HUMAN", "reasonCode": body["reasonCode"]}
+            else:
+                payload = {"accepted": True}
+        return httpx.Response(200, json=payload)
+
+    monkeypatch.setattr(
+        "baseline_agent.graph.httpx.AsyncClient",
+        lambda **kwargs: native_client(**kwargs, transport=httpx.MockTransport(spring)),
+    )
+    monkeypatch.setattr(
+        "baseline_agent.graph.investigation_action_model", DeterministicActionModel()
+    )
+    monkeypatch.setattr(
+        "baseline_agent.graph.investigation_judgment_model", FixedFakeInvestigationModel()
+    )
+    monkeypatch.setattr(
+        "baseline_agent.graph.customer_communication_model", FixedFakeCustomerCommunicationModel()
+    )
+    monkeypatch.setenv("SPRING_INTERNAL_URL", "http://spring")
+    monkeypatch.setenv("AGENT_MACHINE_TOKEN", "agent-token")
+    monkeypatch.setenv("AGENT_INVESTIGATION_SHADOW_MODE", "disabled")
+
+    result = await graph.ainvoke(
+        {
+            "requested_by": "spring",
+            "ticket_id": "ticket-second-precision",
+            "generation_id": "generation-second-precision",
+            "issue_kind": "LOGISTICS_DELAY",
+        }
+    )
+
+    conclusions = [body for path, body in calls if path.endswith("/conclusions")]
+    handoffs = [body for path, body in calls if path.endswith("/human-handoff")]
+    if not accepted:
+        assert conclusions == []
+        assert len(handoffs) == 1
+        assert handoffs[0]["reasonCode"] == "FACT_CONFLICT"
+        return
+
+    assert handoffs == []
+    assert len(conclusions) == 1
+    assert conclusions[0]["delayHours"] == delay_hours
+    assert conclusions[0]["delaySeconds"] == delay_seconds
+    assert conclusions[0]["compensationRequired"] is (delay_seconds >= 86_400)
+    assert conclusions[0]["reasonCode"] == (
+        "LOGISTICS_DELAY" if delay_seconds >= 86_400 else "DELAY_UNDER_24_HOURS"
+    )
+    assert result["facts"]["delaySeconds"] == delay_seconds
+    assert conclusions[0]["customerReply"]["body"]
 
 
 @pytest.mark.asyncio
