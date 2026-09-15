@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readApprovalClaim, storeApprovalClaim } from "./approvalClaimStorage";
 import {
   announceHumanSessionChange,
   observeHumanSession,
@@ -10,6 +11,21 @@ describe("人工 Session 跨标签生命周期", () => {
   afterEach(() => {
     resetHumanSessionLifecycleForTests();
     vi.restoreAllMocks();
+    globalThis.sessionStorage.clear();
+  });
+
+  it("审批领取恢复记录按主体隔离并在退出时清除", () => {
+    storeApprovalClaim("approver-demo", {
+      proposalRevisionId: "27000000-0000-0000-0000-000000000001",
+      requestId: "27000000-0000-0000-0000-000000000002",
+      requestedLeaseSeconds: 900,
+    });
+    expect(readApprovalClaim("another-approver")).toBeNull();
+    expect(readApprovalClaim("approver-demo")).not.toBeNull();
+
+    announceHumanSessionChange("logged-out");
+
+    expect(readApprovalClaim("approver-demo")).toBeNull();
   });
 
   it("同源其他标签退出时立即通知当前标签清除旧主体", () => {

@@ -207,7 +207,7 @@ describe("#193 现有授权工作台入口接线", () => {
         );
       throw new Error(`unexpected request: ${path}`);
     });
-    render(<ApprovalWorkbench />);
+    render(<ApprovalWorkbench approverId="approver-demo" />);
     await screen.findByRole("button", { name: "领取审批" });
     expect(screen.queryByRole("region", { name: "审批详情入口" })).not.toBeInTheDocument();
     const queueReads = fetchMock.mock.calls.length;

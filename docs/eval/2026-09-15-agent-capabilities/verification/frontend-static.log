@@ -1,0 +1,6 @@
+Checking formatting...
+All matched files use Prettier code style!
+
+> customer-agent-frontend@0.1.0 typecheck
+> tsc --noEmit
+

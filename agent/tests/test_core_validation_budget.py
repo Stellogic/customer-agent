@@ -120,7 +120,7 @@ def test_stop_survives_reopening_and_allows_inflight_usage_to_settle(tmp_path: P
     budget = CoreValidationBudget.create(
         tmp_path / "budget.json",
         authorization_id="synthetic-stop",
-        limit_micros=3_000_000,
+        limit_micros=10_000_000,
         max_attempts=10,
         max_tokens=1_000_000,
         deadline=datetime.now(UTC) + timedelta(minutes=5),

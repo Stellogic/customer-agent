@@ -1,0 +1,4 @@
+root 0 777 /budget
+root 0 644 /budget/ledger.json
+root 0 644 /budget/ledger.lock
+RUNTIME_USER_CAN_OPEN_BUDGET

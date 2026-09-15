@@ -160,7 +160,12 @@ async def test_fact_action_derives_authoritative_reference_without_supplier_echo
 
 
 @pytest.mark.asyncio
-async def test_flash_allows_terminal_action_without_order_parameter() -> None:
+@pytest.mark.parametrize(
+    ("delay_hours", "delay_seconds"), [(25, 90_000), (23, 86_399), (72, 259_201)]
+)
+async def test_flash_allows_terminal_action_without_order_parameter(
+    delay_hours: int, delay_seconds: int
+) -> None:
     model = DeepSeekResponsesInvestigationActionModel(
         DeepSeekActionConfig(api_key="synthetic-test-key", max_attempts=1),
         transport=httpx.MockTransport(
@@ -172,8 +177,8 @@ async def test_flash_allows_terminal_action_without_order_parameter() -> None:
         {
             "matchStatus": "UNIQUE",
             "orderReference": "ORDER-128",
-            "delayHours": 25,
-            "delaySeconds": 90_000,
+            "delayHours": delay_hours,
+            "delaySeconds": delay_seconds,
             "paid": True,
             "cancelled": False,
             "fullyRefunded": False,
@@ -284,7 +289,7 @@ async def test_flash_schema_requires_handoff_for_known_fact_conflict() -> None:
         {
             "matchStatus": "UNIQUE",
             "orderReference": "ORDER-128",
-            "delayHours": 25,
+            "delayHours": 24,
             "delaySeconds": 90_001,
             "paid": True,
             "cancelled": False,

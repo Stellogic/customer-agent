@@ -6,7 +6,7 @@ import { createSingleTicket, intakeReply, prepareOrder } from "./support/issue17
 
 // 已登记串行门禁；完整 AC、运行证据与复用边界见 issue-173-acceptance-plan.md。
 
-function expectRequiredLogisticsFacts(ticketId: string) {
+function expectRequiredLogisticsFacts(ticketId: string, delaySeconds: number) {
   // 补充核对真实产品调查产生的首代次记录；不注入事实，也不限定读取顺序。
   const investigation = JSON.parse(
     queryFixtureSql(`
@@ -15,11 +15,18 @@ function expectRequiredLogisticsFacts(ticketId: string) {
           FROM agent_command_request WHERE generation_id = g.id
             AND operation = 'USE_INVESTIGATION_CAPABILITY'),
         'factTypes', (SELECT json_agg(fact_type)
-          FROM investigation_fact WHERE generation_id = g.id)
+          FROM investigation_fact WHERE generation_id = g.id),
+        'delayFacts', (SELECT json_object_agg(fact_type, fact_value)
+          FROM investigation_fact WHERE generation_id = g.id
+            AND fact_type IN ('LOGISTICS_DELAY_HOURS', 'LOGISTICS_DELAY_SECONDS'))
       ) FROM agent_processing_generation g
       WHERE g.ticket_id = '${ticketId}' AND g.generation_number = 1;
     `),
-  ) as { capabilities: string[]; factTypes: string[] };
+  ) as { capabilities: string[]; factTypes: string[]; delayFacts: Record<string, string> };
+  expect(investigation.delayFacts).toEqual({
+    LOGISTICS_DELAY_HOURS: String(Math.floor(delaySeconds / 3600)),
+    LOGISTICS_DELAY_SECONDS: String(delaySeconds),
+  });
   expect(investigation.capabilities).toEqual(
     expect.arrayContaining([
       "CONFIRM_ORDER",
@@ -93,7 +100,8 @@ test("Issue #173 A：自然语言多问题澄清、一次建单与订单分组�
 
 test("Issue #173 D：真实低风险回复产生五分钟候选，刷新后仍可取消", async ({ browser }) => {
   test.setTimeout(90_000);
-  const reference = prepareOrder({ delayHours: 23 });
+  // #242：合法的秒级事实必须通过完整 Agent 链路，23:59:59 仍未达到补偿门槛。
+  const reference = prepareOrder({ delayHours: 23, delaySeconds: 86_399 });
   const context = await newAcceptanceContext(browser, { viewport: { width: 1440, height: 960 } });
   try {
     const page = await context.newPage();
@@ -103,7 +111,12 @@ test("Issue #173 D：真实低风险回复产生五分钟候选，刷新后仍�
     const notice = page.getByRole("region", { name: "自动解决状态" });
     const cancel = notice.getByRole("button", { name: "仍需帮助，取消自动解决" });
     await expect(cancel).toBeVisible({ timeout: 60_000 });
-    expectRequiredLogisticsFacts(ticketId);
+    expectRequiredLogisticsFacts(ticketId, 86_399);
+    expect(
+      queryFixtureSql(`
+      SELECT count(*) FROM compensation_proposal_revision WHERE ticket_id = '${ticketId}';
+    `),
+    ).toBe("0");
     const candidate = JSON.parse(
       queryFixtureSql(`
       SELECT json_build_object('waitSeconds', extract(epoch FROM due_at - created_at)::integer, 'dueAt', due_at)
@@ -302,7 +315,8 @@ test("Issue #173 E：同订单两提案竞争30元额度，只允许一笔26.80�
 
 test("Issue #173 B：真实调查流、并发追加消息、旧代次隔离与断线恢复", async ({ browser }) => {
   test.setTimeout(120_000);
-  const reference = prepareOrder();
+  // #242：72小时加1秒按精确秒数进入部分退款档，不能按展示小时落入20元优惠券档。
+  const reference = prepareOrder({ delayHours: 72, delaySeconds: 259_201 });
   const context = await newAcceptanceContext(browser, { viewport: { width: 1440, height: 960 } });
   try {
     const page = await context.newPage();
@@ -340,7 +354,27 @@ test("Issue #173 B：真实调查流、并发追加消息、旧代次隔离与�
         .locator(".pending-compensation-card")
         .getByRole("heading", { name: "待审批", exact: true }),
     ).toBeVisible();
-    expectRequiredLogisticsFacts(ticketId);
+    expectRequiredLogisticsFacts(ticketId, 259_201);
+    const delayProposal = JSON.parse(
+      queryFixtureSql(`
+      SELECT json_build_object(
+        'hours', p.delay_hours, 'seconds', p.delay_seconds,
+        'method', p.compensation_method, 'amount', p.amount,
+        'snapshotHours', s.delay_hours, 'snapshotSeconds', s.delay_seconds)
+      FROM compensation_proposal_revision p
+      JOIN approval_evidence_snapshot s ON s.proposal_revision_id = p.id
+      JOIN agent_processing_generation g ON g.id = p.generation_id
+      WHERE p.ticket_id = '${ticketId}' AND g.generation_number = 1;
+    `),
+    ) as Record<string, string | number>;
+    expect(delayProposal).toEqual({
+      hours: 72,
+      seconds: 259_201,
+      method: "SIMULATED_PARTIAL_REFUND",
+      amount: 26.8,
+      snapshotHours: 72,
+      snapshotSeconds: 259_201,
+    });
     const agentReply = queryFixtureSql(`
       SELECT body FROM public_message
       WHERE ticket_id = '${ticketId}' AND author = 'AGENT'

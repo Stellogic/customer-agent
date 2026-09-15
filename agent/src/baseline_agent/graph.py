@@ -1582,7 +1582,7 @@ def _unsafe_facts_reason(
         return "INVALID_TOOL_RESPONSE"
     if issue_kind == "DUPLICATE_CHARGE":
         return None
-    if facts["delaySeconds"] != facts["delayHours"] * 60 * 60:
+    if facts["delayHours"] != facts["delaySeconds"] // 3600:
         return "FACT_CONFLICT"
     if facts["logisticsStatus"] not in {
         "IN_TRANSIT",

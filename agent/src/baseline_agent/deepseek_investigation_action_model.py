@@ -457,7 +457,7 @@ def _known_facts_require_handoff(facts: dict[str, object]) -> bool:
     ):
         return True
     return (
-        delay_seconds != delay_hours * 60 * 60
+        delay_hours != delay_seconds // 3600
         or not facts["paid"]
         or bool(facts["cancelled"])
         or bool(facts["fullyRefunded"])

@@ -1,0 +1,28 @@
+﻿场景ID,名称,自动结果,结果来源,语义审阅,整例毫秒,受理至响应毫秒,首确认至终态毫秒,追加至终态毫秒,确认至正文UI毫秒,已记录请求数,完整请求数,已知token,完整token,已知估算微元,完整估算微元,未知用量次数,工单ID,受理ID,Agent正文数,动作来源计数,错误
+natural_status,正文识别订单，口语物流询问与秒级事实,PASS,playwright,PENDING,17445,4557,9824,,7796,4,4,4342,4342,48114,48114,0,022dd06f-a003-40c5-b4fe-d724e83ac227,e600e229-9b85-4947-871a-cce4737206ed,1,"{""PROGRAM_REQUIRED"": 5, ""MODEL_SELECTED"": 1}",
+natural_proposal,正文识别订单，物流处理方案保留72小时加1秒,PASS,playwright,PENDING,16543,4525,9394,,6998,4,4,4832,4832,59526,59526,0,2299be3e-60ca-40fc-85e8-0fd07c349eab,8ff95473-b9ee-42fa-914f-eb6ba050e5b7,1,"{""PROGRAM_REQUIRED"": 5, ""MODEL_SELECTED"": 1}",
+ambiguous_order,缺少订单与问题时先澄清，再保留客户补充,FAIL,playwright,PENDING,14868,3930,5077,,,3,3,3427,,36531,,1,f2aa1698-5b5b-4775-a7e4-30d55846189d,52562e3b-bf4c-4af5-90fd-2d36c658a21d,0,"{""PROGRAM_REQUIRED"": 5}","Error: {""ticket"":{""id"":""f2aa1698-5b5b-4775-a7e4-30d55846189d"",""orderReference"":""ORDER-CAP-0915-AMBIGUOUS-ORDER-A-b4ca1779-3080-4e28-889f-d71e4ff439e6"",""issueKind"":""LOGISTICS_DELAY"",""handlingMode"":""HUMAN"",""lifecycleState"":""INVESTIGATING"",""reason"":""INVALID_MODEL_OUTPUT"",""humanPreference"":false},""generation"":{""id"":""df817549-77c4-44d1-a078-bd009dc21a19"",""status"":""HANDED_OFF"",""thread_id"":""5374f88d-fa9c-46db-836c-805eda8749d0"",""ticket_id"":""f2aa1698-5b5b-4775-a7e4-30d55846189d"",""created_at"":""2026-08-09T14:00:00+00:00"",""completed_at"":""2026-08-09T14:00:00+00:00"",""generation_number"":1}}
+
+expect(received).toBe(expected) // Object.is equality
+
+Expected: ""COMPLETED""
+Received: ""HANDED_OFF""
+
+  161 |     (g) => g.ticket_id === ticket.id && g.generation_number === generationNumber,
+  162 |   )!;
+> 163 |   expect(generation?.status, JSON.stringify({ ticket, generation })).toBe(""COMPLETED"");
+      |                                                                      ^
+  164 |   expect(
+  165 |     state.commands.filter(
+  166 |       (c) =>
+    at verifyTicket (/app/e2e/evaluation.spec.ts:163:70)
+    at /app/e2e/evaluation.spec.ts:346:9"
+clarification_denied,否认疑似重复扣款后仅保留已确认物流问题,NOT_RUN,playwright,NOT_RUN,,,,,,0,,,,,,,,,,{},
+split_asserted,同一订单两个明确问题分别调查,NOT_RUN,playwright,NOT_RUN,,,,,,0,,,,,,,,,,{},
+two_orders,一句话两订单逐单确认，保持各自时长与方案,NOT_RUN,playwright,NOT_RUN,,,,,,0,,,,,,,,,,{},
+payment_affirmed,客户肯定疑似扣款后核对未退款状态,NOT_RUN,playwright,NOT_RUN,,,,,,0,,,,,,,,,,{},
+payment_refunded,已全额退款仍需调查客户报告的两笔扣款,NOT_RUN,playwright,NOT_RUN,,,,,,0,,,,,,,,,,{},
+followup_details,首轮完成后追加具体问题，结合对话继续调查,NOT_RUN,playwright,NOT_RUN,,,,,,0,,,,,,,,,,{},
+human_preference,自然语言明确人工偏好后停止自主公开回复,NOT_RUN,playwright,NOT_RUN,,,,,,0,,,,,,,,,,{},
+supplemental_help,物流调查中的补充规则与配送知识，区分已知和未知,NOT_RUN,playwright,NOT_RUN,,,,,,0,,,,,,,,,,{},
+signed_not_received,签收未收到与普通物流延迟区分，旧路径独立记录,NOT_RUN,playwright,NOT_RUN,,,,,,0,,,,,,,,,,{},

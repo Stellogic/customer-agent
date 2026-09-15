@@ -1,0 +1,17 @@
+../evaluation/evaluation.spec.ts 168ms
+../evaluation/scenarios.json 20ms
+Listing tests:
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 natural_status
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 natural_proposal
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 ambiguous_order
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 clarification_denied
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 split_asserted
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 two_orders
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 payment_affirmed
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 payment_refunded
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 followup_details
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 human_preference
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 supplemental_help
+  evaluation.spec.ts:215:3 › Agent capabilities 20260915 signed_not_received
+Total: 12 tests in 1 file
+COLLECTOR_IMPORT_PASS

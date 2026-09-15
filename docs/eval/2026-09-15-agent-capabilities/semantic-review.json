@@ -1,0 +1,573 @@
+{
+  "schemaVersion": "agent-capability-semantic-review-v1",
+  "runId": "issue242-capabilities-20260915-resume",
+  "testedHead": "3f0027c42d0b88f0476059f4f59aa050a3325559",
+  "reviewedOn": "2026-09-15",
+  "sources": [
+    "PLAN.md#数据与评分",
+    "data.json",
+    "scenarios.json"
+  ],
+  "reviewer": "Codex 按冻结人工评分表进行定性审阅；非真人独立标注、非额外付费裁判模型，也不是正式 Spec 轴审查。",
+  "reviewStatus": "COMPLETED_FOR_AVAILABLE_REPLIES",
+  "overallCapabilityConclusion": "INSUFFICIENT_COVERAGE_WITH_OBSERVED_ANSWER_GAPS",
+  "capabilityAcceptance": null,
+  "rubric": {
+    "factConsistency": "与本票授权事实一致，区分客户陈述与系统事实",
+    "directAnswer": "直接回答本轮明确问题，具体说明所问状态或所需信息",
+    "contextRetention": "保留已确认问题、否定或追加内容及本票上下文",
+    "noFabricatedPromise": "正确说明审批、执行和未知信息，无无据承诺"
+  },
+  "summary": {
+    "plannedCases": 12,
+    "automaticStatusCounts": {
+      "PASS": 2,
+      "FAIL": 1,
+      "NOT_RUN": 9
+    },
+    "semanticStatusCounts": {
+      "SCORED": 2,
+      "NO_REPLY": 1,
+      "NOT_RUN": 9
+    },
+    "scoredReplyCount": 2,
+    "allFourDimensionsSatisfiedReplyCount": 0,
+    "dimensionTotals": {
+      "factConsistency": {
+        "ones": 2,
+        "applicable": 2
+      },
+      "directAnswer": {
+        "ones": 0,
+        "applicable": 2
+      },
+      "contextRetention": {
+        "ones": 2,
+        "applicable": 2
+      },
+      "noFabricatedPromise": {
+        "ones": 2,
+        "applicable": 2
+      }
+    },
+    "citationCount": 0,
+    "citationSemanticSupport": "NOT_APPLICABLE_FOR_AVAILABLE_REPLIES",
+    "metricBoundary": "各维度分母仅为实际2条正文，0条同时满足四项是描述统计，不是新设自动验收门槛，也不是12例整体能力通过率。NO_REPLY和NOT_RUN不进入正文评分分母，完整保留其失败或未运行状态。"
+  },
+  "actionObservations": {
+    "executedCoreCases": 3,
+    "programRequiredReadCount": 15,
+    "modelSelectedActionCount": 2,
+    "modelSelectedActions": [
+      "SUBMIT_CONCLUSION",
+      "SUBMIT_CONCLUSION"
+    ],
+    "observedOptionalRuleReads": 0,
+    "observedKnowledgeSearches": 0,
+    "interpretation": "三例各有5次程序必需读取；两例模型选择提交结论，第三例没有有效选择结果。不能把15次固定读取算模型自主调查成功。规则和知识专用场景未运行，不能按观察到0次调用判其能力失败。",
+    "evidencePointers": [
+      "data.json#/cases/0/actions",
+      "data.json#/cases/1/actions",
+      "data.json#/cases/2/actions",
+      "data.json#/cases/0/modelSelections",
+      "data.json#/cases/1/modelSelections",
+      "data.json#/cases/2/modelSelections"
+    ]
+  },
+  "cases": [
+    {
+      "id": "natural_status",
+      "title": "正文识别订单，口语物流询问与秒级事实",
+      "automaticStatus": "PASS",
+      "reviewStatus": "SCORED",
+      "expectedInputTemplate": "{A} 这单配送比预计时间晚了，物流一直没更新，请查一下现在是什么状态，具体晚了多久。",
+      "publicReplyCount": 1,
+      "replies": [
+        {
+          "ticketId": "022dd06f-a003-40c5-b4fe-d724e83ac227",
+          "sequence": 3,
+          "author": "AGENT",
+          "body": "关于您反馈的订单 ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142 配送延迟、物流未更新的问题，我们已经完成核查。本次调查确认该订单不涉及补偿处理，相关结论已向您提供。后续处理将按页面状态进行，如有其他问题欢迎继续在此沟通。",
+          "scores": {
+            "factConsistency": 1,
+            "directAnswer": 0,
+            "contextRetention": 1,
+            "noFabricatedPromise": 1
+          },
+          "rationale": {
+            "factConsistency": "原文将配送延迟、物流未更新归于“您反馈”，订单号与本票一致。“本次调查确认该订单不涉及补偿处理”与 compensationRequired=false、DELAY_UNDER_24_HOURS、无提案一致；未声称已经送达或工单关闭。此1分只说明已说出的事实没有矛盾，不代表充分利用事实。",
+            "directAnswer": "客户明确问“现在是什么状态，具体晚了多久”。授权事实已含 IN_TRANSIT、86399秒（23小时59分59秒），正文却只说“不涉及补偿处理”“相关结论已向您提供”“按页面状态进行”，没有当前物流状态、延迟时长或不补偿的时长依据，遗漏两个核心问题，记0分。",
+            "contextRetention": "正确保留当前订单号及客户的配送延迟、物流未更新问题，没有串单或将其他问题带入；本例没有否认或多轮追加，仅证明这一轮订单与问题承接。核心问题未回答已记入 directAnswer。",
+            "noFabricatedPromise": "正文未声称退款、已补偿、已关闭、保证送达时间或自动解决。完成核查可对应已接受的首代结论；工单实际仍为 INVESTIGATING/HUMAN。含糊的“后续处理将按页面状态进行”不算具体进展说明，但本条未出现无据执行承诺。"
+          },
+          "citationSemanticSupport": "NOT_APPLICABLE",
+          "citationRationale": "该条公开正文无知识引用，受控 customerReply 无 knowledge，未观察到知识检索回执；本例也未要求知识引用，不能当作引用能力通过。",
+          "evidencePointers": [
+            "data.json#/cases/0/publicReplies",
+            "data.json#/cases/0/evidence/business",
+            "data.json#/cases/0/capabilityGenerations"
+          ]
+        }
+      ],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NOT_APPLICABLE",
+      "observation": "程序事实和已接受结论保留86399秒/23小时；86399秒是23小时59分59秒，尚不足24小时。无补偿结论正确，正文未解释该事实，工单交人工继续调查也不能算客户问题已解决。",
+      "businessOutcome": {
+        "tickets": [
+          {
+            "id": "022dd06f-a003-40c5-b4fe-d724e83ac227",
+            "orderReference": "ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142",
+            "issueKind": "LOGISTICS_DELAY",
+            "handlingMode": "HUMAN",
+            "lifecycleState": "INVESTIGATING",
+            "reason": "DELAY_UNDER_24_HOURS",
+            "humanPreference": false
+          }
+        ],
+        "generations": [
+          {
+            "id": "e48d918b-a2a2-4687-9729-cd7e564a298b",
+            "status": "COMPLETED",
+            "generation_number": 1
+          }
+        ],
+        "facts": [
+          {
+            "fact_type": "ORDER",
+            "fact_value": "ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142"
+          },
+          {
+            "fact_type": "EXISTING_COMPENSATION",
+            "fact_value": "false"
+          },
+          {
+            "fact_type": "PENDING_ACTION_COUNT",
+            "fact_value": "0"
+          },
+          {
+            "fact_type": "LOGISTICS_DELAY_HOURS",
+            "fact_value": "23"
+          },
+          {
+            "fact_type": "LOGISTICS_DELAY_SECONDS",
+            "fact_value": "86399"
+          },
+          {
+            "fact_type": "LOGISTICS_STATUS",
+            "fact_value": "IN_TRANSIT"
+          },
+          {
+            "fact_type": "PAYMENT",
+            "fact_value": "PAID"
+          },
+          {
+            "fact_type": "ORDER_CANCELLATION",
+            "fact_value": "NOT_CANCELLED"
+          },
+          {
+            "fact_type": "REFUND_STATUS",
+            "fact_value": "NOT_FULLY_REFUNDED"
+          },
+          {
+            "fact_type": "DUPLICATE_CHARGE_SUSPECTED",
+            "fact_value": "false"
+          },
+          {
+            "fact_type": "POLICY",
+            "fact_value": "delay-policy-v1"
+          }
+        ],
+        "proposals": [],
+        "executionCount": 0
+      },
+      "observedModelSelectedActions": [
+        "SUBMIT_CONCLUSION"
+      ],
+      "programRequiredReadCount": 5,
+      "stopReason": null,
+      "supplementalSubscores": null,
+      "evidencePointer": "data.json#/cases/0"
+    },
+    {
+      "id": "natural_proposal",
+      "title": "正文识别订单，物流处理方案保留72小时加1秒",
+      "automaticStatus": "PASS",
+      "reviewStatus": "SCORED",
+      "expectedInputTemplate": "{A} 的配送已经超过预计时间，物流更新延迟，请核实订单后说明处理方案和补偿流程。",
+      "publicReplyCount": 1,
+      "replies": [
+        {
+          "ticketId": "2299be3e-60ca-40fc-85e8-0fd07c349eab",
+          "sequence": 3,
+          "author": "AGENT",
+          "body": "关于您反馈的 ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8 配送超过预计时间和物流更新延迟的情况，我们已完成初步核实。基于本次调查，我们已形成一个补偿方案建议，目前该方案正等待人工审核确认。在审核通过前，本次调查尚未执行任何补偿或退款动作。结论已提供，后续处理将按页面状态进行，如有进一步疑问欢迎继续回复。",
+          "scores": {
+            "factConsistency": 1,
+            "directAnswer": 0,
+            "contextRetention": 1,
+            "noFabricatedPromise": 1
+          },
+          "rationale": {
+            "factConsistency": "正文引用本票订单，将配送延迟归于客户反馈。“形成一个补偿方案建议”“等待人工审核确认”“尚未执行任何补偿或退款动作”与本票 PENDING_APPROVAL 提案及 executions=0 一致；未混淆支付退款事实。",
+            "directAnswer": "客户要求“说明处理方案和补偿流程”。正文说明了待人工审核、尚未执行这一流程阶段，但未说明实际方案为9.90元模拟部分退款，也未解释适用依据，只以“一个补偿方案建议”“按页面状态进行”代替具体方案。按冻结标准，部分流程说明不能覆盖遗漏的核心处理方案，记0分。",
+            "contextRetention": "正确保留当前订单及配送超过预计时间、物流更新延迟的请求，回复围绕其补偿流程，没有跨票混淆。本例是单轮，不能据此证明否认、多票或追加上下文能力。",
+            "noFabricatedPromise": "明确说“在审核通过前，本次调查尚未执行任何补偿或退款动作”，符合 PENDING_APPROVAL 和 executions=0；没有保证审批通过、到账时间或已退款。未具体说明“模拟”属于方案解释遗漏，本条也没有承诺真实资金退款。"
+          },
+          "citationSemanticSupport": "NOT_APPLICABLE",
+          "citationRationale": "该条公开正文无知识引用，受控 customerReply 无 knowledge，未观察到知识检索回执；本例也未要求知识引用，不能当作引用能力通过。",
+          "evidencePointers": [
+            "data.json#/cases/1/publicReplies",
+            "data.json#/cases/1/evidence/business",
+            "data.json#/cases/1/capabilityGenerations"
+          ]
+        }
+      ],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NOT_APPLICABLE",
+      "observation": "程序事实、已接受结论和待审批提案保留259201秒/72小时；259201秒是72小时零1秒，已超过72小时。9.90元模拟部分退款已建提案、未执行；正文审批边界正确，但没有说出方案方式和金额。",
+      "businessOutcome": {
+        "tickets": [
+          {
+            "id": "2299be3e-60ca-40fc-85e8-0fd07c349eab",
+            "orderReference": "ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8",
+            "issueKind": "LOGISTICS_DELAY",
+            "handlingMode": "AGENT",
+            "lifecycleState": "INVESTIGATING",
+            "reason": null,
+            "humanPreference": false
+          }
+        ],
+        "generations": [
+          {
+            "id": "cb0bab1d-8d6d-4b35-8e7e-6d0289d21130",
+            "status": "COMPLETED",
+            "generation_number": 1
+          }
+        ],
+        "facts": [
+          {
+            "fact_type": "ORDER",
+            "fact_value": "ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8"
+          },
+          {
+            "fact_type": "EXISTING_COMPENSATION",
+            "fact_value": "false"
+          },
+          {
+            "fact_type": "PENDING_ACTION_COUNT",
+            "fact_value": "0"
+          },
+          {
+            "fact_type": "LOGISTICS_DELAY_HOURS",
+            "fact_value": "72"
+          },
+          {
+            "fact_type": "LOGISTICS_DELAY_SECONDS",
+            "fact_value": "259201"
+          },
+          {
+            "fact_type": "LOGISTICS_STATUS",
+            "fact_value": "IN_TRANSIT"
+          },
+          {
+            "fact_type": "PAYMENT",
+            "fact_value": "PAID"
+          },
+          {
+            "fact_type": "ORDER_CANCELLATION",
+            "fact_value": "NOT_CANCELLED"
+          },
+          {
+            "fact_type": "REFUND_STATUS",
+            "fact_value": "NOT_FULLY_REFUNDED"
+          },
+          {
+            "fact_type": "DUPLICATE_CHARGE_SUSPECTED",
+            "fact_value": "false"
+          },
+          {
+            "fact_type": "POLICY",
+            "fact_value": "delay-policy-v1"
+          }
+        ],
+        "proposals": [
+          {
+            "ticketId": "2299be3e-60ca-40fc-85e8-0fd07c349eab",
+            "generationId": "cb0bab1d-8d6d-4b35-8e7e-6d0289d21130",
+            "status": "PENDING_APPROVAL",
+            "method": "SIMULATED_PARTIAL_REFUND",
+            "amount": 9.9,
+            "delaySeconds": 259201
+          }
+        ],
+        "executionCount": 0
+      },
+      "observedModelSelectedActions": [
+        "SUBMIT_CONCLUSION"
+      ],
+      "programRequiredReadCount": 5,
+      "stopReason": null,
+      "supplementalSubscores": null,
+      "evidencePointer": "data.json#/cases/1"
+    },
+    {
+      "id": "ambiguous_order",
+      "title": "缺少订单与问题时先澄清，再保留客户补充",
+      "automaticStatus": "FAIL",
+      "reviewStatus": "NO_REPLY",
+      "expectedInputTemplate": "我的订单有点问题，帮我看看。",
+      "publicReplyCount": 0,
+      "replies": [],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NO_REPLY",
+      "observation": "受理快照先 NEEDS_CLARIFICATION，candidateOrder=null、issues=[]；提示原文“你说的是不是某一笔订单的物流问题？请补充订单线索。”属于带物流假设的询问，未结构化确认物流事实。客户补充后 READY_TO_CONFIRM，再确认创建指定物流票；可观察澄清和补充承接，但后续调查 HANDED_OFF/INVALID_MODEL_OUTPUT，未产生 Agent 公开正文，四项无法评分。系统 SUPPORT 交接通知不是 Agent 正文。",
+      "businessOutcome": {
+        "tickets": [
+          {
+            "id": "f2aa1698-5b5b-4775-a7e4-30d55846189d",
+            "orderReference": "ORDER-CAP-0915-AMBIGUOUS-ORDER-A-b4ca1779-3080-4e28-889f-d71e4ff439e6",
+            "issueKind": "LOGISTICS_DELAY",
+            "handlingMode": "HUMAN",
+            "lifecycleState": "INVESTIGATING",
+            "reason": "INVALID_MODEL_OUTPUT",
+            "humanPreference": false
+          }
+        ],
+        "generations": [
+          {
+            "id": "df817549-77c4-44d1-a078-bd009dc21a19",
+            "status": "HANDED_OFF",
+            "generation_number": 1
+          }
+        ],
+        "facts": [
+          {
+            "fact_type": "ORDER",
+            "fact_value": "ORDER-CAP-0915-AMBIGUOUS-ORDER-A-b4ca1779-3080-4e28-889f-d71e4ff439e6"
+          },
+          {
+            "fact_type": "EXISTING_COMPENSATION",
+            "fact_value": "false"
+          },
+          {
+            "fact_type": "PENDING_ACTION_COUNT",
+            "fact_value": "0"
+          },
+          {
+            "fact_type": "LOGISTICS_DELAY_HOURS",
+            "fact_value": "36"
+          },
+          {
+            "fact_type": "LOGISTICS_DELAY_SECONDS",
+            "fact_value": "129600"
+          },
+          {
+            "fact_type": "LOGISTICS_STATUS",
+            "fact_value": "IN_TRANSIT"
+          },
+          {
+            "fact_type": "PAYMENT",
+            "fact_value": "PAID"
+          },
+          {
+            "fact_type": "ORDER_CANCELLATION",
+            "fact_value": "NOT_CANCELLED"
+          },
+          {
+            "fact_type": "REFUND_STATUS",
+            "fact_value": "NOT_FULLY_REFUNDED"
+          },
+          {
+            "fact_type": "DUPLICATE_CHARGE_SUSPECTED",
+            "fact_value": "false"
+          },
+          {
+            "fact_type": "POLICY",
+            "fact_value": "delay-policy-v1"
+          }
+        ],
+        "proposals": [],
+        "executionCount": 0
+      },
+      "observedModelSelectedActions": [],
+      "programRequiredReadCount": 5,
+      "stopReason": null,
+      "supplementalSubscores": null,
+      "evidencePointer": "data.json#/cases/2"
+    },
+    {
+      "id": "clarification_denied",
+      "title": "否认疑似重复扣款后仅保留已确认物流问题",
+      "automaticStatus": "NOT_RUN",
+      "reviewStatus": "NOT_RUN",
+      "expectedInputTemplate": "{A} 物流确实延迟，而且我怀疑可能多扣了一笔款。",
+      "publicReplyCount": null,
+      "replies": [],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NOT_RUN",
+      "observation": "前一案例后出现 CORE_BUDGET_UNSETTLED，本例未运行。没有本轮输入理解、行动、正文、引用或多轮结果证据，不计0分或满分，也不从其他案例外推。",
+      "businessOutcome": null,
+      "observedModelSelectedActions": [],
+      "programRequiredReadCount": null,
+      "stopReason": "CORE_BUDGET_UNSETTLED",
+      "supplementalSubscores": null,
+      "evidencePointer": "data.json#/cases/3"
+    },
+    {
+      "id": "split_asserted",
+      "title": "同一订单两个明确问题分别调查",
+      "automaticStatus": "NOT_RUN",
+      "reviewStatus": "NOT_RUN",
+      "expectedInputTemplate": "{A} 配送超过预计送达时间，物流轨迹更新延迟；另外我看到两笔扣款，请分别核查物流延迟和重复扣款。",
+      "publicReplyCount": null,
+      "replies": [],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NOT_RUN",
+      "observation": "前一案例后出现 CORE_BUDGET_UNSETTLED，本例未运行。没有本轮输入理解、行动、正文、引用或多轮结果证据，不计0分或满分，也不从其他案例外推。",
+      "businessOutcome": null,
+      "observedModelSelectedActions": [],
+      "programRequiredReadCount": null,
+      "stopReason": "CORE_BUDGET_UNSETTLED",
+      "supplementalSubscores": null,
+      "evidencePointer": "data.json#/cases/4"
+    },
+    {
+      "id": "two_orders",
+      "title": "一句话两订单逐单确认，保持各自时长与方案",
+      "automaticStatus": "NOT_RUN",
+      "reviewStatus": "NOT_RUN",
+      "expectedInputTemplate": "{A} 的物流延迟需要调查；{B} 的物流也超过预计送达时间了，请分开处理这两笔订单。",
+      "publicReplyCount": null,
+      "replies": [],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NOT_RUN",
+      "observation": "前一案例后出现 CORE_BUDGET_UNSETTLED，本例未运行。没有本轮输入理解、行动、正文、引用或多轮结果证据，不计0分或满分，也不从其他案例外推。",
+      "businessOutcome": null,
+      "observedModelSelectedActions": [],
+      "programRequiredReadCount": null,
+      "stopReason": "CORE_BUDGET_UNSETTLED",
+      "supplementalSubscores": null,
+      "evidencePointer": "data.json#/cases/5"
+    },
+    {
+      "id": "payment_affirmed",
+      "title": "客户肯定疑似扣款后核对未退款状态",
+      "automaticStatus": "NOT_RUN",
+      "reviewStatus": "NOT_RUN",
+      "expectedInputTemplate": "{A} 我怀疑这笔订单被扣了两次款，请帮我核对。",
+      "publicReplyCount": null,
+      "replies": [],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NOT_RUN",
+      "observation": "前一案例后出现 CORE_BUDGET_UNSETTLED，本例未运行。没有本轮输入理解、行动、正文、引用或多轮结果证据，不计0分或满分，也不从其他案例外推。",
+      "businessOutcome": null,
+      "observedModelSelectedActions": [],
+      "programRequiredReadCount": null,
+      "stopReason": "CORE_BUDGET_UNSETTLED",
+      "supplementalSubscores": null,
+      "evidencePointer": "data.json#/cases/6"
+    },
+    {
+      "id": "payment_refunded",
+      "title": "已全额退款仍需调查客户报告的两笔扣款",
+      "automaticStatus": "NOT_RUN",
+      "reviewStatus": "NOT_RUN",
+      "expectedInputTemplate": "{A} 我看到两笔扣款，请核对支付和退款记录，并说明这是否能证明重复扣款已经处理好了。",
+      "publicReplyCount": null,
+      "replies": [],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NOT_RUN",
+      "observation": "前一案例后出现 CORE_BUDGET_UNSETTLED，本例未运行。没有本轮输入理解、行动、正文、引用或多轮结果证据，不计0分或满分，也不从其他案例外推。",
+      "businessOutcome": null,
+      "observedModelSelectedActions": [],
+      "programRequiredReadCount": null,
+      "stopReason": "CORE_BUDGET_UNSETTLED",
+      "supplementalSubscores": null,
+      "evidencePointer": "data.json#/cases/7"
+    },
+    {
+      "id": "followup_details",
+      "title": "首轮完成后追加具体问题，结合对话继续调查",
+      "automaticStatus": "NOT_RUN",
+      "reviewStatus": "NOT_RUN",
+      "expectedInputTemplate": "订单 {A} 的物流延迟问题：请解释物流状态",
+      "publicReplyCount": null,
+      "replies": [],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NOT_RUN",
+      "observation": "前一案例后出现 CORE_BUDGET_UNSETTLED，本例未运行。没有本轮输入理解、行动、正文、引用或多轮结果证据，不计0分或满分，也不从其他案例外推。",
+      "businessOutcome": null,
+      "observedModelSelectedActions": [],
+      "programRequiredReadCount": null,
+      "stopReason": "CORE_BUDGET_UNSETTLED",
+      "supplementalSubscores": null,
+      "evidencePointer": "data.json#/cases/8"
+    },
+    {
+      "id": "human_preference",
+      "title": "自然语言明确人工偏好后停止自主公开回复",
+      "automaticStatus": "NOT_RUN",
+      "reviewStatus": "NOT_RUN",
+      "expectedInputTemplate": "订单 {A} 的物流延迟问题：请解释物流状态",
+      "publicReplyCount": null,
+      "replies": [],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NOT_RUN",
+      "observation": "前一案例后出现 CORE_BUDGET_UNSETTLED，本例未运行。没有本轮输入理解、行动、正文、引用或多轮结果证据，不计0分或满分，也不从其他案例外推。",
+      "businessOutcome": null,
+      "observedModelSelectedActions": [],
+      "programRequiredReadCount": null,
+      "stopReason": "CORE_BUDGET_UNSETTLED",
+      "supplementalSubscores": null,
+      "evidencePointer": "data.json#/cases/9"
+    },
+    {
+      "id": "supplemental_help",
+      "title": "物流调查中的补充规则与配送知识，区分已知和未知",
+      "automaticStatus": "NOT_RUN",
+      "reviewStatus": "NOT_RUN",
+      "expectedInputTemplate": "{A} 物流更新延迟，请核查当前物流；我想知道这单修改地址和取消的规则，只解释不要操作。另外请查配送信息补充指南，告诉我要补充什么，并说明能否确定明天几点送到。",
+      "publicReplyCount": null,
+      "replies": [],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NOT_RUN",
+      "observation": "前一案例后出现 CORE_BUDGET_UNSETTLED，本例未运行。没有本轮输入理解、行动、正文、引用或多轮结果证据，不计0分或满分，也不从其他案例外推。",
+      "businessOutcome": null,
+      "observedModelSelectedActions": [],
+      "programRequiredReadCount": null,
+      "stopReason": "CORE_BUDGET_UNSETTLED",
+      "supplementalSubscores": {
+        "ruleAnswer": "NOT_RUN",
+        "guideAnswer": "NOT_RUN",
+        "admitsUnknownExactEta": "NOT_RUN",
+        "citationSemanticSupport": "NOT_RUN"
+      },
+      "evidencePointer": "data.json#/cases/10"
+    },
+    {
+      "id": "signed_not_received",
+      "title": "签收未收到与普通物流延迟区分，旧路径独立记录",
+      "automaticStatus": "NOT_RUN",
+      "reviewStatus": "NOT_RUN",
+      "expectedInputTemplate": "{A} 物流显示已经签收，但我本人没有收到包裹，请核实签收情况。",
+      "publicReplyCount": null,
+      "replies": [],
+      "scoresWhenNoReply": null,
+      "citationReviewStatus": "NOT_RUN",
+      "observation": "前一案例后出现 CORE_BUDGET_UNSETTLED，本例未运行。没有本轮输入理解、行动、正文、引用或多轮结果证据，不计0分或满分，也不从其他案例外推。",
+      "businessOutcome": null,
+      "observedModelSelectedActions": [],
+      "programRequiredReadCount": null,
+      "stopReason": "CORE_BUDGET_UNSETTLED",
+      "supplementalSubscores": null,
+      "evidencePointer": "data.json#/cases/11"
+    }
+  ],
+  "limitations": [
+    "实际仅覆盖3/12例、2条Agent正文，且均为单轮物流；两条上下文一致不能证明否定、多订单、多问题或多轮能力。",
+    "支付已退与未退、人工偏好、补充规则、知识引用和签收未收到均NOT_RUN；此处对退款承诺的结论只适用于natural_proposal的待审批提案说明。",
+    "计量未知触发停止及供应商失败根因由主报告独立核对；本审阅不将缺失usage、未知token或缺失选择结果解释成模型语义错误。",
+    "已执行两例正确保存精确秒数和业务结论，证明结构化路径可处理这些非整小时事实；正文未说出精确时长，不能据此宣称模型已给出精确时长解释。",
+    "没有为改变通过率重复案例、修改冻结问句或增加正文关键词门禁；本报告只评实际持久化Agent公开正文，SUPPORT模板与受理提示作为阶段证据另述。"
+  ]
+}

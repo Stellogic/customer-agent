@@ -1,0 +1,27 @@
+BEGIN
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.762789+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.765037+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.766689+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.768085+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.769314+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+INSERT 0 1
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.771007+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.772535+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.774284+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.775933+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.777354+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.778874+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+INSERT 0 1
+{"capturedAt" : "2026-09-15T15:04:52.780738+00:00", "tickets" : [], "generations" : [], "messages" : [], "facts" : [], "commands" : [], "audit" : [], "events" : [], "proposals" : [], "executions" : 0, "queue" : [], "intakeCalls" : []}
+ROLLBACK

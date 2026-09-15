@@ -1,6 +1,7 @@
 import { parseCurrentSession, type CurrentSession } from "./authContract";
 import { clearPendingSupportReplies } from "./supportReplyStorage";
 import { clearPendingCompensationSubmits } from "./supportCompensationStorage";
+import { clearApprovalClaims } from "./approvalClaimStorage";
 
 export type HumanSessionInvalidationReason = "logged-out" | "subject-replaced" | "server-rejected";
 
@@ -129,6 +130,7 @@ function parseChange(value: unknown): HumanSessionChange | undefined {
 function invalidateCurrentTab(reason: HumanSessionInvalidationReason) {
   clearPendingSupportReplies();
   clearPendingCompensationSubmits();
+  clearApprovalClaims();
   for (const listener of listeners) listener(reason);
 }
 

@@ -191,7 +191,7 @@ describe.skipIf(skipLiveScenario)("Issue #29 两条 React 全栈验收", () => {
     expect(scenarioRevisionIds).toHaveLength(1);
     const scenarioQueueIndex = queueAfterScenario.indexOf(scenarioRevisionIds[0]);
 
-    const approver = render(<ApprovalWorkbench />);
+    const approver = render(<ApprovalWorkbench approverId="approver-demo" />);
     await waitFor(
       () => {
         expect(screen.getAllByRole("button", { name: "领取审批" })).toHaveLength(

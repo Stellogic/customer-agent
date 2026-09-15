@@ -1,0 +1,371 @@
+FRESH_BUDGET_CREATED: 10 CNY / 80 requests / 160000 tokens; deadline=2026-09-15T15:56:16.326898+00:00
+ Image customer-agent/frontend-browser-server:gate-issue242-capabilities-20260915 Building 
+ Image customer-agent/backend:gate-issue242-capabilities-20260915 Building 
+ Image customer-agent/frontend-browser-test:gate-issue242-capabilities-20260915 Building 
+ Image customer-agent/agent:gate-issue242-capabilities-20260915 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 5.60kB 0.0s done
+#1 DONE 0.0s
+
+#2 [browser-frontend internal] load build definition from Dockerfile
+#2 transferring dockerfile: 2.25kB done
+#2 DONE 0.0s
+
+#3 [agent-server internal] load build definition from Dockerfile
+#3 transferring dockerfile: 1.29kB done
+#3 DONE 0.0s
+
+#4 [browser-frontend internal] load metadata for docker.io/library/nginx:1.29.4-alpine
+#4 DONE 0.0s
+
+#5 [browser-acceptance internal] load metadata for docker.io/library/node:24.19.0-bookworm-slim
+#5 DONE 0.0s
+
+#6 [agent-server internal] load metadata for docker.io/library/python:3.13.14-slim-bookworm
+#6 DONE 0.0s
+
+#7 [backend internal] load build definition from Dockerfile
+#7 transferring dockerfile: 877B done
+#7 DONE 0.0s
+
+#8 [browser-frontend internal] load .dockerignore
+#8 transferring context: 2B done
+#8 DONE 0.0s
+
+#9 [backend internal] load metadata for docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#9 DONE 0.0s
+
+#10 [backend internal] load metadata for docker.io/library/gradle:9.3.1-jdk25
+#10 DONE 0.0s
+
+#11 [agent-server internal] load .dockerignore
+#11 transferring context: 96B 0.0s done
+#11 DONE 0.0s
+
+#12 [browser-frontend browser-test  1/12] FROM docker.io/library/node:24.19.0-bookworm-slim
+#12 DONE 0.0s
+
+#13 [backend internal] load .dockerignore
+#13 transferring context: 2B done
+#13 DONE 0.0s
+
+#14 [browser-frontend browser-server 1/4] FROM docker.io/library/nginx:1.29.4-alpine
+#14 DONE 0.0s
+
+#15 [agent-server base 1/7] FROM docker.io/library/python:3.13.14-slim-bookworm
+#15 DONE 0.0s
+
+#16 [backend runtime 1/5] FROM docker.io/library/eclipse-temurin:25.0.3_9-jre-noble
+#16 DONE 0.0s
+
+#17 [backend build 1/6] FROM docker.io/library/gradle:9.3.1-jdk25
+#17 DONE 0.0s
+
+#18 [agent-server internal] load build context
+#18 transferring context: 7.35kB 0.0s done
+#18 DONE 0.0s
+
+#19 [agent-server base 5/7] RUN uv sync --frozen
+#19 CACHED
+
+#20 [agent-server base 3/7] RUN apt-get update     && apt-get install --yes --no-install-recommends libatomic1     && rm -rf /var/lib/apt/lists/*     && pip install --no-cache-dir uv==0.8.22
+#20 CACHED
+
+#21 [agent-server base 2/7] WORKDIR /app
+#21 CACHED
+
+#22 [agent-server base 7/7] COPY src ./src
+#22 CACHED
+
+#23 [agent-server runtime 1/2] RUN uv sync --frozen --no-dev
+#23 CACHED
+
+#24 [agent-server base 4/7] COPY pyproject.toml uv.lock ./
+#24 CACHED
+
+#25 [agent-server base 6/7] COPY langgraph.json ./
+#25 CACHED
+
+#26 [agent-server runtime 2/2] RUN useradd --system --uid 10002 --create-home agent && chown -R agent:agent /app
+#26 CACHED
+
+#27 [backend internal] load build context
+#27 transferring context: 29.14kB 0.0s done
+#27 DONE 0.1s
+
+#28 [browser-frontend internal] load build context
+#28 transferring context: 94.28kB 0.0s done
+#28 DONE 0.1s
+
+#29 [browser-acceptance internal] load build context
+#29 transferring context: 288.95kB 0.0s done
+#29 DONE 0.1s
+
+#30 [agent-server] exporting to image
+#30 exporting layers done
+#30 writing image sha256:e0b7aa0521aecfe1f6bc1f10df8ab221387b847f2d970f59ec6cc8bb99aff7da done
+#30 naming to docker.io/customer-agent/agent:gate-issue242-capabilities-20260915 done
+#30 DONE 0.0s
+
+#31 [agent-server] resolving provenance for metadata file
+#31 DONE 0.0s
+
+#32 [browser-frontend build 8/8] RUN npm run build
+#32 CACHED
+
+#33 [browser-frontend build 3/8] COPY package.json package-lock.json ./
+#33 CACHED
+
+#34 [browser-frontend browser-server 3/4] COPY nginx.browser.conf /etc/nginx/conf.d/default.conf
+#34 CACHED
+
+#35 [browser-frontend build 5/8] COPY tsconfig.json vite.config.ts index.html eslint.config.js .prettierrc.json .prettierignore ./
+#35 CACHED
+
+#36 [browser-frontend build 6/8] COPY scripts ./scripts
+#36 CACHED
+
+#37 [browser-frontend browser-server 2/4] RUN apk add --no-cache openssl     && mkdir -p /etc/nginx/tls     && openssl req -x509 -newkey rsa:2048 -nodes -days 1        -subj '/CN=browser-frontend'        -addext 'subjectAltName=DNS:browser-frontend'        -keyout /etc/nginx/tls/key.pem        -out /etc/nginx/tls/cert.pem
+#37 CACHED
+
+#38 [browser-frontend build 7/8] COPY src ./src
+#38 CACHED
+
+#39 [browser-frontend build 4/8] RUN npm ci
+#39 CACHED
+
+#40 [browser-frontend browser-server 4/4] COPY --from=build /app/dist /usr/share/nginx/html
+#40 CACHED
+
+#41 [backend build 3/6] COPY settings.gradle.kts build.gradle.kts gradle.lockfile ./
+#41 CACHED
+
+#42 [backend build 2/6] WORKDIR /workspace
+#42 CACHED
+
+#43 [backend runtime 4/5] WORKDIR /app
+#43 CACHED
+
+#44 [backend build 4/6] COPY config ./config
+#44 CACHED
+
+#45 [backend build 6/6] RUN --mount=type=cache,target=/home/gradle/.gradle     gradle --init-script config/gradle-proxy.init.gradle.kts bootJar --no-daemon
+#45 CACHED
+
+#46 [backend runtime 3/5] RUN useradd --system --uid 10001 --create-home app
+#46 CACHED
+
+#47 [backend runtime 2/5] RUN apt-get update     && apt-get install --yes --no-install-recommends curl     && rm -rf /var/lib/apt/lists/*
+#47 CACHED
+
+#48 [backend build 5/6] COPY src ./src
+#48 CACHED
+
+#49 [backend runtime 5/5] COPY --from=build /workspace/build/libs/customer-agent-backend-0.1.0-SNAPSHOT.jar app.jar
+#49 CACHED
+
+#50 [browser-acceptance browser-test  9/12] COPY e2e ./e2e
+#50 CACHED
+
+#51 [browser-acceptance browser-test  3/12] COPY package.json package-lock.json ./
+#51 CACHED
+
+#52 [browser-acceptance browser-test 11/12] COPY src/test-support/issue215-intake-diagnostic.ts ./src/test-support/issue215-intake-diagnostic.ts
+#52 CACHED
+
+#53 [browser-acceptance browser-test  7/12] RUN for attempt in 1 2 3; do       npx playwright install chromium && exit 0;       echo "Playwright Chromium download attempt ${attempt} failed";     done;     exit 1
+#53 CACHED
+
+#54 [browser-acceptance browser-test  6/12] RUN --mount=type=cache,target=/var/cache/apt,sharing=locked     --mount=type=cache,target=/var/lib/apt,sharing=locked     for attempt in 1 2 3 4 5; do       npx playwright install-deps chromium         && apt-get install -y --no-install-recommends postgresql-client         && exit 0;       echo "Playwright system dependency attempt ${attempt} failed";     done;     exit 1
+#54 CACHED
+
+#55 [browser-acceptance browser-test  2/12] WORKDIR /app
+#55 CACHED
+
+#56 [browser-acceptance browser-test  5/12] RUN rm -f /etc/apt/apt.conf.d/docker-clean     && printf 'Acquire::Retries "10";\nAcquire::http::Timeout "30";\nBinary::apt-get::APT::Keep-Downloaded-Packages "true";\n'     > /etc/apt/apt.conf.d/80-playwright-retries
+#56 CACHED
+
+#57 [browser-acceptance browser-test  8/12] COPY playwright.config.ts ./
+#57 CACHED
+
+#58 [browser-acceptance browser-test 10/12] COPY src/sensitive-content-patterns.json ./src/sensitive-content-patterns.json
+#58 CACHED
+
+#59 [browser-acceptance browser-test  4/12] RUN npm ci
+#59 CACHED
+
+#60 [browser-acceptance browser-test 12/12] COPY src/test-support/issue230-case-budget.ts ./src/test-support/issue230-case-budget.ts
+#60 CACHED
+
+#61 [backend] exporting to image
+#61 exporting layers done
+#61 writing image sha256:2ad1d21f495dac3f299595af79ee5e1fc033f74140f525a82df2a586be230c57 0.1s done
+#61 naming to docker.io/customer-agent/backend:gate-issue242-capabilities-20260915 0.0s done
+#61 DONE 0.1s
+
+#62 [browser-frontend] exporting to image
+#62 exporting layers done
+#62 writing image sha256:55422ffaa32c9c8b6eda6a5326b4b9febdd709ab9793639006e4a4bb9e00b08f 0.1s done
+#62 naming to docker.io/customer-agent/frontend-browser-server:gate-issue242-capabilities-20260915 done
+#62 DONE 0.1s
+
+#63 [browser-acceptance] exporting to image
+#63 exporting layers done
+#63 writing image sha256:3933eccfe911c3ef1e17c60c359faa8876636888bbb311c0b39961d55ceb1a7b 0.1s done
+#63 naming to docker.io/customer-agent/frontend-browser-test:gate-issue242-capabilities-20260915 0.0s done
+#63 DONE 0.1s
+
+#64 [browser-frontend] resolving provenance for metadata file
+#64 DONE 0.0s
+
+#65 [backend] resolving provenance for metadata file
+#65 DONE 0.0s
+
+#66 [browser-acceptance] resolving provenance for metadata file
+#66 DONE 0.0s
+ Image customer-agent/frontend-browser-server:gate-issue242-capabilities-20260915 Built 
+ Image customer-agent/frontend-browser-test:gate-issue242-capabilities-20260915 Built 
+ Image customer-agent/backend:gate-issue242-capabilities-20260915 Built 
+ Image customer-agent/agent:gate-issue242-capabilities-20260915 Built 
+ Volume customer-agent-issue242-capabilities-20260915_postgres-data Creating 
+ Volume customer-agent-issue242-capabilities-20260915_postgres-data Creating 
+ Network customer-agent-issue242-capabilities-20260915_provider-egress Creating 
+ Network customer-agent-issue242-capabilities-20260915_data Creating 
+ Network customer-agent-issue242-capabilities-20260915_services Creating 
+ Network customer-agent-issue242-capabilities-20260915_edge Creating 
+ Network customer-agent-issue242-capabilities-20260915_data Creating 
+ Network customer-agent-issue242-capabilities-20260915_edge Creating 
+ Network customer-agent-issue242-capabilities-20260915_provider-egress Creating 
+ Network customer-agent-issue242-capabilities-20260915_services Creating 
+ Volume customer-agent-issue242-capabilities-20260915_postgres-data Created 
+ Volume customer-agent-issue242-capabilities-20260915_postgres-data Created 
+ Network customer-agent-issue242-capabilities-20260915_data Created 
+ Network customer-agent-issue242-capabilities-20260915_data Created 
+ Network customer-agent-issue242-capabilities-20260915_edge Created 
+ Network customer-agent-issue242-capabilities-20260915_edge Created 
+ Network customer-agent-issue242-capabilities-20260915_provider-egress Created 
+ Network customer-agent-issue242-capabilities-20260915_provider-egress Created 
+ Network customer-agent-issue242-capabilities-20260915_services Created 
+ Network customer-agent-issue242-capabilities-20260915_services Created 
+ Container customer-agent-issue242-capabilities-20260915-browser-acceptance-run-8ff1def77321 Creating 
+ Container customer-agent-issue242-capabilities-20260915-browser-acceptance-run-8ff1def77321 Created 
+Checking formatting...
+All matched files use Prettier code style!
+ Container customer-agent-issue242-capabilities-20260915-browser-acceptance-run-351fbb1e3e55 Creating 
+ Container customer-agent-issue242-capabilities-20260915-browser-acceptance-run-351fbb1e3e55 Created 
+npm notice
+npm notice New major version of npm available! 11.17.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+ Container customer-agent-issue242-capabilities-20260915-browser-acceptance-run-dfa2f3990fb0 Creating 
+ Container customer-agent-issue242-capabilities-20260915-browser-acceptance-run-dfa2f3990fb0 Created 
+npm notice
+npm notice New major version of npm available! 11.17.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+ Container customer-agent-issue242-capabilities-20260915-core-metrics-run-c5b3b3b28f79 Creating 
+ Container customer-agent-issue242-capabilities-20260915-core-metrics-run-c5b3b3b28f79 Created 
+METRICS_MODULE_IMPORT_OK
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Creating 
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Created 
+ Container customer-agent-issue242-capabilities-20260915-agent-migrate-1 Creating 
+ Container customer-agent-issue242-capabilities-20260915-spring-migrate-1 Creating 
+ Container customer-agent-issue242-capabilities-20260915-agent-migrate-1 Created 
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Creating 
+ Container customer-agent-issue242-capabilities-20260915-spring-migrate-1 Created 
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Created 
+ Container customer-agent-issue242-capabilities-20260915-backend-1 Creating 
+ Container customer-agent-issue242-capabilities-20260915-backend-1 Created 
+ Container customer-agent-issue242-capabilities-20260915-browser-frontend-1 Creating 
+ Container customer-agent-issue242-capabilities-20260915-browser-frontend-1 Created 
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Starting 
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Started 
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Waiting 
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Waiting 
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Healthy 
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Healthy 
+ Container customer-agent-issue242-capabilities-20260915-spring-migrate-1 Starting 
+ Container customer-agent-issue242-capabilities-20260915-agent-migrate-1 Starting 
+ Container customer-agent-issue242-capabilities-20260915-agent-migrate-1 Started 
+ Container customer-agent-issue242-capabilities-20260915-agent-migrate-1 Waiting 
+ Container customer-agent-issue242-capabilities-20260915-spring-migrate-1 Started 
+ Container customer-agent-issue242-capabilities-20260915-agent-migrate-1 Exited 
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Starting 
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Started 
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Waiting 
+ Container customer-agent-issue242-capabilities-20260915-spring-migrate-1 Waiting 
+ Container customer-agent-issue242-capabilities-20260915-spring-migrate-1 Exited 
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Error dependency agent-server failed to start
+dependency failed to start: container customer-agent-issue242-capabilities-20260915-agent-server-1 exited (3)
+ Container customer-agent-issue242-capabilities-20260915-core-budget-stop-run-5a4dba7991ff Creating 
+ Container customer-agent-issue242-capabilities-20260915-core-budget-stop-run-5a4dba7991ff Created 
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import sys; from pathlib import Path; from baseline_agent.core_validation_budget import CoreValidationBudget; CoreValidationBudget.open(Path(sys.argv[1]), authorization_id=sys.argv[2]).stop(sys.argv[3])
+                                                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/src/baseline_agent/core_validation_budget.py", line 165, in open
+    with budget._lock():
+         ~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.13/contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "/app/src/baseline_agent/core_validation_budget.py", line 172, in _lock
+    with self.path.with_suffix(".lock").open("a") as lock:
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/usr/local/lib/python3.13/pathlib/_local.py", line 537, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/core-budget/ledger.lock'
+
+警告: 预算停止写入失败，立即停止 Agent；未结算用量保持未知。
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Stopping 
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Stopped 
+ Container customer-agent-issue242-capabilities-20260915-browser-frontend-1 Stopping 
+ Container customer-agent-issue242-capabilities-20260915-browser-frontend-1 Stopped 
+ Container customer-agent-issue242-capabilities-20260915-browser-frontend-1 Removing 
+ Container customer-agent-issue242-capabilities-20260915-browser-frontend-1 Removed 
+ Container customer-agent-issue242-capabilities-20260915-backend-1 Stopping 
+ Container customer-agent-issue242-capabilities-20260915-backend-1 Stopped 
+ Container customer-agent-issue242-capabilities-20260915-backend-1 Removing 
+ Container customer-agent-issue242-capabilities-20260915-backend-1 Removed 
+ Container customer-agent-issue242-capabilities-20260915-spring-migrate-1 Stopping 
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Stopping 
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Stopped 
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Removing 
+ Container customer-agent-issue242-capabilities-20260915-spring-migrate-1 Stopped 
+ Container customer-agent-issue242-capabilities-20260915-spring-migrate-1 Removing 
+ Container customer-agent-issue242-capabilities-20260915-spring-migrate-1 Removed 
+ Container customer-agent-issue242-capabilities-20260915-agent-server-1 Removed 
+ Container customer-agent-issue242-capabilities-20260915-agent-migrate-1 Stopping 
+ Container customer-agent-issue242-capabilities-20260915-agent-migrate-1 Stopped 
+ Container customer-agent-issue242-capabilities-20260915-agent-migrate-1 Removing 
+ Container customer-agent-issue242-capabilities-20260915-agent-migrate-1 Removed 
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Stopping 
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Stopped 
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Removing 
+ Container customer-agent-issue242-capabilities-20260915-postgres-1 Removed 
+ Network customer-agent-issue242-capabilities-20260915_services Removing 
+ Network customer-agent-issue242-capabilities-20260915_edge Removing 
+ Volume customer-agent-issue242-capabilities-20260915_postgres-data Removing 
+ Network customer-agent-issue242-capabilities-20260915_provider-egress Removing 
+ Network customer-agent-issue242-capabilities-20260915_data Removing 
+ Volume customer-agent-issue242-capabilities-20260915_postgres-data Removed 
+ Network customer-agent-issue242-capabilities-20260915_edge Removed 
+ Network customer-agent-issue242-capabilities-20260915_services Removed 
+ Network customer-agent-issue242-capabilities-20260915_provider-egress Removed 
+ Network customer-agent-issue242-capabilities-20260915_data Removed 
+Untagged: customer-agent/backend:gate-issue242-capabilities-20260915
+Deleted: sha256:2ad1d21f495dac3f299595af79ee5e1fc033f74140f525a82df2a586be230c57
+Untagged: customer-agent/agent:gate-issue242-capabilities-20260915
+Deleted: sha256:e0b7aa0521aecfe1f6bc1f10df8ab221387b847f2d970f59ec6cc8bb99aff7da
+Untagged: customer-agent/frontend-browser-server:gate-issue242-capabilities-20260915
+Deleted: sha256:55422ffaa32c9c8b6eda6a5326b4b9febdd709ab9793639006e4a4bb9e00b08f
+Untagged: customer-agent/frontend-browser-test:gate-issue242-capabilities-20260915
+Deleted: sha256:3933eccfe911c3ef1e17c60c359faa8876636888bbb311c0b39961d55ceb1a7b
+LOCK_RELEASED
+NativeCommandExitException: D:\customer-agent\docs\eval\2026-09-15-agent-capabilities\runner.ps1:90
+Line |
+  90 |      & docker compose --profile smoke --env-file $emptyEnv -f (Join-Pa …
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | 程序“docker.exe”以非零退出代码结束: 1 (0x00000001)。
