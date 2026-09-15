@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "issue230-core-budget-v1",
+  "authorizationId": "user-agent-capabilities-20260915",
+  "currency": "CNY",
+  "model": "deepseek-v4-pro",
+  "communicationModel": "deepseek-v4-pro",
+  "limitMicros": 10000000,
+  "maxAttempts": 80,
+  "maxTokens": 160000,
+  "deadline": "2026-09-15T15:56:16.326898+00:00",
+  "price": {
+    "inputMicrosPerToken": 9,
+    "outputMicrosPerToken": 27
+  },
+  "pricesByModel": {
+    "deepseek-v4-pro": {
+      "inputMicrosPerToken": 9,
+      "outputMicrosPerToken": 27
+    }
+  },
+  "entries": []
+}

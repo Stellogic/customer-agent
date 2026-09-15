@@ -1,0 +1,486 @@
+{
+  "schemaVersion": "agent-capabilities-summary-v1",
+  "runId": "issue242-capabilities-20260915-resume",
+  "generatedAt": "2026-09-15T15:19:22.367615+00:00",
+  "testedHead": "3f0027c42d0b88f0476059f4f59aa050a3325559",
+  "scenarioSource": "D:\\customer-agent\\docs\\eval\\2026-09-15-agent-capabilities\\raw\\plan.json",
+  "sourceAvailability": {
+    "plan": {
+      "available": true,
+      "path": "D:\\customer-agent\\docs\\eval\\2026-09-15-agent-capabilities\\raw\\plan.json"
+    },
+    "result": {
+      "available": true,
+      "path": "D:\\customer-agent\\docs\\eval\\2026-09-15-agent-capabilities\\raw\\result.json"
+    },
+    "ledger": {
+      "available": true,
+      "path": "D:\\customer-agent\\docs\\eval\\2026-09-15-agent-capabilities\\raw\\ledger.final.json"
+    },
+    "metrics": {
+      "available": true,
+      "path": "D:\\customer-agent\\docs\\eval\\2026-09-15-agent-capabilities\\raw\\metrics.json"
+    },
+    "capabilities": {
+      "available": true,
+      "path": "D:\\customer-agent\\docs\\eval\\2026-09-15-agent-capabilities\\raw\\capabilities.json"
+    },
+    "playwright": {
+      "available": true,
+      "path": "D:\\customer-agent\\docs\\eval\\2026-09-15-agent-capabilities\\raw\\playwright.json"
+    }
+  },
+  "denominator": 12,
+  "counts": {
+    "PASS": 2,
+    "FAIL": 1,
+    "NOT_RUN": 9
+  },
+  "pathCounts": {
+    "core": {
+      "PASS": 2,
+      "FAIL": 1,
+      "NOT_RUN": 8
+    },
+    "legacy": {
+      "PASS": 0,
+      "FAIL": 0,
+      "NOT_RUN": 1
+    }
+  },
+  "automaticBusinessPassFraction": 0.16666666666666666,
+  "executedBusinessPassFraction": 0.6666666666666666,
+  "executionCoverage": 0.25,
+  "semanticReviewStatus": "PENDING",
+  "capabilityAcceptance": null,
+  "browserStats": {
+    "startTime": "2026-09-15T15:15:44.318Z",
+    "duration": 57155.357,
+    "expected": 2,
+    "skipped": 9,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "caseLatency": {
+    "n": 3,
+    "meanMs": 16285.33,
+    "p50Ms": 16543,
+    "p90Ms": 17445,
+    "minMs": 14868,
+    "maxMs": 17445
+  },
+  "timings": {
+    "intakeClickToResponseMs": {
+      "n": 3,
+      "meanMs": 4337.33,
+      "p50Ms": 4525,
+      "p90Ms": 4557,
+      "minMs": 3930,
+      "maxMs": 4557
+    },
+    "confirmationToTicketsMs": {
+      "n": 3,
+      "meanMs": 618.67,
+      "p50Ms": 147,
+      "p90Ms": 1586,
+      "minMs": 123,
+      "maxMs": 1586
+    },
+    "confirmationToTerminalMs": {
+      "n": 3,
+      "meanMs": 8098.33,
+      "p50Ms": 9394,
+      "p90Ms": 9824,
+      "minMs": 5077,
+      "maxMs": 9824
+    },
+    "lastConfirmationToTerminalMs": {
+      "n": 3,
+      "meanMs": 8098.33,
+      "p50Ms": 9394,
+      "p90Ms": 9824,
+      "minMs": 5077,
+      "maxMs": 9824
+    },
+    "confirmationToReplyUiMs": {
+      "n": 2,
+      "meanMs": 7397,
+      "p50Ms": 7397.0,
+      "p90Ms": 7796,
+      "minMs": 6998,
+      "maxMs": 7796
+    },
+    "intakeClickToTerminalMs": {
+      "n": 3,
+      "meanMs": 13809.33,
+      "p50Ms": 13965,
+      "p90Ms": 14436,
+      "minMs": 13027,
+      "maxMs": 14436
+    },
+    "followupClickToTerminalMs": {
+      "n": 0,
+      "meanMs": null,
+      "p50Ms": null,
+      "p90Ms": null,
+      "minMs": null,
+      "maxMs": null
+    },
+    "intakeClickToFinalTerminalMs": {
+      "n": 3,
+      "meanMs": 13809.33,
+      "p50Ms": 13965,
+      "p90Ms": 14436,
+      "minMs": 13027,
+      "maxMs": 14436
+    }
+  },
+  "roleLatency": {
+    "action": {
+      "n": 3,
+      "meanMs": 2536.67,
+      "p50Ms": 3023,
+      "p90Ms": 3213,
+      "minMs": 1374,
+      "maxMs": 3213
+    },
+    "communication": {
+      "n": 2,
+      "meanMs": 3559,
+      "p50Ms": 3559.0,
+      "p90Ms": 3659,
+      "minMs": 3459,
+      "maxMs": 3659
+    },
+    "intake": {
+      "n": 4,
+      "meanMs": 2506.75,
+      "p50Ms": 2506.5,
+      "p90Ms": 2779,
+      "minMs": 2235,
+      "maxMs": 2779
+    },
+    "judgment": {
+      "n": 2,
+      "meanMs": 1196.5,
+      "p50Ms": 1196.5,
+      "p90Ms": 1344,
+      "minMs": 1049,
+      "maxMs": 1344
+    }
+  },
+  "roleUsage": {
+    "action": {
+      "recordedAttempts": 3,
+      "attempts": 3,
+      "attemptNumbers": [
+        2,
+        6,
+        11
+      ],
+      "allUsageKnown": false,
+      "unknownUsageAttempts": 1,
+      "observedUnknownUsageAttempts": 1,
+      "knownTokens": 4407,
+      "tokens": null,
+      "knownEstimatedCostMicros": 46917,
+      "estimatedCostMicros": null,
+      "statuses": {
+        "SETTLED": 2,
+        "PENDING": 1
+      }
+    },
+    "communication": {
+      "recordedAttempts": 2,
+      "attempts": 2,
+      "attemptNumbers": [
+        4,
+        8
+      ],
+      "allUsageKnown": true,
+      "unknownUsageAttempts": 0,
+      "observedUnknownUsageAttempts": 0,
+      "knownTokens": 2171,
+      "tokens": 2171,
+      "knownEstimatedCostMicros": 29511,
+      "estimatedCostMicros": 29511,
+      "statuses": {
+        "SETTLED": 2
+      }
+    },
+    "intake": {
+      "recordedAttempts": 4,
+      "attempts": 4,
+      "attemptNumbers": [
+        1,
+        5,
+        9,
+        10
+      ],
+      "allUsageKnown": true,
+      "unknownUsageAttempts": 0,
+      "observedUnknownUsageAttempts": 0,
+      "knownTokens": 5443,
+      "tokens": 5443,
+      "knownEstimatedCostMicros": 61695,
+      "estimatedCostMicros": 61695,
+      "statuses": {
+        "SETTLED": 4
+      }
+    },
+    "judgment": {
+      "recordedAttempts": 2,
+      "attempts": 2,
+      "attemptNumbers": [
+        3,
+        7
+      ],
+      "allUsageKnown": true,
+      "unknownUsageAttempts": 0,
+      "observedUnknownUsageAttempts": 0,
+      "knownTokens": 580,
+      "tokens": 580,
+      "knownEstimatedCostMicros": 6048,
+      "estimatedCostMicros": 6048,
+      "statuses": {
+        "SETTLED": 2
+      }
+    }
+  },
+  "ledgerTotals": {
+    "recordedAttempts": 11,
+    "attempts": 11,
+    "attemptNumbers": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "allUsageKnown": false,
+    "unknownUsageAttempts": 1,
+    "observedUnknownUsageAttempts": 1,
+    "knownTokens": 12601,
+    "tokens": null,
+    "knownEstimatedCostMicros": 144171,
+    "estimatedCostMicros": null,
+    "statuses": {
+      "SETTLED": 10,
+      "PENDING": 1
+    },
+    "source": "persistent-budget-ledger",
+    "supplierChargeMicros": null,
+    "pendingReservedMicros": 169686,
+    "inFlightReservedMicros": 0
+  },
+  "independentMetricsReconciliation": false,
+  "ledgerMetricsMismatchAttemptIds": [],
+  "independentMetricsTotals": {
+    "schemaVersion": "issue230-core-metrics-v1",
+    "currency": "CNY",
+    "intakeInvocations": 4,
+    "logicalCalls": 11,
+    "providerAttempts": 11,
+    "knownProviderAttempts": 11,
+    "missingEvidenceSources": 0,
+    "unknownUsageAttempts": 1,
+    "tokens": null,
+    "knownTokens": 12601,
+    "estimatedCostMicros": null,
+    "knownEstimatedCostMicros": 144171,
+    "supplierChargeMicros": null,
+    "pendingReservedMicros": 169686,
+    "inFlightReservedMicros": 0,
+    "unattributedAttemptIds": [],
+    "ledgerRecoveredGenerationIds": [],
+    "authorizationId": "user-agent-capabilities-20260915",
+    "springRejections": [],
+    "intakeResults": [
+      {
+        "invocationId": "07846ba1-74e5-4c94-837d-0f42358880dd",
+        "intakeId": "52562e3b-bf4c-4af5-90fd-2d36c658a21d",
+        "status": "SUCCEEDED",
+        "springFailureReason": null
+      },
+      {
+        "invocationId": "08cad4db-68ac-4365-8f0d-62fe5350f60c",
+        "intakeId": "52562e3b-bf4c-4af5-90fd-2d36c658a21d",
+        "status": "SUCCEEDED",
+        "springFailureReason": null
+      },
+      {
+        "invocationId": "5ed1873a-3b27-4d85-909c-6b323e70939a",
+        "intakeId": "e600e229-9b85-4947-871a-cce4737206ed",
+        "status": "SUCCEEDED",
+        "springFailureReason": null
+      },
+      {
+        "invocationId": "61c550ee-5447-4133-a4c0-f48781db279e",
+        "intakeId": "8ff95473-b9ee-42fa-914f-eb6ba050e5b7",
+        "status": "SUCCEEDED",
+        "springFailureReason": null
+      }
+    ],
+    "generationResults": [
+      {
+        "generationId": "cb0bab1d-8d6d-4b35-8e7e-6d0289d21130",
+        "ticketId": "2299be3e-60ca-40fc-85e8-0fd07c349eab",
+        "status": "COMPLETED"
+      },
+      {
+        "generationId": "df817549-77c4-44d1-a078-bd009dc21a19",
+        "ticketId": "f2aa1698-5b5b-4775-a7e4-30d55846189d",
+        "status": "HANDED_OFF",
+        "diagnostics": [
+          {
+            "source": "investigation_run_evidence",
+            "role": "action",
+            "failureClassification": "MODEL_CALL_FAILED",
+            "outcome": "SAFE_HANDOFF",
+            "modelCalls": [
+              {
+                "callNumber": 1,
+                "selectedAction": ""
+              }
+            ],
+            "capabilityResults": [
+              {
+                "actionType": "CONFIRM_ORDER",
+                "resultCode": "PROGRESSED"
+              },
+              {
+                "actionType": "READ_COMPENSATION_AND_PENDING_ACTIONS",
+                "resultCode": "PROGRESSED"
+              },
+              {
+                "actionType": "READ_LOGISTICS",
+                "resultCode": "PROGRESSED"
+              },
+              {
+                "actionType": "READ_PAYMENT_AND_REFUNDS",
+                "resultCode": "PROGRESSED"
+              },
+              {
+                "actionType": "READ_APPLICABLE_POLICY",
+                "resultCode": "PROGRESSED"
+              }
+            ],
+            "providerCalls": [
+              {
+                "attemptId": "d498c00b-9712-4fdb-a819-2646a417a70e",
+                "internalCallId": "1692830e-2c91-42a9-9c75-339114511c59"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "generationId": "e48d918b-a2a2-4687-9729-cd7e564a298b",
+        "ticketId": "022dd06f-a003-40c5-b4fe-d724e83ac227",
+        "status": "COMPLETED"
+      }
+    ],
+    "notes": [
+      "范围为本轮专属隔离验收数据库的全部入单调用和调查代次。",
+      "金额单位为微元人民币;程序估算、供应商结算及未完成预留分别列示。",
+      "null 表示证据未知;known 字段仅统计已知部分,不能代替总量。",
+      "checkpoint 只提供调用计量证据,不能代替浏览器产品路径验收。",
+      "springRejections 来自本轮隔离数据库的工单审计,不推断对应代次或供应商调用。"
+    ]
+  },
+  "unattributedAttemptIds": [],
+  "metricsOnlyAttemptIds": [],
+  "timeWindowAttributedAttemptIds": [],
+  "unattributedCapabilityGenerationIds": [],
+  "casesWithoutBrowserEvidence": [],
+  "unexpectedBrowserCaseIds": [],
+  "result": {
+    "runId": "issue242-capabilities-20260915-resume",
+    "head": "3f0027c42d0b88f0476059f4f59aa050a3325559",
+    "authorizationId": "user-agent-capabilities-20260915",
+    "outcome": "FAIL",
+    "denominator": 12,
+    "matrix": [
+      {
+        "case": "natural_status",
+        "sample": 1,
+        "status": "PASS"
+      },
+      {
+        "case": "natural_proposal",
+        "sample": 1,
+        "status": "PASS"
+      },
+      {
+        "case": "ambiguous_order",
+        "sample": 1,
+        "status": "FAIL"
+      },
+      {
+        "case": "clarification_denied",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "split_asserted",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "two_orders",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "payment_affirmed",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "payment_refunded",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "followup_details",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "human_preference",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "supplemental_help",
+        "sample": 1,
+        "status": "NOT_RUN"
+      },
+      {
+        "case": "signed_not_received",
+        "sample": 1,
+        "status": "NOT_RUN"
+      }
+    ],
+    "metricsCollected": true,
+    "cleanupPassed": true,
+    "automaticChecksPassed": false,
+    "semanticReviewStatus": "PENDING",
+    "capabilityAcceptance": null
+  },
+  "definitions": {
+    "status": "自动业务合同结果；FAIL 包含浏览器断言/运行失败，不自动推导语义能力失败原因。",
+    "unknown": "null 表示未采集、不完整或不适用；known 字段只统计已知部分。NOT_RUN 不计零消耗或零延迟。",
+    "latency": "P50 为中位数，P90 为 nearest-rank。小样本描述，不计算或宣称生产 P95。模型 durationMs 是完整请求/响应时间，非 TTFT；整例含登录、采集和断言。",
+    "confirmationToTerminalMs": "第一次确认至全部首代终态；多订单另保留每次确认阶段和最后一次确认至终态。",
+    "confirmationToReplyUiMs": "第一次确认至页面首次观察到 reply-sources；近似正文 UI 时点，非供应商首 token。缺失或时间倒序记 null。",
+    "usage": "账本金额保持原样，独立 metrics 仅核对及补归属；PENDING 不因已有其他计量证据而自动结算。预留不是实扣。",
+    "actions": "保留采集器给出的 MODEL_SELECTED/PROGRAM_REQUIRED/UNKNOWN；动作存在或引文逐字匹配不等于语义充分。"
+  }
+}

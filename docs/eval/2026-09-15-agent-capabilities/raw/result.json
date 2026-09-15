@@ -1,0 +1,74 @@
+{
+  "runId": "issue242-capabilities-20260915-resume",
+  "head": "3f0027c42d0b88f0476059f4f59aa050a3325559",
+  "authorizationId": "user-agent-capabilities-20260915",
+  "outcome": "FAIL",
+  "denominator": 12,
+  "matrix": [
+    {
+      "case": "natural_status",
+      "sample": 1,
+      "status": "PASS"
+    },
+    {
+      "case": "natural_proposal",
+      "sample": 1,
+      "status": "PASS"
+    },
+    {
+      "case": "ambiguous_order",
+      "sample": 1,
+      "status": "FAIL"
+    },
+    {
+      "case": "clarification_denied",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "split_asserted",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "two_orders",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "payment_affirmed",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "payment_refunded",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "followup_details",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "human_preference",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "supplemental_help",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "signed_not_received",
+      "sample": 1,
+      "status": "NOT_RUN"
+    }
+  ],
+  "metricsCollected": true,
+  "cleanupPassed": true,
+  "automaticChecksPassed": false,
+  "semanticReviewStatus": "PENDING",
+  "capabilityAcceptance": null
+}

@@ -1,0 +1,337 @@
+{
+  "schemaVersion": "agent-capability-actions-v1",
+  "generations": [
+    {
+      "generationId": "cb0bab1d-8d6d-4b35-8e7e-6d0289d21130",
+      "ticketId": "2299be3e-60ca-40fc-85e8-0fd07c349eab",
+      "orderReference": "ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8",
+      "issueKind": "LOGISTICS_DELAY",
+      "status": "COMPLETED",
+      "checkpointStatus": "AVAILABLE",
+      "actions": [
+        {
+          "actionType": "CONFIRM_ORDER",
+          "evidenceReferences": [
+            "order:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_COMPENSATION_AND_PENDING_ACTIONS",
+          "evidenceReferences": [
+            "compensation:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8",
+            "order-actions:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_LOGISTICS",
+          "evidenceReferences": [
+            "logistics:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_PAYMENT_AND_REFUNDS",
+          "evidenceReferences": [
+            "payment:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_APPLICABLE_POLICY",
+          "evidenceReferences": [
+            "policy:delay-policy-v1"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "SUBMIT_CONCLUSION",
+          "evidenceReferences": [],
+          "resultCode": "SELECTED",
+          "origin": "MODEL_SELECTED"
+        }
+      ],
+      "modelCalls": [
+        {
+          "callNumber": 1,
+          "selectedAction": "SUBMIT_CONCLUSION",
+          "providerAttempts": 1,
+          "tokens": 2398,
+          "costMicros": 4161
+        }
+      ],
+      "investigationOutcome": "CONCLUSION_SUBMITTED",
+      "failureClassification": "",
+      "conclusion": {
+        "compensationRequired": true,
+        "reasonCode": "LOGISTICS_DELAY",
+        "delayHours": 72,
+        "delaySeconds": 259201,
+        "orderReference": "ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8",
+        "evidenceRefs": [
+          "order:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8",
+          "logistics:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8"
+        ],
+        "riskScenario": "LOGISTICS_DELAY",
+        "sufficiencyPolicyVersion": "evidence-sufficiency-v1",
+        "evidence": [
+          {
+            "evidenceReference": "compensation:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8",
+            "applicability": [
+              "EXISTING_COMPENSATION"
+            ]
+          },
+          {
+            "evidenceReference": "logistics:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8",
+            "applicability": [
+              "DELAY_DURATION"
+            ]
+          },
+          {
+            "evidenceReference": "order:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8",
+            "applicability": [
+              "ORDER_IDENTITY"
+            ]
+          },
+          {
+            "evidenceReference": "payment:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8",
+            "applicability": [
+              "ORDER_ELIGIBILITY"
+            ]
+          },
+          {
+            "evidenceReference": "order-actions:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8",
+            "applicability": [
+              "PENDING_ACTIONS"
+            ]
+          },
+          {
+            "evidenceReference": "policy:delay-policy-v1",
+            "applicability": [
+              "POLICY_BASIS"
+            ]
+          }
+        ]
+      },
+      "customerReply": {
+        "schemaVersion": "customer-reply-v1",
+        "body": "关于您反馈的 ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8 配送超过预计时间和物流更新延迟的情况，我们已完成初步核实。基于本次调查，我们已形成一个补偿方案建议，目前该方案正等待人工审核确认。在审核通过前，本次调查尚未执行任何补偿或退款动作。结论已提供，后续处理将按页面状态进行，如有进一步疑问欢迎继续回复。",
+        "intent": "COMPENSATION_REVIEW_PENDING",
+        "evidenceRefs": [
+          "order:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8",
+          "logistics:ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8"
+        ],
+        "escalationRequired": false,
+        "referencedOrder": "ORDER-CAP-0915-NATURAL-PROPOSAL-A-4a0dd742-9a68-48ba-be2f-b03cf6f78ca8"
+      },
+      "knowledgeReceipt": null
+    },
+    {
+      "generationId": "df817549-77c4-44d1-a078-bd009dc21a19",
+      "ticketId": "f2aa1698-5b5b-4775-a7e4-30d55846189d",
+      "orderReference": "ORDER-CAP-0915-AMBIGUOUS-ORDER-A-b4ca1779-3080-4e28-889f-d71e4ff439e6",
+      "issueKind": "LOGISTICS_DELAY",
+      "status": "HANDED_OFF",
+      "checkpointStatus": "AVAILABLE",
+      "actions": [
+        {
+          "actionType": "CONFIRM_ORDER",
+          "evidenceReferences": [
+            "order:ORDER-CAP-0915-AMBIGUOUS-ORDER-A-b4ca1779-3080-4e28-889f-d71e4ff439e6"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_COMPENSATION_AND_PENDING_ACTIONS",
+          "evidenceReferences": [
+            "compensation:ORDER-CAP-0915-AMBIGUOUS-ORDER-A-b4ca1779-3080-4e28-889f-d71e4ff439e6",
+            "order-actions:ORDER-CAP-0915-AMBIGUOUS-ORDER-A-b4ca1779-3080-4e28-889f-d71e4ff439e6"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_LOGISTICS",
+          "evidenceReferences": [
+            "logistics:ORDER-CAP-0915-AMBIGUOUS-ORDER-A-b4ca1779-3080-4e28-889f-d71e4ff439e6"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_PAYMENT_AND_REFUNDS",
+          "evidenceReferences": [
+            "payment:ORDER-CAP-0915-AMBIGUOUS-ORDER-A-b4ca1779-3080-4e28-889f-d71e4ff439e6"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_APPLICABLE_POLICY",
+          "evidenceReferences": [
+            "policy:delay-policy-v1"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        }
+      ],
+      "modelCalls": [
+        {
+          "callNumber": 1,
+          "selectedAction": "",
+          "providerAttempts": 1,
+          "tokens": 0,
+          "costMicros": 0
+        }
+      ],
+      "investigationOutcome": "SAFE_HANDOFF",
+      "failureClassification": "MODEL_CALL_FAILED",
+      "conclusion": null,
+      "customerReply": null,
+      "knowledgeReceipt": null
+    },
+    {
+      "generationId": "e48d918b-a2a2-4687-9729-cd7e564a298b",
+      "ticketId": "022dd06f-a003-40c5-b4fe-d724e83ac227",
+      "orderReference": "ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142",
+      "issueKind": "LOGISTICS_DELAY",
+      "status": "COMPLETED",
+      "checkpointStatus": "AVAILABLE",
+      "actions": [
+        {
+          "actionType": "CONFIRM_ORDER",
+          "evidenceReferences": [
+            "order:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_COMPENSATION_AND_PENDING_ACTIONS",
+          "evidenceReferences": [
+            "compensation:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142",
+            "order-actions:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_LOGISTICS",
+          "evidenceReferences": [
+            "logistics:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_PAYMENT_AND_REFUNDS",
+          "evidenceReferences": [
+            "payment:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "READ_APPLICABLE_POLICY",
+          "evidenceReferences": [
+            "policy:delay-policy-v1"
+          ],
+          "resultCode": "PROGRESSED",
+          "origin": "PROGRAM_REQUIRED"
+        },
+        {
+          "actionType": "SUBMIT_CONCLUSION",
+          "evidenceReferences": [],
+          "resultCode": "SELECTED",
+          "origin": "MODEL_SELECTED"
+        }
+      ],
+      "modelCalls": [
+        {
+          "callNumber": 1,
+          "selectedAction": "SUBMIT_CONCLUSION",
+          "providerAttempts": 1,
+          "tokens": 2009,
+          "costMicros": 2721
+        }
+      ],
+      "investigationOutcome": "CONCLUSION_SUBMITTED",
+      "failureClassification": "",
+      "conclusion": {
+        "compensationRequired": false,
+        "reasonCode": "DELAY_UNDER_24_HOURS",
+        "delayHours": 23,
+        "delaySeconds": 86399,
+        "orderReference": "ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142",
+        "evidenceRefs": [
+          "order:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142",
+          "logistics:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142"
+        ],
+        "riskScenario": "LOGISTICS_DELAY",
+        "sufficiencyPolicyVersion": "evidence-sufficiency-v1",
+        "evidence": [
+          {
+            "evidenceReference": "compensation:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142",
+            "applicability": [
+              "EXISTING_COMPENSATION"
+            ]
+          },
+          {
+            "evidenceReference": "logistics:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142",
+            "applicability": [
+              "DELAY_DURATION"
+            ]
+          },
+          {
+            "evidenceReference": "order:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142",
+            "applicability": [
+              "ORDER_IDENTITY"
+            ]
+          },
+          {
+            "evidenceReference": "payment:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142",
+            "applicability": [
+              "ORDER_ELIGIBILITY"
+            ]
+          },
+          {
+            "evidenceReference": "order-actions:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142",
+            "applicability": [
+              "PENDING_ACTIONS"
+            ]
+          },
+          {
+            "evidenceReference": "policy:delay-policy-v1",
+            "applicability": [
+              "POLICY_BASIS"
+            ]
+          }
+        ]
+      },
+      "customerReply": {
+        "schemaVersion": "customer-reply-v1",
+        "body": "关于您反馈的订单 ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142 配送延迟、物流未更新的问题，我们已经完成核查。本次调查确认该订单不涉及补偿处理，相关结论已向您提供。后续处理将按页面状态进行，如有其他问题欢迎继续在此沟通。",
+        "intent": "NO_COMPENSATION_RESOLUTION",
+        "evidenceRefs": [
+          "order:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142",
+          "logistics:ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142"
+        ],
+        "escalationRequired": false,
+        "referencedOrder": "ORDER-CAP-0915-NATURAL-STATUS-A-f185ec54-cb96-4c2a-adba-afc63cd41142"
+      },
+      "knowledgeReceipt": null
+    }
+  ],
+  "notes": [
+    "必需读取归程序，明确出现在modelCalls.selectedAction的动作才记模型选择。",
+    "UNKNOWN或缺失checkpoint不是零调用；已执行业务事实以Spring记录为准。",
+    "引用来源/版本/逐字匹配不等于语义支持或回答充分，另做人工评分。"
+  ]
+}

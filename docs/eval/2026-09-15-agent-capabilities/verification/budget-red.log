@@ -1,0 +1,43 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_stop_survives_reopening_and_allows_inflight_usage_to_settle _______
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-1/test_stop_survives_reopening_a0')
+
+    def test_stop_survives_reopening_and_allows_inflight_usage_to_settle(tmp_path: Path) -> None:
+>       budget = CoreValidationBudget.create(
+            tmp_path / "budget.json",
+            authorization_id="synthetic-stop",
+            limit_micros=10_000_000,
+            max_attempts=10,
+            max_tokens=1_000_000,
+            deadline=datetime.now(UTC) + timedelta(minutes=5),
+        )
+
+tests/test_core_validation_budget.py:120: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cls = <class 'baseline_agent.core_validation_budget.CoreValidationBudget'>
+path = PosixPath('/tmp/pytest-of-root/pytest-1/test_stop_survives_reopening_a0/budget.json')
+
+    @classmethod
+    def create(
+        cls,
+        path: Path,
+        *,
+        authorization_id: str,
+        limit_micros: int,
+        max_attempts: int,
+        max_tokens: int,
+        deadline: datetime,
+        model: str = _MODEL,
+        communication_model: str | None = None,
+    ) -> CoreValidationBudget:
+        if not 0 < limit_micros <= 3_000_000 or max_attempts < 1 or max_tokens < 1:
+>           raise ValueError("invalid frozen core budget")
+E           ValueError: invalid frozen core budget
+
+src/baseline_agent/core_validation_budget.py:131: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_core_validation_budget.py::test_stop_survives_reopening_and_allows_inflight_usage_to_settle
+1 failed, 9 deselected in 0.32s
