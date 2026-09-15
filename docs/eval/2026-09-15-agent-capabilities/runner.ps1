@@ -1,6 +1,7 @@
 param(
     [switch]$ConfirmProviderSpend,
     [switch]$ContinueOnCaseFailure,
+    [switch]$ResumeBeforeFirstRequest,
     [ValidateSet("deepseek-v4-pro")][string]$Model = "deepseek-v4-pro",
     [ValidateSet("deepseek-v4-pro")][string]$CommunicationModel,
     [Parameter(Mandatory)][string]$TestedHead,
@@ -68,7 +69,21 @@ if ($Deadline -gt [datetimeoffset]::UtcNow.AddMinutes(45)) { throw '本轮截止
 if (@($ledger.entries).Count -ne 0) { throw '本轮必须使用新建的空授权账本，不能复用已经调用过的账本。' }
 if (@($ledger.entries | Where-Object status -ne 'SETTLED').Count -ne 0) { throw '账本含 PENDING/IN_FLIGHT，必须停止，不能释放预留重跑。' }
 $planPath = Join-Path $ledgerDirectory 'agent-capability-plan.json'
-if (Test-Path -LiteralPath $planPath) { throw '此授权已冻结执行；禁止通过新 RunId 重跑场景。' }
+$startupRecovery = $null
+if (Test-Path -LiteralPath $planPath) {
+    if (-not $ResumeBeforeFirstRequest) { throw '此授权已冻结执行；禁止通过新 RunId 重跑场景。' }
+    $originalPlan = Get-Content -Raw -LiteralPath $planPath | ConvertFrom-Json
+    $originalEvidence = Join-Path $repo ".local/gate-evidence/$($originalPlan.runId)"
+    $originalResult = Get-Content -Raw -LiteralPath (Join-Path $originalEvidence 'result.json') | ConvertFrom-Json
+    if (@($originalResult.matrix | Where-Object status -ne 'NOT_RUN').Count -ne 0 -or
+        -not $originalResult.cleanupPassed -or (Test-Path (Join-Path $originalEvidence 'artifacts/playwright.json')) -or
+        $originalPlan.deadline -ne $Deadline.ToUniversalTime().ToString('o')) {
+        throw '只允许零请求、浏览器未开始、已清理的启动失败沿用原截止时间恢复。'
+    }
+    $startupRecovery = @{ originalRunId = $originalPlan.runId; reason = 'BUDGET_FILE_OWNERSHIP'; providerAttemptsBeforeRecovery = 0 }
+    $planPath = Join-Path $ledgerDirectory 'agent-capability-resumed-plan.json'
+    if (Test-Path -LiteralPath $planPath) { throw '启动恢复已经执行，禁止再次重跑。' }
+} elseif ($ResumeBeforeFirstRequest) { throw '找不到需要恢复的原冻结计划。' }
 $matrix = @(Get-Content -Raw (Join-Path $evaluationDirectory 'scenarios.json') | ConvertFrom-Json | ForEach-Object { [ordered]@{ case = $_.id; sample = 1; status = 'NOT_RUN' } })
 $project = "customer-agent-$RunId"
 $tag = "gate-$RunId"
@@ -108,6 +123,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $evaluationDirectory 'scenarios.json'), (Join-Path $evaluationDirectory 'evaluation.spec.ts'), (Join-Path $evaluationDirectory 'collect.py'), (Join-Path $evaluationDirectory 'PLAN.md'), $PSCommandPath -Destination $evidence
     [ordered]@{
         schemaVersion = 'customer-agent-capabilities-20260915-v1'; scenarios = (Get-Content -Raw (Join-Path $evaluationDirectory 'scenarios.json') | ConvertFrom-Json); authorizationId = $AuthorizationId
+        startupRecovery = $startupRecovery
         runId = $RunId; testedHead = $TestedHead; model = $Model; communicationModel = $CommunicationModel; pricesByModel = $ledger.pricesByModel; providerVersions = $ProviderVersions
         limitMicros = $LimitMicros; currency = 'CNY'; maxAttempts = $MaxAttempts; maxTokens = $MaxTokens
         deadline = $Deadline.ToUniversalTime().ToString('o'); investigationWallClockMs = $InvestigationWallClockMs
