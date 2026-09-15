@@ -1,0 +1,52 @@
+{
+  "runId": "issue230-real-eval-20260915-corrected",
+  "head": "2bd502b564449a6c8201ebf303b9868fb9bf3f1e",
+  "authorizationId": "user-e2e-20260915-correction",
+  "outcome": "BROWSER_PASS",
+  "denominator": 8,
+  "matrix": [
+    {
+      "case": "under24",
+      "sample": 1,
+      "status": "PASS"
+    },
+    {
+      "case": "at24",
+      "sample": 1,
+      "status": "PASS"
+    },
+    {
+      "case": "at72",
+      "sample": 1,
+      "status": "PASS"
+    },
+    {
+      "case": "over72",
+      "sample": 1,
+      "status": "PASS"
+    },
+    {
+      "case": "cancelled",
+      "sample": 1,
+      "status": "PASS"
+    },
+    {
+      "case": "compensated",
+      "sample": 1,
+      "status": "PASS"
+    },
+    {
+      "case": "refunded_payment",
+      "sample": 1,
+      "status": "PASS"
+    },
+    {
+      "case": "split_refresh",
+      "sample": 1,
+      "status": "PASS"
+    }
+  ],
+  "metricsCollected": true,
+  "cleanupPassed": true,
+  "productAcceptance": true
+}

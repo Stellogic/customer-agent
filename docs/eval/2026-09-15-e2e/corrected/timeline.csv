@@ -1,0 +1,80 @@
+﻿场景ID,阶段,Unix毫秒,本例经过毫秒,补充数据
+under24,logged_in,1789478740747,713,null
+under24,intake_clicked,1789478741108,1074,null
+under24,intake_response,1789478745391,5357,"{""status"": ""READY_TO_CONFIRM""}"
+under24,confirmation_clicked,1789478745395,5361,null
+under24,tickets_created,1789478745512,5478,null
+under24,all_terminal,1789478756298,16264,"[{""ticketId"": ""775b7372-c4ca-4970-adb0-c2a336e14ea1"", ""status"": ""COMPLETED""}]"
+under24,visible_LOGISTICS_DELAY,1789478756850,16816,null
+under24,refreshed_LOGISTICS_DELAY,1789478757341,17307,null
+under24,checks_passed,1789478757341,17307,null
+at24,logged_in,1789478759356,466,null
+at24,intake_clicked,1789478760170,1280,null
+at24,intake_response,1789478764376,5486,"{""status"": ""READY_TO_CONFIRM""}"
+at24,confirmation_clicked,1789478764378,5488,null
+at24,tickets_created,1789478764485,5595,null
+at24,all_terminal,1789478772035,13145,"[{""ticketId"": ""fa34536d-3f7b-458c-937f-d05e8faf90b6"", ""status"": ""COMPLETED""}]"
+at24,visible_LOGISTICS_DELAY,1789478772528,13638,null
+at24,refreshed_LOGISTICS_DELAY,1789478773049,14159,null
+at24,checks_passed,1789478773049,14159,null
+at72,logged_in,1789478774869,465,null
+at72,intake_clicked,1789478775230,826,null
+at72,intake_response,1789478779206,4802,"{""status"": ""READY_TO_CONFIRM""}"
+at72,confirmation_clicked,1789478779208,4804,null
+at72,tickets_created,1789478779318,4914,null
+at72,all_terminal,1789478786858,12454,"[{""ticketId"": ""3f2bc994-4fc5-4ecc-a2e3-1595d7889cf4"", ""status"": ""COMPLETED""}]"
+at72,visible_LOGISTICS_DELAY,1789478787346,12942,null
+at72,refreshed_LOGISTICS_DELAY,1789478787880,13476,null
+at72,checks_passed,1789478787880,13476,null
+over72,logged_in,1789478789746,444,null
+over72,intake_clicked,1789478790563,1261,null
+over72,intake_response,1789478795100,5798,"{""status"": ""READY_TO_CONFIRM""}"
+over72,confirmation_clicked,1789478795103,5801,null
+over72,tickets_created,1789478795211,5909,null
+over72,all_terminal,1789478803828,14526,"[{""ticketId"": ""07ade3ff-4b36-4837-b481-710a3fdbdc1b"", ""status"": ""COMPLETED""}]"
+over72,visible_LOGISTICS_DELAY,1789478804319,15017,null
+over72,refreshed_LOGISTICS_DELAY,1789478804861,15559,null
+over72,checks_passed,1789478804861,15559,null
+cancelled,logged_in,1789478806597,413,null
+cancelled,intake_clicked,1789478807417,1233,null
+cancelled,intake_response,1789478811092,4908,"{""status"": ""READY_TO_CONFIRM""}"
+cancelled,confirmation_clicked,1789478811093,4909,null
+cancelled,tickets_created,1789478811192,5008,null
+cancelled,all_terminal,1789478814412,8228,"[{""ticketId"": ""15d20e28-09e4-45af-8a26-31863634d2cc"", ""status"": ""HANDED_OFF""}]"
+cancelled,visible_LOGISTICS_DELAY,1789478814886,8702,null
+cancelled,refreshed_LOGISTICS_DELAY,1789478815288,9104,null
+cancelled,checks_passed,1789478815288,9104,null
+compensated,logged_in,1789478816687,417,null
+compensated,intake_clicked,1789478817167,897,null
+compensated,intake_response,1789478821514,5244,"{""status"": ""READY_TO_CONFIRM""}"
+compensated,confirmation_clicked,1789478821515,5245,null
+compensated,tickets_created,1789478821613,5343,null
+compensated,all_terminal,1789478824833,8563,"[{""ticketId"": ""7710ae56-110d-4c83-88cb-1a122e211b09"", ""status"": ""HANDED_OFF""}]"
+compensated,visible_LOGISTICS_DELAY,1789478825319,9049,null
+compensated,refreshed_LOGISTICS_DELAY,1789478825746,9476,null
+compensated,checks_passed,1789478825746,9476,null
+refunded_payment,logged_in,1789478827215,425,null
+refunded_payment,intake_clicked,1789478827699,909,null
+refunded_payment,intake_response,1789478832993,6203,"{""status"": ""NEEDS_CLARIFICATION""}"
+refunded_payment,clarification_clicked,1789478833007,6217,"{""answer"": ""我看到两笔扣款，请核查重复扣款。""}"
+refunded_payment,clarification_response,1789478834706,7916,"{""status"": ""READY_TO_CONFIRM""}"
+refunded_payment,confirmation_clicked,1789478834708,7918,null
+refunded_payment,tickets_created,1789478834806,8016,null
+refunded_payment,all_terminal,1789478841794,15004,"[{""ticketId"": ""00ed4ffe-e2ec-4ede-a9e7-795e02f3715b"", ""status"": ""COMPLETED""}]"
+refunded_payment,visible_DUPLICATE_CHARGE,1789478842274,15484,null
+refunded_payment,refreshed_DUPLICATE_CHARGE,1789478842734,15944,null
+refunded_payment,checks_passed,1789478842734,15944,null
+split_refresh,logged_in,1789478844406,424,null
+split_refresh,intake_clicked,1789478844913,931,null
+split_refresh,intake_response,1789478848489,4507,"{""status"": ""NEEDS_CLARIFICATION""}"
+split_refresh,clarification_clicked,1789478848503,4521,"{""answer"": ""我看到两笔扣款，请核查重复扣款。物流也确实超过预计送达时间，两件事都请处理。""}"
+split_refresh,clarification_response,1789478850542,6560,"{""status"": ""READY_TO_CONFIRM""}"
+split_refresh,confirmation_clicked,1789478850543,6561,null
+split_refresh,tickets_created,1789478850665,6683,null
+split_refresh,all_terminal,1789478859872,15890,"[{""ticketId"": ""faa4dcdf-8a2b-463a-837e-568d3b56d310"", ""status"": ""COMPLETED""}, {""ticketId"": ""e0b9f78b-eba6-4f8c-86ec-43e936d361d0"", ""status"": ""COMPLETED""}]"
+split_refresh,visible_LOGISTICS_DELAY,1789478860384,16402,null
+split_refresh,refreshed_LOGISTICS_DELAY,1789478860925,16943,null
+split_refresh,visible_DUPLICATE_CHARGE,1789478861334,17352,null
+split_refresh,refreshed_DUPLICATE_CHARGE,1789478861776,17794,null
+split_refresh,support_claim_read_release,1789478864463,20481,null
+split_refresh,checks_passed,1789478865062,21080,null

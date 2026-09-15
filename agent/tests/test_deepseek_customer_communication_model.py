@@ -130,6 +130,61 @@ def _streamed(payload: dict[str, object], *, split_at: int | None = None) -> htt
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("ending", ["incomplete", "failed"])
+@pytest.mark.parametrize("has_usage", [True, False])
+async def test_payment_failed_terminal_preserves_usage_without_publishing(
+    tmp_path: Path, ending: str, has_usage: bool
+) -> None:
+    from test_customer_communication_model import _payment_input, _payment_reply
+
+    expected = _payment_reply()
+    payload = _completed(expected["body"], expected["intent"])
+    payload["status"] = ending
+    payload["output"][0]["content"][0]["text"] = json.dumps(expected, ensure_ascii=False)
+    if not has_usage:
+        del payload["usage"]
+    content = _streamed(payload).content.replace(
+        b"response.completed", f"response.{ending}".encode()
+    )
+    budget_path = tmp_path / "payment-budget.json"
+    budget = CoreValidationBudget.create(
+        budget_path,
+        authorization_id="offline-payment-terminal",
+        limit_micros=1_500_000,
+        max_attempts=2,
+        max_tokens=100_000,
+        deadline=datetime.now(UTC) + timedelta(minutes=1),
+    )
+    published: list[str] = []
+    model = DeepSeekResponsesCustomerCommunicationModel(
+        DeepSeekCustomerCommunicationConfig(api_key="synthetic-test-key"),
+        transport=httpx.MockTransport(
+            lambda _: httpx.Response(
+                200, headers={"Content-Type": "text/event-stream"}, content=content
+            )
+        ),
+        budget=budget,
+    )
+    with pytest.raises(CustomerCommunicationFailure):
+        await model.compose(_payment_input(), lambda delta: _capture(published, delta))
+
+    assert published == []
+    assert len(model.audit_sink.records) == 1
+    record = model.audit_sink.records[0]
+    assert record.provider_response_id == "response-c129"
+    assert record.response_status == ending
+    assert record.total_tokens == (110 if has_usage else None)
+    assert record.validation_diagnostic == {
+        "category": "PROVIDER_TERMINAL",
+        "path": "$.type",
+        "expected": "response.completed",
+        "actual_type": f"response.{ending}",
+    }
+    entry = json.loads(budget_path.read_text())["entries"][0]
+    assert entry["status"] == ("SETTLED" if has_usage else "PENDING")
+
+
+@pytest.mark.asyncio
 async def test_payment_stream_uses_same_authoritative_contract_and_buffers_publication() -> None:
     from test_customer_communication_model import _payment_input, _payment_reply
 

@@ -1,0 +1,60 @@
+{
+  "method": "离线核对已保存的真实运行附件和持久预算账本；0 新模型请求",
+  "originalResultUnchanged": true,
+  "proposalCases": [
+    {
+      "id": "under24",
+      "status": "CONTRACT_LIMIT_CONFIRMED",
+      "delayHours": "23",
+      "delaySeconds": "86399",
+      "note": "冻结计划假设小时向下取整与秒数可并存；当前 Agent 合同要求精确整小时。本次不把该转人工计为模型失败，也不改写原始 FAIL。"
+    },
+    {
+      "id": "at24",
+      "status": "SAVED_EVIDENCE_PASS",
+      "checks": [
+        "同代次完成",
+        "提案类型金额状态",
+        "提交命令accepted=true",
+        "提案创建审计一次",
+        "实际浏览器首个正文状态记录",
+        "执行数0"
+      ],
+      "notChecked": [
+        "本例刷新恢复：原脚本已提前失败，未执行"
+      ],
+      "changesOriginalStatus": false
+    },
+    {
+      "id": "at72",
+      "status": "SAVED_EVIDENCE_PASS",
+      "checks": [
+        "同代次完成",
+        "提案类型金额状态",
+        "提交命令accepted=true",
+        "提案创建审计一次",
+        "实际浏览器首个正文状态记录",
+        "执行数0"
+      ],
+      "notChecked": [
+        "本例刷新恢复：原脚本已提前失败，未执行"
+      ],
+      "changesOriginalStatus": false
+    },
+    {
+      "id": "over72",
+      "status": "CONTRACT_LIMIT_CONFIRMED",
+      "delayHours": "72",
+      "delaySeconds": "259201",
+      "note": "冻结计划假设小时向下取整与秒数可并存；当前 Agent 合同要求精确整小时。本次不把该转人工计为模型失败，也不改写原始 FAIL。"
+    }
+  ],
+  "ledgerChecks": {
+    "attempts": 22,
+    "tokens": 25819,
+    "costMicros": 278793,
+    "knownUsageEntries": 22,
+    "independentCollectorReconciliation": false
+  },
+  "executionCountAcrossAllSnapshots": 0
+}

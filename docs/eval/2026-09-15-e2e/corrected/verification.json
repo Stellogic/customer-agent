@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "checks": [
+    "31 unique calls match metrics and ledger",
+    "36096 tokens and 394812 micro-CNY reconcile",
+    "31 calls attributed by authoritative IDs",
+    "8 passed cases with refresh checks",
+    "split support claim/read/release completed",
+    "8 screenshots present",
+    "no browser errors",
+    "no compensation executions",
+    "owned resources absent",
+    "no actual configured provider secret in text artifacts"
+  ],
+  "newProviderCalls": 0
+}

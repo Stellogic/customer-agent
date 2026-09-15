@@ -1,0 +1,81 @@
+﻿场景ID,名称,结果,整例毫秒,确认至终态毫秒,确认至正文UI毫秒,请求数,已知token,估算元,错误
+under24,延迟23小时59分59秒，查询物流,FAIL,10516,3366,,2,2899,0.029817,"Error: {""ticket"":{""id"":""3e82ef45-0d41-40a9-aa09-3f8c95fdf9fd"",""issueKind"":""LOGISTICS_DELAY"",""handlingMode"":""HUMAN"",""lifecycleState"":""INVESTIGATING"",""reason"":""FACT_CONFLICT""},""terminal"":{""ticketId"":""3e82ef45-0d41-40a9-aa09-3f8c95fdf9fd"",""status"":""HANDED_OFF""}}
+
+expect(received).toBe(expected) // Object.is equality
+
+Expected: ""COMPLETED""
+Received: ""HANDED_OFF""
+
+  212 |           ).toBe(true);
+  213 |         } else {
+> 214 |           expect(terminal.status, JSON.stringify({ ticket, terminal })).toBe(""COMPLETED"");
+      |                                                                         ^
+  215 |           expect(
+  216 |             (state.audit ?? []).filter(
+  217 |               (a: { ticket_id: string; event_type: string }) =>
+    at /app/e2e/new-e2e.spec.ts:214:73"
+at24,恰好24小时，申请物流补偿,FAIL,13419,7097,5229,4,4284,0.047196,"Error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+Received array:  []
+
+  218 |                 a.ticket_id === ticket.id && a.event_type === ""AGENT_CONCLUSION_ACCEPTED"",
+  219 |             ),
+> 220 |           ).toHaveLength(1);
+      |             ^
+  221 |           const proposals = (state.proposals ?? []).filter(
+  222 |             (p: { ticketId: string }) => p.ticketId === ticket.id,
+  223 |           );
+    at /app/e2e/new-e2e.spec.ts:220:13"
+at72,恰好72小时，券档位上边界,FAIL,15446,8211,5522,4,4285,0.047601,"Error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+Received array:  []
+
+  218 |                 a.ticket_id === ticket.id && a.event_type === ""AGENT_CONCLUSION_ACCEPTED"",
+  219 |             ),
+> 220 |           ).toHaveLength(1);
+      |             ^
+  221 |           const proposals = (state.proposals ?? []).filter(
+  222 |             (p: { ticketId: string }) => p.ticketId === ticket.id,
+  223 |           );
+    at /app/e2e/new-e2e.spec.ts:220:13"
+over72,72小时加1秒，转部分退款档位,FAIL,9799,3299,,2,2986,0.03096,"Error: {""ticket"":{""id"":""1b302ccc-0dfb-4c3c-a6b3-dfb55f9305a5"",""issueKind"":""LOGISTICS_DELAY"",""handlingMode"":""HUMAN"",""lifecycleState"":""INVESTIGATING"",""reason"":""FACT_CONFLICT""},""terminal"":{""ticketId"":""1b302ccc-0dfb-4c3c-a6b3-dfb55f9305a5"",""status"":""HANDED_OFF""}}
+
+expect(received).toBe(expected) // Object.is equality
+
+Expected: ""COMPLETED""
+Received: ""HANDED_OFF""
+
+  212 |           ).toBe(true);
+  213 |         } else {
+> 214 |           expect(terminal.status, JSON.stringify({ ticket, terminal })).toBe(""COMPLETED"");
+      |                                                                         ^
+  215 |           expect(
+  216 |             (state.audit ?? []).filter(
+  217 |               (a: { ticket_id: string; event_type: string }) =>
+    at /app/e2e/new-e2e.spec.ts:214:73"
+cancelled,已取消订单仍要求物流补偿,PASS,9671,2780,,2,2952,0.030402,
+compensated,已有补偿记录，再次要求补偿,PASS,10523,3415,,2,3015,0.031023,
+refunded_payment,已全额退款，客户怀疑重复扣款,PASS,16909,7649,7520,4,4197,0.047655,
+split_refresh,36小时物流延迟和重复扣款，同订单拆票恢复,FAIL,9506,,,2,1201,0.014139,"Error: expect(received).toEqual(expected) // deep equality
+
+- Expected  - 1
++ Received  + 1
+
+  Array [
+    ""DUPLICATE_CHARGE"",
+-   ""LOGISTICS_DELAY"",
++   ""PACKAGE_NOT_RECEIVED"",
+  ]
+
+  153 |       }
+  154 |       expect(intake.status).toBe(""READY_TO_CONFIRM"");
+> 155 |       expect(intake.issues.map((i: { kind: string }) => i.kind).sort()).toEqual(
+      |                                                                         ^
+  156 |         scenario.expected === ""split""
+  157 |           ? [""DUPLICATE_CHARGE"", ""LOGISTICS_DELAY""]
+  158 |           : [scenario.expected === ""payment"" ? ""DUPLICATE_CHARGE"" : ""LOGISTICS_DELAY""],
+    at /app/e2e/new-e2e.spec.ts:155:73"

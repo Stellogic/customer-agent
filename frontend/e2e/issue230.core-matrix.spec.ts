@@ -98,14 +98,18 @@ async function createPaymentIntake(page: Page, reference: string, split: boolean
 }
 
 async function complete(ticketId: string, generation = 1) {
+  let status = "";
   await expect
     .poll(
-      () =>
-        queryFixtureSql(`SELECT status FROM agent_processing_generation
-    WHERE ticket_id = '${ticketId}' AND generation_number = ${generation};`),
+      () => {
+        status = queryFixtureSql(`SELECT status FROM agent_processing_generation
+    WHERE ticket_id = '${ticketId}' AND generation_number = ${generation};`);
+        return status;
+      },
       { timeout: 120_000 },
     )
-    .toBe("COMPLETED");
+    .toMatch(/^(COMPLETED|HANDED_OFF|SUPERSEDED)$/);
+  expect(status, `工单 ${ticketId} 第 ${generation} 代未成功完成`).toBe("COMPLETED");
 }
 
 async function verifyLogistics(

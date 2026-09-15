@@ -1,0 +1,84 @@
+[
+  {
+    "fault": "valid",
+    "error": null,
+    "classification": null,
+    "responseId": "response-c129",
+    "responseStatus": "completed",
+    "tokens": 110,
+    "diagnostic": null,
+    "budgetStatus": "SETTLED",
+    "suppliedUsage": 110
+  },
+  {
+    "fault": "incomplete_with_usage",
+    "error": "MODEL_CALL_FAILED",
+    "classification": "SCHEMA_MISMATCH",
+    "responseId": null,
+    "responseStatus": null,
+    "tokens": null,
+    "diagnostic": null,
+    "budgetStatus": "PENDING",
+    "suppliedUsage": 110
+  },
+  {
+    "fault": "failed_with_usage",
+    "error": "MODEL_CALL_FAILED",
+    "classification": "SCHEMA_MISMATCH",
+    "responseId": null,
+    "responseStatus": null,
+    "tokens": null,
+    "diagnostic": null,
+    "budgetStatus": "PENDING",
+    "suppliedUsage": 110
+  },
+  {
+    "fault": "duplicate_sequence",
+    "error": "MODEL_CALL_FAILED",
+    "classification": "SCHEMA_MISMATCH",
+    "responseId": null,
+    "responseStatus": null,
+    "tokens": null,
+    "diagnostic": null,
+    "budgetStatus": "PENDING",
+    "suppliedUsage": 110
+  },
+  {
+    "fault": "missing_sequence",
+    "error": "MODEL_CALL_FAILED",
+    "classification": "SCHEMA_MISMATCH",
+    "responseId": null,
+    "responseStatus": null,
+    "tokens": null,
+    "diagnostic": null,
+    "budgetStatus": "PENDING",
+    "suppliedUsage": 110
+  },
+  {
+    "fault": "eof_without_terminal",
+    "error": "MODEL_CALL_FAILED",
+    "classification": "SCHEMA_MISMATCH",
+    "responseId": null,
+    "responseStatus": null,
+    "tokens": null,
+    "diagnostic": null,
+    "budgetStatus": "PENDING",
+    "suppliedUsage": null
+  },
+  {
+    "fault": "completed_bad_schema",
+    "error": "MODEL_CALL_FAILED",
+    "classification": "SCHEMA_MISMATCH",
+    "responseId": "response-c129",
+    "responseStatus": "completed",
+    "tokens": 110,
+    "diagnostic": {
+      "category": "REQUIRED",
+      "path": "$.schemaVersion",
+      "expected": "present",
+      "actual_type": "missing"
+    },
+    "budgetStatus": "SETTLED",
+    "suppliedUsage": 110
+  }
+]
