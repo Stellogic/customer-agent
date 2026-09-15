@@ -1,0 +1,219 @@
+[
+  {
+    "id": "natural_status",
+    "title": "正文识别订单，口语物流询问与秒级事实",
+    "description": "{A} 这单配送比预计时间晚了，物流一直没更新，请查一下现在是什么状态，具体晚了多久。",
+    "clarification": "我确认这单物流延迟，请核对当前物流状态和延迟时长。",
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 86399,
+        "kinds": ["LOGISTICS_DELAY"],
+        "outcome": "no_compensation"
+      }
+    ],
+    "qualityFocus": "正面说明当前物流状态与精确延迟；不足24小时不等于已经解决客户诉求。"
+  },
+  {
+    "id": "natural_proposal",
+    "title": "正文识别订单，物流处理方案保留72小时加1秒",
+    "description": "{A} 的配送已经超过预计时间，物流更新延迟，请核实订单后说明处理方案和补偿流程。",
+    "clarification": "确认是物流延迟，请核实这笔订单的处理方案。",
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 259201,
+        "kinds": ["LOGISTICS_DELAY"],
+        "outcome": "proposal",
+        "method": "SIMULATED_PARTIAL_REFUND",
+        "amount": 9.9
+      }
+    ],
+    "qualityFocus": "解释尚待审批，不能宣称已发放或已退款；政策档位以秒为准。"
+  },
+  {
+    "id": "ambiguous_order",
+    "title": "缺少订单与问题时先澄清，再保留客户补充",
+    "description": "我的订单有点问题，帮我看看。",
+    "initialClarificationRequired": true,
+    "initialOrderUnknown": true,
+    "initialKinds": [],
+    "clarification": "是 {A}，配送确实超过了预计送达时间，物流轨迹更新延迟，请调查物流延迟。",
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 129600,
+        "kinds": ["LOGISTICS_DELAY"],
+        "outcome": "proposal",
+        "method": "COUPON",
+        "amount": 10
+      }
+    ],
+    "qualityFocus": "首次不猜订单或问题；补充后明确复述本次订单和物流问题。"
+  },
+  {
+    "id": "clarification_denied",
+    "title": "否认疑似重复扣款后仅保留已确认物流问题",
+    "description": "{A} 物流确实延迟，而且我怀疑可能多扣了一笔款。",
+    "initialClarificationRequired": true,
+    "initialKinds": ["LOGISTICS_DELAY"],
+    "clarification": "我查清楚了，没有重复扣款，只扣了一次，请只处理物流延迟。",
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 129600,
+        "kinds": ["LOGISTICS_DELAY"],
+        "outcome": "proposal",
+        "method": "COUPON",
+        "amount": 10
+      }
+    ],
+    "qualityFocus": "理解否定，不新增支付票，不把已经否认的扣款疑虑当作事实。"
+  },
+  {
+    "id": "split_asserted",
+    "title": "同一订单两个明确问题分别调查",
+    "description": "{A} 配送超过预计送达时间，物流轨迹更新延迟；另外我看到两笔扣款，请分别核查物流延迟和重复扣款。",
+    "clarification": "我看到两笔扣款，物流也确实延迟，两件事都请核查。",
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 129600,
+        "duplicate": true,
+        "kinds": ["LOGISTICS_DELAY", "DUPLICATE_CHARGE"],
+        "outcome": "proposal",
+        "method": "COUPON",
+        "amount": 10
+      }
+    ],
+    "qualityFocus": "两票分别回答本票问题，不将物流政策当支付依据，不宣称已证实重复扣款。"
+  },
+  {
+    "id": "two_orders",
+    "title": "一句话两订单逐单确认，保持各自时长与方案",
+    "description": "{A} 的物流延迟需要调查；{B} 的物流也超过预计送达时间了，请分开处理这两笔订单。",
+    "clarification": "这两笔订单都确实物流延迟，请先处理当前候选订单，再继续另一笔。",
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 129600,
+        "kinds": ["LOGISTICS_DELAY"],
+        "outcome": "proposal",
+        "method": "COUPON",
+        "amount": 10
+      },
+      {
+        "slot": "B",
+        "delaySeconds": 288000,
+        "kinds": ["LOGISTICS_DELAY"],
+        "outcome": "proposal",
+        "method": "SIMULATED_PARTIAL_REFUND",
+        "amount": 9.9
+      }
+    ],
+    "qualityFocus": "先A再B，第二单保留原始诉求，不能串用第一单的36小时时长或10元方案。"
+  },
+  {
+    "id": "payment_affirmed",
+    "title": "客户肯定疑似扣款后核对未退款状态",
+    "description": "{A} 我怀疑这笔订单被扣了两次款，请帮我核对。",
+    "initialClarificationRequired": true,
+    "initialKinds": [],
+    "clarification": "我在账单里看到了两笔扣款，请继续调查重复扣款。",
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 0,
+        "duplicate": true,
+        "kinds": ["DUPLICATE_CHARGE"],
+        "outcome": "payment"
+      }
+    ],
+    "qualityFocus": "区分客户观察、已支付/未全额退款事实和未证实逐笔扣款原因；说明人工核查。"
+  },
+  {
+    "id": "payment_refunded",
+    "title": "已全额退款仍需调查客户报告的两笔扣款",
+    "description": "{A} 我看到两笔扣款，请核对支付和退款记录，并说明这是否能证明重复扣款已经处理好了。",
+    "clarification": "我看到两笔扣款，请核查这个重复扣款问题。",
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 0,
+        "duplicate": true,
+        "refunded": true,
+        "kinds": ["DUPLICATE_CHARGE"],
+        "outcome": "payment"
+      }
+    ],
+    "qualityFocus": "明确全额退款记录不证明重复扣款原因已查实或本次问题已解决。"
+  },
+  {
+    "id": "followup_details",
+    "title": "首轮完成后追加具体问题，结合对话继续调查",
+    "description": "订单 {A} 的物流延迟问题：请解释物流状态",
+    "clarification": "请解释物流状态。",
+    "followup": "补充一下，最后一次物流更新是昨天下午。请结合刚才的调查告诉我当前状态，以及我还应该在这张工单补充哪些信息。",
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 43200,
+        "kinds": ["LOGISTICS_DELAY"],
+        "outcome": "no_compensation"
+      }
+    ],
+    "qualityFocus": "第二次回复正面回应新增时间和缺失信息，不将客户时间陈述伪装为系统事实，不只重复首轮结论。"
+  },
+  {
+    "id": "human_preference",
+    "title": "自然语言明确人工偏好后停止自主公开回复",
+    "description": "订单 {A} 的物流延迟问题：请解释物流状态",
+    "clarification": "请解释物流状态。",
+    "followup": "请转人工客服继续处理，我希望由人工客服核查这个问题。",
+    "humanPreference": true,
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 43200,
+        "kinds": ["LOGISTICS_DELAY"],
+        "outcome": "no_compensation"
+      }
+    ],
+    "qualityFocus": "识别客户人工意愿并保留上下文；交接系统消息不算Agent正文。"
+  },
+  {
+    "id": "supplemental_help",
+    "title": "物流调查中的补充规则与配送知识，区分已知和未知",
+    "description": "{A} 物流更新延迟，请核查当前物流；我想知道这单修改地址和取消的规则，只解释不要操作。另外请查配送信息补充指南，告诉我要补充什么，并说明能否确定明天几点送到。",
+    "clarification": "物流确实延迟，请继续核查当前订单规则和配送信息补充方法，不要修改订单。",
+    "supplemental": true,
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 129600,
+        "kinds": ["LOGISTICS_DELAY"],
+        "outcome": "proposal",
+        "method": "COUPON",
+        "amount": 10
+      }
+    ],
+    "qualityFocus": "记录模型是否按需要选择补充规则/知识；指南引用应支持补充节点时间，不能编造准确送达时刻。没有检索或内容不足如实记能力不足。"
+  },
+  {
+    "id": "signed_not_received",
+    "title": "签收未收到与普通物流延迟区分，旧路径独立记录",
+    "description": "{A} 物流显示已经签收，但我本人没有收到包裹，请核实签收情况。",
+    "clarification": "确认显示签收但我没有收到，请调查包裹未收到这一个问题。",
+    "legacy": true,
+    "orders": [
+      {
+        "slot": "A",
+        "delaySeconds": 0,
+        "logisticsStatus": "SIGNED",
+        "kinds": ["PACKAGE_NOT_RECEIVED"],
+        "outcome": "signed_handoff"
+      }
+    ],
+    "qualityFocus": "只建包裹未收到票，结合SIGNED事实说明争议与人工后续，不自动认定已收到、丢失或已解决。"
+  }
+]
