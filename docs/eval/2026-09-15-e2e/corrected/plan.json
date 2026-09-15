@@ -1,0 +1,188 @@
+{
+  "schemaVersion": "customer-agent-e2e-20260915-v1",
+  "scenarios": [
+    {
+      "id": "under24",
+      "title": "延迟23小时，查询物流",
+      "delaySeconds": 82800,
+      "description": "请解释物流状态",
+      "expected": "no_compensation",
+      "expectedTickets": 1
+    },
+    {
+      "id": "at24",
+      "title": "恰好24小时，申请物流补偿",
+      "delaySeconds": 86400,
+      "description": "物流延迟，请核实订单后说明处理方案。",
+      "expected": "proposal",
+      "method": "COUPON",
+      "amount": 10,
+      "expectedTickets": 1
+    },
+    {
+      "id": "at72",
+      "title": "恰好72小时，券档位上边界",
+      "delaySeconds": 259200,
+      "description": "物流一直延迟，请查询后给出处理方案。",
+      "expected": "proposal",
+      "method": "COUPON",
+      "amount": 20,
+      "expectedTickets": 1
+    },
+    {
+      "id": "over72",
+      "title": "延迟73小时，部分退款档位",
+      "delaySeconds": 262800,
+      "description": "物流延迟还没到，请核实后说明补偿方案。",
+      "expected": "proposal",
+      "method": "SIMULATED_PARTIAL_REFUND",
+      "amount": 9.9,
+      "expectedTickets": 1
+    },
+    {
+      "id": "cancelled",
+      "title": "已取消订单仍要求物流补偿",
+      "delaySeconds": 288000,
+      "cancelled": true,
+      "description": "订单已经取消了，但之前物流延迟，请核查还能否补偿。",
+      "expected": "human_no_proposal",
+      "expectedTickets": 1
+    },
+    {
+      "id": "compensated",
+      "title": "已有补偿记录，再次要求补偿",
+      "delaySeconds": 288000,
+      "existingCompensation": true,
+      "description": "物流延迟的这笔订单之前补偿过，请核查还能否再补偿。",
+      "expected": "human_no_proposal",
+      "expectedTickets": 1
+    },
+    {
+      "id": "refunded_payment",
+      "title": "已全额退款，客户怀疑重复扣款",
+      "delaySeconds": 172800,
+      "refunded": true,
+      "duplicate": true,
+      "description": "我怀疑这笔订单扣了两次款，请核对支付和退款记录。",
+      "expected": "payment",
+      "expectedTickets": 1
+    },
+    {
+      "id": "split_refresh",
+      "title": "36小时物流延迟和重复扣款，同订单拆票恢复",
+      "delaySeconds": 129600,
+      "duplicate": true,
+      "description": "订单配送已经超过预计送达时间，物流轨迹更新延迟，另外我看到两笔扣款，请分别核查物流延迟和重复扣款。",
+      "expected": "split",
+      "method": "COUPON",
+      "amount": 10,
+      "expectedTickets": 2
+    }
+  ],
+  "authorizationId": "user-e2e-20260915-correction",
+  "runId": "issue230-real-eval-20260915-corrected",
+  "testedHead": "2bd502b564449a6c8201ebf303b9868fb9bf3f1e",
+  "model": "deepseek-v4-pro",
+  "communicationModel": "deepseek-v4-pro",
+  "pricesByModel": {
+    "deepseek-v4-pro": {
+      "inputMicrosPerToken": 9,
+      "outputMicrosPerToken": 27
+    }
+  },
+  "providerVersions": {
+    "communication": {
+      "schema": "customer-reply-v1",
+      "prompt": "customer-communication-v5"
+    },
+    "judgment": {
+      "schema": "investigation-judgment-v1",
+      "prompt": "investigation-judgment-v2"
+    },
+    "action": {
+      "schema": "investigation-action-v4",
+      "prompt": "investigation-action-v7"
+    },
+    "intake": {
+      "schema": [
+        "customer_intake_clarification",
+        "customer_intake_issue_assessments",
+        "customer_intake_understanding"
+      ],
+      "prompt": "intake-v4"
+    }
+  },
+  "limitMicros": 1000000,
+  "currency": "CNY",
+  "maxAttempts": 58,
+  "maxTokens": 130000,
+  "deadline": "2026-09-15T22:09:38.446234+08:00",
+  "investigationWallClockMs": 30000,
+  "denominator": 8,
+  "matrix": [
+    {
+      "case": "under24",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "at24",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "at72",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "over72",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "cancelled",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "compensated",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "refunded_payment",
+      "sample": 1,
+      "status": "NOT_RUN"
+    },
+    {
+      "case": "split_refresh",
+      "sample": 1,
+      "status": "NOT_RUN"
+    }
+  ],
+  "selectedCase": "",
+  "selectedSample": "",
+  "retries": 0,
+  "maxFailures": 0,
+  "continueOnCaseFailure": true,
+  "workers": 1,
+  "sideEffects": [
+    "创建本轮合成订单与工单",
+    "发布客户公开回复",
+    "客服领取并释放本轮支付工单",
+    "创建待审批提案；不批准或执行补偿"
+  ],
+  "notes": [
+    "输入预算是程序工程预留，不是供应商数学上界。",
+    "供应商费用未知时保留预留并停止，不换账本重跑。"
+  ],
+  "effectiveInvestigationLimits": {
+    "AGENT_INVESTIGATION_MAX_ACTIONS": "8",
+    "AGENT_INVESTIGATION_MAX_WALL_CLOCK_MS": "30000",
+    "AGENT_INVESTIGATION_MAX_TOKENS": "4000",
+    "AGENT_INVESTIGATION_MAX_COST_MICROS": "100000",
+    "AGENT_INVESTIGATION_MAX_PROVIDER_ATTEMPTS": "8",
+    "AGENT_INVESTIGATION_MAX_REPEATED_ACTIONS": "0"
+  }
+}
